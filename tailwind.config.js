@@ -216,7 +216,7 @@ module.exports = {
         'ui': `ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"`.split(', '),
         'sans': [`"GT-Walsheim-Regular"`, 'sans-serif'],
         'serif': `Constantia, "Lucida Bright", Lucidabright, "Lucida Serif", Lucida, "DejaVu Serif", "Bitstream Vera Serif", "Liberation Serif", Georgia, serif`.split(', '),
-        'mono': [`'Cutive Mono'`, ...defaultTheme.fontFamily.mono],
+        'mono-brand': [`'Cutive Mono'`, 'monospace'],
       },
 
       // https://github.com/tailwindlabs/tailwindcss-typography#customization
