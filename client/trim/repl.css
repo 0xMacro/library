@@ -1,0 +1,16 @@
+.repl-input {
+  outline: none;
+  @apply p-5 border border-transparent font-mono focus:border-gray-800;
+  @apply dark:bg-cool-gray-600;
+}
+.pre-output {
+  margin-top: 0;
+  min-width: 0;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bg-output {
+  background: #f2f2f2;
+  @apply dark:bg-cool-gray-700;
+}
