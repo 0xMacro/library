@@ -26,7 +26,7 @@ console.log("WHAT")
 const App = cc(function() {
   let chainId = null
   let message = ''
-  let signedMessage = null
+  let messageSig = null
 
   let verifyMsg = ''
   let verifySig = ''
@@ -54,7 +54,7 @@ const App = cc(function() {
         return
       }
     }
-    signedMessage = await signer.signMessage(message)
+    messageSig = await signer.signMessage(message)
     m.redraw()
   }
 
@@ -75,7 +75,7 @@ const App = cc(function() {
         <textarea
           placeholder="Message to sign"
           class="mt-1 input flex-1 flex-shrink-0 w-full"
-          onchange={e => message = e.target.value}
+          oninput={e => message = e.target.value}
         >{message}</textarea>
 
         <div class="flex justify-end">
@@ -88,10 +88,10 @@ const App = cc(function() {
           </button>
         </div>
 
-        {signedMessage &&
+        {messageSig &&
           <div>
-            <h3>Signed message:</h3>
-            <pre>{signedMessage}</pre>
+            <h3>Message signature:</h3>
+            <pre>{messageSig}</pre>
           </div>
         }
       </div>
