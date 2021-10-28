@@ -9,26 +9,12 @@ window.signer = signer
 window.ethers = ethers
 window.provider = provider
 
-console.log("WHAT")
-
-// async function connectToMetamask() {
-//   try {
-//     console.log("Signed in", await signer.getAddress())
-//   }
-//   catch(err) {
-//     console.log("Not signed in")
-//     await provider.send("eth_requestAccounts", [])
-//   }
-// }
-
-
-
 const App = cc(function() {
   let chainId = null
-  let message = ''
+  let message = m.parseQueryString(window.location.search.slice(1)).m
   let messageSig = null
+  let messageSigSigner = null
 
-  let verifyMsg = ''
   let verifySig = ''
   let verifyStatus = null
 
@@ -43,7 +29,7 @@ const App = cc(function() {
 
   async function sign() {
     try {
-      await signer.getAddress()
+      messageSigSigner = await signer.getAddress()
     }
     catch (err) {
       try {
@@ -59,12 +45,12 @@ const App = cc(function() {
   }
 
   async function verifyMessage() {
-    if (!verifyMsg || !verifySig) {
+    if (!message || !verifySig) {
       verifyStatus = null
     }
     else {
       try {
-        verifyStatus = ethers.utils.verifyMessage(verifyMsg, verifySig)
+        verifyStatus = ethers.utils.verifyMessage(message, verifySig)
       }
       catch(err) {
         verifyStatus = 'invalid'
@@ -123,10 +109,10 @@ const App = cc(function() {
           class="mt-1 input flex-1 flex-shrink-0 w-full"
           placeholder="Message to verify"
           oninput={e => {
-            verifyMsg = e.target.value
+            message = e.target.value
             verifyMessage()
           }}
-        ></textarea>
+        >{message}</textarea>
         <input
           type="text"
           class="input"
