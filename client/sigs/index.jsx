@@ -11,23 +11,15 @@ window.provider = provider
 
 console.log("WHAT")
 
-
-// Kick things off
-go()
-
-async function go() {
-  await connectToMetamask()
-}
-
-async function connectToMetamask() {
-  try {
-    console.log("Signed in", await signer.getAddress())
-  }
-  catch(err) {
-    console.log("Not signed in")
-    await provider.send("eth_requestAccounts", [])
-  }
-}
+// async function connectToMetamask() {
+//   try {
+//     console.log("Signed in", await signer.getAddress())
+//   }
+//   catch(err) {
+//     console.log("Not signed in")
+//     await provider.send("eth_requestAccounts", [])
+//   }
+// }
 
 
 
@@ -54,8 +46,13 @@ const App = cc(function() {
       await signer.getAddress()
     }
     catch (err) {
-      alert('Please connect your metamask address')
-      return
+      try {
+        await provider.send("eth_requestAccounts", [])
+      }
+      catch (err) {
+        alert('Please connect your metamask address')
+        return
+      }
     }
     signedMessage = await signer.signMessage(message)
     m.redraw()
