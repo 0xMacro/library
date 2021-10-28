@@ -59,19 +59,26 @@ const App = cc(function() {
   }
 
   async function verifyMessage() {
-    if (!verifyMsg || !verifySig) return
-    try {
-      verifyStatus = ethers.utils.verifyMessage(verifyMsg, verifySig)
+    if (!verifyMsg || !verifySig) {
+      verifyStatus = null
     }
-    catch(err) {
-      verifyStatus = 'invalid'
+    else {
+      try {
+        verifyStatus = ethers.utils.verifyMessage(verifyMsg, verifySig)
+      }
+      catch(err) {
+        verifyStatus = 'invalid'
+      }
     }
+    m.redraw()
   }
+
+  let recentlyCopied = false
 
   return () => (
     <div class="p-4">
       <div>
-        <h3>Create Signature</h3>
+        <h2 class="dark:text-gray-200">Create Signature</h2>
         <textarea
           placeholder="Message to sign"
           class="mt-1 input flex-1 flex-shrink-0 w-full"
@@ -90,8 +97,20 @@ const App = cc(function() {
 
         {messageSig &&
           <div>
-            <h3>Message signature:</h3>
-            <pre>{messageSig}</pre>
+            <h3 class="dark:text-gray-200">Message signature:</h3>
+            <textarea id="messageSigOutput" class="input w-full">{messageSig}</textarea>
+            <button
+              class="btn"
+              onclick={() => {
+                messageSigOutput.focus()
+                messageSigOutput.select()
+                document.execCommand("copy")
+                recentlyCopied = true
+                setTimeout(() => { recentlyCopied = false; m.redraw() }, 2600)
+              }}
+            >
+              {recentlyCopied ? 'Copied!' : 'Copy to Clipboard'}
+            </button>
           </div>
         }
       </div>
@@ -99,12 +118,11 @@ const App = cc(function() {
       <hr class="mt-8" />
 
       <div class="mt-8">
-        <h3>Verify Signature</h3>
+        <h2 class="dark:text-gray-200">Verify Signature</h2>
         <textarea
           class="mt-1 input flex-1 flex-shrink-0 w-full"
           placeholder="Message to verify"
-          onkeypress={() => verifyStatus = null}
-          onchange={e => {
+          oninput={e => {
             verifyMsg = e.target.value
             verifyMessage()
           }}
@@ -113,9 +131,12 @@ const App = cc(function() {
           type="text"
           class="input"
           placeholder="Message signature"
-          onkeypress={() => verifyStatus = null}
+          oninput={e => {
+            verifySig = e.target.value
+            verifyMessage()
+          }}
         />
-        <div class="mt-2 text-sm">
+        <div class="mt-2 text-sm dark:text-gray-200">
           {
             verifyStatus === null ? 'Please enter message and signature' :
             verifyStatus === 'invalid' ? 'Invalid signature' :

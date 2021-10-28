@@ -1,6 +1,6 @@
 
 .btn {
-  @apply text-sm bg-gray-800 text-gray-100 py-1 px-2 rounded-sm;
+  @apply text-sm bg-gray-800 dark:bg-gray-200 text-gray-100 dark:text-gray-800 py-1 px-2 rounded-sm;
 }
 .btn[disabled] {
   cursor: not-allowed;
@@ -12,5 +12,5 @@ input[type="text"].input,
 input[type="email"].input {
   outline: none;
   @apply p-2 border border-transparent font-mono focus:border-gray-800;
-  @apply dark:bg-cool-gray-600;
+  @apply dark:bg-cool-gray-600 dark:text-gray-100;
 }
