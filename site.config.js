@@ -11,4 +11,7 @@ module.exports = {
     'stream': 'npm:stream-browserify',
     'immediate': 'npm:immediate', // No idea why this is needed, probably esbuild related
   },
+
+  jsxFactory: 'm',
+  jsxFragment: '"["',
 }

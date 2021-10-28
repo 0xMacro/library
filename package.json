@@ -23,6 +23,8 @@
     "ethers": "^5.4.7",
     "events": "^3.3.0",
     "immediate": "^3.3.0",
+    "mithril": "^2.0.4",
+    "mithril-cc": "^0.9.9",
     "path-browserify": "^1.0.1",
     "process": "^0.11.10",
     "stream-browserify": "^3.0.0",
