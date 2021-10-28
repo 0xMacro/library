@@ -34,6 +34,7 @@ const App = cc(function() {
     catch (err) {
       try {
         await provider.send("eth_requestAccounts", [])
+        messageSigSigner = await signer.getAddress()
       }
       catch (err) {
         alert('Please connect your metamask address')
@@ -97,6 +98,7 @@ const App = cc(function() {
             >
               {recentlyCopied ? 'Copied!' : 'Copy to Clipboard'}
             </button>
+            <div class="mt-4 text-xs dark:text-gray-200">Signed by address: <code>{messageSigSigner}</code></div>
           </div>
         }
       </div>
