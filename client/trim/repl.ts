@@ -68,6 +68,8 @@ async function runContract(code: string) {
     data: code,
   }
   const {createdAddress, results: results1} = (await runTx(vm, txData1, privateKey))!
+
+  outputPanel.scrollTop = 0 // Reset position before editing content
   report(outputCreate, results1)
 
   // The second transaction calls that contract
@@ -129,6 +131,7 @@ async function runTx(vm: VM, txData, privateKey) {
 const languageSelect = document.getElementById('languageSelect') as HTMLSelectElement
 
 const input = document.getElementById('input') as HTMLTextAreaElement
+const outputPanel = document.getElementById('outputPanel')!
 const errorOutput = document.getElementById('errorOutput')!
 const outputCreate = document.getElementById('outputCreate')!
 
@@ -146,7 +149,7 @@ const callElems = [
 ]
 
 async function update() {
-  errorOutput.style.display = 'none'
+  errorOutput.innerText = 'No compile errors.'
   try {
     const code = languageSelect.value === 'trim'
       ? compileTrim(input.value, { opcodes })
@@ -287,5 +290,4 @@ function pad(str, len, char='0') {
 function reportError(err) {
   console.error('Runtime error', err)
   errorOutput.innerText = err.message
-  errorOutput.style.display = 'block'
 }
