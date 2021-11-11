@@ -1,7 +1,7 @@
 .repl-input {
   outline: none;
   @apply p-5 border border-transparent font-mono focus:border-gray-800;
-  @apply dark:bg-cool-gray-600;
+  @apply dark:text-cool-gray-150 dark:bg-cool-gray-600;
 }
 .pre-output {
   margin-top: 0;
@@ -12,5 +12,5 @@
 }
 .bg-output {
   background: #f2f2f2;
-  @apply dark:bg-cool-gray-700;
+  @apply dark:text-cool-gray-200 dark:bg-cool-gray-700;
 }

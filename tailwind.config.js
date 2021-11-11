@@ -170,6 +170,10 @@ const exportedColors = [
         "color": "ADBAC7"
       },
       {
+        "name": "cool-gray-150",
+        "color": "CCD6E0"
+      },
+      {
         "name": "cool-gray-100",
         "color": "F1F8FF"
       }

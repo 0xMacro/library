@@ -73,7 +73,7 @@ JUMPDEST
     </div>
 
     <div>
-      <div class="p-2 flex-1">Scratch Converter</div>
+      <div class="p-2 flex-1 dark:text-cool-gray-400">Scratch Converter</div>
       <div style="display: flex">
         <textarea oninput="updateScratch()" id="scratchInput" class="repl-input p-4 flex-1 outline-none"></textarea>
         <div style="width: 60%">
@@ -90,12 +90,19 @@ JUMPDEST
     </div>
 
     <div>
-      <div class="p-2 flex-1">Hex Padder</div>
+      <div class="p-2 flex-1 dark:text-cool-gray-400">Hex Padder</div>
       <div style="display: flex">
         <textarea oninput="updateHex()" id="hexInput" class="repl-input p-4 flex-1 outline-none"></textarea>
         <div style="width: 60%">
-          <div class="px-5">
-            Pad <input type="text" id="hexPadInput" oninput="updateHex()" value="32" style="width: 3em" class="mx-1 text-center"> bytes
+          <div class="px-5 dark:text-cool-gray-400">
+            Pad <input
+              type="text"
+              id="hexPadInput"
+              oninput="updateHex()"
+              value="32"
+              style="width: 3em"
+              class="mx-1 text-center dark:text-cool-gray-150 dark:bg-cool-gray-600"
+            > bytes
           </div>
           <pre id="hexOutput" class="pre-output p-5 overflow-x"></pre>
         </div>
