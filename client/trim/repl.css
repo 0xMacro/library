@@ -9,6 +9,7 @@
   word-wrap: break-word;
   white-space: pre-wrap;
   word-break: break-word;
+  @apply dark:text-cool-gray-200;
 }
 .bg-output {
   background: #f2f2f2;
