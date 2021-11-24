@@ -267,6 +267,18 @@ updateScratch()
 
 
 //
+// Function selector tools
+//
+const fnsInput = document.getElementById('fnsInput') as HTMLTextAreaElement
+const fnsOutput = document.getElementById('fnsOutput')
+
+function updateFns() {
+  fnsOutput.innerText = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(fnsInput.value)).slice(0,10)
+}
+;(window as any).updateFns = updateFns
+updateFns()
+
+//
 // Hex tools
 //
 const hexInput = document.getElementById('hexInput') as HTMLTextAreaElement
