@@ -5,11 +5,15 @@ import { cc, uniques } from 'mithril-cc'
 import { pad, decompileBytecode } from '../trim/repl'
 
 const bytecodeInput = document.getElementById('import') as HTMLInputElement
+const headerLabel = document.getElementById('headerLabel')!
 
-const initBytecode = '0x60046000601c376000518063cfae32171461001657fd5b6c48656c6c6f2c20776f726c642160005260206000f3'
+const initBytecode =
+  localStorage.getItem('exploringBytecode') ||
+  '0x60046000601c376000518063cfae32171461001657fd5b6c48656c6c6f2c20776f726c642160005260206000f3'
 
 const App = cc(function() {
   this.addEventListener(bytecodeInput, 'change', (e: any) => {
+    const bytecode = e.target.value
     parsed = parseBytecode(e.target.value)
     digStack = []
     e.target.value = ''
@@ -112,6 +116,12 @@ function parseBytecode(bytecode: string) {
       ? 1 + (line[1].length - 2) / 2  // ASSUMPTION: Hex values are always properly padded
       : 1
   }
+
+  headerLabel.innerText = ` ${pc} bytes (0x${pad(pc.toString(16), 2)})`
+  if (pc < 2400) {
+    localStorage.setItem('exploringBytecode', bytecode)
+  }
+
   return { lines, lineNums, pc, jumpdestLines }
 }
 
