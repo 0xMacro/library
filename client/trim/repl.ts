@@ -161,8 +161,6 @@ async function update() {
     reportError(err)
   }
 }
-update()
-;(window as any).update = update
 
 
 
@@ -215,7 +213,8 @@ const decompileFormatSelect = document.getElementById('decompileFormatSelect') a
 function updateScratch() {
   const type = decompileFormatSelect.value
   if (type === 'bytecode') {
-    decompileBytecode()
+    const lines = decompileBytecode(scratchInput.value.replace(/^0x/, '').replace(/[^0-9a-f]/g, ''))
+    scratchOutput.innerText = lines.map(words => words.join(' ')).join('\n')
   }
   else if (type === 'utf8') {
     hexToUtf8()
@@ -225,9 +224,9 @@ function updateScratch() {
   }
 }
 
-function decompileBytecode() {
-  const input = scratchInput.value.replace(/^0x/, '').replace(/[^0-9a-f]/g, '')
-  const output = []
+export function decompileBytecode(bytecode: string): string[][] {
+  const input = bytecode.replace(/^0x/, '').replace(/[^0-9a-f]/g, '')
+  const lines = []
 
   for (let i=0; i < input.length; i += 2) {
     let byte = input.slice(i, i+2)
@@ -235,20 +234,24 @@ function decompileBytecode() {
     // console.log("BYTE", byteDec, byte)
     let op = opcodesByCode[byteDec]
     if (op) {
+      let words = []
       // console.log("->", op)
-      output.push((i === 0 ? '' : '\n') + op.fullName)
+      // lines.push((i === 0 ? '' : '\n') + op.fullName)
+      words.push(op.fullName)
       if (op?.name === 'PUSH') {
         let pushLen = +op.fullName.replace('PUSH', '')
-        output.push('0x' + input.slice(i+2, i+2+pushLen*2))
+        words.push('0x' + input.slice(i+2, i+2+pushLen*2))
         i += pushLen*2
       }
+      lines.push(words)
     }
     else {
-      output.push(`\n<<invalid op: ${byte} (decimal: ${byteDec})>>`)
+      lines.push([`<<invalid op: ${byte} (decimal: ${byteDec})>>`])
     }
   }
+  return lines
 
-  scratchOutput.innerText = output.join(' ')
+  // scratchOutput.innerText = lines.join(' ')
 }
 
 function hexToUtf8() {
@@ -261,9 +264,6 @@ function utf8ToHex() {
   scratchOutput.innerText = '0x' + Buffer.from(input, 'utf8').toString('hex')
 }
 
-updateScratch()
-;(window as any).updateScratch = updateScratch
-
 
 
 //
@@ -275,8 +275,6 @@ const fnsOutput = document.getElementById('fnsOutput')
 function updateFns() {
   fnsOutput.innerText = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(fnsInput.value)).slice(0,10)
 }
-;(window as any).updateFns = updateFns
-updateFns()
 
 //
 // Hex tools
@@ -290,10 +288,19 @@ function updateHex() {
 }
 ;(window as any).updateHex = updateHex
 
+
+
+function initRepl() {
+  update(); ;(window as any).update = update
+  updateScratch(); (window as any).updateScratch = updateScratch
+  updateFns(); (window as any).updateFns = updateFns
+}
+;(window as any).initRepl = initRepl
+
 //
 // Util
 //
-function pad(str, len, char='0') {
+export function pad(str, len, char='0') {
   for (let i=str.length; i < len; i++) {
     str = char + str
   }

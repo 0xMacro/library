@@ -1,0 +1,20 @@
+<page title="EVM Bytecode Explorer" layout>
+
+<link rel="stylesheet" type="text/css" href="../trim/repl.css">
+<link rel="stylesheet" type="text/css" href="./explorer.css">
+
+
+<div class="h-screen flex flex-col">
+  <div class="px-5 p-2 flex bg-output space-x-5">
+    <h1 class="font-mono-brand">EVM Bytecode Explorer</h1>
+    <div class="flex-1"></div>
+    <input id="import" class="input" type="text" placeholder="Paste here...">
+  </div>
+
+  <div class="pt-3 flex-1 flex">
+    <div id="outputLines" class="p-5 pre-output font-mono text-right dark:bg-cool-gray-800">0</div>
+    <div id="outputCode" class="p-5 flex-1 pre-output font-mono bg-output">Please paste some bytecode above</div>
+  </div>
+</div>
+
+<script type="module" src="./explorer.ts"></script>
