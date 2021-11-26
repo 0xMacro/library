@@ -1,4 +1,7 @@
 
-#outputLines .-active {
+.OutputLines .-active {
+  @apply text-blue-500;
+}
+.OutputCode .-active {
   @apply text-blue-500;
 }
