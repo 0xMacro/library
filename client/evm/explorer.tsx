@@ -62,7 +62,7 @@ const StackedView = cc<StackedViewAttrs>(function($attrs) {
     })
   })
 
-  return ({ activeLine, viewingLine, parsed: {lines, lineNums, pc, jumpdestLines} }) => (
+  return ({ activeLine, viewingLine, parsed: {notes, lines, lineNums, pc, jumpdestLines} }) => (
     <div class="flex flex-shrink-0 items-start overflow-y-scroll">
       <div class="OutputLines p-5 font-mono text-right dark:bg-cool-gray-800 dark:text-cool-gray-200">
         {lineNums.map(lnum => <>
@@ -71,24 +71,42 @@ const StackedView = cc<StackedViewAttrs>(function($attrs) {
         </>)}
       </div>
       <div class="OutputCode p-5 w-[20em] flex-1 flex-shrink-0 overflow-x-scroll whitespace-nowrap bg-output font-mono dark:text-cool-gray-200">
-        {lines.map((line, i) => <>
-          <span class={lineNums[i].dec === activeLine ? '-active' : ''}>{line[0]}</span>
-          {line[1] && ' '}
-          {line[1] && (() => {
-            const hex = line[1]
-            const dec = hex.length < 8 && parseInt(hex, 16)
-            return dec && jumpdestLines[dec]
-            ? <span
-                class={`${viewingLine === dec ? '-active' : 'cursor-pointer hover:text-blue-500 underline'}`}
-                onclick={(e: any) => {
-                  e.preventDefault()
-                  onNav(level, dec)
-                }}
-              >{hex}</span>
-            : hex
-          })()}
-          <br />
-        </>)}
+        {lines.map((line, i) => {
+          const lineNum = lineNums[i].dec
+          const note = notes.get(lineNum)
+
+          return <div class="group">
+            <span class={lineNums[i].dec === activeLine ? '-active' : ''}>{line[0]}</span>
+            {line[1] && ' '}
+            {line[1] && (() => {
+              const hex = line[1]
+              const dec = hex.length < 8 && parseInt(hex, 16)
+              return dec && jumpdestLines[dec]
+              ? <span
+                  class={`${viewingLine === dec ? '-active' : 'cursor-pointer hover:text-blue-500 underline'}`}
+                  onclick={(e: any) => {
+                    e.preventDefault()
+                    onNav(level, dec)
+                  }}
+                >{hex}</span>
+              : hex
+            })()}
+            {note
+              ? <input
+                  type="text"
+                  value={note}
+                  class="ml-2 px-2 bg-[#e5e5e5] rounded-l text-sm"
+                  onchange={(e: any) => notes.set(lineNum, e.target.value)}
+                  // @ts-ignore
+                  oncreate={vnode => vnode.dom.value === '...' && vnode.dom.select()}
+                />
+              : <span
+                  onclick={() => notes.set(lineNum, '...')}
+                  class="ml-2 opacity-60 hidden group-hover:inline cursor-pointer"
+                >+</span>
+            }
+          </div>
+        })}
       </div>
     </div>
   )
@@ -122,7 +140,32 @@ function parseBytecode(bytecode: string) {
     localStorage.setItem('exploringBytecode', bytecode)
   }
 
-  return { lines, lineNums, pc, jumpdestLines }
+  const notes = new Notes(bytecode)
+  console.log("WHUT", notes)
+
+  return { notes, lines, lineNums, pc, jumpdestLines }
+}
+
+
+class Notes {
+  private data: Record<number, string>
+  constructor(private bytecode: string) {
+    this.data = JSON.parse(localStorage.getItem(`notes:${bytecode}`) || '{}')
+  }
+  get(line: number) {
+    return this.data[line]
+  }
+  set(line: number, note: string) {
+    if (this.data[line] !== note) {
+      if (note) {
+        this.data[line] = note
+      }
+      else {
+        delete this.data[line]
+      }
+      localStorage.setItem(`notes:${this.bytecode}`, JSON.stringify(this.data))
+    }
+  }
 }
 
 
