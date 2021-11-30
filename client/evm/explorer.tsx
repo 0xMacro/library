@@ -95,7 +95,7 @@ const StackedView = cc<StackedViewAttrs>(function($attrs) {
               ? <input
                   type="text"
                   value={note}
-                  class="ml-2 px-2 bg-[#e5e5e5] rounded-l text-sm"
+                  class="ml-2 px-2 bg-[#e5e5e5] dark:bg-cool-gray-800 rounded-l text-sm"
                   onchange={(e: any) => notes.set(lineNum, e.target.value)}
                   // @ts-ignore
                   oncreate={vnode => vnode.dom.value === '...' && vnode.dom.select()}
