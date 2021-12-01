@@ -1,0 +1,48 @@
+<page title="EVM Bytecode Explorer" layout>
+
+<link rel="stylesheet" type="text/css" href="../trim/repl.css">
+<link rel="stylesheet" type="text/css" href="./explorer.css">
+
+
+<div class="h-screen flex flex-col bg-gray-200 dark:bg-transparent">
+  <div class="px-5 p-2 flex items-center bg-output space-x-5">
+    <h1 class="font-mono-brand">Solidity REPL</h1>
+    <div class="flex-1"></div>
+  </div>
+
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <div class="flex-1 flex overflow-y-scroll">
+      <!-- Left side -->
+      <div class="flex-1 flex flex-col">
+        <textarea oninput="update()" id="input" class="repl-input flex-1 flex-shrink-0">//SPDX-License-Identifier: Unlicense
+pragma solidity ^0.8.0;
+
+contract GreeterSimple {
+    bytes32 private greeting = "Hello, EVM!";
+
+    function greet() public view returns (bytes32) {
+        return greeting;
+    }
+
+    function setGreeting(bytes32 _greeting) external {
+        greeting = _greeting;
+    }
+}</textarea>
+        <pre id="errorOutput" class="p-5 mx-[1px] pre-output sticky bottom-0 bg-output">No compile errors.</pre>
+      </div>
+
+      <!-- Right side -->
+      <div id="outputPanel" class="bg-output overflow-y-scroll" style="width: 40%">
+        <div class="ml-5 bg-white dark:bg-cool-gray-600" style="padding: 1em;">
+          Compiler Output
+        </div>
+        <pre id="output" class="p-5 pre-output"></pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TODO: Support version switching -->
+<script src="https://solc-bin.ethereum.org/bin/soljson-v0.8.10+commit.fc410830.js"></script>
+<script type="module" src="./solidity-repl.js"></script>

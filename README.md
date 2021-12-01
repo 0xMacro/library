@@ -11,3 +11,9 @@ $ npm install
 $ npm run init
 $ npm run dev
 ```
+
+## Notes
+
+`solc-wrapper.js` was generated via:
+
+    $ browserify node_modules/solc/wrapper.js -o solc-wrapper.js -s SolcWrapper

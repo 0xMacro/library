@@ -141,7 +141,6 @@ function parseBytecode(bytecode: string) {
   }
 
   const notes = new Notes(bytecode)
-  console.log("WHUT", notes)
 
   return { notes, lines, lineNums, pc, jumpdestLines }
 }
