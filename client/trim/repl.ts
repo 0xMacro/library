@@ -1,73 +1,27 @@
 import './shims'
 import { ethers } from 'ethers'
-import { BN, Address, Account, toBuffer, pubToAddress } from 'ethereumjs-util'
-import Common, { Chain, Hardfork } from '@ethereumjs/common'
-import { Transaction, TxData } from '@ethereumjs/tx'
-import VM from '@ethereumjs/vm'
-import { getOpcodesForHF, Opcode } from '@ethereumjs/vm/dist/evm/opcodes'
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx'
 
 import { compileBasm, compileTrim, getOpcodesForTrim } from '@hackerdao/trim'
+import { BetterVM } from '../evm/_lib/evm'
 
-const common = new Common({ chain: Chain.Mainnet, hardfork: Hardfork.Berlin })
-const opcodes = getOpcodesForTrim(getOpcodesForHF(common))
 
 window.ethers = ethers
 
-// console.log("HM", JSON.stringify([...getOpcodesForHF(common).values()]))
-
-// const opHex = (name: string) => pad(opcodesByName[name].code.toString(16), 2)
-
-
-// Used to sign transactions and generate addresses
-const keyPair = {
-  "secretKey": "0x3cd7232cd6f3fc66a57a6bedc1a8ed6c228fff0a327e169c2bcc5e869ed49511",
-  "publicKey": "0x0406cc661590d48ee972944b35ad13ff03c7876eae3fd191e8a2f77311b0a3c6613407b5005e63d7d8d76b89d5f900cde691497688bb281e07a5052ff61edebdc0"
-}
-
-const privateKey = toBuffer(keyPair.secretKey)
-const publicKeyBuf = toBuffer(keyPair.publicKey)
-const address = new Address(pubToAddress(publicKeyBuf, true))
-
-console.log('---------------------')
-console.log('Sender address: ', address.toString())
-
-let txCache = {
-  reads: [] as { loc: BN, pc: number }[],
-  writes: [] as { loc: BN, value: BN, pc: number }[],
-}
+let vm = new BetterVM()
+const opcodes = getOpcodesForTrim(vm.opcodes)
 
 async function runContract(code: string) {
-  const vm = new VM({ common })
-
-  vm.on('step', function (data) {
-    // console.log(`Opcode: ${data.opcode.name}\tStack: ${data.stack}`, data.memoryWordCount.toString(), data)
-    if (data.opcode.name === 'SLOAD') {
-      txCache.reads.push({ loc: data.stack[data.stack.length-1], pc: data.pc })
-    }
-    if (data.opcode.name === 'SSTORE') {
-      txCache.writes.push({ loc: data.stack[data.stack.length-1], value: data.stack[data.stack.length-2], pc: data.pc })
-    }
-  })
-
-  // Create a new account
-  const acctData = {
-    nonce: 0,
-    balance: new BN(10).pow(new BN(19)), // 10 eth
-  }
-  const account = Account.fromAccountData(acctData)
-
-  // Save the account
-  await vm.stateManager.putAccount(address, account)
+  const vm = new BetterVM()
+  await vm.setup()
 
   // The first transaction deploys a contract
-  const txData1 = {
+  const {createdAddress, results: results1} = await vm.runTx(0, {
     nonce: '0x00',
     gasPrice: "0x09184e72a000",
     gasLimit: "0x90710",
     data: code,
-  }
-  const {createdAddress, results: results1} = (await runTx(vm, txData1, privateKey))!
+  })
 
   outputPanel.scrollTop = 0 // Reset position before editing content
   report(outputCreate, results1)
@@ -77,20 +31,18 @@ async function runContract(code: string) {
   let nonce = 1
   for (let {abi, input, output} of callElems) {
     const iface = new ethers.utils.Interface([`function ${abi.value}`])
-    const txData2 = {
+
+    const { results } = await vm.runTx(0, {
       nonce: nonce++,
       gasPrice: '0x09184e72a000',
       gasLimit: '0x20710',
       value: '0x10',
-      to: createdAddress.toString(),
+      to: createdAddress!.toString(),
       data: iface.encodeFunctionData(abi.value.split('(')[0], JSON.parse(input.value))
       // data: calldataInput.value
       //   ? '0x' + calldataInput.value.split(',').map(v => pad(v, 64)).join('')
       //   : ''
-    }
-    // console.log("Go", txData2)
-
-    const { results } = await runTx(vm, txData2, privateKey)
+    })
     report(output, results)
   }
 
@@ -106,24 +58,6 @@ async function runContract(code: string) {
   // console.log('stateRoot: 0x' + createdAccount.stateRoot.toString('hex'))
   // console.log('codeHash: 0x' + createdAccount.codeHash.toString('hex'))
   // console.log('---------------------')
-}
-
-
-async function runTx(vm: VM, txData, privateKey) {
-  txCache = { reads: [], writes: [] }
-  const tx = Transaction.fromTxData(txData).sign(privateKey)
-
-  console.log('----running tx-------')
-  const results = await vm.runTx({ tx })
-
-  console.log('gas used: ' + results.gasUsed.toString())
-  console.log('returned: ' + results.execResult.returnValue.toString('hex'))
-
-  const createdAddress = results.createdAddress
-  if (createdAddress) {
-    console.log('address created: ' + createdAddress.toString())
-  }
-  return { createdAddress, results }
 }
 
 
@@ -165,12 +99,12 @@ async function update() {
 
 
 function report(elem: HTMLElement, results: RunTxResult) {
-  console.log("RESULTS", results, txCache)
+  console.log("RESULTS", results, vm.txCache)
   elem.innerText = ''
   if (results.execResult.runState?.callData?.length) {
     elem.innerText += `Call data: 0x${results.execResult.runState.callData.toString('hex')}\n\n`
   }
-  elem.innerText += `Storage: ${txCache.reads.length} reads, ${txCache.writes.length} writes\n`
+  elem.innerText += `Storage: ${vm.txCache.reads.length} reads, ${vm.txCache.writes.length} writes\n`
 
   const ret = results.execResult.returnValue.toString('hex')
   elem.innerText += `Return value: ${ret ? `0x${ret}` : '<<empty>>'}\n`
@@ -201,7 +135,7 @@ function report(elem: HTMLElement, results: RunTxResult) {
 }
 
 
-const opcodesByCode = [...getOpcodesForHF(common).values()].reduce((all, op) => {
+const opcodesByCode = [...vm.opcodes.values()].reduce((all, op) => {
   all[op.code] = op
   return all
 }, {})
