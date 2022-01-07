@@ -50,6 +50,7 @@ updateSource()
 
 
 async function updateRepl() {
+  if (1+1) return // Skip this for now
   if (!latestBytecode) return
   const vm = new BetterVM()
   await vm.setup()
