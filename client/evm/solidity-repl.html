@@ -14,7 +14,7 @@
     <div class="flex-1 flex overflow-y-scroll">
       <!-- Left side -->
       <div class="flex-1 flex flex-col">
-        <textarea oninput="update()" id="input" class="repl-input flex-1 flex-shrink-0">//SPDX-License-Identifier: Unlicense
+        <textarea oninput="updateSource()" id="input" class="repl-input flex-1 flex-shrink-0">//SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
 contract GreeterSimple {
@@ -37,6 +37,20 @@ contract GreeterSimple {
           Compiler Output
         </div>
         <pre id="output" class="p-5 pre-output"></pre>
+
+        <textarea oninput="updateRepl()" id="replInput" class="repl-input flex-1 flex-shrink-0">
+contract Repl {
+  address target;
+  constructor(address _target) {
+    target = _target;
+  }
+  function go() external returns (bytes32) {
+    uint x = 99;
+    return bytes32(x);
+  }
+}
+        </textarea>
+        <pre id="replOutput" class="p-5 pre-output"></pre>
       </div>
     </div>
   </div>

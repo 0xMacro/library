@@ -1,4 +1,4 @@
-import './shims'
+import '../evm/_lib/shims'
 import { ethers } from 'ethers'
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx'
 
@@ -62,6 +62,7 @@ async function runContract(code: string) {
 
 
 
+const compiledBytecode = document.getElementById('compiledBytecode') as HTMLElement
 const languageSelect = document.getElementById('languageSelect') as HTMLSelectElement
 
 const input = document.getElementById('input') as HTMLTextAreaElement
@@ -89,6 +90,7 @@ async function update() {
       ? compileTrim(input.value, { opcodes })
       : compileBasm(input.value, { opcodes })
     console.log("CODE", code)
+    compiledBytecode.innerText = code
     await runContract(code)
   }
   catch (err) {

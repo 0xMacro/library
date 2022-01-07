@@ -58,7 +58,6 @@ export class BetterVM {
     this.txCache = { reads: [], writes: [] }
 
     const account = this.accounts[accountNo]
-    console.log("ACCOUNT", account)
     const tx = Transaction.fromTxData(txData).sign(account.privateKey)
 
     console.log('----running tx-------')
