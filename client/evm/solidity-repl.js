@@ -27,8 +27,14 @@ function updateSource() {
         const bytecode = contract.evm.bytecode.object
         out.push(`${contractName} (${bytecode.length / 2} bytes)` + '\n')
 
-        for (let fn of new ethers.utils.Interface(contract.abi).format(ethers.utils.FormatTypes.full)) {
-          out.push(`  ${fn}\n`)
+        const fullSigs = new ethers.utils.Interface(contract.abi).format(ethers.utils.FormatTypes.full)
+        const jsonSigs = JSON.parse(new ethers.utils.Interface(contract.abi).format(ethers.utils.FormatTypes.json))
+        for (var i=0; i < fullSigs.length; i++) {
+          const jsig = jsonSigs[i]
+          const minimalSig = `${jsig.name}(${jsig.inputs.map(param => param.type).join(',')})`
+          let selector = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(minimalSig)).slice(0,10)
+
+          out.push(`  ${selector} ${fullSigs[i]}\n`)
         }
         out.push('\n')
         out.push(bytecode.replace('f3fe', 'f3fe\n'))
