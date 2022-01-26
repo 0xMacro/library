@@ -14,7 +14,7 @@
   "license": "ISC",
   "dependencies": {
     "@ethereumjs/vm": "^5.5.3",
-    "@hackerdao/trim": "^0.9.1",
+    "@hackerdao/trim": "^0.9.2",
     "@lancer/studio": "^0.14.2",
     "@tailwindcss/typography": "^0.4.1",
     "@types/mithril": "^2.0.8",

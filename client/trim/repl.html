@@ -26,12 +26,12 @@ DUP1
 
 #runtime
 (CALLDATACOPY 0x1c 0x00 0x04)
-(MLOAD 0x00) ; copy function id onto the stack
+(MLOAD 0x00) ; copy function selector onto the stack
 
-(EQ (abi/function-id "greet()") DUP1)
+(EQ (abi/fn-selector "greet()") DUP1)
 (JUMPI #greet _)
 
-REVERT ; No matching function id
+REVERT ; No matching function selector
 
 #greet
 JUMPDEST
