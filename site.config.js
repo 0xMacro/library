@@ -1,6 +1,6 @@
 
 module.exports = {
-  name: "Hacker DAO",
+  name: "Shipyard DAO Rocks",
   locales: ['en'],
 
   // These are to get @ethereumjs/vm working in the browser
