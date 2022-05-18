@@ -1,6 +1,6 @@
 <page title="Trim REPL" layout>
 
-<link rel="stylesheet" type="text/css" href="./repl.css">
+<link rel="stylesheet" type="text/css" href="./repl/index.css">
 
 <div class="h-screen flex flex-col">
   <div class="px-5 p-2 flex bg-output space-x-5">
@@ -42,33 +42,7 @@ JUMPDEST
       </div>
 
       <!-- Right side -->
-      <div id="outputPanel" class="bg-output overflow-y-scroll" style="width: 60%">
-        <div class="ml-5 flex items-center bg-white dark:bg-cool-gray-600" style="padding: 1em;">
-          Contract Create –&nbsp;<div id="compiledBytecode" class="flex-1 overflow-hidden font-mono" style="text-overflow: ellipsis;"></div>
-        </div>
-        <pre id="outputCreate" class="p-5 pre-output"></pre>
-
-        <div class="ml-5 bg-white dark:bg-cool-gray-600" style="padding: 1em;">
-          <div class="flex items-center space-x-2">
-            <div class="pr-2 border-r dark:border-cool-gray-500">Call 1</div>
-            <label class="text-sm font-mono">ABI</label>
-            <input oninput="update()" type="text" id="calldataABI" value="greet()" class="bg-output p-2 font-mono">
-            <label class="text-sm font-mono">Args</label>
-            <input oninput="update()" type="text" id="calldataInput" value="[]" class="bg-output p-2 font-mono">
-          </div>
-        </div>
-        <pre id="outputCall" class="p-5 pre-output"></pre>
-
-        <div class="ml-5 bg-white dark:bg-cool-gray-600" style="padding: 1em;">
-          <div class="flex items-center space-x-2">
-            <div class="pr-2 border-r dark:border-cool-gray-500">Call 2</div>
-            <label class="text-sm font-mono">ABI</label>
-            <input oninput="update()" type="text" id="calldataABI2" value="setGreeting(string)" class="bg-output p-2 font-mono">
-            <label class="text-sm font-mono">Args</label>
-            <input oninput="update()" type="text" id="calldataInput2" value='["Updated!"]' class="bg-output p-2 font-mono">
-          </div>
-        </div>
-        <pre id="outputCall2" class="p-5 pre-output"></pre>
+      <div id="tx-ui" class="bg-output overflow-y-scroll" style="width: 60%">
       </div>
     </div>
   </div>
@@ -125,7 +99,7 @@ JUMPDEST
 
 </div>
 
-<script type="module" src="./repl.ts"></script>
+<script type="module" src="./repl/index.tsx"></script>
 <script>
   window.addEventListener('load', () => initRepl())
 </script>

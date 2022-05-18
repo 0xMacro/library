@@ -1,50 +1,124 @@
-import '../evm/_lib/shims'
+import '../../evm/_lib/shims'
+
+import m from 'mithril'
+import { cc } from 'mithril-cc'
 import { ethers } from 'ethers'
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx'
+import { Address } from 'ethereumjs-util';
 
-import { compileBasm, compileTrim, getOpcodesForTrim } from '@hackerdao/trim'
-import { BetterVM } from '../evm/_lib/evm'
+import { compileBasm, compileTrim, getOpcodesForTrim } from '@0xmacro/trim'
+import { BetterVM } from '../../evm/_lib/evm'
+import { Opcode } from '@ethereumjs/vm/dist/evm/opcodes'
 
+const ONE_WEI = 1_000_000_000
 
 window.ethers = ethers
 
 let vm = new BetterVM()
 const opcodes = getOpcodesForTrim(vm.opcodes)
 
-async function runContract(code: string) {
+type CallTx   = { type: 'call', abi: string, args: string, output?: string }
+type CreateTx = { type: 'create', source: string, bytecode: string, output?: string }
+
+type Tx =
+  | CallTx
+  | CreateTx
+
+export const txs: Tx[] = [
+  { type: 'create', source: '', bytecode: '' },
+  { type: 'call', abi: 'greet()', args: '[]' },
+  { type: 'call', abi: 'setGreeting(string)', args: '["Updated!"]' },
+]
+
+const TxUi = cc(function() {
+  return () => (
+    txs.map(tx => {
+
+      if (tx.type === 'create') {
+        return <>
+          <div class="ml-5 flex items-center bg-white dark:bg-cool-gray-600" style="padding: 1em;">
+            Contract Create –&nbsp;<div class="flex-1 overflow-hidden font-mono" style="text-overflow: ellipsis;">
+              {tx.bytecode || ''}
+            </div>
+          </div>
+          <pre class="p-5 pre-output">{tx.output || ''}</pre>
+        </>
+      }
+
+      if (tx.type === 'call') {
+        return <>
+          <div class="ml-5 bg-white dark:bg-cool-gray-600" style="padding: 1em;">
+            <div class="flex items-center space-x-2">
+              <div class="pr-2 border-r dark:border-cool-gray-500">Call 1</div>
+
+              <label class="text-sm font-mono">ABI</label>
+              <input onchange={(e: any) => { tx.abi = e.target.value; update() }} type="text" value={tx.abi} class="bg-output p-2 font-mono" />
+
+              <label class="text-sm font-mono">Args</label>
+              <input onchange={(e: any) => { tx.args = e.target.value; update() }} type="text" value={tx.args} class="bg-output p-2 font-mono" />
+            </div>
+          </div>
+          <pre class="p-5 pre-output">{tx.output || ''}</pre>
+        </>
+      }
+    })
+  )
+})
+
+
+
+async function runTransactions() {
   const vm = new BetterVM()
   await vm.setup()
 
-  // The first transaction deploys a contract
-  const {createdAddress, results: results1} = await vm.runTx(0, {
-    nonce: '0x00',
-    gasPrice: "0x09184e72a000",
-    gasLimit: "0x90710",
-    data: code,
-  })
+  let nonce = 0
+  let mainContract: Address | undefined
+  for (let [i, tx] of txs.entries()) {
 
-  outputPanel.scrollTop = 0 // Reset position before editing content
-  report(outputCreate, results1)
+    if (tx.type === 'create') {
+      tx.bytecode = languageSelect.value === 'trim'
+        ? compileTrim(input.value, { opcodes })
+        : compileBasm(input.value, { opcodes })
+      console.log("BYTECODE", tx.bytecode)
 
-  // The second transaction calls that contract
-  // console.log("DATA", ethers.utils.defaultAbiCoder.encode([calldataABI.value], JSON.parse(calldataInput.value)))
-  let nonce = 1
-  for (let {abi, input, output} of callElems) {
-    const iface = new ethers.utils.Interface([`function ${abi.value}`])
+      const {createdAddress, results} = await vm.runTx(0, {
+        nonce: '0x' + pad(nonce.toString(16), 2),
+        gasPrice: '0x' + pad((50 * ONE_WEI).toString(16), 8),
+        gasLimit: '0x' + pad((30_000_000).toString(16), 8),
+        data: tx.bytecode,
+      })
 
-    const { results } = await vm.runTx(0, {
-      nonce: nonce++,
-      gasPrice: '0x09184e72a000',
-      gasLimit: '0x20710',
-      value: '0x10',
-      to: createdAddress!.toString(),
-      data: iface.encodeFunctionData(abi.value.split('(')[0], JSON.parse(input.value))
-      // data: calldataInput.value
-      //   ? '0x' + calldataInput.value.split(',').map(v => pad(v, 64)).join('')
-      //   : ''
-    })
-    report(output, results)
+      tx.output = report(results)
+
+      if (!createdAddress) {
+        break
+      }
+
+      if (!mainContract) {
+        mainContract = createdAddress
+      }
+    }
+    else {
+
+      const iface = new ethers.utils.Interface([`function ${tx.abi}`])
+
+      const { results } = await vm.runTx(0, {
+        nonce: '0x' + pad(nonce.toString(16), 2),
+        gasPrice: '0x' + pad((50 * ONE_WEI).toString(16), 8),
+        gasLimit: '0x' + pad((30_000_000).toString(16), 8),
+        value: '0x00', // TODO
+        to: mainContract!.toString(),
+        data: iface.encodeFunctionData(tx.abi.split('(')[0], JSON.parse(tx.args))
+        // data: calldataInput.value
+        //   ? '0x' + calldataInput.value.split(',').map(v => pad(v, 64)).join('')
+        //   : ''
+      })
+      tx.output = report(results)
+    }
+
+    nonce += 1
   }
+  m.redraw()
 
   // Now let's look at what we created. The transaction
   // should have created a new account for the contract
@@ -62,7 +136,6 @@ async function runContract(code: string) {
 
 
 
-const compiledBytecode = document.getElementById('compiledBytecode') as HTMLElement
 const languageSelect = document.getElementById('languageSelect') as HTMLSelectElement
 
 const input = document.getElementById('input') as HTMLTextAreaElement
@@ -86,12 +159,8 @@ const callElems = [
 async function update() {
   errorOutput.innerText = 'No compile errors.'
   try {
-    const code = languageSelect.value === 'trim'
-      ? compileTrim(input.value, { opcodes })
-      : compileBasm(input.value, { opcodes })
-    console.log("CODE", code)
-    compiledBytecode.innerText = code
-    await runContract(code)
+    ;(txs[1] as CreateTx).source = input.value
+    await runTransactions()
   }
   catch (err) {
     reportError(err)
@@ -100,50 +169,51 @@ async function update() {
 
 
 
-function report(elem: HTMLElement, results: RunTxResult) {
+function report(results: RunTxResult) {
   console.log("RESULTS", results, vm.txCache)
-  elem.innerText = ''
+  let output = ''
   if (results.execResult.runState?.callData?.length) {
-    elem.innerText += `Call data: 0x${results.execResult.runState.callData.toString('hex')}\n\n`
+    output += `Call data: 0x${results.execResult.runState.callData.toString('hex')}\n\n`
   }
-  elem.innerText += `Storage: ${vm.txCache.reads.length} reads, ${vm.txCache.writes.length} writes\n`
+  output += `Storage: ${vm.txCache.reads.length} reads, ${vm.txCache.writes.length} writes\n`
 
   const ret = results.execResult.returnValue.toString('hex')
-  elem.innerText += `Return value: ${ret ? `0x${ret}` : '<<empty>>'}\n`
-  elem.innerText += `Gas used: ${results.gasUsed.toString()}\n`
+  output += `Return value: ${ret ? `0x${ret}` : '<<empty>>'}\n`
+  output += `Gas used: ${results.gasUsed.toString()}\n`
 
   if (results.execResult.runState) {
     let memCount = results.execResult.runState.memoryWordCount.toNumber() * 2
     if (memCount > 0) {
-      elem.innerText += `\nMemory Usage:\n`
+      output += `\nMemory Usage:\n`
       let pointer = 0x0
       for (let i=0; i < memCount; i++) {
-        elem.innerText += `  0x${pad(pointer.toString(16), 2)}: ${results.execResult.runState.memory.read(pointer, 16).toString('hex')}\n`
+        output += `  0x${pad(pointer.toString(16), 2)}: ${results.execResult.runState.memory.read(pointer, 16).toString('hex')}\n`
         pointer += 0x10
       }
     }
 
     const stack = results.execResult.runState.stack
     if (stack.length) {
-      elem.innerText += `\nLeftover Stack:\n`
+      output += `\nLeftover Stack:\n`
       for (let i = 0; i < stack.length; i++) {
-        elem.innerText += `  0x${pad(i.toString(16), 2)}: 0x${stack._store[i].toString('hex')}\n`
+        output += `  0x${pad(i.toString(16), 2)}: 0x${stack._store[i].toString('hex')}\n`
       }
     }
   }
   else {
-    elem.innerText += `<<none>>`
+    output += `<<none>>`
   }
+  return output
 }
 
 
 const opcodesByCode = [...vm.opcodes.values()].reduce((all, op) => {
   all[op.code] = op
   return all
-}, {})
+}, {} as Record<string, Opcode>)
 
 const scratchInput = document.getElementById('scratchInput') as HTMLTextAreaElement
-const scratchOutput = document.getElementById('scratchOutput')
+const scratchOutput = document.getElementById('scratchOutput')!
 const decompileFormatSelect = document.getElementById('decompileFormatSelect') as HTMLSelectElement
 
 function updateScratch() {
@@ -206,7 +276,7 @@ function utf8ToHex() {
 // Function selector tools
 //
 const fnsInput = document.getElementById('fnsInput') as HTMLTextAreaElement
-const fnsOutput = document.getElementById('fnsOutput')
+const fnsOutput = document.getElementById('fnsOutput')!
 
 function updateFns() {
   fnsOutput.innerText = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(fnsInput.value)).slice(0,10)
@@ -217,7 +287,7 @@ function updateFns() {
 //
 const hexInput = document.getElementById('hexInput') as HTMLTextAreaElement
 const hexPadInput = document.getElementById('hexPadInput') as HTMLInputElement
-const hexOutput = document.getElementById('hexOutput')
+const hexOutput = document.getElementById('hexOutput')!
 
 function updateHex() {
   hexOutput.innerText = '0x' + pad(Buffer.from(hexInput.value.replace('0x', ''), 'hex').toString('hex'), parseInt(hexPadInput.value, 10) * 2)
@@ -230,19 +300,20 @@ function initRepl() {
   update(); ;(window as any).update = update
   updateScratch(); (window as any).updateScratch = updateScratch
   updateFns(); (window as any).updateFns = updateFns
+  m.mount(document.getElementById('tx-ui')!, TxUi)
 }
 ;(window as any).initRepl = initRepl
 
 //
 // Util
 //
-export function pad(str, len, char='0') {
+export function pad(str: string, len: number, char='0') {
   for (let i=str.length; i < len; i++) {
     str = char + str
   }
   return str
 }
-function reportError(err) {
+function reportError(err: any) {
   console.error('Runtime error', err)
   errorOutput.innerText = err.message
 }
