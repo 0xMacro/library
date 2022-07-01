@@ -15,7 +15,7 @@
   "dependencies": {
     "@0xmacro/trim": "^0.9.2",
     "@ethereumjs/vm": "^5.5.3",
-    "@lancer/studio": "^0.16.1",
+    "@lancer/studio": "^0.16.2",
     "@tailwindcss/typography": "^0.4.1",
     "@types/mithril": "^2.0.8",
     "assert": "^2.0.0",
