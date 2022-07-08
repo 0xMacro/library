@@ -5,7 +5,7 @@
 @import "./_fonts.css";
 
 body {
-  @apply bg-light dark:bg-gray-800;
+  @apply bg-light dark:bg-gray-800 dark:text-gray-200;
 }
 
 .flex-center {
