@@ -4,7 +4,6 @@ module.exports = {
   locales: ['en'],
 
   static: true,
-  rootPath: '/library/',
 
   // These are to get @ethereumjs/vm working in the browser
   bundleAliases: {

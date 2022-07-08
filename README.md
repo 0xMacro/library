@@ -18,6 +18,8 @@ This is a Lancer project. Read more at [lancer.studio](https://lancer.studio)
 
 ## Notes
 
+PUT EVERYTHING UNDER THE `client/library/` FOLDER. This is necessary due to our url routing setup.
+
 `solc-wrapper.js` was generated via:
 
     $ browserify node_modules/solc/wrapper.js -o solc-wrapper.js -s SolcWrapper
