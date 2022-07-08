@@ -1,7 +1,10 @@
 
 module.exports = {
-  name: "Shipyard DAO Rocks",
+  name: "The 0xMacro Library",
   locales: ['en'],
+
+  static: true,
+  rootPath: '/library/',
 
   // These are to get @ethereumjs/vm working in the browser
   bundleAliases: {

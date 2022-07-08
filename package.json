@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "lancer build --static",
+    "build": "lancer build",
     "init": "lancer init",
     "dev": "lancer dev"
   },
@@ -15,7 +15,7 @@
   "dependencies": {
     "@0xmacro/trim": "^0.9.2",
     "@ethereumjs/vm": "^5.5.3",
-    "@lancer/studio": "^0.16.2",
+    "@lancer/studio": "^0.17.0",
     "@tailwindcss/typography": "^0.4.1",
     "@types/mithril": "^2.0.8",
     "assert": "^2.0.0",
