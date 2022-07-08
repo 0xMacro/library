@@ -1,8 +1,10 @@
-# New Lancer Project
+# The 0xMacro Library
 
-This is a new Lancer project. Read more at [lancer.studio](https://lancer.studio)
+Here you will find [Macro](https://0xMacro.com)'s growing collection of public resources.
 
-## Getting Started
+[Visit the library here](https://0xMacro.com/library/).
+
+## Development
 
 After cloning this project:
 
@@ -11,6 +13,8 @@ $ npm install
 $ npm run init
 $ npm run dev
 ```
+
+This is a Lancer project. Read more at [lancer.studio](https://lancer.studio)
 
 ## Notes
 
