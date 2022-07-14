@@ -1,223 +1,232 @@
-<page title="Gas Numbers Every Solidity Dev Should Know">
-<link rel="stylesheet" href="./output.css">
-
-<!-- Google Tag Manager -->
-<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-TKSFM3B');</script>
-
-
-<div class="max-w-5xl m-auto">
-  <!-- Google Tag Manager (noscript) -->
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TKSFM3B"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <!-- End Google Tag Manager (noscript) -->
-  <div class="flex justify-between align-center pt-5">
-    <h1 class="text-2xl font-bold">Gas Numbers Every Solidity Dev Should Know</h1>
-    <a target="_blank" href="https://0xmacro.com/?utm_source=gasnums"><img class="h-8 my-auto object-contain" src="/logo-t.png"/></a>
-  </div>
-  <p class="mb-5 mt-1 text-xs">Created by Theo Telonis (<a target="_blank" href="https://twitter.com/dd0sxx">dd0sxx</a>) for <a target="_blank" href="https://0xmacro.com/?utm_source=gasnums">Macro</a></p>
-  <div class="my-5 p-2 dark:bg-cool-gray-700 border-2 border-black dark:border-gray-300 dark:border-dashed">
-    <h2>Key:</h2>
-    <ul>
-      <li>⟢ Each box is = 2,000 units of gas. All numbers indicate the number of gas units each operation requires to execute.</li>
-      <li>⟢ <a target="_blank" href="https://github.com/wolflo/evm-opcodes/blob/main/gas.md#a0-2-access-sets">Warm/Cold and Dirty/Clean</a> is whether or not a slot or address has been accessed or written to within the current execution context.</li>
-      <li>⟢ New-Address is when a CALL is made to an address that does not exist, forcing a new account to be created in the state trie.</li>
-    </ul>
-  </div>
-  <p class="mb-1 mt-1 text-sm text-neutral-600">Opcode gas numbers were sourced from the official <a target="_blank" href="https://ethereum.org/en/developers/docs/evm/opcodes/">Ethereum Docs</a>, and contract-calls were sourced from <a target="_blank" href="https://etherscan.io/gastracker">Etherscan.io</a> and converted into gas units using <a target="_blank" href="https://www.wolframalpha.com/">Wolfram Alpha</a> for calculations.</p>
-  <p class="mb-5 mt-1 text-sm text-neutral-600">Inspired by <a target="_blank" href="https://colin-scott.github.io/personal_website/research/interactive_latency.html">Norvig's Latency Numbers</a>, and a post in the <a target="_blank" href="https://0xmacro.com/?utm_source=gasnums">Macro</a> discord from a student named <a target="_blank" href="https://twitter.com/jqphu">Justin Phu</a>, who suggested someone make a version with gas numbers for popular calls and opcodes.</p>
-  <!-- <h2 class="my-5">Current Gas Price:</h2>
-  <div class="flex justify-between my-5">
-    <div>High:</div>
-    <div>Med:</div>
-    <div>Low:</div>
-  </div> -->
-  <h3 class="text-xl underline underline-offset-2">OPCODES</h3>
-  <div id='opcodes' class="flex flex-col flex-wrap justify-between my-5">
-    <div id="ADD" class="flex opcode">
-      <div class="operation-name">ADD: 3</div>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-TKSFM3B');</script>
+     <!-- End Google Tag Manager -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta property="og:title" content="Gas Numbers Every Solidity Dev Should Know">
+    <meta property="og:image" content="/assets/banner.png">
+    <meta property="og:description" content="A cheat sheet to reference the gas price of the most important OPCODES and popular contract calls on Ethereum and the EVM">
+    <title>Gas Numbers Every Solidity Dev Should Know</title>
+    <link rel="stylesheet" href="./dist/output.css">
+  </head>
+  <body class="max-w-5xl m-auto">
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TKSFM3B"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+    <div class="flex justify-between align-center pt-5">
+      <h1 class="text-2xl font-bold">Gas Numbers Every Solidity Dev Should Know</h1>
+      <a target="_blank" href="https://0xmacro.com/?utm_source=gasnums"><img class="h-8 my-auto object-contain" src="./assets/logo-t.png"/></a>
     </div>
-    <div id="BALANCE (warm)" class="flex opcode">
-      <div class="operation-name">BALANCE (warm): 100</div>
+    <p class="mb-5 mt-1 text-xs">Created by Theo Telonis (<a target="_blank" href="https://twitter.com/dd0sxx">dd0sxx</a>) for <a target="_blank" href="https://0xmacro.com/?utm_source=gasnums">Macro</a></p>
+    <div class="my-5 p-2 border-2 border-black">
+      <h2>Key:</h2>
+      <ul>
+        <li>⟢ Each box is = 2,000 units of gas. All numbers indicate the number of gas units each operation requires to execute.</li>
+        <li>⟢ <a target="_blank" href="https://github.com/wolflo/evm-opcodes/blob/main/gas.md#a0-2-access-sets">Warm/Cold and Dirty/Clean</a> is whether or not a slot or address has been accessed or written to within the current execution context.</li>
+        <li>⟢ New-Address is when a CALL is made to an address that does not exist, forcing a new account to be created in the state trie.</li>
+      </ul>
     </div>
-    <div id="BALANCE (cold)" class="flex opcode">
-      <div class="operation-name">BALANCE (cold): 2,600</div>
+    <p class="mb-1 mt-1 text-sm text-neutral-600">Opcode gas numbers were sourced from the official <a target="_blank" href="https://ethereum.org/en/developers/docs/evm/opcodes/">Ethereum Docs</a>, and contract-calls were sourced from <a target="_blank" href="https://etherscan.io/gastracker">Etherscan.io</a> and converted into gas units using <a target="_blank" href="https://www.wolframalpha.com/">Wolfram Alpha</a> for calculations.</p>
+    <p class="mb-5 mt-1 text-sm text-neutral-600">Inspired by <a target="_blank" href="https://colin-scott.github.io/personal_website/research/interactive_latency.html">Norvig's Latency Numbers</a>, and a post in the <a target="_blank" href="https://0xmacro.com/?utm_source=gasnums">Macro</a> discord from a student named <a target="_blank" href="https://twitter.com/jqphu">Justin Phu</a>, who suggested someone make a version with gas numbers for popular calls and opcodes.</p>
+    <!-- <h2 class="my-5">Current Gas Price:</h2>
+    <div class="flex justify-between my-5">
+      <div>High:</div>
+      <div>Med:</div>
+      <div>Low:</div>
+    </div> -->
+    <h3 class="text-xl underline underline-offset-2">OPCODES</h3>
+    <div id='opcodes' class="flex flex-col flex-wrap justify-between my-5">
+      <div id="ADD" class="flex opcode">
+        <div class="operation-name">ADD: 3</div>
+      </div>
+      <div id="BALANCE (warm)" class="flex opcode">
+        <div class="operation-name">BALANCE (warm): 100</div>
+      </div>
+      <div id="BALANCE (cold)" class="flex opcode">
+        <div class="operation-name">BALANCE (cold): 2,600</div>
+      </div>
+      <div id="CALLDATACOPY" class="flex opcode">
+        <div class="operation-name">CALLDATACOPY: 7</div>
+      </div>
+      <div id="MSTORE" class="flex opcode">
+        <div class="operation-name">MSTORE: 3</div>
+      </div>
+      <div id="MLOAD" class="flex opcode">
+        <div class="operation-name">MLOAD: 3</div>
+      </div>
+      <div id="TIMESTAMP" class="flex opcode">
+        <div class="operation-name">TIMESTAMP: 2</div>
+      </div>
+      <div id="ADDRESS" class="flex opcode">
+        <div class="operation-name">ADDRESS: 2</div>
+      </div>
+      <div id="LOG0" class="flex opcode">
+        <div class="operation-name">LOG0: 632</div>
+      </div>
+      <div id="LOG4" class="flex opcode">
+        <div class="operation-name">LOG4: 2,132</div>
+      </div>
+      <div id="SSTORE (clean: zero to nonzero)" class="flex opcode">
+        <div class="operation-name">SSTORE (clean: zero to nonzero): 22,100</div>
+      </div>
+      <div id="SSTORE (clean: nonzero to nonzero)" class="flex opcode">
+        <div class="operation-name">SSTORE (clean: nonzero to nonzero): 5,000</div>
+      </div>
+      <div id="SSTORE (clean: nonzero to zero)" class="flex opcode">
+        <div class="operation-name">SSTORE (clean: nonzero to zero): 5,000 (refund: 4,800)</div>
+      </div>
+      <div id="SSTORE (dirty: zero to nonzero)" class="flex opcode">
+        <div class="operation-name">SSTORE (dirty: zero to nonzero): 20,000</div>
+      </div>
+      <div id="SSTORE (dirty: nonzero to nonzero)" class="flex opcode">
+        <div class="operation-name">SSTORE (dirty: nonzero to nonzero): 2,900</div>
+      </div>
+      <div id="SSTORE (dirty: nonzero to zero)" class="flex opcode">
+        <div class="operation-name">SSTORE (dirty: nonzero to zero): 2,900 (refund: 4,800)</div>
+      </div>
+      <div id="SLOAD (cold)" class="flex opcode">
+        <div class="operation-name">SLOAD (cold): 2,100</div>
+      </div>
+      <div id="SLOAD (warm)" class="flex opcode">
+        <div class="operation-name">SLOAD (warm): 100</div>
+      </div>
+      <div id="CALL (no-value, warm)" class="flex opcode">
+        <div class="operation-name">CALL (no-value, warm): 100</div>
+      </div>
+      <div id="CALL (no-value, cold)" class="flex opcode">
+        <div class="operation-name">CALL (no-value, cold): 2,600</div>
+      </div>
+      <div id="CALL (no-value, new-address)" class="flex opcode">
+        <div class="operation-name">CALL (no-value, new-address): 25,000</div>
+      </div>
+      <div id="CALL (value, cold)" class="flex opcode">
+        <div class="operation-name">CALL (value, cold): 11,600</div>
+      </div>
+      <div id="CALL (value, warm)" class="flex opcode">
+        <div class="operation-name">CALL (value, warm): 9,100</div>
+      </div>
+      <div id="CALL (value, new-address)" class="flex opcode">
+        <div class="operation-name">CALL (value, new-address): 34,000</div>
+      </div>
+      <div id="CREATE" class="flex opcode">
+        <div class="operation-name">CREATE: 32,000</div>
+      </div>
     </div>
-    <div id="CALLDATACOPY" class="flex opcode">
-      <div class="operation-name">CALLDATACOPY: 7</div>
+    <h4 class="text-xl underline underline-offset-4">CONTRACT CALLS</h4>
+    <div id='contract-calls'  class="flex flex-col flex-wrap justify-between my-5">
+      <div class='flex contract-call' id="ERC20: Transfer">
+        <div class="operation-name">ERC20::Transfer: 64,883</div>
+      </div>
+      <div class='flex contract-call' id="ERC721: Transfer">
+        <div class="operation-name">ERC721::Transfer: 84,663</div>
+      </div>
+      <div class='flex contract-call' id="Uniswap V3: Swap">
+        <div class="operation-name">Uniswap V3::Swap: 184,361</div>
+      </div>
+      <div class='flex contract-call' id="Uniswap V2: Swap">
+        <div class="operation-name">Uniswap V2::Swap: 152,711</div>
+      </div>
+      <div class='flex contract-call' id="SushiSwap: Swap">
+        <div class="operation-name">SushiSwap::Swap: 140,843</div>
+      </div>
+      <div class='flex contract-call' id="Curve: Swap">
+        <div class="operation-name">Curve::Swap: 749,314</div>
+      </div>
+      <div class='flex contract-call' id="Balancer: Swap">
+        <div class="operation-name">Balancer::Swap: 196,230</div>
+      </div>
+      <div class='flex contract-call' id="1inch: Swap">
+        <div class="operation-name">1inch::Swap: 141,634</div>
+      </div>
+      <div class='flex contract-call' id="CoW Protocol: Swap">
+        <div class="operation-name">CoW Protocol::Swap: 343,007</div>
+      </div>
+      <div class='flex contract-call' id="OpenSea: Sale">
+        <div class="operation-name">OpenSea::Sale: 202,164</div>
+      </div>
+      <div class='flex contract-call' id="SuperRare: Sale">
+        <div class="operation-name">SuperRare::Sale: 130,556</div>
+      </div>
+      <div class='flex contract-call' id="Rarible: Sale">
+        <div>Rarible::Sale: 245,288</div>
+      </div>
+      <div class='flex contract-call' id="LooksRare: Sale">
+        <div class="operation-name">LooksRare::Sale: 326,391</div>
+      </div>
+      <div class='flex contract-call' id="ENS: Register Domain">
+        <div class="operation-name">ENS::Register Domain: 266,651</div>
+      </div>
+      <div class='flex contract-call' id="Gnosis Safe: Create Multisig">
+        <div class="operation-name">Gnosis Safe::Create Multisig: 288,015</div>
+      </div>
+      <div class='flex contract-call' id="Arbitrum: Deposit">
+        <div class="operation-name">Arbitrum::Deposit: 90,994</div>
+      </div>
+      <div class='flex contract-call' id="Optimism: Deposit">
+        <div class="operation-name">Optimism::Deposit: 150,733</div>
+      </div>
+      <div class='flex contract-call' id="Polygon: Deposit">
+        <div class="operation-name">Polygon::Deposit: 149,151</div>
+      </div>
+      <div class='flex contract-call' id="Beacon Chain: Deposit">
+        <div class="operation-name">Beacon Chain::Deposit: 53,014</div>
+      </div>
+      <div class='flex contract-call' id="Tornado.Cash: Deposit">
+        <div class="operation-name">Tornado.Cash::Deposit: 1,012,400</div>
+      </div>
+      <div class='flex contract-call' id="Tornado.Cash: Withdraw">
+        <div class="operation-name">Tornado.Cash::Withdraw: 360,414</div>
+      </div>
+      <div class='flex contract-call' id="dYdX: Borrow">
+        <div class="operation-name">dYdX::Borrow: 174,075</div>
+      </div>
+      <div class='flex contract-call' id="MakerDAO: Borrow">
+        <div class="operation-name">MakerDAO::Borrow: 223,023</div>
+      </div>
+      <div class='flex contract-call' id="Compound: Collect">
+        <div class="operation-name">Compound::Collect: 1,237,520</div>
+      </div>
+      <div class='flex contract-call' id="Compound: Borrow">
+        <div class="operation-name">Compound::Borrow: 339,842</div>
+      </div>
+      <div class='flex contract-call' id="Compound: Repay">
+        <div class="operation-name">Compound::Repay: 112,358</div>
+      </div>
+      <div class='flex contract-call' id="Aave: Borrow">
+        <div class="operation-name">Aave::Borrow: 318,478</div>
+      </div>
+      <div class='flex contract-call' id="Aave: Repay">
+        <div class="operation-name">Aave::Repay: 199,395</div>
+      </div>
+      <div class='flex contract-call' id="Lido: Stake">
+        <div class="operation-name">Lido::Stake: 82,686</div>
+      </div>
+      <div class='flex contract-call' id="Yearn Finance: Deposit">
+        <div class="operation-name">Yearn Finance::Deposit: 216,011</div>
+      </div>
+      <div class='flex contract-call' id="Hop Protocol: Bridge">
+        <div class="operation-name">Hop Protocol::Bridge: 121,457</div>
+      </div>
+      <div class='flex contract-call' id="Multichain: Bridge">
+        <div class="operation-name">Multichain::Bridge: 57,761</div>
+      </div>
+      <div class='flex contract-call' id="Across Protocol: Bridge">
+        <div class="operation-name">Across Protocol::Bridge: 120,666</div>
+      </div>
+      <div class='flex contract-call' id="Synapse: Bridge">
+        <div class="operation-name">Synapse::Bridge: 107,610</div>
+      </div>
     </div>
-    <div id="MSTORE" class="flex opcode">
-      <div class="operation-name">MSTORE: 3</div>
-    </div>
-    <div id="MLOAD" class="flex opcode">
-      <div class="operation-name">MLOAD: 3</div>
-    </div>
-    <div id="TIMESTAMP" class="flex opcode">
-      <div class="operation-name">TIMESTAMP: 2</div>
-    </div>
-    <div id="ADDRESS" class="flex opcode">
-      <div class="operation-name">ADDRESS: 2</div>
-    </div>
-    <div id="LOG0" class="flex opcode">
-      <div class="operation-name">LOG0: 632</div>
-    </div>
-    <div id="LOG4" class="flex opcode">
-      <div class="operation-name">LOG4: 2,132</div>
-    </div>
-    <div id="SSTORE (clean: zero to nonzero)" class="flex opcode">
-      <div class="operation-name">SSTORE (clean: zero to nonzero): 22,100</div>
-    </div>
-    <div id="SSTORE (clean: nonzero to nonzero)" class="flex opcode">
-      <div class="operation-name">SSTORE (clean: nonzero to nonzero): 5,000</div>
-    </div>
-    <div id="SSTORE (clean: nonzero to zero)" class="flex opcode">
-      <div class="operation-name">SSTORE (clean: nonzero to zero): 5,000 (refund: 4,800)</div>
-    </div>
-    <div id="SSTORE (dirty: zero to nonzero)" class="flex opcode">
-      <div class="operation-name">SSTORE (dirty: zero to nonzero): 20,000</div>
-    </div>
-    <div id="SSTORE (dirty: nonzero to nonzero)" class="flex opcode">
-      <div class="operation-name">SSTORE (dirty: nonzero to nonzero): 2,900</div>
-    </div>
-    <div id="SSTORE (dirty: nonzero to zero)" class="flex opcode">
-      <div class="operation-name">SSTORE (dirty: nonzero to zero): 2,900 (refund: 4,800)</div>
-    </div>
-    <div id="SSLOAD (cold)" class="flex opcode">
-      <div class="operation-name">SSLOAD (cold): 2,100</div>
-    </div>
-    <div id="SSLOAD (warm)" class="flex opcode">
-      <div class="operation-name">SSLOAD (warm): 100</div>
-    </div>
-    <div id="CALL (no-value, warm)" class="flex opcode">
-      <div class="operation-name">CALL (no-value, warm): 100</div>
-    </div>
-    <div id="CALL (no-value, cold)" class="flex opcode">
-      <div class="operation-name">CALL (no-value, cold): 2,600</div>
-    </div>
-    <div id="CALL (no-value, new-address)" class="flex opcode">
-      <div class="operation-name">CALL (no-value, new-address): 25,000</div>
-    </div>
-    <div id="CALL (value, cold)" class="flex opcode">
-      <div class="operation-name">CALL (value, cold): 11,600</div>
-    </div>
-    <div id="CALL (value, warm)" class="flex opcode">
-      <div class="operation-name">CALL (value, warm): 9,100</div>
-    </div>
-    <div id="CALL (value, new-address)" class="flex opcode">
-      <div class="operation-name">CALL (value, new-address): 34,000</div>
-    </div>
-    <div id="CREATE" class="flex opcode">
-      <div class="operation-name">CREATE: 32,000</div>
-    </div>
-  </div>
-  <h4 class="text-xl underline underline-offset-4">CONTRACT CALLS</h4>
-  <div id='contract-calls'  class="flex flex-col flex-wrap justify-between my-5">
-    <div class='flex contract-call' id="ERC20: Transfer">
-      <div class="operation-name">ERC20::Transfer: 64,883</div>
-    </div>
-    <div class='flex contract-call' id="ERC721: Transfer">
-      <div class="operation-name">ERC721::Transfer: 84,663</div>
-    </div>
-    <div class='flex contract-call' id="Uniswap V3: Swap">
-      <div class="operation-name">Uniswap V3::Swap: 184,361</div>
-    </div>
-    <div class='flex contract-call' id="Uniswap V2: Swap">
-      <div class="operation-name">Uniswap V2::Swap: 152,711</div>
-    </div>
-    <div class='flex contract-call' id="SushiSwap: Swap">
-      <div class="operation-name">SushiSwap::Swap: 140,843</div>
-    </div>
-    <div class='flex contract-call' id="Curve: Swap">
-      <div class="operation-name">Curve::Swap: 749,314</div>
-    </div>
-    <div class='flex contract-call' id="Balancer: Swap">
-      <div class="operation-name">Balancer::Swap: 196,230</div>
-    </div>
-    <div class='flex contract-call' id="1inch: Swap">
-      <div class="operation-name">1inch::Swap: 141,634</div>
-    </div>
-    <div class='flex contract-call' id="CoW Protocol: Swap">
-      <div class="operation-name">CoW Protocol::Swap: 343,007</div>
-    </div>
-    <div class='flex contract-call' id="OpenSea: Sale">
-      <div class="operation-name">OpenSea::Sale: 202,164</div>
-    </div>
-    <div class='flex contract-call' id="SuperRare: Sale">
-      <div class="operation-name">SuperRare::Sale: 130,556</div>
-    </div>
-    <div class='flex contract-call' id="Rarible: Sale">
-      <div>Rarible::Sale: 245,288</div>
-    </div>
-    <div class='flex contract-call' id="LooksRare: Sale">
-      <div class="operation-name">LooksRare::Sale: 326,391</div>
-    </div>
-    <div class='flex contract-call' id="ENS: Register Domain">
-      <div class="operation-name">ENS::Register Domain: 266,651</div>
-    </div>
-    <div class='flex contract-call' id="Gnosis Safe: Create Multisig">
-      <div class="operation-name">Gnosis Safe::Create Multisig: 288,015</div>
-    </div>
-    <div class='flex contract-call' id="Arbitrum: Deposit">
-      <div class="operation-name">Arbitrum::Deposit: 90,994</div>
-    </div>
-    <div class='flex contract-call' id="Optimism: Deposit">
-      <div class="operation-name">Optimism::Deposit: 150,733</div>
-    </div>
-    <div class='flex contract-call' id="Polygon: Deposit">
-      <div class="operation-name">Polygon::Deposit: 149,151</div>
-    </div>
-    <div class='flex contract-call' id="Beacon Chain: Deposit">
-      <div class="operation-name">Beacon Chain::Deposit: 53,014</div>
-    </div>
-    <div class='flex contract-call' id="Tornado.Cash: Deposit">
-      <div class="operation-name">Tornado.Cash::Deposit: 1,012,400</div>
-    </div>
-    <div class='flex contract-call' id="Tornado.Cash: Withdraw">
-      <div class="operation-name">Tornado.Cash::Withdraw: 360,414</div>
-    </div>
-    <div class='flex contract-call' id="dYdX: Borrow">
-      <div class="operation-name">dYdX::Borrow: 174,075</div>
-    </div>
-    <div class='flex contract-call' id="MakerDAO: Borrow">
-      <div class="operation-name">MakerDAO::Borrow: 223,023</div>
-    </div>
-    <div class='flex contract-call' id="Compound: Collect">
-      <div class="operation-name">Compound::Collect: 1,237,520</div>
-    </div>
-    <div class='flex contract-call' id="Compound: Borrow">
-      <div class="operation-name">Compound::Borrow: 339,842</div>
-    </div>
-    <div class='flex contract-call' id="Compound: Repay">
-      <div class="operation-name">Compound::Repay: 112,358</div>
-    </div>
-    <div class='flex contract-call' id="Aave: Borrow">
-      <div class="operation-name">Aave::Borrow: 318,478</div>
-    </div>
-    <div class='flex contract-call' id="Aave: Repay">
-      <div class="operation-name">Aave::Repay: 199,395</div>
-    </div>
-    <div class='flex contract-call' id="Lido: Stake">
-      <div class="operation-name">Lido::Stake: 82,686</div>
-    </div>
-    <div class='flex contract-call' id="Yearn Finance: Deposit">
-      <div class="operation-name">Yearn Finance::Deposit: 216,011</div>
-    </div>
-    <div class='flex contract-call' id="Hop Protocol: Bridge">
-      <div class="operation-name">Hop Protocol::Bridge: 121,457</div>
-    </div>
-    <div class='flex contract-call' id="Multichain: Bridge">
-      <div class="operation-name">Multichain::Bridge: 57,761</div>
-    </div>
-    <div class='flex contract-call' id="Across Protocol: Bridge">
-      <div class="operation-name">Across Protocol::Bridge: 120,666</div>
-    </div>
-    <div class='flex contract-call' id="Synapse: Bridge">
-      <div class="operation-name">Synapse::Bridge: 107,610</div>
-    </div>
-  </div>
-  <p class="mb-5 mt-1 text-sm text-neutral-600">Want to become an expert smart contract developer? Check out the <a target="_blank" href="https://0xmacro.com/engineering-fellowship?utm_source=gasnums" class="text-blue-500 underline">Macro Engineering Fellowship</a> 🚀</p>
-  <script src="./bundle.js"></script>
-</div>
+    <p class="mb-0 mt-1 text-sm text-neutral-600">Want to become an expert smart contract developer? Check out the <a target="_blank" href="https://0xmacro.com/engineering-fellowship?utm_source=gasnums">Macro Engineering Fellowship</a> 🚀</p>
+    <p class="mb-5 mt-2 text-sm text-neutral-600">Something missing from this page? Make an issue or PR on our <a target="_blank" href="https://github.com/0xMacro/gas-numbers-every-solidity-dev-should-know">github repo</a> 🤖</p>
+    <script src="./dist/bundle.js"></script>
+  </body>
+  </html>
