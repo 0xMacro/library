@@ -1,3 +1,8 @@
+
+.bg-mid {
+  @apply bg-gray-200/25 dark:bg-gray-700/75;
+}
+
 #audit-report > section, .Section {
   @apply px-4 sm:px-12 mx-auto max-w-3xl bg-light dark:bg-gray-800;
   @apply border-b-2 border-r-2 border-gray-200 dark:border-none;
@@ -11,7 +16,7 @@
 .Copy p,
 .Copy ol,
 .Copy ul {
-  @apply font-ui text-base sm:text-lg;
+  @apply text-base sm:text-lg;
 }
 
 .Copy p:first-child,
@@ -34,20 +39,18 @@
 
 .Copy p > code,
 .Copy ul code {
+  @apply bg-gray-200/75 dark:bg-gray-700;
   padding: .2em .4em;
   margin: 0;
-  font-size: 85%;
-  background-color: rgba(99,110,123,0.4);
+  font-size: 80%;
   border-radius: 6px;
 }
 
 .Copy > pre {
-  @apply mt-8 p-4;
+  @apply mt-8 p-4 bg-gray-200/25 dark:bg-gray-700/75 rounded-sm;
   overflow: auto;
-  font-size: 85%;
+  font-size: 80%;
   line-height: 1.45;
-  background-color: #343534;
-  border-radius: 2px;
 }
 
 .Copy > ul, .Copy > ol {
