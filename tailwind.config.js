@@ -190,6 +190,10 @@ module.exports = {
     './client/**/*.jsx',
     './client/**/*.ts',
     './client/**/*.tsx',
+    './lib/**/*.js',
+    './lib/**/*.jsx',
+    './lib/**/*.ts',
+    './lib/**/*.tsx',
   ],
   theme: {
     screens: {
@@ -218,8 +222,9 @@ module.exports = {
       },
       fontFamily: {
         'ui': `ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"`.split(', '),
-        'sans': [`"GT-Walsheim-Regular"`, 'sans-serif'],
+        'sans': [`"Kievit W01"`, 'sans-serif'],
         'serif': `Constantia, "Lucida Bright", Lucidabright, "Lucida Serif", Lucida, "DejaVu Serif", "Bitstream Vera Serif", "Liberation Serif", Georgia, serif`.split(', '),
+        'brand': [`'AllRoundGothic-Thick.otf'`, 'monospace'],
         'mono-brand': [`'Cutive Mono'`, 'monospace'],
       },
 

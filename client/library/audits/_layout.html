@@ -1,0 +1,323 @@
+<page title="{{page.auditTitle}} | Macro Audits" layout="/_layout.html">
+
+<link rel="stylesheet" type="text/css" href="/library/audits/audits.css">
+
+{{var auditId = page.location.pathname.split('/').slice(-1)[0]}}
+{{var issues = collection(auditId + '-issues').map(Issues.normalize)}}
+{{issues.map(Issues.validate) && ''}}
+
+<div class="py-5 fixed top-0 right-0 left-0 bg-gray-100 dark:bg-gray-900">
+  <div class="px-4 sm:px-12 lg:px-0 mx-auto max-w-3xl flex">
+    <a href="https://0xmacro.com">
+      <img class="h-6 dark:hidden" src="/library/logotype-t.svg" />
+      <img class="h-6 hidden dark:block" src="/library/logotype-t-ondark.svg" />
+    </a>
+  </div>
+</div>
+
+<div id="audit-report" class="text-lg pb-12 bg-gray-100 dark:bg-gray-900">
+  <section class="pt-24 min-h-screen flex flex-col">
+    <div class="py-[4vh]"></div>
+    <h1 class="text-6xl sm:text-7xl font-medium dark:text-white">{{page.auditTitle}}</h1>
+    <p class="mt-4 text-2xl sm:text-3xl dark:text-gray-300">Security Audit</p>
+    <p class="mt-4 text-sm sm:text-base font-ui">{{page.reportDate}}</p>
+    <p class="text-sm sm:text-base font-ui">Version {{page.auditVersion}}</p>
+    <div class="flex-1"></div>
+    <p class="mb-[6vh] text-base font-ui">Presented by <a class="text-blue-500 underline" target="_blank" href="https://0xmacro.com">0xMacro</a></p>
+  </section>
+
+  <section id="toc" class="Copy py-16">
+    <h2>Table of Contents</h2>
+    <ul class="list-style-none">
+      <li class="text-xl">
+        <a href="#introduction" class="hover:underline">Introduction</a>
+      </li>
+      <li class="text-xl">
+        <a href="#overall" class="hover:underline">Overall Assessment</a>
+      </li>
+      <li class="text-xl">
+        <a href="#specification" class="hover:underline">Specification</a>
+      </li>
+      <li class="text-xl">
+        <a href="#source-code" class="hover:underline">Source Code</a>
+      </li>
+      <li class="text-xl">
+        <a href="#issue-list" class="hover:underline">Issue Descriptions and Recommendations</a>
+      </li>
+      <li class="text-xl">
+        <a href="#security-levels" class="hover:underline">Security Levels Reference</a>
+      </li>
+      <li class="text-xl">
+        <a href="#disclaimer" class="hover:underline">Disclaimer</a>
+      </li>
+    </ul>
+  </section>
+
+  <section id="introduction" class="Copy py-16">
+    <h2>Introduction</h2>
+
+    <p>
+      This document includes the results of the security audit for {{page.clientName}}'s smart contract code as found in the section titled ‘Source Code’.
+      <yield name="schedule" />
+    </p>
+
+    <p>The purpose of this audit is to review the source code of certain {{page.clientName}} Solidity contracts, and provide feedback on the design, architecture, and quality of the source code with an emphasis on validating the correctness and security of the software in its entirety.</p>
+
+    <p><b class="text-red-500">Disclaimer:</b> While Macro’s review is comprehensive and has surfaced some changes that should be made to the source code, this audit should not solely be relied upon for security, as no single audit is guaranteed to catch all possible bugs.</p>
+  </section>
+
+  <section id="overall" class="Copy py-16">
+    <h2>Overall Assessment</h2>
+
+    <p>The following is an aggregation of issues found by the Macro Audit team:</p>
+
+    <div class="mt-8 -mx-4 overflow-x-auto sm:mx-0">
+      <div class="inline-block min-w-full py-2 align-middle">
+        <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600">
+          <thead>
+            <tr>
+              <th
+                scope="col"
+                class="py-3.5 pl-4 sm:pl-0 pr-3 text-right font-medium text-gray-900 dark:text-gray-300 dark:text-gray-300"
+              >
+                Severity
+              </th>
+              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                Count
+              </th>
+              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                Fixed
+              </th>
+              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                Acknowledged
+              </th>
+              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                Won't Do
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+            <for let="severity of 'HMLQIG'.split('')">
+              {{var subset = issues.filter(i => i.severity === severity)}}
+              <if cond="subset.length > 0">
+                <tr>
+                  <td class="whitespace-nowrap pl-4 sm:pl-0 py-4 pr-3  font-medium text-gray-900 dark:text-gray-300 text-right">
+                    {{Issues.severityNames[severity]}}
+                  </td>
+                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                    {{subset.length}}
+                  </td>
+                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                    {{subset.filter(i => i.status === 'fixed').length || '-'}}
+                  </td>
+                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                    {{subset.filter(i => i.status === 'ack').length || '-'}}
+                  </td>
+                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                    {{subset.filter(i => i.status === 'wontdo').length || '-'}}
+                  </td>
+                </tr>
+              </if>
+            </for>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p>{{page.clientName}} was quick to respond to these issues.</p>
+  </section>
+
+  <section id="specification" class="Copy py-16">
+    <h2>Specification</h2>
+
+    <p>Our understanding of the specification was based on the following sources:</p>
+
+    <yield name="spec" />
+  </section>
+
+  <section id="source-code" class="Copy py-16">
+    <h2>Source Code</h2>
+
+    <p>The following source code was reviewed during the audit:</p>
+
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank" class="text-blue-500 hover:underline">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        <b>Commit Hash:</b>
+        {{page.repoCommitHash}}
+      </li>
+    </ul>
+
+    <yield name="source-code" />
+
+    <p><b>Note:</b> This document contains an audit solely of the Solidity contracts listed above. Specifically, the audit pertains only to the contracts themselves, and does not pertain to any other programs or scripts, including deployment scripts.</p>
+  </section>
+
+  <section id="issue-list" class="py-12">
+
+    <div class="Copy">
+      <h2>Issue Descriptions and Recommendations</h2>
+
+      <p>Click on an issue to jump to it, or scroll down to see them all.</p>
+    </div>
+
+    <ul class="mt-8 list-style-none space-y-2">
+      <for let="issue of issues">
+        <li>
+          <a href="#{{issue.tag}}" class="flex hover:opacity-75">
+            <div class="w-7 h-7 flex-center flex-shrink-0 text-xs rounded-sm dark:text-black font-medium font-ui {{
+              issue.severity === 'H' ? 'bg-red-400' :
+              issue.severity === 'M' ? 'bg-yellow-400' :
+              issue.severity === 'L' ? 'bg-yellow-200' :
+              issue.severity === 'Q' ? 'bg-blue-300' :
+              'bg-gray-200'
+            }}">
+              {{issue.tag}}
+            </div>
+            <h2 class="pl-3 text-lg font-medium">
+              {{issue.title}}
+            </h2>
+          </a>
+        </li>
+      </for>
+    </ul>
+  </section>
+
+  <section id="security-levels" class="Copy py-12">
+    <h2>Security Level Reference</h2>
+
+    <div class="mt-8 -mx-4 overflow-x-auto sm:mx-0">
+      <div class="inline-block min-w-full py-2 align-middle">
+        <table class="mt-8 table-fixed divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600">
+          <thead>
+            <tr>
+              <th
+                scope="col"
+                class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300 dark:text-gray-300"
+              >
+                Level
+              </th>
+              <th scope="col" class="py-3.5 px-4 text-center  font-medium text-gray-900 dark:text-gray-300">
+                Description
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+            <tr>
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                High
+              </td>
+              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
+                <p>The issue poses existential risk to the project, and the issue identified could lead to massive financial or reputational repercussions.</p>
+                <p>We highly recommend fixing the reported issue. If you have already deployed, you should upgrade or redeploy your contracts.</p>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                Medium
+              </td>
+              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
+                <p>The potential risk is large, but there is some ambiguity surrounding whether or not the issue would practically manifest.</p>
+                <p>We recommend considering a fix for the reported issue.</p>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                Low
+              </td>
+              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
+                <p>The risk is small, unlikely, or not relevant to the project in a meaningful way.</p>
+                <p>Whether or not the project wants to develop a fix is up to the goals and needs of the project.</p>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                Code Quality
+              </td>
+              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
+                <p>The issue identified does not pose any obvious risk, but fixing it would improve overall code quality, conform to recommended best practices, and perhaps lead to fewer development issues in the future.</p>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                Informational
+              </td>
+              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
+                <p>Warnings and things to keep in mind when operating the protocol. No immediate action required.</p>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                Gas Optimizations
+              </td>
+              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
+                <p>The presented optimization suggestion would save an amount of gas significant enough, in our opinion, to be worth the development cost of implementing it.</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="issues" class="py-12">
+    <div class="Copy">
+      <h2>Issue Details</h2>
+    </div>
+    <for let="issue of issues">
+      <section id="{{issue.tag}}">
+        <div class="mt-12 pt-12 border-t dark:border-gray-600"></div>
+        <div class="flex">
+          <a
+            href="#{{issue.tag}}"
+            class="group w-10 h-10 flex-center flex-shrink-0 text-base rounded-sm dark:text-black font-medium font-ui {{
+              issue.severity === 'H' ? 'bg-red-400' :
+              issue.severity === 'M' ? 'bg-yellow-400' :
+              issue.severity === 'L' ? 'bg-yellow-200' :
+              issue.severity === 'Q' ? 'bg-blue-300' :
+              'bg-gray-200'
+            }}"
+          >
+            <span class="group-hover:hidden">{{issue.tag}}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden group-hover:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+</svg>
+          </a>
+          <h2 class="mt-1 pl-3 text-2xl font-medium">
+            {{issue.title}}
+          </h2>
+        </div>
+        <div class="mt-4 p-3 border dark:border-gray-600 flex">
+          <div class="flex-1">
+            <div class="uppercase text-sm font-medium text-gray-400">Topic</div>
+            <div class="text-base font-ui">{{issue.topic}}</div>
+          </div>
+          <div>
+            <div class="uppercase text-sm font-medium text-gray-400">Impact</div>
+            <div class="text-base font-ui">{{Issues.severityNames[issue.impact]}}</div>
+          </div>
+          <div class="pl-8 {{issue.isVuln ? '' : 'invisible'}}">
+            <div class="uppercase text-sm font-medium text-gray-400">Likelihood</div>
+            <div class="text-base font-ui">{{Issues.severityNames[issue.chance]}}</div>
+          </div>
+        </div>
+        <div class="mt-4 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>
+      </section>
+    </for>
+  </section>
+
+  <section id="disclaimer" class="Copy py-16">
+    <h2>Disclaimer</h2>
+
+    <p>Macro makes no warranties, either express, implied, statutory, or otherwise, with respect to the services or deliverables provided in this report, and Macro specifically disclaims all implied warranties of merchantability, fitness for a particular purpose, noninfringement and those arising from a course of dealing, usage or trade with respect thereto, and all such warranties are hereby excluded to the fullest extent permitted by law.</p>
+
+    <p>Macro will not be liable for any lost profits, business, contracts, revenue, goodwill, production, anticipated savings, loss of data, or costs of procurement of substitute goods or services or for any claim or demand by any other party. In no event will Macro be liable for consequential, incidental, special, indirect, or exemplary damages arising out of this agreement or any work statement, however caused and (to the fullest extent permitted by law) under any theory of liability (including negligence), even if Macro has been advised of the possibility of such damages.</p>
+
+    <p>The scope of this report and review is limited to a review of only the code presented by the Emergent team and only the source code Macro notes as being within the scope of Macro’s review within this report. This report does not include an audit of the deployment scripts used to deploy the Solidity contracts in the repository corresponding to this audit. Specifically, for the avoidance of doubt, this report does not constitute investment advice, is not intended to be relied upon as investment advice, is not an endorsement of this project or team, and it is not a guarantee as to the absolute security of the project. In this report you may through hypertext or other computer links, gain access to websites operated by persons other than Macro. Such hyperlinks are provided for your reference and convenience only, and are the exclusive responsibility of such websites’ owners. You agree that Macro is not responsible for the content or operation of such websites, and that Macro shall have no liability to your or any other person or entity for the use of third party websites. Macro assumes no responsibility for the use of third party software and shall have no liability whatsoever to any person or entity for the accuracy or completeness of any outcome generated by such software.</p>
+  </section>
+</div>

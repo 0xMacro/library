@@ -1,3 +1,5 @@
+const Issues = require('./lib/issues')
+const AuditMarkdown = require('./lib/audit-markdown')
 
 module.exports = {
   name: "The 0xMacro Library",
@@ -16,4 +18,13 @@ module.exports = {
 
   jsxFactory: 'm',
   jsxFragment: '"["',
+
+  locals: {
+    Issues,
+    AuditMarkdown,
+  },
+
+  templateTypes: {
+    'file-hashes': require('./lib/file-hashes')
+  },
 }
