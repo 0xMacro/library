@@ -3,7 +3,7 @@
 <link rel="stylesheet" type="text/css" href="/library/audits/audits.css">
 
 {{var auditId = page.location.pathname.split('/').slice(-1)[0]}}
-{{var issues = collection(auditId + '-issues').map(Issues.normalize)}}
+{{var issues = collection(`${page.passwordEncrypt ? 'private/' : ''}${auditId}-issues`).map(Issues.normalize)}}
 {{issues.map(Issues.validate) && ''}}
 
 <div class="py-5 fixed top-0 right-0 left-0 bg-gray-100 dark:bg-gray-900">
@@ -167,16 +167,23 @@
     </div>
 
     <ul class="mt-8 list-style-none space-y-2">
+      {{var doubleDigits = issues.some(i => +i.tag.split('-')[1] >= 10)}}
       <for let="issue of issues">
         <li>
           <a href="#{{issue.tag}}" class="flex hover:opacity-75">
-            <div class="w-7 h-7 flex-center flex-shrink-0 text-xs rounded-sm dark:text-black font-medium font-ui {{
-              issue.severity === 'H' ? 'bg-red-400' :
-              issue.severity === 'M' ? 'bg-yellow-400' :
-              issue.severity === 'L' ? 'bg-yellow-200' :
-              issue.severity === 'Q' ? 'bg-blue-300' :
-              'bg-gray-200'
-            }} {{issue.status === 'fixed' ? 'line-through' : ''}}">
+            <div
+              class="w-7 h-7 flex-center flex-shrink-0 rounded-sm dark:text-black font-medium font-ui {{
+                issue.severity === 'H' ? 'bg-red-400' :
+                issue.severity === 'M' ? 'bg-yellow-400' :
+                issue.severity === 'L' ? 'bg-yellow-200' :
+                issue.severity === 'Q' ? 'bg-blue-300' :
+                'bg-gray-200'
+              }} {{
+                issue.status === 'fixed' ? 'line-through' : ''
+              }} {{
+                doubleDigits ? 'text-[0.6rem]' : 'text-xs'
+              }}"
+            >
               {{issue.tag}}
             </div>
             <h2 class="pl-3 text-lg font-medium">
@@ -270,18 +277,24 @@
       <h2>Issue Details</h2>
     </div>
     <for let="issue of issues">
+      {{var doubleDigits = +issue.tag.split('-')[1] >= 10}}
+      {{var isFixed = issue.status === 'fixed'}}
       <section id="{{issue.tag}}">
         <div class="mt-12 pt-12 border-t dark:border-gray-600"></div>
         <div class="flex">
           <a
             href="#{{issue.tag}}"
-            class="group w-10 h-10 flex-center flex-shrink-0 text-base rounded-sm dark:text-black font-medium font-ui {{
+            class="group w-10 h-10 flex-center flex-shrink-0 rounded-sm dark:text-black font-medium font-ui {{
               issue.severity === 'H' ? 'bg-red-400' :
               issue.severity === 'M' ? 'bg-yellow-400' :
               issue.severity === 'L' ? 'bg-yellow-200' :
               issue.severity === 'Q' ? 'bg-blue-300' :
               'bg-gray-200'
-            }} {{issue.status === 'fixed' ? 'line-through' : ''}}"
+            }} {{
+              isFixed ? 'line-through' : ''
+            }} {{
+              doubleDigits ? 'text-xs' : 'text-sm'
+            }}"
           >
             <span class="group-hover:hidden">{{issue.tag}}</span>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden group-hover:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -292,7 +305,7 @@
             {{issue.title}}
           </h2>
         </div>
-        <div class="mt-5 p-4 flex dark:border-gray-600 bg-mid space-x-4 overflow-x-auto">
+        <div class="mt-5 p-4 flex dark:border-gray-600 bg-gray-200/25 dark:bg-gray-700/25 space-x-4 overflow-x-auto">
           <div class="flex-1 flex-shrink-0">
             <div class="uppercase text-sm font-medium text-gray-400">Topic</div>
             <div class="text-base font-ui whitespace-nowrap">{{issue.topic}}</div>
@@ -300,11 +313,24 @@
           <div>
             <div class="uppercase text-sm font-medium text-gray-400">Status</div>
             <div
-              class="text-base font-ui whitespace-nowrap {{
-                issue.status === 'fixed' ? 'text-green-500' : ''
-              }}"
+              class="text-base font-ui whitespace-nowrap"
             >
-              {{Issues.statusNames[issue.status]}}
+              <if cond="isFixed">
+                <a
+                  class="flex items-center text-green-500 dark:text-green-400 hover:text-blue-500 hover:underline"
+                  href="{{page.repoUrl}}/commit/{{issue.commit}}"
+                  title="{{issue.commit}}"
+                  target="_blank"
+                >
+                  Fixed
+                  <svg xmlns="http://www.w3.org/2000/svg" class="pl-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+</svg>
+                </a>
+              </if>
+              <else>
+                {{Issues.statusNames[issue.status]}}
+              </else>
             </div>
           </div>
           <div>
@@ -316,11 +342,13 @@
             <div class="text-base font-ui whitespace-nowrap">{{Issues.severityNames[issue.chance]}}</div>
           </div>
         </div>
-        <div class="mt-5 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>
+        <div class="mt-8 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>
         <if cond="issue.response">
-          <div class="mt-5 p-5 Copy bg-mid">
-            <div class="-mb-4 text-sm uppercase font-medium text-gray-400">Response by {{page.clientName}}</div>
-            {{AuditMarkdown.renderIssueContent(issue.response)}}
+          <div class="mt-8 Copy dark:border-gray-600">
+            <div class="-mb-4 text-sm uppercase font-medium text-gray-400">Response by {{page.clientName}}:</div>
+            <blockquote class="Copy ClientResponse">
+              {{AuditMarkdown.renderIssueContent(issue.response)}}
+            </blockquote>
           </div>
         </if>
       </section>

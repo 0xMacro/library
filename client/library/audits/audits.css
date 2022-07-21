@@ -1,8 +1,4 @@
 
-.bg-mid {
-  @apply bg-gray-200/25 dark:bg-gray-700/75;
-}
-
 #audit-report > section, .Section {
   @apply px-4 sm:px-12 mx-auto max-w-3xl bg-light dark:bg-gray-800;
   @apply border-b-2 border-r-2 border-gray-200 dark:border-none;
@@ -34,7 +30,7 @@
 }
 
 .Copy p {
-  @apply mt-8 leading-loose sm:leading-loose;
+  @apply mt-8 leading-loose;
 }
 
 .Copy p > code,
@@ -68,4 +64,18 @@
 }
 .Copy ul > ul > li {
   list-style: circle;
+}
+
+.Copy blockquote {
+  @apply mt-8 px-4 py-2 border-l-4 dark:border-gray-600 opacity-75;
+}
+.Copy blockquote p,
+.Copy blockquote ul li,
+.Copy blockquote ol li {
+  @apply leading-snug;
+}
+
+.Copy blockquote ul,
+.Copy blockquote ol {
+  @apply pl-4;
 }
