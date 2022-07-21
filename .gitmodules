@@ -1,0 +1,3 @@
+[submodule "content/collections/private"]
+	path = content/collections/private
+	url = git@github.com:0xMacro/private-audits.git

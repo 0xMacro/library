@@ -6,7 +6,7 @@
 {{var issues = collection(`${page.passwordEncrypt ? 'private/' : ''}${auditId}-issues`).map(Issues.normalize)}}
 {{issues.map(Issues.validate) && ''}}
 
-<div class="py-5 fixed top-0 right-0 left-0 bg-gray-100 dark:bg-gray-900">
+<div class="py-5 fixed z-20 top-0 right-0 left-0 bg-gray-100 dark:bg-gray-900">
   <div class="px-4 sm:px-12 lg:px-0 mx-auto max-w-3xl flex">
     <a href="https://0xmacro.com">
       <img class="h-6 dark:hidden" src="/library/logotype-t.svg" />
