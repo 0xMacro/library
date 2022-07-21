@@ -1,0 +1,53 @@
+<page
+  clientName="LiquiFi"
+  reportDate="July 18, 2022"
+  auditTitle="LiquiFi A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/LiquiFi/vesting-contracts-v1"
+  repoCommitHash="fad8f58439be5af4dd921776dc18032805dc88c3"
+  passwordEncrypt="PASS_LIQUIFY_1"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 20, 2022 to July 5, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>A privately accessible GitBook link of documentation.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    3d78ecb636072ede021dda001fb97f09f4841b37b79faba32fce2380aaea10ac  contracts/interfaces/IModule.sol
+    c3776f1c3f775a44dc5c73116351a5148c4c97b1e4aa38816b9717ce73c93b5c  contracts/interfaces/IStaggeredTokenVesting.sol
+    605ce4e715bfcc9359f2d386862e4dc9e6a72ee36d3547133605793b7d12156f  contracts/interfaces/IStaggeredTokenVestingFactory.sol
+    8faa685a3cfb16b4ce5a88573ef482ccbceda0d2ac675dcaf5e147c494bbad3a  contracts/interfaces/ITokenVesting.sol
+    d4f414c8b02126b0ff6fb579aca2c64f51895c64044c50241b9fd8ab028733f5  contracts/interfaces/ITokenVestingFactory.sol
+    8e5ddf89c175dc131f72454d19bec1b992ddd74598d262dd213b33332a188092  contracts/interfaces/IVestingModuleRegistry.sol
+    8d081e94a1ae4695feadcfe782c916976e9abc19c58808ca5bff10213a8178ae  contracts/interfaces/IWeightedTokenVesting.sol
+    25a321b63e3d77921e5916ee9d8ee2073efd43d226beaa9688448a449cdd5ee1  contracts/interfaces/IWeightedTokenVestingFactory.sol
+    488021fbda38a3e765a371c36ba1de300c2b440f826f4c6568e09ffabedaabcf  contracts/lib/VestPlans.sol
+    383943814632615d7231401863da2a66efcf8b42fa0bbfd6dc89142ed58fbd00  contracts/lib/helper/Token.sol
+    ac5650ca3774abad5d4141574e4fee3803aad6629d0338518fe167d2766d590c  contracts/modules/StaggeredVestingModule.sol
+    a120473a377bdd9389861c4602087ff7765ad8a1d7a7ca13dfc8447db1918494  contracts/modules/VestingModule.sol
+    83d3c2ae8b91f2bc46c5e8e11e6dd932bb89a81d0cf3823de5bff826ae7148d9  contracts/modules/VestingModuleRegistry.sol
+    7d27481c66eff269e4319c2a7d564b37fa853e95af17e40d8d64afcd9769bc8e  contracts/modules/WeightedVestingModule.sol
+    3fbbd124e154f6967020f22325ca536205da0954977e49728100e8f32e156541  contracts/payments/BatchPayments.sol
+    295be7d9cee9880443306e780fd81244f83252eeff418140aaf00113bde6e1fe  contracts/vesting/BaseTokenVesting.sol
+    64b03e9f751e418a7d491768fa5a3250b7a2e4ecf04a4e05a3bdac44fb18db92  contracts/vesting/TokenVesting.sol
+    d4e6d4f4682dcd2af150cc95a8587f7ac560c91e67001a959b936fffe49ae11e  contracts/vesting/TokenVestingFactory.sol
+    c9928fe2dca06b9ce609564cf983dae872a03175c33b8e46163e80bbb28e2763  contracts/vesting/staggered/StaggeredTokenVesting.sol
+    7bce1f7344835553a2fd4348003028d071460fabf67f8e87bf2c4634dbffba18  contracts/vesting/staggered/StaggeredTokenVestingFactory.sol
+    c5958684915abe6780002af611d6d12d56c49193709d36e31f1f6b0fad18aa49  contracts/vesting/weighted/WeightedTokenVesting.sol
+    88c8766302fe3dc638900a60082ec6630e62774a2d56140f009694762feb9de4  contracts/vesting/weighted/WeightedTokenVestingFactory.sol
+  </template>
+</content-for>
