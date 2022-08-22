@@ -1,0 +1,48 @@
+<page
+  clientName="Treasure DAO"
+  reportDate="August 22, 2022"
+  auditTitle="TreasureDAO A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/ghoul-sol/treasure-staking"
+  repoCommitHash="19c1c232b88907ac62440f1c3a6543f22b25f2af"
+  passwordEncrypt="env:PAGE_PASS_TREASUREDAO_1"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 20, 2022 to July 22, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+    <li>A privately accessible Google Docs link of documentation.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    b3ddb43736bb974750d7b035e70e0b40e0e6f9d84ced208079c38a4df15d7641  harvester/Harvester.sol
+    fbf50539c1c29a2d1cc8094f5227edcc9d6348e0a5d13109a3ae9858d8c1a141  harvester/HarvesterFactory.sol
+    d1b25e883fe3158c3732d3fbff804188c751811bff3416b0cb37978c354ebde1  harvester/Middleman.sol
+    81e4f35458a9f9ad1029593b01e79319b7d069877c5dbdc3f47e6e737630ae52  harvester/NftHandler.sol
+    bcc4c924d1711f69159e6682069da2c294dc0ab9c5d169061497b9296c69b6eb  harvester/interfaces/IExtractorStakingRules.sol
+    6733514f4fe96d9acc37bd794137a1a0cafa196f5d68414c3973ba8c85d4fade  harvester/interfaces/IHarvester.sol
+    61bebb2f33efee7b2bc6ce247c7d22045301f1b87338bbd0b59c0d8b0eee4023  harvester/interfaces/IHarvesterFactory.sol
+    e1cbd6356e18232d3f35b9565af51e9f1a3b907a952eb7748fda001573b85bc6  harvester/interfaces/IMiddleman.sol
+    b4e4a89043bc4159881e5fb18e9149fb41b0d7bd84fa5866cfb17fe300c252c2  harvester/interfaces/INftHandler.sol
+    c0d978c53b2ce0df967a3e9ad1747babe9a9339c94e12ef538208e6b5e67bb9f  harvester/interfaces/IPartsStakingRules.sol
+    ebe01b23135912ee2a632314c495542b4c8dbfcae13697fe8c40e921a27adb36  harvester/interfaces/IStakingRules.sol
+    43bd37cc3a1d3a3f6278152e56ad69d11cca53f8b372641535cff4ecf565a392  harvester/lib/Constant.sol
+    616597784a5cc4ec27f9d9b3b365b8cd7439dc545815689c77a1767e32b98a7c  harvester/rules/ExtractorStakingRules.sol
+    7ca128960f6d00ec1a3dbda9f8dc00ea8d6ac4bf720f820524439647fe35989e  harvester/rules/LegionStakingRules.sol
+    e1b15b309f316beabef88ef9b8074564256159ac9e5ff551dd2d461aa0388ea7  harvester/rules/PartsStakingRules.sol
+    881d6246ba488038b16a689955125bac7cd627d5d4808915aaeec253809b6437  harvester/rules/StakingRulesBase.sol
+    697f1233ece7c9bbf4ef2d8d53aab1f78fe8d0048fda42a402840cecefa07fb8  harvester/rules/TreasureStakingRules.sol
+  </template>
+</content-for>
