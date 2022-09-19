@@ -198,7 +198,31 @@
   <section id="security-levels" class="Copy py-12">
     <h2>Security Level Reference</h2>
 
-    <div class="mt-8 -mx-4 overflow-x-auto sm:mx-0">
+    <p>We quantify issues in three parts:</p>
+
+    <ol>
+      <li>
+        The high/medium/low/spec-breaking <b>impact</b> of the issue:
+        <ul>
+          <li>How bad things can get (for a vulnerability)</li>
+          <li>The significance of an improvement (for a code quality issue)</li>
+          <li>The amount of gas saved (for a gas optimization)</li>
+        </ul>
+      </li>
+      <li>
+        The high/medium/low <b>likelihood</b> of the issue:
+        <ul>
+          <li>How likely is the issue to occur (for a vulnerability)</li>
+        </ul>
+      </li>
+      <li>
+        The overall critical/high/medium/low <b>severity</b> of the issue.
+      </li>
+    </ol>
+
+    <p>This third part – the severity level – is a summary of how much consideration the client should give to fixing the issue. We assign severity according to the table of guidelines below:</p>
+
+    <div class="mt-4 -mx-4 overflow-x-auto sm:mx-0">
       <div class="inline-block min-w-full py-2 align-middle">
         <table class="mt-8 table-fixed divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600">
           <thead>
@@ -207,7 +231,7 @@
                 scope="col"
                 class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300 dark:text-gray-300"
               >
-                Level
+                Severity
               </th>
               <th scope="col" class="py-3.5 px-4 text-center  font-medium text-gray-900 dark:text-gray-300">
                 Description
@@ -217,33 +241,44 @@
           <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
             <tr>
               <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                (C-x)<br/>
+                Critical
+              </td>
+              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
+                <p>We recommend the client <b>must</b> fix the issue, no matter what, because not fixing would mean <b>significant funds WILL be lost.</b></p>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                (H-x)<br/>
                 High
               </td>
               <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
-                <p>The issue poses existential risk to the project, and the issue identified could lead to massive financial or reputational repercussions.</p>
-                <p>We highly recommend fixing the reported issue. If you have already deployed, you should upgrade or redeploy your contracts.</p>
+                <p>We recommend the client <b>must</b> address the issue, no matter what, because not fixing would be very bad, <i>or</i> some funds will be lost, <i>or</i> the code’s behavior is against the provided spec.</p>
               </td>
             </tr>
             <tr>
               <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                (M-x)<br/>
                 Medium
               </td>
               <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
-                <p>The potential risk is large, but there is some ambiguity surrounding whether or not the issue would practically manifest.</p>
-                <p>We recommend considering a fix for the reported issue.</p>
+                <p>We recommend the client to <b>seriously consider</b> fixing the issue, as the implications of not fixing the issue are severe enough to impact the project significantly, albiet not in an existential manner.</p>
               </td>
             </tr>
             <tr>
               <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                (L-x)<br/>
                 Low
               </td>
               <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
-                <p>The risk is small, unlikely, or not relevant to the project in a meaningful way.</p>
+                <p>The risk is small, unlikely, or may not relevant to the project in a meaningful way.</p>
                 <p>Whether or not the project wants to develop a fix is up to the goals and needs of the project.</p>
               </td>
             </tr>
             <tr>
               <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                (Q-x)<br/>
                 Code Quality
               </td>
               <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
@@ -252,6 +287,7 @@
             </tr>
             <tr>
               <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                (I-x)<br/>
                 Informational
               </td>
               <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
@@ -260,6 +296,7 @@
             </tr>
             <tr>
               <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+                (G-x)<br/>
                 Gas Optimizations
               </td>
               <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
@@ -305,7 +342,7 @@
             {{AuditMarkdown.renderInlineContent(issue.title)}}
           </h2>
         </div>
-        <div class="mt-5 p-4 flex dark:border-gray-600 bg-gray-200/25 dark:bg-gray-700/25 space-x-4 overflow-x-auto">
+        <div class="mt-5 p-4 flex dark:border-gray-600 bg-gray-200/25 dark:bg-gray-700/25 space-x-4 lg:space-x-5 overflow-x-auto">
           <div class="flex-1 flex-shrink-0">
             <div class="uppercase text-sm font-medium text-gray-400">Topic</div>
             <div class="text-base font-ui whitespace-nowrap">{{issue.topic}}</div>
@@ -333,14 +370,22 @@
               </else>
             </div>
           </div>
-          <div>
-            <div class="uppercase text-sm font-medium text-gray-400">Impact</div>
+          <div class="{{issue.isVuln ? '' : 'pr-2'}}">
+            <div class="uppercase text-sm font-medium text-gray-400">
+              {{
+                issue.severity === 'Q' ? 'Quality Impact' :
+                issue.severity === 'G' ? 'Gas Savings' :
+                'Impact'
+              }}
+            </div>
             <div class="text-base font-ui whitespace-nowrap">{{Issues.severityNames[issue.impact]}}</div>
           </div>
-          <div class="{{issue.isVuln ? '' : 'hidden sm:invisible sm:block'}}">
-            <div class="uppercase text-sm font-medium text-gray-400">Likelihood</div>
-            <div class="text-base font-ui whitespace-nowrap">{{Issues.severityNames[issue.chance]}}</div>
-          </div>
+          <if cond="issue.isVuln">
+            <div>
+              <div class="uppercase text-sm font-medium text-gray-400">Likelihood</div>
+              <div class="text-base font-ui whitespace-nowrap">{{Issues.severityNames[issue.chance]}}</div>
+            </div>
+          </if>
         </div>
         <div class="mt-8 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>
         <if cond="issue.response">

@@ -50,7 +50,7 @@
   line-height: 1.45;
 }
 
-.Copy > ul, .Copy > ol {
+.Copy ul, .Copy ol {
   @apply mt-8 pl-8 space-y-4;
   list-style: disc;
 }
@@ -60,8 +60,13 @@
 .Copy > p + ul, .Copy > p + ol {
   @apply mt-8;
 }
-.Copy ul ul, .Copy ol ol {
-  @apply mt-0;
+
+.Copy ul ul, .Copy ol ol,
+.Copy ul ol, .Copy ol ul,
+.Copy ul ul:first-child, .Copy ol ol:first-child, /* Necessary to override other mt-0 rule */
+.Copy ul ol:first-child, .Copy ol ul:first-child /* Necessary to override other mt-0 rule */
+{
+  @apply mt-5 mb-5;
 }
 .Copy ul > ul > li {
   list-style: circle;
