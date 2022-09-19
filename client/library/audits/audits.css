@@ -34,7 +34,8 @@
 }
 
 .Copy p > code,
-.Copy ul code {
+.Copy ul code,
+.IssueTitle code {
   @apply bg-gray-200/75 dark:bg-gray-700;
   padding: .2em .4em;
   margin: 0;
