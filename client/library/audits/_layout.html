@@ -301,8 +301,8 @@
   <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
 </svg>
           </a>
-          <h2 class="mt-1 pl-3 text-xl sm:text-2xl font-medium">
-            {{issue.title}}
+          <h2 class="IssueTitle mt-1 pl-3 text-xl sm:text-2xl font-medium">
+            {{AuditMarkdown.renderInlineContent(issue.title)}}
           </h2>
         </div>
         <div class="mt-5 p-4 flex dark:border-gray-600 bg-gray-200/25 dark:bg-gray-700/25 space-x-4 overflow-x-auto">
