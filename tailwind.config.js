@@ -222,10 +222,13 @@ module.exports = {
       },
       fontFamily: {
         'ui': `ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"`.split(', '),
-        'sans': [`"Kievit W01"`, 'sans-serif'],
+        'sans': [`"Informative"`, 'sans-serif'],
         'serif': `Constantia, "Lucida Bright", Lucidabright, "Lucida Serif", Lucida, "DejaVu Serif", "Bitstream Vera Serif", "Liberation Serif", Georgia, serif`.split(', '),
         'brand': [`'AllRoundGothic-Thick.otf'`, 'monospace'],
         'mono-brand': [`'Cutive Mono'`, 'monospace'],
+      },
+      fontSize: {
+        'lg': ['1.0625rem', '1.75'], // 17px instead of 18px
       },
 
       // https://github.com/tailwindlabs/tailwindcss-typography#customization

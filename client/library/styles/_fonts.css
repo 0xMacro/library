@@ -1,25 +1,32 @@
 @font-face {
   /* Regular */
-  font-family: "Kievit W01";
+  font-family: "Informative";
   font-weight: 400;
-  src: url("/library/fonts/Kievit-W01-Regular.woff2") format("woff2"),url("/library/fonts/Kievit-W01-Regular.woff") format("woff");
+  src: url("/library/fonts/Informative-Regular.woff2") format("woff2"),url("/library/fonts/Informative-Regular.woff") format("woff");
 }
 @font-face {
   /* Italic */
-  font-family: "Kievit W01";
+  font-family: "Informative";
   font-weight: 400;
   font-style: italic;
-  src: url("/library/fonts/Kievit-W01-Italic.woff2") format("woff2"),url("/library/fonts/Kievit-W01-Italic.woff") format("woff");
+  src: url("/library/fonts/Informative-Italic.woff2") format("woff2"),url("/library/fonts/Informative-Italic.woff") format("woff");
 }
 @font-face {
   /* Medium */
-  font-family: "Kievit W01";
+  font-family: "Informative";
   font-weight: 500;
-  src: url("/library/fonts/Kievit-W01-Medium.woff2") format("woff2"),url("/library/fonts/Kievit-W01-Medium.woff") format("woff");
+  src: url("/library/fonts/Informative-Medium.woff2") format("woff2"),url("/library/fonts/Informative-Medium.woff") format("woff");
 }
 @font-face {
   /* Bold */
-  font-family: "Kievit W01";
+  font-family: "Informative";
   font-weight: 700;
-  src: url("/library/fonts/Kievit-W01-Bold.woff2") format("woff2"),url("/library/fonts/Kievit-W01-Bold.woff") format("woff");
+  src: url("/library/fonts/Informative-Semibold.woff2") format("woff2"),url("/library/fonts/Informative-Semibold.woff") format("woff");
+}
+
+body {
+  letter-spacing: -0.01em;
+}
+.font-ui {
+  letter-spacing: 0;
 }

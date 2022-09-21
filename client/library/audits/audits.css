@@ -23,14 +23,14 @@
 
 
 .Copy h2 {
-  @apply text-3xl sm:text-4xl font-medium;
+  @apply text-3xl sm:text-4xl font-bold;
 }
 .Copy h3 {
   @apply text-2xl sm:text-3xl font-medium;
 }
 
 .Copy p {
-  @apply mt-8 leading-loose;
+  @apply mt-8;
 }
 
 .Copy p > code,
@@ -51,14 +51,11 @@
 }
 
 .Copy ul, .Copy ol {
-  @apply mt-8 pl-8 space-y-4;
+  @apply mt-6 pl-8 space-y-4;
   list-style: disc;
 }
 .Copy > ol {
   list-style: decimal;
-}
-.Copy > p + ul, .Copy > p + ol {
-  @apply mt-8;
 }
 
 .Copy ul ul, .Copy ol ol,
@@ -66,7 +63,7 @@
 .Copy ul ul:first-child, .Copy ol ol:first-child, /* Necessary to override other mt-0 rule */
 .Copy ul ol:first-child, .Copy ol ul:first-child /* Necessary to override other mt-0 rule */
 {
-  @apply mt-5 mb-5;
+  @apply mt-4 mb-5;
 }
 .Copy ul > ul > li {
   list-style: circle;

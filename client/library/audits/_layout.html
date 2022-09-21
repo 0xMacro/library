@@ -18,7 +18,7 @@
 <div id="audit-report" class="text-lg md:pb-12 bg-gray-100 dark:bg-gray-900">
   <section class="pt-24 min-h-screen flex flex-col">
     <div class="py-[4vh]"></div>
-    <h1 class="text-6xl sm:text-7xl font-medium dark:text-white">{{page.auditTitle}}</h1>
+    <h1 class="text-6xl sm:text-7xl font-bold dark:text-white">{{page.auditTitle}}</h1>
     <p class="mt-4 text-2xl sm:text-3xl dark:text-gray-300">Security Audit</p>
     <p class="mt-4 text-sm sm:text-base font-ui">{{page.reportDate}}</p>
     <p class="text-sm sm:text-base font-ui">Version {{page.auditVersion}}</p>
@@ -73,7 +73,7 @@
 
     <div class="mt-8 -mx-4 overflow-x-auto sm:mx-0">
       <div class="inline-block min-w-full py-2 align-middle">
-        <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600">
+        <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
           <thead>
             <tr>
               <th
@@ -240,67 +240,67 @@
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
             <tr>
-              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center leading-snug">
                 (C-x)<br/>
                 Critical
               </td>
-              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
-                <p>We recommend the client <b>must</b> fix the issue, no matter what, because not fixing would mean <b>significant funds/assets WILL be lost.</b></p>
+              <td class="p-4 dark:text-gray-100 text-left break-words">
+                <p class="!leading-snug">We recommend the client <b>must</b> fix the issue, no matter what, because not fixing would mean <b>significant funds/assets WILL be lost.</b></p>
               </td>
             </tr>
             <tr>
-              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center leading-snug">
                 (H-x)<br/>
                 High
               </td>
-              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
-                <p>We recommend the client <b>must</b> address the issue, no matter what, because not fixing would be very bad, <i>or</i> some funds/assets will be lost, <i>or</i> the code’s behavior is against the provided spec.</p>
+              <td class="p-4 dark:text-gray-100 text-left break-words">
+                <p class="!leading-snug">We recommend the client <b>must</b> address the issue, no matter what, because not fixing would be very bad, <i>or</i> some funds/assets will be lost, <i>or</i> the code’s behavior is against the provided spec.</p>
               </td>
             </tr>
             <tr>
-              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center leading-snug">
                 (M-x)<br/>
                 Medium
               </td>
-              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
-                <p>We recommend the client to <b>seriously consider</b> fixing the issue, as the implications of not fixing the issue are severe enough to impact the project significantly, albiet not in an existential manner.</p>
+              <td class="p-4 dark:text-gray-100 text-left break-words">
+                <p class="!leading-snug">We recommend the client to <b>seriously consider</b> fixing the issue, as the implications of not fixing the issue are severe enough to impact the project significantly, albiet not in an existential manner.</p>
               </td>
             </tr>
             <tr>
-              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center leading-snug">
                 (L-x)<br/>
                 Low
               </td>
-              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
-                <p>The risk is small, unlikely, or may not relevant to the project in a meaningful way.</p>
-                <p>Whether or not the project wants to develop a fix is up to the goals and needs of the project.</p>
+              <td class="p-4 dark:text-gray-100 text-left break-words">
+                <p class="!leading-snug">The risk is small, unlikely, or may not relevant to the project in a meaningful way.</p>
+                <p class="!mt-4 !leading-snug">Whether or not the project wants to develop a fix is up to the goals and needs of the project.</p>
               </td>
             </tr>
             <tr>
-              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center leading-snug">
                 (Q-x)<br/>
                 Code Quality
               </td>
-              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
-                <p>The issue identified does not pose any obvious risk, but fixing could improve overall code quality, on-chain composability, developer ergonomics, or even certain aspects of protocol design.</p>
+              <td class="p-4 dark:text-gray-100 text-left break-words">
+                <p class="!leading-snug">The issue identified does not pose any obvious risk, but fixing could improve overall code quality, on-chain composability, developer ergonomics, or even certain aspects of protocol design.</p>
               </td>
             </tr>
             <tr>
-              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center leading-snug">
                 (I-x)<br/>
                 Informational
               </td>
-              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
-                <p>Warnings and things to keep in mind when operating the protocol. No immediate action required.</p>
+              <td class="p-4 dark:text-gray-100 text-left break-words">
+                <p class="!leading-snug">Warnings and things to keep in mind when operating the protocol. No immediate action required.</p>
               </td>
             </tr>
             <tr>
-              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center">
+              <td class="py-4 px-4 sm:px-8 font-medium text-gray-900 dark:text-gray-300 text-center leading-snug">
                 (G-x)<br/>
                 Gas Optimizations
               </td>
-              <td class="p-4 text-gray-500 dark:text-gray-100 font-ui text-left break-words">
-                <p>The presented optimization suggestion would save an amount of gas significant enough, in our opinion, to be worth the development cost of implementing it.</p>
+              <td class="p-4 dark:text-gray-100 text-left break-words">
+                <p class="!leading-snug">The presented optimization suggestion would save an amount of gas significant enough, in our opinion, to be worth the development cost of implementing it.</p>
               </td>
             </tr>
           </tbody>
@@ -338,19 +338,19 @@
   <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
 </svg>
           </a>
-          <h2 class="IssueTitle mt-1 pl-3 text-xl sm:text-2xl font-medium">
+          <h2 class="IssueTitle mt-1 pl-3 text-xl sm:text-2xl font-bold">
             {{AuditMarkdown.renderInlineContent(issue.title)}}
           </h2>
         </div>
         <div class="mt-5 p-4 flex dark:border-gray-600 bg-gray-200/25 dark:bg-gray-700/25 space-x-4 lg:space-x-5 overflow-x-auto">
           <div class="flex-1 flex-shrink-0">
-            <div class="uppercase text-sm font-medium text-gray-400">Topic</div>
-            <div class="text-base font-ui whitespace-nowrap">{{issue.topic}}</div>
+            <div class="uppercase text-xs font-medium font-ui text-gray-400">Topic</div>
+            <div class="whitespace-nowrap">{{issue.topic}}</div>
           </div>
           <div>
-            <div class="uppercase text-sm font-medium text-gray-400">Status</div>
+            <div class="uppercase text-xs font-medium font-ui text-gray-400">Status</div>
             <div
-              class="text-base font-ui whitespace-nowrap"
+              class="whitespace-nowrap"
             >
               <if cond="isFixed">
                 <a
@@ -371,19 +371,19 @@
             </div>
           </div>
           <div class="{{issue.isVuln ? '' : 'pr-2'}}">
-            <div class="uppercase text-sm font-medium text-gray-400">
+            <div class="uppercase text-xs font-medium font-ui text-gray-400">
               {{
                 issue.severity === 'Q' ? 'Quality Impact' :
                 issue.severity === 'G' ? 'Gas Savings' :
                 'Impact'
               }}
             </div>
-            <div class="text-base font-ui whitespace-nowrap">{{Issues.severityNames[issue.impact]}}</div>
+            <div class="whitespace-nowrap">{{Issues.severityNames[issue.impact]}}</div>
           </div>
           <if cond="issue.isVuln">
             <div>
-              <div class="uppercase text-sm font-medium text-gray-400">Likelihood</div>
-              <div class="text-base font-ui whitespace-nowrap">{{Issues.severityNames[issue.chance]}}</div>
+              <div class="uppercase text-xs font-medium font-ui text-gray-400">Likelihood</div>
+              <div class="whitespace-nowrap">{{Issues.severityNames[issue.chance]}}</div>
             </div>
           </if>
         </div>
