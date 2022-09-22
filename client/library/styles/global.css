@@ -3,6 +3,7 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 @import "./_fonts.css";
+@import "./_tooltips.css";
 
 body {
   @apply bg-light dark:bg-gray-800 dark:text-gray-200;

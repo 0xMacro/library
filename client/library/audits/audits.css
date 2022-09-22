@@ -9,6 +9,10 @@
   @apply mt-1;
 }
 
+.Copy a {
+  @apply text-blue-600 hover:underline;
+}
+
 .Copy p,
 .Copy ol,
 .Copy ul {

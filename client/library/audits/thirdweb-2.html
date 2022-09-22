@@ -1,0 +1,124 @@
+<page
+  clientName="thirdweb"
+  reportDate="June 24th, 2022"
+  auditTitle="thirdweb A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  customRepoInfo
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 1, 2022 to June 17, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>
+      The official <a href="https://thirdweb.com/" target="_blank">website</a>, <a href="https://portal.thirdweb.com/" target="_blank">developer documentation</a> and more specifically provided documentation for contracts which were in scope of the performed audit <a href="https://github.com/thirdweb-dev/contracts/blob/multiwrap-audit-1.1/contracts/multiwrap/multiwrap.md" target="_blank">Multiwrap</a>, <a href="https://github.com/thirdweb-dev/contracts/blob/dropERC1155-audit-macro/contracts/drop/drop.md" target="_blank">DropERC1155</a> and <a href="https://github.com/thirdweb-dev/contracts/blob/v2.3.13/contracts/signature-drop/signatureDrop.md" target="_blank">SignatureDrop</a>.
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank">
+        {{page.repoUrl.split('/').slice(-1)[0]}}
+      </a>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash <b>(Multiwrap):</b>
+      <code>e33de553cfcdbcaa7c0a179756488b4e1238291a</code>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash <b>(DropERC1155):</b>
+      <code>f10d5433f004260ed80ca877e5427fb273e2f40c</code>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash <b>(SignatureDrop):</b>
+      <code>e1c2115c31a8be5e1453820b144c3ade01460f9a</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts as part of Multiwrap contract audit:</p>
+
+  <template type="file-hashes">
+    ceaaa52ceda0943f7fdf6044280189ca3a07bc8c8c5ee90d0aea3c29268f9a4b  contracts/multiwrap/Multiwrap.sol
+    df3db74a134e523735fc9915a8cd52f6d55dcad26fcbff4fd00e619f2a93bc7b  contracts/feature/ContractMetadata.sol
+    f2ba6cef6221bc122452c8d7ba7aed1a70de6d52fcc9f280a85205c1440b3d79  contracts/feature/Royalty.sol
+    195496f2b9e8218a5e6bb92243ad9f6e5baa72104559807a38e069ca7c9257e5  contracts/feature/Ownable.sol
+    a2af3b9cdb65c69e3943113a824490c244e68a1e632c750a3b89d95f0c6186d6  contracts/feature/Permissions.sol
+    27e09155f457aa32cd1c51f892dbdee9806d7bfa9bc985b565283463a07b0dba  contracts/feature/PermissionsEnumerable.sol
+    492880c72765692ca59c1baecfa55d1a58753708a23377efbeff45793b055bc4  contracts/feature/TokenBundle.sol
+    8b0ca57cbedbf8eb62b3ecd0a4e8bb51f845f26dabe70c41bd5056c9479d2517  contracts/feature/TokenStore.sol
+    052c1c014b8169fdb02a9daa37b5edfbbbf9c883d89fcfe4ea3717810fecc76c  contracts/lib/CurrencyTransferLib.sol
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  contracts/openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    d54f071277c95834259df0378bb569ce80132ba1adacb97a6eb71758395968b6  contracts/interfaces/IMultiwrap.sol
+    453c5d2cecd21718181c667c95e89e0dc4e6ee0df3df7e2152f93ebdcbde06f2  contracts/feature/interface/IContractMetadata.sol
+    6eb343aa794e6e30bbb1c8c7a6d09d8b380614dc6ca2ede1fb8d86908a38c409  contracts/feature/interface/IRoyalty.sol
+    e588d8e1d498f6c1ea9cdc308914c8284a417cf3f18f9a2e9583111aa69962f0  contracts/feature/interface/IOwnable.sol
+    333d596baf00c08da55bc1671da3f5df65c4a1d9e8d5639e910d1c23ffb7f980  contracts/feature/interface/IPermissions.sol
+    5993fac74a2908a778d21786cf0542f32c8c57d05a03321175b630948bf4913e  contracts/feature/interface/IPermissionsEnumerable.sol
+    fe05e8c4123da579aab2a92efe43b925e81443c870ac05b0f3b99bcaee0321bb  contracts/feature/interface/ITokenBundle.sol
+  </template>
+
+
+  <p>We audited the following contracts as part of DropERC1155 contract audit:</p>
+
+  <template type="file-hashes">
+    224b5233428ef803c6e875868945b840ec59f9694d1ce4dc42ee29b0e8fef582  contracts/drop/DropERC1155.sol
+    3d2ede585eb7e37872a0f3566a143f5b2aa586873160966d34c98963015f622d  contracts/lib/FeeType.sol
+    cf3d021220b40ba34a503595000419df6576fabb4309dc3c265abe4ad21a25c8  contracts/lib/MerkleProof.sol
+    052c1c014b8169fdb02a9daa37b5edfbbbf9c883d89fcfe4ea3717810fecc76c  contracts/lib/CurrencyTransferLib.sol
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  contracts/openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    8fc9d29ddee99b052ccdc521c272ee4df8a7de0e1754bfcba397dc5cdfa18c72  contracts/interfaces/IThirdwebContract.sol
+    a40ab9eb32bb694e01aed83c32e19e713f6686d5c10c41ceab2a962b65d954ae  contracts/feature/interface/IPlatformFee.sol
+    19fc349c2d09c7c3cf629010ac376f9e59876c753c7375dc0cd0d9962db2dea4  contracts/feature/interface/IPrimarySale.sol
+    6eb343aa794e6e30bbb1c8c7a6d09d8b380614dc6ca2ede1fb8d86908a38c409  contracts/feature/interface/IRoyalty.sol
+    e588d8e1d498f6c1ea9cdc308914c8284a417cf3f18f9a2e9583111aa69962f0  contracts/feature/interface/IOwnable.sol
+    4c57ef2e5572551ee29ec7ecfcb67932f152f7b0ffd1e5c84e0976f577eb43c5  contracts/interfaces/ITWFee.sol
+    acfcfa34578efe1c51d17c0506f3ee7261442bd6dcec49196a571918929c5a51  contracts/interfaces/drop/IDropClaimCondition.sol
+    440080243336aee49d674627c1a1dbc53fd7f75adc99bbebb93ee10f6a5d04c0  contracts/interfaces/drop/IDropERC1155.sol
+  </template>
+
+
+  <p>We audited the following contracts as part of SignatureDrop contract audit:</p>
+
+  <template type="file-hashes">
+    b61014572ce0e07b44c5814570eb0efe23e9302c8660a5629f6cc47a3c983f6e  contracts/signature-drop/SignatureDrop.sol
+    883965fe2c88a3ea36b56fbd780554485ee8c9bd5ac1d82f87dfa27cdf38820c  contracts/feature/ContractMetadata.sol
+    5761f4a8b9a1bd90070a09091a94e50370616002ef0825299d54120324f7020d  contracts/feature/PlatformFee.sol
+    6f472f7d77830b4924862b9e33e1cea34a1d7be30cba0ca4d99b76acc63eee11  contracts/feature/PrimarySale.sol
+    3faf5a5fb83fafc6169f3d0a97d9186e5b3e0a178bbb99db3cb849691df3a87e  contracts/feature/Royalty.sol
+    48df35ee1e617f6cd5ed52d1490719a12137ba77eb88df82aeed12140f3eceb8  contracts/feature/DelayedReveal.sol
+    58af5a7c6e04de4cefb82f1d74a1f6c8875fc76469b05f3c595ca81faae1cae4  contracts/feature/DropSinglePhase.sol
+    0f7aa682dd9c83e1b108d55c0a8b879dc4ee8fec582a9de3b36c3e24696d4d23  contracts/feature/LazyMint.sol
+    fa86e93306669311a74343ad50cbe533442792f8091e810763dc6125fd710cb0  contracts/feature/Ownable.sol
+    e07a0b4d807e31b6297677887ad704e79e45cf15eecba710949d3a92d078ee69  contracts/feature/Permissions.sol
+    27e09155f457aa32cd1c51f892dbdee9806d7bfa9bc985b565283463a07b0dba  contracts/feature/PermissionsEnumerable.sol
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  contracts/openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    052c1c014b8169fdb02a9daa37b5edfbbbf9c883d89fcfe4ea3717810fecc76c  contracts/lib/CurrencyTransferLib.sol
+    f83b0704e73d831f8d448a798c1a7eaf2b0dca156e276881c1cce925c3fd2c43  contracts/feature/SignatureMintERC721Upgradeable.sol
+    0dbad456208d0d05608647c27de0aee95e92fd288e364cf552ecffe6aff2bcaa  contracts/feature/interface/IClaimCondition.sol
+    453c5d2cecd21718181c667c95e89e0dc4e6ee0df3df7e2152f93ebdcbde06f2  contracts/feature/interface/IContractMetadata.sol
+    c6b5754ca0a19df8950b36b26ecef66b1c8408ed2dff305dbfbed9f4d9bf1e05  contracts/feature/interface/IDelayedReveal.sol
+    e588d8e1d498f6c1ea9cdc308914c8284a417cf3f18f9a2e9583111aa69962f0  contracts/feature/interface/IOwnable.sol
+    333d596baf00c08da55bc1671da3f5df65c4a1d9e8d5639e910d1c23ffb7f980  contracts/feature/interface/IPermissions.sol
+    5993fac74a2908a778d21786cf0542f32c8c57d05a03321175b630948bf4913e  contracts/feature/interface/IPermissionsEnumerable.sol
+    a40ab9eb32bb694e01aed83c32e19e713f6686d5c10c41ceab2a962b65d954ae  contracts/feature/interface/IPlatformFee.sol
+    19fc349c2d09c7c3cf629010ac376f9e59876c753c7375dc0cd0d9962db2dea4  contracts/feature/interface/IPrimarySale.sol
+    6eb343aa794e6e30bbb1c8c7a6d09d8b380614dc6ca2ede1fb8d86908a38c409  contracts/feature/interface/IRoyalty.sol
+    3fa03ed9c11deac6a8ab645465ee1b11604a7818cdb59b3ddc34c9b8dd5ec93e  contracts/feature/interface/ISignatureMintERC721.sol
+    aa7a6dbeb9599756597bfc7426ed9331aaa6a8c977fb31b29defb721917dcc03  contracts/feature/interface/IDropSinglePhase.sol
+    9cf7240f6527a848c1aa5267db2794fde9cbd8f11c3e5f9f6b0ac0ceca13eb4d  contracts/feature/interface/ILazyMint.sol
+  </template>
+</content-for>
