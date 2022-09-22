@@ -358,7 +358,7 @@
             <div
               class="whitespace-nowrap"
             >
-              <if cond="isAddressed">
+              <if cond="issue.commit">
                 <a
                   class="flex items-center text-green-500 dark:text-green-400 hover:text-blue-500 hover:underline"
                   href="{{page.repoUrl}}/commit/{{issue.commit}}"
@@ -374,6 +374,10 @@
               <else>
                 {{Issues.statusNames[issue.status]}}
               </else>
+
+              <if cond="issue.statusNote">
+                <span class="text-xs cursor-help" data-tippy-content="{{issue.statusNote}}">✳</span>
+              </if>
             </div>
           </div>
           <div class="{{issue.isVuln ? '' : 'pr-2'}}">
