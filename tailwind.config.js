@@ -205,6 +205,9 @@ module.exports = {
       '2xl': '1536px',
     },
     extend: {
+      screens: {
+        'print': {'raw': 'print'}, // @media print { ... }
+      },
       colors: {
         gray: colors.trueGray,
         light: '#fafafa',

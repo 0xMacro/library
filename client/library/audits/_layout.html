@@ -356,7 +356,7 @@
 
           <if cond="issue.severity !== 'I'">
             <div>
-              <div class="uppercase text-xs font-medium font-ui text-gray-400">Status</div>
+              <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-700">Status</div>
               <div
                 class="whitespace-nowrap"
               >
@@ -384,7 +384,7 @@
             </div>
           </if>
           <div class="{{issue.isVuln ? '' : 'pr-2'}}">
-            <div class="uppercase text-xs font-medium font-ui text-gray-400">
+            <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-800">
               {{
                 issue.severity === 'Q' ? 'Quality Impact' :
                 issue.severity === 'G' ? 'Gas Savings' :
@@ -406,7 +406,7 @@
           </div>
           <if cond="issue.isVuln">
             <div>
-              <div class="uppercase text-xs font-medium font-ui text-gray-400">Likelihood</div>
+              <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-800">Likelihood</div>
               <div class="whitespace-nowrap">
                 {{Issues.severityNames[issue.chance]}}
                 <if cond="issue.chanceNote">
@@ -419,7 +419,7 @@
         <div class="mt-8 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>
         <if cond="issue.response">
           <div class="mt-8 Copy dark:border-gray-600">
-            <div class="-mb-4 text-sm uppercase font-medium text-gray-400">Response by {{page.clientName}}:</div>
+            <div class="-mb-4 text-sm uppercase font-medium text-gray-400 print:text-gray-800">Response by {{page.clientName}}:</div>
             <blockquote class="Copy ClientResponse">
               {{AuditMarkdown.renderIssueContent(issue.response)}}
             </blockquote>

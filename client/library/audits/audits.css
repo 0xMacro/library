@@ -1,7 +1,7 @@
 
 #audit-report > section, .Section {
   @apply px-4 sm:px-12 mx-auto max-w-3xl bg-light dark:bg-gray-800;
-  @apply border-b-2 border-r-2 border-gray-200 dark:border-none;
+  @apply border-b-2 border-r-2 border-gray-200 dark:border-none print:border-0;
   border-radius: 1px;
 }
 
