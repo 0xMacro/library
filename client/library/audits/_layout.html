@@ -353,33 +353,36 @@
             <div class="uppercase text-xs font-medium font-ui text-gray-400">Topic</div>
             <div class="whitespace-nowrap">{{issue.topic}}</div>
           </div>
-          <div>
-            <div class="uppercase text-xs font-medium font-ui text-gray-400">Status</div>
-            <div
-              class="whitespace-nowrap"
-            >
-              <if cond="issue.commit">
-                <a
-                  class="flex items-center text-green-500 dark:text-green-400 hover:text-blue-500 hover:underline"
-                  href="{{page.repoUrl}}/commit/{{issue.commit}}"
-                  title="{{issue.commit}}"
-                  target="_blank"
-                >
-                  {{Issues.statusNames[issue.status]}}
-                  <svg xmlns="http://www.w3.org/2000/svg" class="pl-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-  <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-</svg>
-                </a>
-              </if>
-              <else>
-                {{Issues.statusNames[issue.status]}}
-              </else>
 
-              <if cond="issue.statusNote">
-                <span class="text-xs cursor-help" data-tippy-content="{{issue.statusNote}}">✳</span>
-              </if>
+          <if cond="issue.severity !== 'I'">
+            <div>
+              <div class="uppercase text-xs font-medium font-ui text-gray-400">Status</div>
+              <div
+                class="whitespace-nowrap"
+              >
+                <if cond="issue.commit">
+                  <a
+                    class="inline-flex items-center text-green-500 dark:text-green-400 hover:text-blue-500 hover:underline"
+                    href="{{page.repoUrl}}/commit/{{issue.commit}}"
+                    title="{{issue.commit}}"
+                    target="_blank"
+                  >
+                    {{Issues.statusNames[issue.status]}}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="px-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+  </svg>
+                  </a>
+                </if>
+                <else>
+                  {{Issues.statusNames[issue.status]}}
+                </else>
+
+                <if cond="issue.statusNote">
+                  <span class="text-xs cursor-help" data-tippy-content="{{issue.statusNote}}">✳</span>
+                </if>
+              </div>
             </div>
-          </div>
+          </if>
           <div class="{{issue.isVuln ? '' : 'pr-2'}}">
             <div class="uppercase text-xs font-medium font-ui text-gray-400">
               {{
@@ -389,10 +392,16 @@
               }}
             </div>
             <div class="whitespace-nowrap">
-              {{Issues.severityNames[issue.impact]}}
-              <if cond="issue.impactNote">
-                <span class="text-xs cursor-help" data-tippy-content="{{issue.impactNote}}">✳</span>
+              <if cond="issue.severity === 'I'">
+                Informational
+                <span class="text-xs cursor-help" data-tippy-content="Informational issues have no vulnerability in scope, and thus no call-to-action.">✳</span>
               </if>
+              <else>
+                {{Issues.severityNames[issue.impact]}}
+                <if cond="issue.impactNote">
+                  <span class="text-xs cursor-help" data-tippy-content="{{issue.impactNote}}">✳</span>
+                </if>
+              </else>
             </div>
           </div>
           <if cond="issue.isVuln">
