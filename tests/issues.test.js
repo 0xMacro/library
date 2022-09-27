@@ -76,6 +76,8 @@ o.spec('parseNotionMarkdownIssues', function() {
 
     o(result[0].impact).equals('medium')
     o(result[0].chance).equals('high')
+    o(result[0].content.includes('Impact')).equals(false)
+    o(result[0].content.includes('Likelihood')).equals(false)
 
     o(result[1].impact).equals('spec')
     o(result[1].chance).equals('high')
