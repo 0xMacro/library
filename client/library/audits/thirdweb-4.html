@@ -1,0 +1,92 @@
+<page
+  clientName="thirdweb"
+  reportDate="September 29th, 2022"
+  auditTitle="thirdweb A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  passwordEncrypt="env:PAGE_PASS_THIRDWEB_4"
+  customRepoInfo
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from August 23, 2022 to September 2, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>
+      The official <a href="https://thirdweb.com/" target="_blank">website</a>, <a href="https://portal.thirdweb.com/" target="_blank">developer documentation</a> and more specifically provided documentation for contracts which were in scope of the performed audit: <a href="https://github.com/thirdweb-dev/contracts/blob/v3.1.1/contracts/token/signatureMint.md" target="_blank">SignatureMint</a>.
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank">
+        {{page.repoUrl.split('/').slice(-1)[0]}}
+      </a>
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash:</b>
+      <code>d3f61abc34d930788e09b968affb38fec5762408</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts as part of TokenERC20 contract audit:</p>
+
+  <template type="file-hashes">
+    b60f119b198c65147fdd0dfa1db2edacf5018abc0a7600707773bef8a029ee57  contracts/token/TokenERC20.sol
+    3d2ede585eb7e37872a0f3566a143f5b2aa586873160966d34c98963015f622d  contracts/lib/FeeType.sol
+    ab7e40d1b333d675e23d9d4a4c70836c508b2e8b890cf1c6f3dc554424d1215d  contracts/lib/CurrencyTransferLib.sol
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  contracts/openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    6765deea0f732abce9f6b450826da733d59ad101b1bab9014a408a5098e54105  contracts/extension/interface/IPlatformFee.sol
+    923135d5e6d6ea2452ccdecbe4794b48fbe4389231caa78fba964a1d4ba4114f  contracts/extension/interface/IPrimarySale.sol
+    a6160110711cb0935a9b23d2d0429fa54237ec8bdf5ae7d19b328dd39c93ac45  contracts/interfaces/token/ITokenERC20.sol
+    4c57ef2e5572551ee29ec7ecfcb67932f152f7b0ffd1e5c84e0976f577eb43c5  contracts/interfaces/ITWFee.sol
+    8fc9d29ddee99b052ccdc521c272ee4df8a7de0e1754bfcba397dc5cdfa18c72  contracts/interfaces/IThirdwebContract.sol
+  </template>
+
+
+  <p>We audited the following contracts as part of TokenERC721 contract audit:</p>
+
+  <template type="file-hashes">
+    01266703a6d26dbc1e223115dd4476b87d9adb8ab0ac9676718b6c8265a33eb3  contracts/token/TokenERC721.sol
+    3d2ede585eb7e37872a0f3566a143f5b2aa586873160966d34c98963015f622d  contracts/lib/FeeType.sol
+    ab7e40d1b333d675e23d9d4a4c70836c508b2e8b890cf1c6f3dc554424d1215d  contracts/lib/CurrencyTransferLib.sol
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  contracts/openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    6765deea0f732abce9f6b450826da733d59ad101b1bab9014a408a5098e54105  contracts/extension/interface/IPlatformFee.sol
+    923135d5e6d6ea2452ccdecbe4794b48fbe4389231caa78fba964a1d4ba4114f  contracts/extension/interface/IPrimarySale.sol
+    8f39cbdfd7fff348f5f002c2ee87f607811e02312a673781e1cd3281694a9568  contracts/extension/interface/IRoyalty.sol
+    f4e6814d6fa45c709cbd03de2a2fd46fb86d3156cb934f6feb9acaa692deca72  contracts/extension/interface/IOwnable.sol
+    f472020a23d63126b70ddbd2db87d12bdcd2a0765e8ab4e013344794b1fcc7f0  contracts/interfaces/token/ITokenERC721.sol
+    4c57ef2e5572551ee29ec7ecfcb67932f152f7b0ffd1e5c84e0976f577eb43c5  contracts/interfaces/ITWFee.sol
+    8fc9d29ddee99b052ccdc521c272ee4df8a7de0e1754bfcba397dc5cdfa18c72  contracts/interfaces/IThirdwebContract.sol
+  </template>
+
+
+  <p>We audited the following contracts as part of TokenERC1155 contract audit:</p>
+
+  <template type="file-hashes">
+    68d480bcdc3b470ad4049addbc07e6e08e8800a7449f4b198a8d7301dc1c1f23  contracts/token/TokenERC1155.sol
+    3d2ede585eb7e37872a0f3566a143f5b2aa586873160966d34c98963015f622d  contracts/lib/FeeType.sol
+    ab7e40d1b333d675e23d9d4a4c70836c508b2e8b890cf1c6f3dc554424d1215d  contracts/lib/CurrencyTransferLib.sol
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  contracts/openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    6765deea0f732abce9f6b450826da733d59ad101b1bab9014a408a5098e54105  contracts/extension/interface/IPlatformFee.sol
+    923135d5e6d6ea2452ccdecbe4794b48fbe4389231caa78fba964a1d4ba4114f  contracts/extension/interface/IPrimarySale.sol
+    8f39cbdfd7fff348f5f002c2ee87f607811e02312a673781e1cd3281694a9568  contracts/extension/interface/IRoyalty.sol
+    f4e6814d6fa45c709cbd03de2a2fd46fb86d3156cb934f6feb9acaa692deca72  contracts/extension/interface/IOwnable.sol
+    fc20fdff4ab4db1ddf2849e4309c2e2239a147fd0ef6fe49130494af902aa0d0  contracts/interfaces/token/ITokenERC1155.sol
+    4c57ef2e5572551ee29ec7ecfcb67932f152f7b0ffd1e5c84e0976f577eb43c5  contracts/interfaces/ITWFee.sol
+    8fc9d29ddee99b052ccdc521c272ee4df8a7de0e1754bfcba397dc5cdfa18c72  contracts/interfaces/IThirdwebContract.sol
+  </template>
+</content-for>

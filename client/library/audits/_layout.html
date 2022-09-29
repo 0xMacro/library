@@ -98,7 +98,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
-            <for let="severity of 'HMLQIG'.split('')">
+            <for let="severity of 'CHMLQIG'.split('')">
               {{var subset = issues.filter(i => i.severity === severity)}}
               <if cond="subset.length > 0">
                 <tr>
@@ -179,6 +179,7 @@
           <a href="#{{issue.tag}}" class="flex hover:opacity-75">
             <div
               class="w-7 h-7 flex-center flex-shrink-0 rounded-sm dark:text-black font-medium font-ui {{
+                issue.severity === 'C' ? 'bg-red-800' :
                 issue.severity === 'H' ? 'bg-red-400' :
                 issue.severity === 'M' ? 'bg-yellow-400' :
                 issue.severity === 'L' ? 'bg-yellow-200' :
@@ -328,6 +329,7 @@
           <a
             href="#{{issue.tag}}"
             class="group w-10 h-10 flex-center flex-shrink-0 rounded-sm dark:text-black font-medium font-ui {{
+              issue.severity === 'C' ? 'bg-red-800' :
               issue.severity === 'H' ? 'bg-red-400' :
               issue.severity === 'M' ? 'bg-yellow-400' :
               issue.severity === 'L' ? 'bg-yellow-200' :
