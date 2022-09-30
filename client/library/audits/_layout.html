@@ -419,7 +419,11 @@
         <div class="mt-8 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>
         <if cond="issue.response">
           <div class="mt-8 Copy dark:border-gray-600">
-            <div class="-mb-4 text-sm uppercase font-medium text-gray-400 print:text-gray-800">Response by {{page.clientName}}:</div>
+            <div class="-mb-4 text-sm uppercase font-medium text-gray-800 dark:text-gray-400 print:text-gray-800">
+              <span class="py-1 px-2 inline-block rounded bg-gray-200/25 dark:bg-gray-700/25">
+                Response by {{page.clientName}}
+              </span>
+            </div>
             <blockquote class="Copy ClientResponse">
               {{AuditMarkdown.renderIssueContent(issue.response)}}
             </blockquote>
