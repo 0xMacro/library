@@ -232,6 +232,14 @@ module.exports = {
       },
       fontSize: {
         'lg': ['1.0625rem', '1.75'], // 17px instead of 18px
+        // Shift all others down a size
+        'xl': defaultTheme.fontSize['lg'],
+        '2xl': defaultTheme.fontSize['xl'],
+        '3xl': defaultTheme.fontSize['2xl'],
+        '4xl': defaultTheme.fontSize['3xl'],
+        '5xl': defaultTheme.fontSize['4xl'],
+        '6xl': defaultTheme.fontSize['5xl'],
+        '7xl': defaultTheme.fontSize['6xl'],
       },
 
       // https://github.com/tailwindlabs/tailwindcss-typography#customization

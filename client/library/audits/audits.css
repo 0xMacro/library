@@ -27,10 +27,10 @@
 
 
 .Copy h2 {
-  @apply text-3xl sm:text-4xl font-bold;
+  @apply mt-10 -mb-2 text-2xl sm:text-3xl font-bold;
 }
 .Copy h3 {
-  @apply text-2xl sm:text-3xl font-medium;
+  @apply mt-10 -mb-2 text-xl sm:text-2xl font-medium;
 }
 
 .Copy p {
@@ -39,6 +39,10 @@
 
 .Copy p > code,
 .Copy ul code,
+.Copy h1 code,
+.Copy h2 code,
+.Copy h3 code,
+.Copy h4 code,
 .IssueTitle code {
   @apply bg-gray-200/75 dark:bg-gray-700;
   padding: .2em .4em;
