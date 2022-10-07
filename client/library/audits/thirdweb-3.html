@@ -1,0 +1,51 @@
+<page
+  clientName="thirdweb"
+  reportDate="Aug 19th, 2022"
+  auditTitle="thirdweb A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  repoCommitHash="85d1be5546d93ffe1fd1375ceb90af67a4e3210d"
+  passwordEncrypt="env:PAGE_PASS_THIRDWEB_3"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 18, 2022 to June 29, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>An audit handoff document hosted on Notion.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    3dc0c8320b4c58a841c5c09eea8fdf4a4de1f44704f0d193d910e68d3a375568  contracts/pack/Pack.sol
+    a50e76e5f1d5faca0d76ecb578d346c999eec0fbe7806e6780bd68f1204fbd9f  contracts/extension/ContractMetadata.sol
+    56d323ffb5d56d80c98a115dfcef8738e5ff1120c67a940a9b67459d13fac969  contracts/extension/Royalty.sol
+    fe85fc62427b51d9860b1f79796eccd1469a43bd6679fcc7c7e1a31f57dc176c  contracts/extension/Ownable.sol
+    053f4dc4bdd53ee4f59f049516c7513fde53cc5a461af4068ff9015036220efa  contracts/extension/Permissions.sol
+    903504914fd1309f65017775edf99f65e6c334dbeb2fee37cc07d8b39dd6439f  contracts/extension/PermissionsEnumerable.sol
+    b181b2d3ef577b59a798800fa39e6a8df75e1d759eee1ecd5fb36231f0ce0af3  contracts/extension/TokenBundle.sol
+    d04bf4fd423d4765e336a9322bf32afc5458e674824b5d50ae2f90ec450f6bca  contracts/extension/TokenStore.sol
+    f0b7ac93fba3fbb8a71bd76da822cceec0fa86b20418835a228c67d06176eaec  contracts/extension/interface/IContractMetadata.sol
+    f4e6814d6fa45c709cbd03de2a2fd46fb86d3156cb934f6feb9acaa692deca72  contracts/extension/interface/IOwnable.sol
+    333d596baf00c08da55bc1671da3f5df65c4a1d9e8d5639e910d1c23ffb7f980  contracts/extension/interface/IPermissions.sol
+    5993fac74a2908a778d21786cf0542f32c8c57d05a03321175b630948bf4913e  contracts/extension/interface/IPermissionsEnumerable.sol
+    8f39cbdfd7fff348f5f002c2ee87f607811e02312a673781e1cd3281694a9568  contracts/extension/interface/IRoyalty.sol
+    fe05e8c4123da579aab2a92efe43b925e81443c870ac05b0f3b99bcaee0321bb  contracts/extension/interface/ITokenBundle.sol
+    a3a8f38e49e60615ebf87ae9be98e42553a1b240751c3b49b416bdec75ee9776  contracts/interfaces/IPack.sol
+    839869bd411a4e68c9a59d2a0c394a087641eeeadeda4956a255dc3179110cc3  contracts/interfaces/IWETH.sol
+    ab7e40d1b333d675e23d9d4a4c70836c508b2e8b890cf1c6f3dc554424d1215d  contracts/lib/CurrencyTransferLib.sol
+    d1fa327e26529fe1048a230a9fdaa183da21f9418729b665e0d57f68f136de0b  contracts/lib/TWStrings.sol
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  contracts/openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    569cd0b266ff404aeac1a4266a1535121e47907ef1dcea2d55f4c036a11f758e  contracts/openzeppelin-presets/token/ERC20/utils/SafeERC20.sol
+  </template>
+</content-for>
