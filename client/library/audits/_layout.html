@@ -178,13 +178,13 @@
         <li>
           <a href="#{{issue.tag}}" class="flex hover:opacity-75">
             <div
-              class="w-7 h-7 flex-center flex-shrink-0 rounded-sm dark:text-black font-medium font-ui {{
-                issue.severity === 'C' ? 'bg-red-800' :
-                issue.severity === 'H' ? 'bg-red-400' :
-                issue.severity === 'M' ? 'bg-yellow-400' :
-                issue.severity === 'L' ? 'bg-yellow-200' :
-                issue.severity === 'Q' ? 'bg-blue-300' :
-                'bg-gray-200'
+              class="w-7 h-7 flex-center flex-shrink-0 rounded-sm font-medium font-ui {{
+                issue.severity === 'C' ? 'bg-gray-800 dark:bg-black text-white dark:text-white' :
+                issue.severity === 'H' ? 'bg-red-400 dark:text-black' :
+                issue.severity === 'M' ? 'bg-yellow-400 dark:text-black' :
+                issue.severity === 'L' ? 'bg-yellow-200 dark:text-black' :
+                issue.severity === 'Q' ? 'bg-blue-300 dark:text-black' :
+                'bg-gray-200 dark:text-black'
               }} {{
                 issue.status === 'fixed' ? 'line-through' : ''
               }} {{
@@ -328,13 +328,13 @@
         <div class="flex">
           <a
             href="#{{issue.tag}}"
-            class="group w-10 h-10 flex-center flex-shrink-0 rounded-sm dark:text-black font-medium font-ui {{
-              issue.severity === 'C' ? 'bg-red-800' :
-              issue.severity === 'H' ? 'bg-red-400' :
-              issue.severity === 'M' ? 'bg-yellow-400' :
-              issue.severity === 'L' ? 'bg-yellow-200' :
-              issue.severity === 'Q' ? 'bg-blue-300' :
-              'bg-gray-200'
+            class="group w-10 h-10 flex-center flex-shrink-0 rounded-sm font-medium font-ui {{
+              issue.severity === 'C' ? 'bg-gray-800 dark:bg-black text-white dark:text-white' :
+              issue.severity === 'H' ? 'bg-red-400 dark:text-black' :
+              issue.severity === 'M' ? 'bg-yellow-400 dark:text-black' :
+              issue.severity === 'L' ? 'bg-yellow-200 dark:text-black' :
+              issue.severity === 'Q' ? 'bg-blue-300 dark:text-black' :
+              'bg-gray-200 dark:text-black'
             }} {{
               isAddressed ? 'line-through' : ''
             }} {{
