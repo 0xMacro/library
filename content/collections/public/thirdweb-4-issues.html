@@ -1,0 +1,256 @@
+<item>
+    <field name="topic">Frontrunning</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">19a10e308cb90644caa45a880db7dd29d96321bf</field>
+    <field name="content">
+        ## (C-1) `mintWithSignature()` front-running vulnerability
+
+        In *TokenERC20*, *TokenERC721* and *TokenERC115*, `mintWithSignature()` allows the MintRequest’s `to` address to be zero:
+        ```solidity
+        function mintWithSignature(MintRequest calldata _req, bytes calldata _signature) external payable nonReentrant {
+            // ...
+            address receiver = _req.to == address(0) ? _msgSender() : _req.to;
+            // ...
+        }
+        ```
+
+        This behavior allows a minter to construct a mint signature such that the sender will receive the tokens, instead of needing to specify the recipient’s address.
+
+        However, because the recipient is the sender, an attacker can frontrun a `mintWithSignature()` transaction, receiving the tokens and leaving the victim with nothing.
+
+        If there is no price, the attacker gets the tokens for free. This is particularly bad when the token has a market price on an AMM, and the contract owner wanted to grant someone new tokens.
+
+        If a price is present, the attacker does have to pay it. But the situation is still problematic if the price was a discount, or if the use case is minting for a fixed amount of investment.
+
+        Note that this behavior also exists in SignatureDrop.sol.
+
+        Consider forcing MintRequest’s `to` address to always be defined.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">eef735c335326be9b0218167b22de4cc580e4fd5</field>
+    <field name="content">
+        ## (M-1) *TokenERC20* charges price when quantity is 0
+
+        In *TokenERC20’s* `mintWithSignature` function, when mint request is defined with `quantity=0`, nothing is minted to the specified `to` address but:
+        - The price is still charged
+        - The mint request is recorded as a success (via the `minted` mapping).
+
+        Although an account with a minter role would need to create this mint request, it’s not uncommon for such logic to have bugs, especially in an off-chain context.
+
+        Consider adding a check in the `verifyRequest` function to revert when quantity is 0.
+
+        ```solidity
+        require(_req.quantity > 0, "quantity is zero");
+        ```
+
+        Also consider to add the above require statement to *TokenERC1155*. Although this contract doesn’t charge the price as quantity is considered in calculation, it still records the mint request as a success.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">51d5ab7b26937dc165c6442f945d92bebfd9308a</field>
+    <field name="content">
+        ## (M-2) Native tokens can get locked in the contract
+
+        In *TokenERC20*, *TokenERC721* and *TokenERC115* mint requests can include a `price` and a `currency` which can be either `NATIVE_TOKEN` (e.g. ETH) or some other ERC20 token.
+
+        Suppose the currency specified in the request is some ERC20 token and the sender - by mistake -  nevertheless sends ether with the call. The function call will not revert, causing the received “native tokens” to be locked inside the contract without recovery.
+
+        Consider adding a check to the `collectPrice` function which prevents ether being sent to the contract when currency is not set to `NATIVE_TOKEN`.
+
+        ```solidity
+        if (_currency == CurrencyTransferLib.NATIVE_TOKEN) {
+                    require(msg.value == _price, "must send total price.");
+        } else {
+                    require(msg.value == 0, "dont accept ether");
+        }
+        ```
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">78c7d917b913930b525e2a3ec068f1597ce81a2f</field>
+    <field name="content">
+        ## (M-3) Use `_safeMint` instead of `_mint`
+
+        *TokenERC721* and *TokenERC1155* use `_mint` instead of `_safeMint` to mint the actual tokens:
+
+        ```solidity
+        _mint(_to, tokenIdToMint);
+        ```
+
+        This can lead to tokens being locked in those contracts with no recovery.
+
+        Consider using `_safeMint` instead of `_mint` to check if a contract recipient can receive (or is at least aware of receiving) ERC721 tokens.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Input Ranges</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">75982879674aa6911188463fa5b5fb3c2100e204</field>
+    <field name="content">
+        ## (L-1) `platformFeeBps` is not bounded
+
+        In *TokenERC20*, *TokenERC721* and *TokenERC115,* the `initialize` functions don’t have a boundary check for `platformFeeBps`.
+
+        Also in the `setPlatformFeeInfo` function, the only restriction to `platformFeeBps` is ≤ `MAX_BPS` (10_000). If set to `MAX_BPS` or any value close to it (depending on fees), the minting would fail because of underflow in case ThirdWeb fee is applied. See following line:
+
+        ```solidity
+        CurrencyTransferLib.transferCurrency(
+            _currency,
+            _msgSender(),
+            _primarySaleRecipient,
+            _price - platformFees - twFee // underflow
+        );
+        ```
+
+        Consider setting a reasonable upper limit for `platformFeeBps`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Input Ranges</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## (L-2) `PrimarySaleRecipient` and `platformFeeRecipient` can be set to 0x0
+
+        In the `initialize()`, `setPrimarySaleRecipient()`, and `setPlatformFeeInfo()`, in all three token contracts, there is no check for `primarySaleRecipient` and `platformFeeRecipient` to not have address 0x0.
+
+        As a consequence, when using NATIVE_TOKEN (e.g. ETH), ether could be burned to the zero address.
+
+        In the case of an ERC20 transfer, the transaction would be reverted (for [OpenZeppelin ERC20 tokens](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol#L231-L232)).
+
+        Consider adding checks to not allow address 0x0 for `primarySaleRecipient` and `platformFeeRecipient`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">addressed</field>
+    <field name="commit">285009b1a89150803e3512ae8a2c36f7ef818358</field>
+    <field name="content">
+        ## (Q-1) Documentation discrepancy for price in *TokenERC20.sol*
+
+        Thirdweb’s [signatureMint documentation](https://github.com/thirdweb-dev/contracts/blob/v3.1.1/contracts/token/signatureMint.md#payload--mint-request) defines one of the mint request parameters as `pricePerToken`.
+
+        However, in *TokenERC20.sol*, the price specified in the mint request is considered the total price instead.
+
+        This also creates an inconsistency with *TokenERC1155.sol*, which uses `pricePerToken` as documented.
+
+        Consider:
+
+        1. Updating *TokenERC20* to use `pricePerToken` instead of total `price` and adapting `collectPrice` function accordingly to include a `quantity` parameter, or
+        2. Document the differing behavior of *TokenERC20*
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">280668cce00be3671b43e3472970cd1b739cbe28</field>
+    <field name="content">
+        ## (Q-2) Inconsistency between Token contracts regarding pause/unpause functionality
+
+        In *TokenERC20* there is the possibility to pause/unpause token transfers. In contrast, *TokenERC721* and *TokenERC1155* don’t provide this functionality.
+
+        Consider to add pause/unpause capability for token transfers in *TokenERC721* and *TokenERC1155*.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">c49c0e595516720ba878cf5b6bbf3e03a4031b69</field>
+    <field name="content">
+        ## (Q-3) *TokenERC721* can have empty URI
+
+        In TokenERC1155's  `_mintTo` function the minting reverts when the `uri` parameter in `MintRequest` is empty.
+
+        ```solidity
+        if (bytes(_tokenURI[_tokenId]).length == 0) {
+            require(bytes(_uri).length > 0, "empty uri.");
+            _tokenURI[_tokenId] = _uri;
+        }
+        ```
+
+        In contrast, *TokenERC721* doesn’t check for empty uri parameter.
+
+        Consider adding this check to *TokenERC721* as well.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">60541f48ca23fc80a519fe4cec9a34aa11cb8cf2</field>
+    <field name="content">
+        ## (Q-4) Inconsistency among different contracts
+
+        - *TokenERC721* and *TokenERC1155* define their own `NATIVE_TOKEN` constant:
+
+            ```solidity
+            address private constant
+            NATIVE_TOKEN = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+            ```
+
+            However, *TokenERC20* uses `CurrencyTransferLib.NATIVE_TOKEN`.
+
+        - The `collectPrice()` function is written differently in *TokenERC20* from *TokenERC721* and *TokenERC1155*. Instead of passing in a reference to the whole `_req` request, it pulls out specific parameters. In addition, TokenERC20’s version has the logic to determine `saleRecipient` within `mintWithSignature()` instead of `collectPrice()`.
+
+            Consider updating TokenERC20’s `collectPrice()` to be consistent with *TokenERC721* and *TokenERC1155*.
+
+        - `_afterTokenTransfer()` is only overridden in *TokenERC20* without any changed behavior.
+        - `MAX_BPS` is declared as:
+            - `uint128 internal constant` in *TokenERC20*.
+            - `uint256 private constant` in *TokenERC721* and in *TokenERC1155*.
+        - `platformFeeBps` is declared as:
+            - `uint128 internal` in *TokenERC20*.
+            - `uint128 public` in *TokenERC721* and in *TokenERC1155*.
+        - *TokenERC721* and *TokenERC1155* both inherit from OpenZeppelin’s `ReentrancyGuardUpgradeable` and call its `__ReentrancyGuard_init()`. However, *TokenERC20* does call this initializer, even though it inherits the same contract.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">639a4c91521ec1b182d4aca232cc7410216efc0e</field>
+    <field name="content">
+        ## (G-1) Calldata parameters
+        In *TokenERC721* and *TokenERC1155* function `collectPrice` uses `memory` keyword for the `MintRequest` parameter. Consider using `calldata` allocation instead to save gas costs.
+        In *TokenERC721* and *TokenERC1155* function `collectPrice` uses `memory` keyword for the `MintRequest` parameter. Consider using `calldata` allocation instead to save on gas cost.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      ## (I-1) `draft-EIP712Upgradeable.sol` draft status
+      See OZ’s statement regarding draft status here: [https://docs.openzeppelin.com/contracts/3.x/api/drafts](https://docs.openzeppelin.com/contracts/3.x/api/drafts)
+    </field>
+  </item>

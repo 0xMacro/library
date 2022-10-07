@@ -1,0 +1,375 @@
+<item>
+  <field name="topic">On-Chain Randomness</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">Forwarder sub-issue has been fixed.</field>
+  <field name="commit">39ac9726b0b7cf9ac61370031ebbf6a8cb17e0c6</field>
+  <field name="content">
+    ## (H-1) Reward selection exploits
+
+    Three sub-issues are listed below. The main cause for the high severity category is sub-issue #3 – namely, the current Forwarder.sol implementation. Consider updating the implementation to disallow contract calls.
+
+    For the other problems with randomness, consider adding an optional flag that hooks into Chainlink, for the bigger projects that want secure randomness.
+
+    ### 1) A block miner can tweak `block.timestamp` to either get a good reward, or skip if a good reward is not possible
+
+    The RNG logic has three parts:
+
+    - `msg.sender` – always known
+    - `blockhash of n-1` – known once n-1 is mined
+    - `difficulty` – derived in nth block
+
+    Specifically, `difficulty` is derived from `block.timestamp`, of which a block miner has some influence. Here is the formula for `block.difficulty` ([source](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2.md)):
+
+    ```
+    block_diff = parent_diff + parent_diff // 2048 * max(1 - (block_timestamp - parent_timestamp) // 10, -99) + int(2**((block.number // 100000) - 2))
+    ```
+
+    Given the above, a miner can submit their own transaction, and tweak the timestamp for either a better reward, or choose to skip the claim in search of a better reward next time.
+
+    <aside>
+    💡 In the upcoming merge, a block’s difficulty will be no longer needed, and thus be set to 0 forever.
+
+    However, Solidity’s `block.difficulty` will remain functional, and will instead return a random value (see the details of why [here](https://blog.ethereum.org/2021/11/29/how-the-merge-impacts-app-layer/#blockhash--difficulty-opcodes-changes)).
+
+    Although this new form of randomness is more secure than directly using difficulty or blockhash, it should still not be relied on, since validators can still choose to skip opening the pack and wait for a better reward.
+
+    </aside>
+
+    If a pack gets good traction, validators (post-merge) or miners (pre-merge) will likely attempt to extract value in this way.
+
+    ### 2) Users can use the Flashbots to claim rare rewards
+
+    Flashbots bundle allows users to group on-chain transactions such that they execute in an all-or-nothing manner. From [Flashbot’s website](https://docs.flashbots.net/flashbots-auction/searchers/advanced/understanding-bundles):
+
+    > Searchers use Flashbots to submit bundles to block builders for inclusion in blocks. Bundles are one or more transactions that are grouped together and executed in the order they are provided. In addition to the searcher's transaction(s) a bundle can also potentially contain other users' pending transactions from the mempool, and bundles can target specific blocks for inclusion as well.
+
+    Advanced users can use this to create a bundle with two transactions:
+
+    1. Claim reward from the pack
+    2. Call a contract to determine whether they got a rare reward, and revert if not
+
+    Due to the behavior of Flashbots bundles, if the second tx fails, [then the first will fail too](https://docs.flashbots.net/flashbots-auction/searchers/advanced/troubleshooting#how-to-troubleshoot-your-flashbots-bundle-not-landing-on-chain):
+
+    > Unlike broadcasting a transaction which lands on-chain even if the transaction fails, troubleshooting Flashbots bundles is considerably more challenging, since any of the following circumstances will prevent your bundle from landing on chain:
+    >
+    > 1. Transaction failure (ANY within the bundle)
+    > 2. Incentives (gas price + coinbase transfers) not high enough to offset value of block space
+    > 3. Competitors paying more for same opportunity
+    > 4. Bundle received too late to appear in target block
+    > 5. A validator for target slot not running mev-boost
+
+    ### 3) Anyone can bypass the `tx.origin == msg.sender` requirement via a meta-tx
+
+    Thirdweb allows a third party to execute transactions on behalf of a user via meta transactions. Packs.sol also implement this feature:
+
+    ```solidity
+    require(isTrustedForwarder(msg.sender) || _msgSender() == tx.origin, "opener cannot be smart contract");
+    ```
+
+    In a meta transaction, a user only needs to create a signature and submit it to a trusted forwarder, having that forwarder execute the transaction in exchange for not directly paying for its gas cost.
+
+    Because a forwarder is a contract, [any account (EOA or contract) can execute that signed tx on behalf of its user](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/109778c17c7020618ea4e035efb9f0f9b82d43ca/contracts/metatx/MinimalForwarder.sol#L47).
+
+    This exposes a vulnerability:
+
+    1. Attacker creates a signature with `msg.sender` as themselves, and calldata for claiming that reward.
+    2. Attacker deploys an exploit contract and calls it with said signature.
+    3. Exploit contract **calls the forwarder** to execute the created signed transaction.
+    4. Exploit contract can then choose to revert or not, based on the reward received.T
+
+    Since this call is coming from a trusted forwarder, the `msg.sender == tx.origin` check is skipped, and the require statement passes.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Asset Mobility</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (M-1) Lost ERC-20 pack tokens result in permanently locked assets
+
+    In Pack.sol, when `createPack` is called, an ERC-20 token is minted for each pack to open. However, if any one of these tokens are lost (e.g. sent to an invalid address), then the assets in the Pack contract are permanently locked.
+
+    The impact of this in practice depends on the value of the assets escrowed.
+
+    Consider setting expiration date on the pack, allowing the creator to recover any unclaimed assets after that point.
+  </field>
+  <field name="response">
+    In case of unclaimed rewards, either the pack creator will have sold the packs, or will have it in their account to open it themselves. So, we'd rather put onus on the pack owner to redeem it/transfer to correct addresses.
+
+    So, perhaps we'll keep this feature for a later release.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">8905477ecb526f3d33c0f4618244ef05481aa175</field>
+  <field name="content">
+    ## (M-3) Users can claim small amounts of tokens for free
+
+    In DropERC20.sol’s `collectClaimPrice()`:
+
+    ```diff
+    uint256 totalPrice = (_quantityToClaim * _pricePerToken) / 1 ether;
+    ```
+
+    Here, `totalPrice` can be calculated as zero when the product of `_quantityToClaim` and `_pricePerToken` is smaller than `1 ether`. For example:
+
+    - **_quantityToClaim** = 1e+12 (0.000001 tokens)
+    - **_pricePerToken** = 1e+5 ($0.10 USDC)
+    - **totalPrice** = 1e+17 (0.1 ether) / 1 ether = 0
+
+    This allows a user to claim a small amount of tokens for free (assuming the currency is not NATIVE_TOKEN).
+
+    Depending on the perceived value of the dropping ERC-20, an attacker may be motivated to claim this way multiple times in a loop.
+
+    Consider requiring `totalPrice > 0` when `_pricePerToken` is greater than zero.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Turst Model</field>
+  <field name="impact">medium</field>
+  <field name="chance">high</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## (M-4) Publishing is potentially too trusted
+
+    In ContractPublisher.sol, anyone can claim to have published any contract. While this allows a user or contract to take a trusted publisher address and see what contracts they claimed to have published, they still need to trust the claims of the publisher.
+
+    Additionally, a single contract address can be “claimed” by multiple publishers
+
+    Consider a design where a contract must approve, in some way, that a publisher has indeed published it, so that ContractPublisher’s on-chain data is more reliable and trustless.
+  </field>
+  <field name="response">
+    Not fixing (for now).
+
+    The issue pointed out requires a design change in the ContractPublisher contract that must be coordinated throughout the thirdweb Release product.
+  </field>
+</item>
+
+<item>
+  <field name="topic">3rd Party Behavior</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (L-1) Pack opening vulnerable to DoS
+
+    When a user calls `openPack()`, the Pack contract sends them one or many assets, depending on the configuration of the pack. However, if one asset transfer fails, then the entire transaction fails, potentially preventing pack opening altogether.
+
+    Example case: If a pack contained USDC, and the Pack contract is added to the USDC blacklist, then every bundle containing USDC will revert on attempts to open.
+
+    Based on the `ASSET_ROLE` code, thirdweb plans to use an asset allow list at some point. Consider using it on launch, to avoid an attacker creating a valuable bundle of assets mixed with their own malicious asset, in attempt to scam others.
+
+    Another option to consider is isolating each `_transferToken` in a try-catch that emits an Event on throw. This will allow for some record keeping around bad txes. It would also need some sort of collecting from open pack retry feature.
+  </field>
+  <field name="response">
+    Contract owner will be the end users, and they can toggle ASSET_ROLE as required. Pros & cons will be described in design doc.
+  </field>
+</item>
+
+<item>
+  <field name="topic">3rd Party Behavior</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (L-2) Fee-on-transfer ERC-20 incompatibility
+
+    When a user calls `createPack()`, the Pack contract transfers assets to itself for escrow. However, if one of these assets is a fee-on-transfer ERC-20 token, then the contract will end up with insufficient assets necessary to support opening all packs.
+
+    As mentioned in L-1, thirdweb has an allow list ready to use. Consider using it on launch to avoid this issue, or document that these tokens are not supported, or update Pack.sol to perform balance differences by track asset balances on-chain.
+  </field>
+  <field name="response">
+    Contract owner will be the end users, and they can toggle ASSET_ROLE as required. Pros & cons will be described in design doc.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Standards Compliance</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">728abff16435a59d2758f974988b9beba3147ba8</field>
+  <field name="content">
+    ## (L-3) `supportsInterface()` may prevent ERC721 tokens from transferring to Pack.sol
+
+    ERC721 contracts that query for ERC721Receiver interface support during transfers will fail to transfer NFTs to Pack.sol, making these NFTs impossible to include in packs.
+
+    Note that standard ERC721 implementations (e.g. openzeppelin, solmate contract templates) do not perform this check; and rely only on calling `onERC721Received()` post-transfer.  This gives this issue a low likelihood.
+
+    Consider updating `supportsInterface()` to return true for `IERC721Receiver`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Mistake Recovery</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (L-4) No recovery for accidental transfers
+
+    Unfortunately it’s common to see accidental transfers of assets to a protocol’s smart contract. If one sends ERC-20, ERC-721, or ERC-1155 tokens to the Pack contract, there is no way to recover them.
+
+    Consider a state variable that is set before/after a call to `createBundle()` (similar to nonReentrant), so Pack can reject incoming transfers where possible.
+  </field>
+  <field name="response">
+    Not clear how ERC20 accidental transfers would be rejected.
+
+    Any function to recover such tokens might affect existing functionality and token balances in the packs.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Longevity</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## (L-5) Trusted forwarders can be added, not removed
+
+    Thirdweb ERC2771Context implementation receives an array of `trustedForwarder` values on initialization. However, there is no way to remove a trusted forwarder.
+
+    Consider adding a function to remove a trusted forwarder, or to set the full list of forwarders, to handle cases where forwarders get lost, expired, or compromised.
+  </field>
+  <field name="response">
+    Not fixing (for now).
+
+    Today, a thirdweb pre-built smart contract deployed by users on the dashboard or via SDKs use the same set of trusted forwarders deployed by thirdweb, or external providers like Biconomy.
+
+    The issue pointed out requires a design change across all of thirdweb’s smart contracts; it’s fix will be coordinated across the thirdweb products.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (L-6) `maxTotalSupply` can be updated to `< totalSupply()`
+
+    In DropERC20.sol, `setMaxTotalSupply()` allows `maxTotalSupply` to be set to any number. If the value is set to `<` `totalSupply()` all present and future claims will all fail, and a potentially misleading event will be emitted (`MaxTotalSupplyUpdated()`), potentially causing unnecessary confusion for users. Consider updating `setMaxTotalSupply()` to require a value `>= totalSupply()`. 
+
+    Note that if the intent is to halt minting immediately, setting `maxTotalSupply` to present `totalSupply()` may suffer from race conditions if additional claims are processed ahead of `setMaxTotalSupply()` . In this case, consider calling `setClaimConditions()` with an empty `_phases` array instead. The latter approach will not revert if additional claims precede its execution.
+  </field>
+  <field name="response">
+    The purpose here was to achieve pausing of claims by setting maxTotalSupply as less than totalSupply().
+
+    The absence of checks is intended to transfer responsibility to contract admin.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Model</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## (L-7) Unpublishing may orphan data
+
+    The `publishContract()` function adds an entry into `compilerMetadataUriToPublishedMetadataUris` which is not accounted for during `unpublishContract()`.
+
+    This may leave orphan `compilerMetadataUri` data, causing it to refer to non-existent `publishMetadataUri` data. Moreover, `getPublishedUriFromCompilerUri()` will return `publishMetadataUris` for contracts that are unpublished.
+  </field>
+  <field name="response">
+    Not fixing (for now).
+
+    The issue pointed out requires a design change in the ContractPublisher contract that must be coordinated throughout the thirdweb Release product.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Testing</field>
+  <field name="impact">high</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## (Q-1) Low Test Coverage
+
+    DropERC20.sol and ContractPublisher.sol have very light testing. Consider adding more to more confidently affirm the behavior of the contracts.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">b1e1c782b759d744387c1948960f594f8575b993</field>
+  <field name="content">
+    ## (Q-2) Missing Events
+
+    - DropERC20.sol’s `setContractUri()` does not emit an event.
+    - Pack.sol’s `setPublisherProfileUri()` does not emit an event.
+
+    Consider adding an event for these changes.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Model</field>
+  <field name="impact">low</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## (Q-3) Inconsistent datatype for `platformFeeBps`
+
+    The datatype applied to this value varies throughout the contract between `uint256`,  `uint128`, `uint64` and `uint16`. Consider normalizing to the datatype applied to its storage variable definition of `uint128`.
+  </field>
+  <field name="response">
+    Not fixing (yet).
+
+    This fix will be coordinated across the relevant thirdweb smart contracts.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Extra Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">6c9056a3ffc95a0e6fed6c9c994b70d5cefc7721</field>
+  <field name="content">
+    ## (Q-4) Unused import
+
+    In DropERC20.sol, the import of `ERC20PausableUpgradeable.sol` is not used.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Consistency</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">29eaaaf33884db09bf490b6ecaf5f6a07908318b</field>
+  <field name="content">
+    ## (Q-5) Inaccurate `getClaimTimestamp()` return value
+
+    In DropERC20.sol’s `getClaimTimestamp()`, when `lastClaimTimestamp` is zero, `nextValidClaimTimestamp` should arguably be `0` to indicate that no delay is required, since no prior purchase has occurred.
+
+    If this were to be implemented, a minor gas-savings opportunity can be implemented along with it, as the `nextValidClaimTimestamp` could be skipped, and line 376 could be simplified to:
+
+    ```solidity
+    require(block.timestamp >= nextValidClaimTimestamp, "cannot claim yet.");
+    ```
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Consistency</field>
+  <field name="impact">medium</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## (I-1) `setClaimConditions()` will accept phases that cannot become active
+
+    `setClaimConditions()` will update `claimCondition` without comparing individual `_phases[i].startTimestamp` values with respect to `block.timestamp`. As a result, it is possible to supply a set of claim conditions which will never execute. 
+
+    For example, consider calling `setClaimCondition` with 4 entries in `_phases`, with `startTimestamp` values of: `50`, `75`, `100`, `125`.  If executed when `block.timestamp = 100`, the first two phases will never occur.
+
+    This may impact an owner’s intended phases, or mask accidental errors in phase formulation.
+  </field>
+</item>
