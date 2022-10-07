@@ -19,12 +19,11 @@
   @apply text-base sm:text-lg;
 }
 
-.Copy p:first-child,
-.Copy ol:first-child,
-.Copy ul:first-child {
-  @apply mt-0;
+.Copy.--sm p,
+.Copy.--sm ol,
+.Copy.--sm ul {
+  @apply text-sm;
 }
-
 
 .Copy h2 {
   @apply mt-10 -mb-2 text-2xl sm:text-3xl font-bold;
@@ -33,8 +32,15 @@
   @apply mt-10 -mb-2 text-xl sm:text-2xl font-medium;
 }
 
+.Copy.--sm h2 {
+  @apply mt-6 -mb-2 text-xl font-bold;
+}
+.Copy.--sm h3 {
+  @apply mt-6 -mb-2 text-lg font-medium;
+}
+
 .Copy p {
-  @apply mt-8;
+  @apply mt-4;
 }
 
 .Copy p > code,
@@ -61,6 +67,9 @@
 .Copy ul, .Copy ol {
   @apply mt-6 pl-8 space-y-4;
   list-style: disc;
+}
+.Copy.--sm ul, .Copy.--sm ol {
+  @apply mt-4 pl-4 space-y-2;
 }
 .Copy > ol {
   list-style: decimal;
@@ -89,4 +98,15 @@
 .Copy blockquote ul,
 .Copy blockquote ol {
   @apply pl-4;
+}
+
+.Copy p:first-child,
+.Copy ol:first-child,
+.Copy ul:first-child,
+.Copy h2:first-child,
+.Copy h3:first-child,
+.Copy.--sm h2:first-child,
+.Copy.--sm h3:first-child
+{
+  @apply mt-0;
 }
