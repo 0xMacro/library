@@ -1,0 +1,45 @@
+<page
+  clientName="Sommelier Finance"
+  reportDate="October 12, 2022"
+  auditTitle="Sommelier 3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  repoCommitHash="TODO"
+  passwordEncrypt="env:"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team between August 15, 2022 and September 2, 2022; and September 26, 2022 to October 7, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>Publicly available Sommelier Finance documentation.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    f31007d620fce2b14c3a81b1083f4d04f928897e4a3ad6e293b2a1b5d1c9b34a  src/Registry.sol
+    59b4c44244042e20b2b471ae0c927aa5e51e5567eced5cf4fd9a8ceb96487a22  src/base/Cellar.sol
+    e954d1b24bd18d09dc1129b19fd6e0ca35e79d69a740f3ebd2370542a28223f3  src/base/ERC4626.sol
+    cbe4ba9c787b262b1b77a83a9969ff9a716d88f09048d175c1a0d00ee4414e14  src/base/Multicall.sol
+    0d976a972ff63255c5b191b610d7aabe2c43e2918db8e37ee15a28ed3f958586  src/interfaces/IMulticall.sol
+    bbb3b24935dd23fdd209957901fccc78fd43f876bcd893da81cb31addb155c26  src/interfaces/external/IChainlinkAggregator.sol
+    e09c292aa38c53f6282949761962ef1b8b22f9ea00201477b515a3b44dd37c90  src/interfaces/external/IGravity.sol
+    b1b5ea5db6e598cf9396b64754c4fd2397ff86c6c870b8daf870c5ec427477f6  src/interfaces/external/IUniswapV2Router02.sol
+    07e54f895d2e96a922fd26ed7936c3ca432047815f40b9651d613cb73fcb8d81  src/interfaces/external/IUniswapV3Router.sol
+    013e078051ea1dd74784fd63d72261d1c6adac9a5a94a40d14b76a43efb025d6  src/modules/price-router/PriceRouter.sol
+    1cb94a4723caa51ef55f2c9c0ada725f722ff9f37e3d7665aa06ea5420292d1f  src/modules/swap-router/SwapRouter.sol
+    19005e940b7793fe37af6fefc0b398ba4c3f8ba5ab0bae5726e2e10b84697333  src/utils/AddressArray.sol
+    e1b3886632ed1ff5d0498d1f0f8f9d46117e14b579c7b575164731f6b074f5bd  src/utils/Math.sol
+  </template>
+</content-for>
+
