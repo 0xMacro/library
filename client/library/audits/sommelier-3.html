@@ -1,0 +1,47 @@
+<page
+  clientName="Sommelier Finance"
+  reportDate="October 12, 2022"
+  auditTitle="Sommelier 3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  repoCommitHash="d18833d325fa922807f8dc679e81b7b4bcae6606"
+  passwordEncrypt="env:PAGE_PASS_SOMMELIER_3"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team between August 15, 2022 and September 2, 2022; and September 26, 2022 to October 7, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>Publicly available Sommelier Finance documentation.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    33717ae5c698beb1c7dea56991ac9ccf552a94727bedc0b7b6203c1c6926f832  src/Registry.sol
+    490b18749f5b3186e7c487a2a1f74c84f2a722be9de8da91a66291935ea4976b  src/base/Cellar.sol
+    b745b21b01907ace27978063215e5393d08b211c138b50dcd7c44f5d258218a2  src/base/ERC4626.sol
+    cbe4ba9c787b262b1b77a83a9969ff9a716d88f09048d175c1a0d00ee4414e14  src/base/Multicall.sol
+    0d976a972ff63255c5b191b610d7aabe2c43e2918db8e37ee15a28ed3f958586  src/interfaces/IMulticall.sol
+    bbb3b24935dd23fdd209957901fccc78fd43f876bcd893da81cb31addb155c26  src/interfaces/external/IChainlinkAggregator.sol
+    e09c292aa38c53f6282949761962ef1b8b22f9ea00201477b515a3b44dd37c90  src/interfaces/external/IGravity.sol
+    b1b5ea5db6e598cf9396b64754c4fd2397ff86c6c870b8daf870c5ec427477f6  src/interfaces/external/IUniswapV2Router02.sol
+    07e54f895d2e96a922fd26ed7936c3ca432047815f40b9651d613cb73fcb8d81  src/interfaces/external/IUniswapV3Router.sol
+    746f4622db2cd66f37978402dc880d538d312e8c304a7af6d1bab2bc428a0c2e  src/modules/price-router/PriceRouter.sol
+    dd537dcb2fea34417e26febcab6936a842e76460b77d92437de167f93c3853b6  src/modules/price-router/adaptors/ChainlinkPriceFeedAdaptor.sol
+    d2c811ad31a523b80d2e9ead13e72676060298f224bd845f86c458c3bd0fe7e5  src/modules/swap-router/SwapRouter.sol
+    32dd471788ca0b3742177d932c0af3a95fefe0e0c02acde306677e4eb1537e89  src/utils/AddressArray.sol
+    e1b3886632ed1ff5d0498d1f0f8f9d46117e14b579c7b575164731f6b074f5bd  src/utils/Math.sol
+    1a50c67f055d6712749cedd31bd64fa337854978f98157596261d3410f2a4422  src/utils/SafeCast.sol
+  </template>
+</content-for>
+
