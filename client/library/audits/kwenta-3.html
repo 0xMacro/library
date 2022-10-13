@@ -1,0 +1,48 @@
+<page
+  clientName="Kwenta"
+  reportDate="August 30, 2022"
+  auditTitle="Kwenta A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kwenta/margin-manager"
+  repoCommitHash="85c473abbb70c6c710c4552c449f6e1824bdb3cf"
+  passwordEncrypt="env:PAGE_PASS_KWENTA_3"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from September 5, 2022 to September 23, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Discord with the {{page.clientName}} team.</li>
+      <li>KIP-18</li>
+      <li>KIP-19</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+87ca2ddc89ad4cd429faef81105bd1f9ec0820f858138df9a279a0ee954c5a43  contracts/MarginAccountFactory.sol
+c7dc15cd1c6cf93217955f35912f754f5cb5ebb88b6db328cd607cc17c55135c  contracts/MarginBase.sol
+5644182973ee67ae403adf1f33c301a42d30527b258b24abe99c68054ef81eb2  contracts/MarginBaseSettings.sol
+1887b65b0871d372d1b2fcc64740e7ee9462616daca3e485dda4d97dd4c386c3  contracts/interfaces/IAddressResolver.sol
+44133b6bf82ff9e0d998e26869ca041118abf46f74e0e4d859bfbeaf7bdbae55  contracts/interfaces/IExchanger.sol
+efa26e61b2c8192819da56c8370ec43743e17d7929f4d64caa75455688dd0e7c  contracts/interfaces/IFuturesMarket.sol
+585a61a8a4eb6ca84af80992f723aa14e9c0a0befa47161e7dd303c4cca5781c  contracts/interfaces/IFuturesMarketBaseTypes.sol
+c5ead2442b348f2a1e8262d90242ce00d4c00404aa97b8ae756dbfe806b165d8  contracts/interfaces/IFuturesMarketManager.sol
+b4110e3d4395eff706442e0f6ce240f523751d3d4f5085fb86dda9e002a13185  contracts/interfaces/IMarginBase.sol
+ba0e9f6de2374b08e591a2f4535670f5304adc4895db9eb65b5679830d2f5004  contracts/interfaces/IMarginBaseTypes.sol
+7daddcc8921ed2a884b89ce2eb8ef3985a6fff3b749c2b6d47df25dfe8aab058  contracts/interfaces/IOps.sol
+9d51cd8443d96ec59ab53a6af4582ec2c5fb33cc2c6503485ca787cef9dc4721  contracts/interfaces/ISynth.sol
+2cf52408cec467b8cae38074cbd7566653401b1831b86463afd750995514505f  contracts/interfaces/IVirtualSynth.sol
+1143e3ff6352f6d51a49e42229f3a453be4f4ffdce84faaa3fef30dc25e4c577  contracts/utils/MinimalProxyFactory.sol
+8a86778db51c99fd15d0495552229394fe1fc89ffaec9b82b34e4a2aa5971ef3  contracts/utils/MinimalProxyable.sol
+88ab73d58fbe68feb5de4f2ccdfa90e03e41c24940e0c98c0e07e4bd70dd88e1  contracts/utils/OpsReady.sol
+  </template>
+</content-for>
