@@ -225,7 +225,7 @@ export default class PlanetAnimation {
     const loader = new THREE.TextureLoader();
     const texture = loader.load(this.maskImageUrl);
 
-    const geometry = new THREE.PlaneGeometry(0.29, 0.29);
+    const geometry = new THREE.PlaneGeometry(0.35, 0.35);
     const material = new THREE.MeshBasicMaterial( { alphaMap: texture, alphaTest: 0.5, color: this.bgColor } );
 
     const mesh = new THREE.Mesh( geometry, material );
@@ -239,7 +239,7 @@ export default class PlanetAnimation {
       },
       side: THREE.DoubleSide,
       uniforms: {
-        time: { value: 0 },
+        time: { value: 10000 },
         uColor: { value: pallete },
         resolution: { value: new THREE.Vector4() },
       },
