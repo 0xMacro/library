@@ -1,3 +1,5 @@
+const endent = require('endent').default
+
 const Issues = require('./lib/issues')
 const AuditMarkdown = require('./lib/audit-markdown')
 
@@ -25,6 +27,9 @@ module.exports = {
   },
 
   templateTypes: {
-    'file-hashes': require('./lib/file-hashes')
+    'file-hashes': require('./lib/file-hashes'),
+    'audit-markdown'(content) {
+      return AuditMarkdown.renderIssueContent(endent(content))
+    }
   },
 }

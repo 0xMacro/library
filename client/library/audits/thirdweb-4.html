@@ -5,6 +5,7 @@
   auditVersion="1.0.0"
   repoUrl="https://github.com/thirdweb-dev/contracts"
   customRepoInfo
+  appendixLinks="#appendix-review::Review Notes on VoteERC20.sol and Split.sol"
 
   layout="/library/audits/_layout.html"
 >
@@ -88,4 +89,88 @@
     4c57ef2e5572551ee29ec7ecfcb67932f152f7b0ffd1e5c84e0976f577eb43c5  contracts/interfaces/ITWFee.sol
     8fc9d29ddee99b052ccdc521c272ee4df8a7de0e1754bfcba397dc5cdfa18c72  contracts/interfaces/IThirdwebContract.sol
   </template>
+</content-for>
+
+<content-for name="appendix">
+  <section id="appendix-review" class="Copy py-16">
+    <template type="audit-markdown">
+      ## Review Notes on VoteERC20.sol and Split.sol
+
+      **Scope:** VoteERC20.sol and Split.sol
+
+      For these two contracts, we opted to do a review instead of a full audit, due there being no test suite and low documentation. However, we were happy to provide suggestions and considerations in this way.
+
+      ## VoteERC20.sol
+
+      ### (1) Both `proposalIndex` and `proposalId` are used
+
+      The two common options to store proposals on-chain in DAO proposal systems are:
+
+      1. Store all function calls and arguments on-chain.
+      2. Store a 32 byte hash of all function calls on-chain, and post the source of that hash off-chain (e.g. on a public forum).
+
+      The former leans more towards decentralization, as anyone can read on-chain data to verify the proposed function calls at any time.
+
+      On the other hand, the latter saves on gas costs, as storing function calls on-chain can get expensive.
+
+      *VoteERC20* takes the approach of both:
+
+      1. It uses Open Zeppelin’s [GovernorUpgradeable](https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/master/contracts/governance/GovernorUpgradeable.sol#L262) contract, which uses approach #2.
+      2. It extends `propose()` to store all calls in its own proposals variable (approach #1), including the 32 byte hash from the parent OZ contract.
+
+      Doing both is redundant, which will result in increased gas costs for no benefit. It may also cause confusion, as there are arguably two ids: the 32 byte hash, and the proposal index.
+
+      Consider taking one approach or another. If approach #1 is desired, consider using Compound’s Governor Bravo contracts. Otherwise, it may be sufficient that the proposed function calls are [emitted in an event](https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/master/contracts/governance/GovernorUpgradeable.sol#L277-L287).
+
+      ## Split.sol
+
+      ### (1) DoS vulnerability in `distribute` function
+
+      In *Split* contract, `distribute` function loops through each payee address and sends assets performing checks and reverting if any of these calls fails. If one of the payees reverts the transfer the entire `distribute` function will revert in every call. This can also be intentionally done by a smart contract address as a payee.
+
+      The vulnerability is not that bad, since anyone is able to call `release()` for their own account at any time. However, consider documenting the dangers 3rd party contracts or other thirdweb contracts relying on this function.
+
+      Also consider not reverting on failed transfers, if atomicity is not important.
+
+      ### (2) OpenZeppelin’s version of PaymentSplitterUpgradeable.sol has been updated
+
+      Split contract inherits from `PaymentSplitterUpgradeable`.  It is not referencing the OpenZeppelin version directly but instead is using a preset version:
+
+      ```solidity
+      import "./openzeppelin-presets/finance/PaymentSplitterUpgradeable.sol";
+      ```
+
+      OpenZeppelin did some slight changes recently on this contract and has added `releasable` functions. See here: [https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/commit/b392c249e2c72434c438e0e495af1bacbc6cfd4f#diff-ec6a964c766447336ea6842ff3214ac85da5144ccf44d92e100d3d4acfd907c4](https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/commit/b392c249e2c72434c438e0e495af1bacbc6cfd4f#diff-ec6a964c766447336ea6842ff3214ac85da5144ccf44d92e100d3d4acfd907c4)
+
+      Consider to update the preset version to include those latest changes, as `releasable()` is a useful function.
+
+      ### (3) Inconsistent zero check
+
+      After calling `thirdwebFee.getFeeInfo()`, the Split contract checks to see if their values are not equal to zero. This seems to be inconsistent with the rest of the codebase.
+
+      If this check is important, consider reevaluating other parts of the codebase that do not have this check.
+
+      ### (4) Inaccurate comments
+
+      On `distribute` function, *Split* contract has comments referring to an function named `_appPay` but it does not seem to exist in the codebase.
+
+      ```solidity
+      function distribute() public virtual {
+          uint256 count = payeeCount();
+          for (uint256 i = 0; i < count; i++) {
+              ****// note: `_release` should not fail because payee always has shares, **protected by `_appPay`**
+              _release(payable(payee(i)));
+          }
+      }
+
+      function distribute(IERC20Upgradeable token) public virtual {
+          uint256 count = payeeCount();
+          for (uint256 i = 0; i < count; i++) {
+              ****// note: `_release` should not fail because payee always has shares, **protected by `_appPay**`
+              _release(token, payee(i));
+          }
+      }
+      ```
+    </template>
+  </section>
 </content-for>

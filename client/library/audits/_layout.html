@@ -48,6 +48,13 @@
       <li class="text-xl">
         <a href="#security-levels" class="hover:underline">Security Levels Reference</a>
       </li>
+      <if cond="page.appendixLinks">
+        <for let="[href, title] of page.appendixLinks.split(';;').map(x => x.split('::'))">
+          <li class="text-xl">
+            <a href="{{href}}" class="hover:underline">{{title}}</a>
+          </li>
+        </for>
+      </if>
       <li class="text-xl">
         <a href="#disclaimer" class="hover:underline">Disclaimer</a>
       </li>
@@ -447,6 +454,8 @@
       </section>
     </for>
   </section>
+
+  <yield name="appendix" />
 
   <section id="disclaimer" class="Copy py-16">
     <h2>Disclaimer</h2>
