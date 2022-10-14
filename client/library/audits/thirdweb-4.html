@@ -104,6 +104,8 @@
 
       ### (1) Both `proposalIndex` and `proposalId` are used
 
+      **Resolution**: Wont Do.
+
       The two common options to store proposals on-chain in DAO proposal systems are:
 
       1. Store all function calls and arguments on-chain.
@@ -126,6 +128,8 @@
 
       ### (1) DoS vulnerability in `distribute` function
 
+      **Resolution**: Wont Do.
+
       In *Split* contract, `distribute` function loops through each payee address and sends assets performing checks and reverting if any of these calls fails. If one of the payees reverts the transfer the entire `distribute` function will revert in every call. This can also be intentionally done by a smart contract address as a payee.
 
       The vulnerability is not that bad, since anyone is able to call `release()` for their own account at any time. However, consider documenting the dangers 3rd party contracts or other thirdweb contracts relying on this function.
@@ -133,6 +137,8 @@
       Also consider not reverting on failed transfers, if atomicity is not important.
 
       ### (2) OpenZeppelin’s version of PaymentSplitterUpgradeable.sol has been updated
+
+      **Resolution**: Updated preset version to reflect OZ changes.
 
       Split contract inherits from `PaymentSplitterUpgradeable`.  It is not referencing the OpenZeppelin version directly but instead is using a preset version:
 
@@ -146,11 +152,15 @@
 
       ### (3) Inconsistent zero check
 
+      **Resolution**: The ThirdWeb fee was removed.
+
       After calling `thirdwebFee.getFeeInfo()`, the Split contract checks to see if their values are not equal to zero. This seems to be inconsistent with the rest of the codebase.
 
       If this check is important, consider reevaluating other parts of the codebase that do not have this check.
 
       ### (4) Inaccurate comments
+
+      **Resolution**: Removed related comments.
 
       On `distribute` function, *Split* contract has comments referring to an function named `_appPay` but it does not seem to exist in the codebase.
 
