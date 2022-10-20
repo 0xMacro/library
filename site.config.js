@@ -1,9 +1,9 @@
-const endent = require('endent').default
+import endent from 'endent'
+import * as Issues from './lib/issues'
+import * as AuditMarkdown from './lib/audit-markdown'
+import * as LearnEVM from './lib/learnevm'
 
-const Issues = require('./lib/issues')
-const AuditMarkdown = require('./lib/audit-markdown')
-
-module.exports = {
+export default {
   name: "The 0xMacro Library",
   locales: ['en'],
 
