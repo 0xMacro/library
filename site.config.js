@@ -1,7 +1,7 @@
 import endent from 'endent'
 import * as Issues from './lib/issues'
 import * as AuditMarkdown from './lib/audit-markdown'
-import * as LearnEVM from './lib/learnevm'
+// import * as LearnEVM from './lib/learnevm'
 
 export default {
   name: "The 0xMacro Library",
