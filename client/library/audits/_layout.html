@@ -363,7 +363,7 @@
             <div class="whitespace-nowrap">{{issue.topic}}</div>
           </div>
 
-          <if cond="issue.severity !== 'I'">
+          <if cond="issue.status !== 'informational'">
             <div>
               <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-700">Status</div>
               <div
@@ -416,7 +416,7 @@
             <div class="whitespace-nowrap">
               <if cond="issue.severity === 'I'">
                 Informational
-                <span class="text-xs cursor-help" data-tippy-content="Informational issues have no vulnerability in scope, and thus no call-to-action.">✳</span>
+                <span class="text-xs cursor-help" data-tippy-content="Informational issues have no vulnerability in scope, and thus no suggested call-to-action.">✳</span>
               </if>
               <else>
                 {{Issues.severityNames[issue.impact]}}
