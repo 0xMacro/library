@@ -362,15 +362,17 @@
             {{AuditMarkdown.renderInlineContent(issue.title)}}
           </h2>
         </div>
-        <div class="mt-5 p-4 flex dark:border-gray-600 bg-gray-200/25 dark:bg-gray-700/25 space-x-4 lg:space-x-5 overflow-x-auto">
-          <div class="flex-1 flex-shrink-0">
+        <div class="mt-5 px-4 flex dark:border-gray-600 bg-gray-200/25 dark:bg-gray-700/25 space-x-4 lg:space-x-5 overflow-x-auto">
+          <div class="py-4 flex-1 flex-shrink-0">
             <div class="uppercase text-xs font-medium font-ui text-gray-400">Topic</div>
             <div class="whitespace-nowrap">{{issue.topic}}</div>
           </div>
 
           <if cond="issue.status !== 'informational'">
-            <div>
-              <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-700">Status</div>
+            <div class="py-4 self-stretch {{issue.statusNote ? 'px-4 bg-zinc-200' : ''}}">
+              <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-700">
+                Status
+              </div>
               <div
                 class="whitespace-nowrap"
               >
@@ -403,14 +405,10 @@
                 <else>
                   {{Issues.statusNames[issue.status]}}
                 </else>
-
-                <if cond="issue.statusNote">
-                  <span class="text-xs cursor-help" data-tippy-content="{{issue.statusNote}}">✳</span>
-                </if>
               </div>
             </div>
           </if>
-          <div class="{{issue.isVuln ? '' : 'pr-2'}}">
+          <div class="py-4 {{issue.isVuln ? '' : 'pr-2'}}">
             <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-800">
               {{
                 issue.severity === 'Q' ? 'Quality Impact' :
@@ -432,7 +430,7 @@
             </div>
           </div>
           <if cond="issue.isVuln">
-            <div>
+            <div class="py-4">
               <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-800">Likelihood</div>
               <div class="whitespace-nowrap">
                 {{Issues.severityNames[issue.chance]}}
@@ -443,7 +441,13 @@
             </div>
           </if>
         </div>
+
+        <if cond="issue.status !== 'informational' && issue.statusNote">
+          <div class="p-4 relative z-10 -mt-1 dark:border-gray-600 bg-zinc-200 dark:bg-gray-700/25 text-sm">{{issue.statusNote}}</div>
+        </if>
+
         <div class="mt-8 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>
+
         <if cond="issue.response">
           <div class="mt-8 Copy dark:border-gray-600">
             <div class="-mb-4 text-sm uppercase font-medium text-green-800 dark:text-green-500 print:text-gray-800">
