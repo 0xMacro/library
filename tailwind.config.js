@@ -214,6 +214,20 @@ module.exports = {
         primary1: '#f7657e',
         primary2: '#3cdbc6',
 
+        // Backported from v3 https://github.com/tailwindlabs/tailwindcss/blob/master/src/public/colors.js
+        zinc: {
+          50: '#fafafa',
+          100: '#f4f4f5',
+          200: '#e4e4e7',
+          300: '#d4d4d8',
+          400: '#a1a1aa',
+          500: '#71717a',
+          600: '#52525b',
+          700: '#3f3f46',
+          800: '#27272a',
+          900: '#18181b',
+        },
+
         ...exportedColors.map(c => c.swatches).reduce((a,b) => a.concat(b)).reduce((out, row) => {
           const pieces = row.name.split('-')
           const colorName = pieces.slice(0, pieces.length-1).join('-')
