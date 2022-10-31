@@ -370,7 +370,7 @@
 
           <if cond="issue.status !== 'informational'">
             <div class="py-4 self-stretch {{issue.statusNote ? 'px-4 bg-zinc-200 dark:bg-[#222]' : ''}}">
-              <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-700">
+              <div class="uppercase text-xs font-medium font-ui print:text-gray-700 {{issue.statusNote ? 'text-zinc-400' : 'text-gray-400'}}">
                 Status
               </div>
               <div
