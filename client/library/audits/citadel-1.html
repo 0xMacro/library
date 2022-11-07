@@ -1,0 +1,115 @@
+<page
+  clientName="Citadel"
+  reportDate="[FillMe]"
+  auditTitle="Citadel A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thecitadelgame/contracts"
+  repoCommitHash="6c4279e3a0f026db9bbf3bcf0aa80acc799ed4e5"
+  passwordEncrypt="env:PAGE_PASS_CITADEL_1"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from September
+    5, 2022 to November 12, 2022.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Citadel whitepaper and yellowpaper.</li>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+      <li>Internal documents shared by {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository:
+    </p>
+
+    <template type="file-hashes">
+      834be0f6545fff11a6f1c9cb7846f8faf4ccf9a27c004413d73459ed7c4e85ed  contracts/Migrations.sol
+      a2205ed9c7e42de550317c0fd5b6c4ae2f64aa85c2b9552185de124463bc0807  contracts/bridging/BaseChildTunnel.sol
+      b4b95b5dd84d46fe637ea412e9c055f3f898e1cb0c0654a5625957dc7ee25a42  contracts/bridging/BaseRootTunnel.sol
+      c5161e19f99d6331bd7814a73b66891e84c642ae34153cf0c8445ccdc7b3145e  contracts/bridging/BaseRootTunnelMock.sol
+      6f33bdd8a428e62a86707e37b49e23edcfd0565651b36a481c4e62c227a12ff9  contracts/bridging/Dock.sol
+      3e736ef5140b0c626fc58bcd07026d5ac871b8b4fe1c9a250fc3592699311980  contracts/bridging/GovernanceChildTunnel.sol
+      b8f65180782a1e130019571799a3108cffa2057b0ca4f6a04813f33a8e4fade7  contracts/bridging/GovernanceRootTunnel.sol
+      26904b0453d682491b09436b786fe1f9f909f2c1373f8be6b27ca6885cfdfbc8  contracts/bridging/GovernanceRootTunnelMock.sol
+      a2105232d89285ea86711f549374b8470a2624bd3bfb4f2a23e2631d92dbaafc  contracts/bridging/StandardChildTunnel.sol
+      986b05c35a3cbe3a5c0b6ae764f4b6754cc1d8bdcc51143b6fc063a2c3c080f5  contracts/bridging/StandardRootTunnel.sol
+      e4b851ed961b68ce7a8c133d15377750923dc88bd3111a66e880fbd468b0aa48  contracts/bridging/StandardRootTunnelMock.sol
+      4096fb22fba84ff0d905df3612dd3f3e0c9abf2b2457ef1db9f13e4bf5047894  contracts/construction/ConstructionBay.sol
+      0c4cb761a86912e5da5963e0207f93b6854e46542b69b6f86c9a0d4715a4e3f7  contracts/construction/RedBlackTreeLib.sol
+      71fcb5af1e68909f0d26917e68cef5b1aafd8bc68142c5e73cacba4597a682ab  contracts/finance/CitadelPaymentSplitter.sol
+      b87e44ba2770ca369de8098885b30d78260d55ac573eeacf04abca48855d33d6  contracts/fx/FxChildMock.sol
+      4c4abf29efc9e47defbc57e27e55c76ff3684d0e412c7c2632c988d0f7c92109  contracts/fx/FxRootMock.sol
+      624288703e467b956f7c04e0aaf6b97d538eca8d888f67f7a7ffe66468c0eb91  contracts/fx/lib/ExitPayloadReader.sol
+      ecc7cd00047388c0f2612b8086f457162b2d99d93c6141447e4682008fd6324e  contracts/fx/lib/Merkle.sol
+      5086800b71b49202d05b54984e4a0970dbbff8aef6e62e77b9a63755a96e56a1  contracts/fx/lib/MerklePatriciaProof.sol
+      b700843f24e26dea92ba70c9748a305355dcf5a5f08b9adb65b0f57fe4f0c653  contracts/fx/lib/RLPReader.sol
+      880f5ef6b97d74730b34c880868b854902dadccf8d212b659d83dd5a34cce0f8  contracts/fx/tunnel/FxBaseChildTunnel.sol
+      dc9bdfb8ca5f3fb40e6a0102ef1d286ab7fa43696544b3be999cc30661cc46a4  contracts/fx/tunnel/FxBaseRootTunnel.sol
+      e51994cb8fb51b929063f8f3c09152e31cafcd3a315809bc16676da3cf2f2139  contracts/game/Belts.sol
+      89c10b4e41881a8ef762fbdcbd999c694a089cd0862fbee1f0ce58fa24eb7a75  contracts/game/BeltsLib.sol
+      211883e232b87990f90a63f3f1e443a06398c7c0e06338ba90f0df9f282eb321  contracts/game/Game.sol
+      809539b22ad1c06bfef8978690b59f0a9108a1609864b6be28e2e2a667544d82  contracts/game/Outposts.sol
+      2674953b6930a6dfe21656fbf44795be231d63db6beb5e4e2c39c8080d33112f  contracts/game/OutpostsLib.sol
+      61264dd212f59c106d27e62cbce16fd5395b70a566cf798dab2eff6aae25a594  contracts/game/Rewards.sol
+      9be9e875f88e454d9c1da84d162e8fec69dd5d85bd18f78ef81ba31854934799  contracts/game/RewardsLib.sol
+      c5aa6f08306e2a668a64119b959874afe12a2384617717fa8ef2ec41bd0b6b9b  contracts/game/Staking.sol
+      3667f036e4dc978ddec9cb62690d40362ed065b1270e9568204464e931005c30  contracts/game/TokenTraits.sol
+      3d844cd042efeaca67a884a0972b390af72733da1aefcfc5994c24f0b38289d2  contracts/game/Travel.sol
+      f37677edd619126d73e555a0794168a74b7dc6bdae5a24ebe75776b77083a9e7  contracts/game/TravelLib.sol
+      64875fdbc974dde047868819c7d63eb1c8daafe9c556df8e741759f52f5269fd  contracts/game/Upgrades.sol
+      fb961583ac937e2f050d0e94911c0ec61b3e1244b6e4a4a447d03052625871d2  contracts/game/UpgradesCalculator.sol
+      a516f783bae79152a9610fda22981b6bf7fff1269b5a16ac0ffb0e968187985a  contracts/game/UpgradesCalculatorLib.sol
+      efa86ca6aca76c7749e834cad04849959aade5776c376391a3c05fa0a54ff95b  contracts/game/UpgradesLib.sol
+      d2952a04305f588844a61f5555d67e48a90e5dfe4966614fc13ae67bd517cd7b  contracts/governance/CitadelGovernor.sol
+      28f7ffdcc77db398dd19af8412fcb607e41fc224852b2d101bb57c3d748f8c79  contracts/governance/CitadelTimelock.sol
+      5864e47c9e698de36d3918aadb676c2840af0b440e94c0863f1f76231e031fbe  contracts/governance/GovernanceTokenMock.sol
+      fb550a338688809ded088b8cedf7808d1ef0b7aa646f06a814142ffbb36ed1e0  contracts/interfaces/IBeltsLib.sol
+      8b5c03f64cdbad0ce999e17ffbc14003307b3518d05230165a6136e314f9cd86  contracts/interfaces/IConstructionBay.sol
+      d567b4af0c9d1c78a2c2c5e29ea68e7e61377dc6b375c50c18c4caea54f4d39d  contracts/interfaces/IERC20Burnable.sol
+      82335157c0e2704ac500cea28dfc1ff4cd473c5eeb605803b7a67f9e07fe322d  contracts/interfaces/IGameEvents.sol
+      245ca011c31bbbe708152371b011233b1b55109f577850f84b46dd23da2e9266  contracts/interfaces/IMetadataLib.sol
+      664dbaa6e9441fd637d95bbe34325ad1a7057681f684ca49444b08e8bc9ae84e  contracts/interfaces/IOre.sol
+      45fe77a3c67100a5808ec072a5725ca5f33056563288faaf056d00c81b940687  contracts/interfaces/IOutpostsLib.sol
+      a88474279a02fd6156abe00bbe4e5926f2d284a89cf42b59ce427104a00d9465  contracts/interfaces/IPilotBadge.sol
+      dad4566641fdc54baf6ca0df4d7c3ec09da21e45170446ca3e65be7bfe847167  contracts/interfaces/IProxyRegistry.sol
+      cbea5b9a1585e030d9f2194afa1bb3a9c70ef6034403f781416ea83aad565093  contracts/interfaces/IRandomOracle.sol
+      10444a1209e641f12a397b18d9d97c484d9653c3145a69a9769112ae7f906968  contracts/interfaces/IRewardsLib.sol
+      a686bb36ff12e5eb2dfce67581d7d0162123db485437770d998918bf04fb28d1  contracts/interfaces/IShipTraits.sol
+      a11f9039152bc6cdbf2d66ed0da0d00c5e57cff76be65fb3f660c75b72d1d3db  contracts/interfaces/IShips.sol
+      33adac0ddea501c57a6f8124710e55a362fe0915cdccd245e19523145279e4f1  contracts/interfaces/IStructs.sol
+      63c1b6bb1895f8bc52aeabc1c9e020d7afffa30fa50d3bdc1ed88809052b034f  contracts/interfaces/ITravelLib.sol
+      dad64f71c129a395b55cd9b44869836e0fb116da7ce3849e5948b4b319892e7b  contracts/interfaces/ITunnel.sol
+      822e0aa75e8ba5693bab3f44b5ecd3f43245cf38e37c65393626604b34809914  contracts/interfaces/IUpgradesCalculatorLib.sol
+      6f70ace6eb4a95d5f3417e0f15aeecf2036f42cf87cc1862ccaeb2babf58f477  contracts/interfaces/IUpgradesLib.sol
+      f15e1cb67c29d532a4bad1e7de531e781fc140b9142c39506a7fad667a24a63c  contracts/interfaces/IVerifier.sol
+      5265765a89e93ece3f983eea4dba2b0ecfcf2fd2857e23ae62af751fa1a65a22  contracts/oracles/RandomOracle.sol
+      da2e07521241688a4ba48b9bf9b61808b11cce0e820abf6efcee521af8428128  contracts/oracles/RandomOracleConsumer.sol
+      49e7603ee3cb0c991836ba6ce2205a2f31d43d008b019e7b46cc0eaa005ab5ed  contracts/oracles/RandomOracleConsumerMock.sol
+      1ab865eb6631a2052459049b9d289cb0862bfe1de8d01aa6b596d8f0067be19a  contracts/oracles/RandomOracleMock.sol
+      302ed31ac45f3dd2f0244d362a735819b75c32b59444f1342acd87bb5eb76e5c  contracts/oracles/VRFCoordinatorV2Mock.sol
+      8382d2ded6e71e4973fdce1929a01ea562b565733c81fb012507b2c0a2c63434  contracts/proxy/CitadelProxyAdmin.sol
+      2ec505a5b63dd2c97999e7ff91856458b6a074819680296b84cdda9a4122e5f7  contracts/proxy/TransparentUpgradeableProxyMock.sol
+      180c91624339786c236845bc6bf9fb4850ee6ead13242a49211ebff8c6786001  contracts/proxy/UpgradeableMockV1.sol
+      36c303f01782bcf18316a0d9a752084f9f347b8d872c69c4e0f541421dd0ccb8  contracts/proxy/UpgradeableMockV2.sol
+      7e57609054d5aec67c853bd75504beb09bfe91048ba0ad392fd94138f002c929  contracts/token/BaseShips.sol
+      a0559b881fea8caab9d58f3c5163b0b6f38530ba0bd142a9856e8c02265ed8db  contracts/token/DutchAuctionShips.sol
+      9837502605dab69830bccc708c6a7be52bfbdeece77634d053a7f7072e7c9eb6  contracts/token/ERC721C.sol
+      a40902b8c480a89e046c4b836aa141c084b94db154434c6b9c474cae63fa72d9  contracts/token/FixedPriceShips.sol
+      797e4cd07bce5d327bb0b09cb5f7d7ccad169e4b425a88544aa229c508b78562  contracts/token/MetadataLib.sol
+      d49ccecfa214ecc0ac62439287b21e74bd96d5d2786ae95438618b0b3de4b414  contracts/token/Ore.sol
+      c460ebc1c0d52cada400aa23ad8965a66ac6b308815554d650f29d4e7eb928a7  contracts/token/PilotBadge.sol
+      c06c25851d4deb2ea3d5463a2c161c114a328e1678a8f7b9066f779b2a03cd14  contracts/token/ProxyRegistryMock.sol
+      044826e1c2ea3aca78a801c6367b71939735a0f10d86d82fc209714d9d8ea446  contracts/token/ShipTraits.sol
+      71f4ef7c7c100ca5a4329d6945e6933cb0015fcce0946e1266abe913aa6f27b0  contracts/token/ShipsMock.sol
+      9c49d3ee872f8e27866d4086124ca38989d2f41bcb9286af8aa77b0072b27d40  contracts/util/Bytes32Strings.sol
+      39cf23b8454c4a46f07d92231666f3808ce3961d058e7739ac0a610d82a0cf8d  contracts/util/RandomOracleUtil.sol
+      a52603f725839259b0503864ffb8531bfe116c031dda556830e7860742350db7  contracts/util/TokenContracts.sol
+      a7d297e21e16102c7766b536152e42d7a9a2bd8cd7959fae00738711e9d09aed  contracts/verifiers/CommitVerifier.sol
+      930e35921b636fdbe8500a5c9db8a9f3b67cb905d1c1c2a01b6014cba549fcec  contracts/verifiers/RevealVerifier.sol
+    </template>
+  </content-for>
+</page>
