@@ -448,10 +448,10 @@
   dependencies:
     entities "^2.0.0"
 
-"@lancer/studio@^0.18.0":
-  version "0.18.2"
-  resolved "https://registry.yarnpkg.com/@lancer/studio/-/studio-0.18.2.tgz#4aa74697941c97a7b3493968017e2c60aabee981"
-  integrity sha512-HD93wb0jUw0jBGBD7TrALVnHhbiB7rR8AbvKvAPF2aaNuIi6OPcKpITJFIdQA91KiK4QqyVic9ybGqxMLeJZLg==
+"@lancer/studio@^0.20.0":
+  version "0.20.0"
+  resolved "https://registry.yarnpkg.com/@lancer/studio/-/studio-0.20.0.tgz#0e250630a1aa451aefe75149ec5f8ced4d0f9721"
+  integrity sha512-aaXPUw6RvfayKI1wuGMiRYFU6c+OPKynQkhFSJB6harNKASeuKc34mkEsLDoKCRB7TpDJwefdszZ7M+s7Y7NiA==
   dependencies:
     "@lancer/ihtml-parser" "1.0.1"
     "@tailwindcss/forms" "^0.2.1"
@@ -4000,6 +4000,11 @@ tar@^6.1.11:
     minizlib "^2.1.1"
     mkdirp "^1.0.3"
     yallist "^4.0.0"
+
+three@^0.145.0:
+  version "0.145.0"
+  resolved "https://registry.yarnpkg.com/three/-/three-0.145.0.tgz#a613d71e75effc2aed88be630027ca01e2b6502e"
+  integrity sha512-EKoHQEtEJ4CB6b2BGMBgLZrfwLjXcSUfoI/MiIXUuRpeYsfK5aPWbYhdtIVWOH+x6X0TouldHKHBuc/LAiFzAw==
 
 tippy.js@^6.3.7:
   version "6.3.7"
