@@ -1,0 +1,51 @@
+<page
+  clientName="HNT Labs"
+  reportDate="Nov redPill 2022"
+  auditTitle="Zion A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/HereNotThere/harmony/tree/e22ee3a9107a816773e7e56d36a37fb0506a955e/contracts/zion-governance/src/spaces"
+  repoCommitHash="e22ee3a9107a816773e7e56d36a37fb0506a955e"
+  passwordEncrypt="env:PAGE_PASS_TREASUREDAO_1"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from Oct 31, 2022 to Nov 11, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    <li>Privately accessible docs.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    51259881048f625a92e1c6718b3ade61e3b7f35cb275f0a6b4a50c6a942eddd4  ZionPermissionsRegistry.sol
+    db38f6d1d3c13c096911e38e977dda55ed14d2886de344282a11f90bca0532cb  ZionRoleManager.sol
+    445c2e1153deb6eda68ec18729e74cc61c5ab894525eaa30210e43e2f3f3220b  ZionSpaceManager.sol
+    cb78ec798e09aa72ad2844ff89c4f91696461cb0790e96f26ace3f8aae17148a  ./interfaces/IEntitlementModule.sol
+    a2c925cc6c369ccad07b02b6b028e8890a7da16a833829d64ac36be540743e6c  ./interfaces/IPermissionRegistry.sol
+    2ae02e0a1e381b64b4d39b05ca61d28efe73c65d8b585e9175841e5ebe75a0a1  ./interfaces/IRoleManager.sol
+    0f1c00eba40cab5c915c5774b3c32d7eef8fd453efb1f0faf69c3350491ddc11  ./interfaces/ISpaceManager.sol
+    4434407ae557944d40a609e1640c9374ac0beb0bdb544758dde3fc14c67d11c9  ./interfaces/ISpace.sol
+    f5879948eb4e3fd37b28e07cded6f59aa81b9cc0ce0fb4d9b6ffbae4c98a5414  ./libraries/Constants.sol
+    7b2ba98a3f5912a1e65a5e69d01346b60f54f3b9bb5478df0153ddfce774a67b  ./libraries/CreationLogic.sol
+    e7f89fe8bc1ca5fedd6e526e33954a13f76d3d448d5bc191988fc5179efc2941  ./libraries/DataTypes.sol
+    c0190bbb168885d2665723830dac99d85a526b80704276cd26f52c2b210cca27  ./libraries/Errors.sol
+    4d7c1d175de308a439e346565fb43d3b0eb89df1b674b45e2741dfa220bd5ce2  ./libraries/Events.sol
+    50a2c6bb3c7cfd61001f07117282b0f2a29e65caec3a731eb68497ab230cc276  ./libraries/PermissionTypes.sol
+    e406eb9bfb9c4e469d8a115a2d170508a0b27205a50dfb0208531cbc9d3a8fd2  ./libraries/Utils.sol
+    8818cb76cac71f9a9459f5b317a785db35780173dd3fad01aae0507844857164  ./modules/EntitlementModuleBase.sol
+    5e64ce4ecc1202034ed022dca47f2a28b5a40157d500b1f679fa2bb7e23dff5f  ./nft/ZionSpace.sol
+    944af4bdaa71ccefb1d4a0fabc7bf95c051941f6ab3eadf3ae1b3f9ca38c8f6a  ./storage/ZionRoleStorage.sol
+    e9bb425ce3ea103b0225a690f72fb7720a780deb69875031e6b5b70580d7e68b  ./storage/ZionSpaceManagerStorage.sol
+    fe83d1837341f61da1ebaf967fdc33f7105af01e234423757d9722a29210df1f  ./modules/entitlements/TokenEntitlementModule.sol
+    fc03e74bd0b204b4525adbc93a17519fce62e152520905dc6d1335bfc9aafc0d  ./modules/entitlements/UserGrantedEntitlementModule.
+  </template>
+</content-for>
