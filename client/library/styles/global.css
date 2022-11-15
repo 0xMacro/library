@@ -7,6 +7,7 @@
 
 body {
   @apply bg-light dark:bg-gray-800 dark:text-gray-200;
+  @apply print:bg-transparent;
 }
 
 .flex-center {
