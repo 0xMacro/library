@@ -6,6 +6,9 @@
   @apply print:bg-transparent;
   border-radius: 1px;
 }
+#audit-report > section > h2 + *, .Section > h2 + * {
+  page-break-before: avoid;
+}
 
 #audit-report > section + section {
   @apply mt-1;
