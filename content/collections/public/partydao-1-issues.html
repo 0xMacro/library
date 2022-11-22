@@ -1,0 +1,594 @@
+<item>
+    <field name="topic">Assets theft</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>   
+    <field name="status">fixed</field> 
+    <field name="impactNote">
+    The attacker would steal precious guarded NFTs.
+    </field>
+    <field name="chanceNote">
+    An attacker can execute it only when they have the majority and there is no host intervention.
+    </field>
+    <field name="statusNote">
+      Added an indexCall and countCall. Can only call cancelAuction on Zora if it's the last call in the arbitrary proposal calls count.
+    </field>
+    <field name="commit">f3af0ed35a77bb47599a7fbc76200c9c4907c653</field>
+    <field name="content">
+    ## (H-1) The majority can steal precious NFT by combining Zora and arbitrary calls proposal
+  
+    Party allows the ZORA auction as one proposal type in their governance contracts.
+
+    Since ZORA is custodial if you cancel the proposal while the proposal is in `inprogress`, that NFT would remain inside the ZORA auction house.
+
+    Now, the party has two options: either wait for an auction to conclude, or call `cancelAuction()`[🔗](https://github.com/ourzora/auction-house/blob/01c4e8085c6815bf3233057dee8e628aca07813f/contracts/AuctionHouse.sol#L309) before the first bid is placed.
+
+    Party would need to execute an arbitrary proposal for the latter.
+
+    At this point only, the majority holder can trick the party into transferring that retrieved NFT outside of the party.
+
+    The ideal attack would look like this:
+
+    1. **Propose a `ListOnZoraProposal` with a high reserve price.**
+
+    ```solidity
+    Let voting happen, considering the attacker holds the majority and 
+    there is no host intervention, and the proposal would pass.
+    ```
+
+    2.  **Execute ZORA Proposal.**
+
+    Proposal Step 1 : `createAuction()`
+
+    3. **`cancelProposal()`** 
+        
+        The proposal is canceled, the party is unblocked for executing future proposals, and the NFT remains in the ZORA auction house.
+        
+    4. **Propose an `ArbitraryCallsProposal` with two arbitrary calls.**
+        
+        Call 1: Call `cancelAuction()` on the auction house contract.
+        
+        Call 2: Transfer the NFT to an external address.
+        
+        ```
+        Let voting happen, considering the attacker holds the majority and 
+        there is no host intervention, and the proposal would pass.
+        ```
+        
+    5. **Execute Arbitrary Calls Proposal** 
+        
+        Since the reserve price is higher compared to the market value, no one would bid.
+        
+        Hence, `cancelAuction()` would succeed and return the NFT to the party.
+        
+        **All is going as specifications expects, until here.**
+        
+        Now, the issue is in the second call:
+        **`Transferring NFT to an external address.`**
+        
+        Ideally, `ArbiartyCallsProposals` should fail on this call, as it is transferring precious NFT outside of the party since a check of ownership is done before and after the arbitrary calls.
+        
+
+    [](https://github.com/PartyDAO/partybidV2/blob/ecd62753bfb1f001a111ba392cfca57b02beac77/contracts/proposals/ArbitraryCallsProposal.sol#L55)
+
+    ```solidity
+            bool[] memory hadPreciouses = new bool[](params.preciousTokenIds.length);
+            if (!isUnanimous) {
+                for (uint256 i = 0; i < hadPreciouses.length; ++i) {
+                    hadPreciouses[i] = _getHasPrecious(
+                        params.preciousTokens[i],
+                        params.preciousTokenIds[i]
+                    );
+                }
+            }
+            <
+                        
+                _executeSingleArbitraryCall(
+                    i,
+                    calls[i],
+                    params.preciousTokens,
+                    params.preciousTokenIds,
+                    isUnanimous,
+                    ethAvailable
+                );
+
+            >
+        
+            if (!isUnanimous) {
+                for (uint256 i = 0; i < hadPreciouses.length; ++i) {
+                    if (hadPreciouses[i]) {
+                        if (!_getHasPrecious(params.preciousTokens[i], params.preciousTokenIds[i])) {
+                            revert PreciousLostError(
+                                params.preciousTokens[i],
+                                params.preciousTokenIds[i]
+                            );
+                        }
+                    }
+                }
+            }
+    ```
+
+    **However, what if the party received the NFT in one of these single arbitrary calls?**
+
+    The same thing happens as in the case of `cancelAuction` via arbitrary proposal.
+
+    Since the NFT is received in the middle, no record would be present in `hadPreciouses`.
+
+    Hence, the attacker can move the NFT outside via a second arbitrary call.
+
+    One simple solution is to move the `_getHasPrecious` check from multiple to single arbitrary calls, but that would increase gas costs for all arbitrary call proposals; another solution is to block the Zora interactions on arbitrary calls.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>    
+    <field name="impactNote">
+    The target NFT will be locked in the crowdfunding party, despite successfully being bought by the contract. 
+    </field>
+    <field name="chanceNote">
+    In order to force this, the griefer burns the ether sent to the crowdfunding contract. Any crowdfund can be exploited this way, even if it’s private and contains the `onlyHostsCanBid`/`onlyHostsCanBuy` restrictions.
+    </field>
+    <field name="statusNote">
+    Added more checks for lastBid on AuctionCrowdfund.
+    Removed the balance check from BuyCrowdfund contracts and now use only the callValue to assure was not gifted.
+    The zero maximumPrice logic was removed, this was used to define a crowdfund without any max price. Still, the maximumPrice can be set to 0 creating a crowdfund that will revert always in any buy() call. This will cause contributions to get stuck in the contract until expiry.
+    </field>
+    <field name="commitTree">d394e1df1afebf25113d23daa006d4351ee91f51</field>
+    <field name="content">
+    ## (M-1) Crowdfund contracts can be griefed into locking the target NFT after being purchased
+  
+    On [line 136](https://github.com/PartyDAO/partybidV2/blob/audit/macro/contracts/crowdfund/BuyCrowdfundBase.sol#L136), `CrowdfundBase.sol` has the following code inside the *`_buy()`* function logic:
+
+    ```solidity
+
+    {
+        // Execute the call to buy the NFT.
+        (bool s, bytes memory r) = callTarget.call{ value: callValue }(callData);
+        if (!s) {
+                    r.rawRevert();
+        }
+    }
+
+    if (token.safeOwnerOf(tokenId) == address(this)) {
+        if (address(this).balance >= totalContributions_) {
+            // If the purchase was free or the NFT was "gifted" to us,
+            // refund all contributors by declaring we lost.
+            settledPrice = 0;
+            expiry = 0;
+            emit Lost();
+        } else {
+            settledPrice = callValue;
+            emit Won(
+                // Create a party around the newly bought NFT.
+                party_ = _createParty(
+                    governanceOpts,
+                    isValidatedGovernanceOpts,
+                    token,
+                    tokenId
+                ),
+                token,
+                tokenId,
+                callValue
+            );
+        }
+    ```
+
+    There are two possible outcomes from this logic, considering that the crowdfunding contract is the owner of the target NFT (`token.safeOwnerOf(tokenId) == address(this)`):
+
+    - The balance of the contract is equal to or higher than the total contributions, and because of this, the contract will assume the NFT was gifted and will declare the crowdfunding as lost.
+    - Otherwise, the contract will call the crowdfunding as won, deploy the party, and transfer the NFT to the party.
+
+    In the first scenario, the contributors will be able to burn their crowdfunding NFT to reclaim their contributions, and the gifted NFT would be locked in the contract. Given that the contract only compares the balance to the `totalContributions` after the external `.call()`, a malicious actor could force send ether into the crowdfunding contract, pushing the balance higher than the `totalContributions`, even after the NFT is successfully purchased — essentially making the crowdfunding failed and the NFT locked.
+
+    This issue is also present in the `AuctionCrowdfund.sol` contract, and, given that this contract has a `receive()` function, the ether can even be sent by a regular transaction.
+
+    ⚠️ In a whitelisted sale, with a crowdfunding party being exclusively allowed to buy a specific NFT or buy from a specific collection, the attack vector could be considered higher since the party will assume the purchase of the token cannot fail. And an external actor can manipulate the results.
+
+
+    **Resolution**
+
+    One consideration in mitigating this would be to check the balance before and after executing the external call and compare this difference to the total contributions:
+
+    ```solidity
+
+    // Verify the actual balance of the contract
+    uint256 balanceBefore = address(this).balance;
+
+    // Execute the call to buy the NFT.
+    (bool s, bytes memory r) = callTarget.call{ value: callValue }(callData);
+
+    // Make sure we acquired the NFT we want.
+    if (token.safeOwnerOf(tokenId) == address(this)) {
+        // The contract has more or the same balance than before
+        if (balanceBefore <= address(this).balance) { 
+                                    ...
+                    emit Lost();		 
+                } else { // The contract spent eth
+                    settledPrice = callValue;
+                    emit Won();
+                }
+    ```
+
+    By doing this, the contract would ignore any ether outside contributions and assure that at least some funds have been used for the purchase. Still, this is just mitigation, since the external call could be force-sending ether to the contract, but it narrows the possible attack surface
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="impactNote">
+    The whole crowdfund would be lost forever — there is no way to bring it back. 
+    The only way forward is to ask existing contributors to burn their NFT, create a new crowdfund with the `onlyHostCanBuy` option, and then ask them to contribute again.
+    </field>
+    <field name="chanceNote">
+    In the best case, this could be done at the expense of gas costs only. It is not high, considering that this requires a non-gated `buy()` and someone with the motivation to grief.
+    </field>
+    <field name="statusNote">
+      Preventing approve and setApprovalForAll calls through buy() function. Only to the token address.
+    </field>
+    <field name="commit">b30644bbf17e2285597dff95732a3bb0f9a28de6</field>
+    <field name="content">
+    ## (M-2) Someone can grief an active crowdfund by advancing it to a `lost` state at a negligible cost
+ 
+    Let’s consider that there is a non-gated `BuyCrowdFund` intended to buy one NFT. Multiple contributors are contributing, and all is going well.
+
+    Then, someone wants this crowdfund to fail, for some reason.
+
+    One accepted way for them to do this is to buy the given NFT.  But they don't want to hold on to that NFT until expiry and don't have the funds to do so.
+
+    Another accepted way is to gift NFT to the crowdfund so that it would be locked forever, and crowdfund could be advanced to a `lost` state.
+
+    But they don't want to lose their funds. 
+
+    **What they can do?**
+
+    Well, there is one way they can directly fail this crowdfund forever: moving it to a `lost` state, without losing ETH and without locking/gifting the NFT in crowdfund. They can:
+
+    1. Temporarily buy the NFT, and transfer it to the crowdfund contract. 
+    2. Call `buy()` with `(callTarget=NFTContract, callData=approve(their address), callValue=”0”)`
+        
+        This results in the crowdfund contract approving the attacker’s address as a spender for the NFT.
+        
+        Since crowdfund owns the NFT at a null cost, the contract considers that the NFT is gifted and moves to a `lost` state.
+        
+        **Here, the assumption that NFT would remain locked forever so there is little incentive for the griefer to gift NFT won't hold true anymore**
+        
+        Since the NFT is still present in crowdfund and the attacker's address is the spender, they can easily move the NFT out of the contract.
+        
+        **Another assumption, that crowdfund would remain active until expiry if the contract doesn't own the NFT, won't hold true as well.**
+        
+    3. Transfer the NFT back to self or return it back to the marketplace by selling it on the collection floor.
+  
+  ℹ️ If the attacker doesn't have initial funds to cover the buy cost, they can use the flash loan to buy NFT, given they have a buyer at the end to close the loop.
+    If they don't have a specific buyer, they need to sell at the collection price; here, they would need to pay the difference.
+    If they have a specific buyer — for example, some alternate party, competitor, or buyer from mempool — they can close it there.
+
+    
+  ℹ️ If an attacker uses their own funds, they have the option to list NFT again rather than sell it. 
+    Here, though, you take risk of market volatility.
+    So then the question is: How is it different from an attacker just buying NFT to grief crowdfund? In normal cases, the attacker needs to hold it for the whole duration to grief crowdfund.
+    Whereas in an exploit case, you can list it soon and get it sold.
+    So the time period over the risk that is taken is minimized.
+
+        
+    **Resolution**
+
+    If NFT is considered gifted, consider directly sending it to an unreachable address like `address(0)`.
+
+    This way, all previous approvals would be canceled.
+
+    Technically, locking NFT inside the crowdfund contract forever, or sending it to a 0 address, is the same thing.
+
+    Below are a few other solutions that, though possible, are not ideal:
+
+    1. Assert `callTarget ≠ nftContract`: not ideal since this will block the action required for NFT initial mints.
+    2. After the external call, verify the spender: not possible to verify operators.
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">
+    The logic now uses msg.value to assign the first contribution.
+    </field>
+    <field name="commit">3b9eac5b553d7af1f76d8ac1f183b05f7011e9a3</field>
+    <field name="content">
+    ## (L-1) Someone can grief the creation of new crowdfunds by sending some ETH to the predicted address beforehand
+ 
+    While creating crowdfund, if the deployer has passed some ETH, the intention is to credit `opts.initialContributor` with the initial contribution.
+
+    ```solidity
+    Crowdfund.sol L160
+
+    uint96 initialBalance = address(this).balance.safeCastUint256ToUint96(); // @audit msg.value
+    if (initialBalance > 0) {
+        // If this contract has ETH, either passed in during deployment or
+        // pre-existing, credit it to the `initialContributor`.
+        _contribute(opts.initialContributor, initialBalance, opts.initialDelegate, 0, "");
+    }
+    ```
+
+    However, an external actor can force the code to take the path of `inititalBalance > 0`, even when the deployer did not pass any ETH, by predicting the future contract address `function(factory’s address, nonce)` and sending some ETH there beforehand.
+
+    By doing so, someone can grief the creation of “Crowdfunds with Zero initial contribution” as *`_mint`* will revert by `opts.initialContributor = address(0)`.
+
+    Consider checking for `msg.value` instead of `address(this).balance` or credit it to the `msg.sender`.
+
+    We understand that this has a very lower impact and likelihood, as the deployer can always send a new transaction with `intitalContributor ≠ address(0)`, but we wanted to report it because of its easy fix.
+    
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Spec-breaking</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">
+    Now the maximum minted voting power is capped to the totalVotingPower.
+    </field>
+    <field name="commit">03d808af4d86df78f67ddd63b23e0639f763e87d</field>
+    <field name="content">
+    ## (I-1) Voting power minted incorrectly for externally created parties would break various assumptions.
+        
+    ### Party creators can mint tokens with equal or higher power than `totalVotingPower`, allowing them to propose and unanimously pass proposals instantly.
+
+    By doing this, any member owning an NFT with this power could bypass all the different protections for the precious NFTs by calling any proposal and having a unanimous vote because the votes are quantified with the `totalVotingPower`.
+
+    ### Party contracts with a total voting power higher than `totalVotingPower` can leave members without a supply of Fractionalize ERC20 vault tokens.
+
+    Similar to the item above, the `Fractionalize` proposal type creates a distribution of governance tokens with a supply equal to the `totalVotingPower`, if there is more accumulated power than this value among the governance NFTs, possibly leaving contributors without any shares.
+
+    ### Party creators can mint tokens with `VETO_VALUE` voting power, disallowing the receiver to propose and vote.
+
+    The vetoed value in the proposal state info it’s represented as is the `type(uint96).max` value; however, if a creator of a party assigns this value as a voting power for specific governance NFT, every attempt to propose would result in the proposal having the veto value. On the other hand, if this user tries to vote for any proposal, it will revert to an arithmetic error since the proposer will accept the proposal with their power, and the max value of votes (`type(uint96).max`) would be overflowed.
+
+    ### The vote quantity defined in `mint()` can overpass the `uint96` max value and revert to overflow on any `accept()` call.
+
+    The mint function takes the `votingPower` parameter as a `uin256`; however, the votes are accounted for as a `uint96`, the same as the above item, and if an NFT governance token has more power than the `uint96` max value, the voting and proposals for that NFT would revert in every call.
+    
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+    ## (Q-1) Lack of guarantee that the externally created party possesses the precious.
+        
+    The `PartyDAO` specs suggest that a party could be created directly from the factory as well.
+
+    Since it's not coming from the crowdfunding route, the creator can pass anything as precious. 
+
+    There is no verification if the party holds precious NFTs or not in party initialization.
+
+    At present, the creator of the party would need to transfer precious manually after the party initialization.
+    Which they may choose not to do.
+
+    Consider transferring NFTs inside the party initialization to get rid of this trust assumption.
+    We couldn't think of any impact this would have, except wrong information being given to the user and some added restrictions in arbitrary calls proposal — which is why we marked this as quality.
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">
+    Now the multi-sig wallet update happens in two steps, one for assigning the new address, and the second one is accepting it.
+    </field>
+    <field name="commit">a5212a154e23143a713691031547a64710d0ca1b</field>
+    <field name="content">
+    ## (Q-2) Unsafe Multi-Signature Transfer 
+        
+    In the Globals contract, consider making transferMultiSig() a two-step process, where the new multi-sig needs to accept the ownership to have an effect. This would protect from incorrect updates done on highly powerful functions.
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+    ## (Q-3) Non-standard ERC721s could cause odd behaviors
+        
+    The party contracts assume that the underlying NFTs are following the ERC721 standard.
+
+    If any underlying NFTs are not following standard, the code could break at various points.
+
+    While doing `_setPreciousList` in party initialization, consider adding the `supportsInterface` check on passed NFTs.
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">
+    There is a new global variable for the minimum cancel delay.
+    </field>
+    <field name="commit">b2d0886eb16ec49d66e67a5387daa0cc6fb79fbf</field>
+    <field name="content">
+    ## (Q-4) Lack of minimum cap for the cancellation delay
+        
+    The Governance contracts have a `cancel()` function to prevent having a locked status on the party when a proposal has been in progress for an undesired amount of time. Although this function call can “unlock” the contract, it can also leave it in an unrecoverable state, even losing a precious asset.
+
+    To ensure that a cautious time is set to this inside the proposals, consider making the minimum cap for the `cancelDelay` time the currently present cap for the `maximum` cancel delay.
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+    ## (Q-5) Accept function doesn’t revert if the caller has zero voting power
+
+    In the PartyGovernance, the voting power used for the `accept()` function can be zero, and this can cause unnecessary gas spent if a user mistakenly calls the accept function without any voting power. 
+    If the likelihood of users calling accept even when they don't have voting power is high, consider adding a check on top.
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">
+    The `ethOwed` + `ethUsed` is now being used if the party won.
+    </field>
+    <field name="commit">b2d0886eb16ec49d66e67a5387daa0cc6fb79fbf</field>
+    <field name="content">
+    ## (Q-6) Redundant loop in `getContributorInfo()`
+ 
+    For `getContributorInfo()` of `CrowdFund.sol`, there is no need to calculate `ethContributed` by looping over all contributions for won and lost states; the same result could be achieved by adding `ethOwed` and `ethUsed`.
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">
+      
+    </field>
+    <field name="commit">b2d0886eb16ec49d66e67a5387daa0cc6fb79fbf</field>
+    <field name="content">
+    ## (Q-7) Inconsistent comments
+ 
+    In the contract's code, there are a few inconsistencies with the spec and code logic in the comments regarding the voting power.
+
+    - In `PartyGovernance.sol`, [line 226](https://github.com/PartyDAO/partybidV2/blob/audit/macro/contracts/party/PartyGovernance.sol#L226) and [line 239](https://github.com/PartyDAO/partybidV2/blob/audit/macro/contracts/party/PartyGovernance.sol#L239):
+
+    ```solidity
+    // Caller must own a governance NFT at the current time.
+        modifier onlyActiveMember() {
+            ...
+        }
+
+    // Caller must own a governance NFT at the current time or be the `Party` instance.
+        modifier onlyActiveMemberOrSelf() {
+            ...
+        }
+    ```
+
+    - In `PartyGovernance.sol`, [line 545](https://github.com/PartyDAO/partybidV2/blob/audit/macro/contracts/party/PartyGovernance.sol#L545):
+
+    ```solidity
+    /// @dev Only an active member (owns a governance token) can call this.
+    ///      Afterwards, members can vote to support it with accept() or a party
+    ///      host can unilaterally reject the proposal with veto().
+    ```
+
+    - In `PartyGovernance.sol`, [line 578](https://github.com/PartyDAO/partybidV2/blob/audit/macro/contracts/party/PartyGovernance.sol#L578):
+
+    ```solidity
+    /// @dev The voting power cast will be the effective voting power of the caller
+    ///      at the time propose() was called (see `getVotingPowerAt()`).
+    ///      If the proposal reaches `passThresholdBps` acceptance ratio then the
+    ///      proposal will be in the `Passed` state and will be executable after
+    ///      the `executionDelay` has passed, putting it in the `Ready` state.
+    ```
+
+    - In the PartyGovernance docs, in the ****[Voting Power Snapshots](https://github.com/PartyDAO/partybidV2/blob/audit/macro/docs/governance.md#voting-power-snapshots)**** section:
+
+    > When determining the effective voting power of a user, we binary search a user's voting power records for the most recent record <= the proposal time.
+    > 
+
+    It should be `<` instead of `<=`.
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">
+    Changed the function's logic to be executed by only hosts.
+    </field>
+    <field name="commit">b2d0886eb16ec49d66e67a5387daa0cc6fb79fbf</field>
+    <field name="content">
+    ## (Q-8) Imprecise Modifier name
+ 
+    Consider renaming onlyHostCanBuy to a more appropriate name. The naming suggests that only the host can call buy; however, if set to true and there are gatekeeper addresses set, the code also allows gated contributors to buy.
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+    ## (Q-9) Double declaration of `Globals` address 
+
+    The `Globals` address variable is present in both the `CrowdFund` and `CrowdFundNFT` contracts as private immutable.
+
+    CrowdFund inherits from CrowdFundNFT, hence the same result could be achieved by having `Globals` as public or internal immutable inside the `CrowdFundNFT` contract only.
+ 
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+    ## (G-1) Unnecessary check for `_burn()` function
+        
+    In the Crowdfund.sol contract, there is no need for the check at line 548 of the _burn() function. If Crowdfund state is won, its given party address will not be zero for all types of crowdfunding.
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+    ## (G-2) Redundant checks
+        
+    On [line 105](https://github.com/PartyDAO/partybidV2/blob/audit/macro/contracts/crowdfund/BuyCrowdfundBase.sol#L105), `BuyCrowdfundBase` has the following check:
+
+    ```solidity
+    // Ensure the call target isn't trying to reenter
+    if (callTarget == address(this)) {
+        revert InvalidCallTargetError(callTarget);
+    }
+    ```
+
+    Although the `callTarget` will revert if someone tries to re-enter the contract, another smart contract could be the intermediary and achieve a re-entrant call, though it would be useless since there is another re-entrancy protection on [line 127](https://github.com/PartyDAO/partybidV2/blob/audit/macro/contracts/crowdfund/BuyCrowdfundBase.sol#L127):
+
+    ```solidity
+    // Temporarily set to non-zero as a reentrancy guard.
+    settledPrice = type(uint96).max;
+    ```
+
+    By setting the `settledPrice` to a value different from `0`, the function `buy()` is already guarded against any re-entrant call attempts because the function `getCrowdfundLifecycle` will make the execution revert to a `CrowdfundLifecycle.Busy` state.
+
+    The same thing is present in [line 161](https://github.com/PartyDAO/partybidV2/blob/audit/macro/contracts/proposals/ArbitraryCallsProposal.sol#L161), inside the `ArbitraryCallsProposal` contract:
+
+    ```solidity
+    // Cannot call ourselves.
+    if (call.target == address(this)) {
+        return false;
+    }
+    ```
+
+    And it is mitigated with a similar approach in the `ProposalExecutionEngine` contract, in [line 162](https://github.com/PartyDAO/partybidV2/blob/audit/macro/contracts/proposals/ProposalExecutionEngine.sol#L162).
+
+    </field>
+  </item>
