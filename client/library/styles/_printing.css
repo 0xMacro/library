@@ -1,0 +1,10 @@
+
+@layer utilities {
+  .pagebreak {
+    page-break-before: always;
+  }
+}
+
+.nopagebreak {
+  page-break-before: avoid;
+}
