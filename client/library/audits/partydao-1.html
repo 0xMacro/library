@@ -1,0 +1,77 @@
+<page
+  clientName="PartyDAO"
+  reportDate="October 31, 2022"
+  auditTitle="PartyDAO A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PartyDAO/party-protocol"
+  repoCommitHash="ecd62753bfb1f001a111ba392cfca57b02beac77"
+  passwordEncrypt="env:PAGE_PASS_PARTYDAO_1"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from September 26, 2022 to October 21, 2022. And, is the 3rd audit on these contracts.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    98156f9a82a21c110fd43ff5c1f341e509047a6cb3d3ca74bae82758a3ca73c4  contracts/crowdfund/AuctionCrowdfund.sol
+    51863984d1275284d6f81b593398803c9de6c080152c7fdeec622204d90967e7  contracts/crowdfund/BuyCrowdfund.sol
+    2adbc2415af1374d8e458b064d52e9ade78409cc7b84bf742713edcdf1c2094c  contracts/crowdfund/BuyCrowdfundBase.sol
+    793e15d104d5fa63babf7f5194a0654b5d6ec61b3a929d1128d66a15f659869f  contracts/crowdfund/CollectionBuyCrowdfund.sol
+    5f8dfe0392b6d032f92950e26a445826cf564d597c6a65302d92380d47f5461e  contracts/crowdfund/Crowdfund.sol
+    734befe53fef65a2729b6edef3948f03c983b8e84154bddcc80c5a64f130113a  contracts/crowdfund/CrowdfundFactory.sol
+    2608e7ce40758c8acf95b1cbd75e1ab31b6dcb734d67c7a664c0d81b684db95e  contracts/crowdfund/CrowdfundNFT.sol
+    5b009aae28baf4f5773f199599a264014505d0992a90992adf56db7329d94741  contracts/distribution/ITokenDistributor.sol
+    61bd2a86a6c45ecf080a1f4df0f3dd41e517a2f1fe930c452cbd73aac710af9d  contracts/distribution/ITokenDistributorParty.sol
+    505dc19ff3ed45da6dd3779c15b0d26fc988bf3de6abac0e40dfe6f33ef92f3b  contracts/distribution/TokenDistributor.sol
+    60f646ff29f4e1023169e44b9284f8ee9051a75aeb05f5aa63224bf272101fa3  contracts/gatekeepers/IGateKeeper.sol
+    53e785d45dc0b1f110c10516b307b85ea456980b08a830b6d9bc6b28812859da  contracts/globals/Globals.sol
+    0a1c3ab36f45cf9ac178889e27ad9988819f07c046ec22bd67b288d317004d46  contracts/globals/IGlobals.sol
+    14be10b7d082c9aac7c7b67ae96119bd64201f8c41430dd729890e83ccf41060  contracts/market-wrapper/IMarketWrapper.sol
+    0fda8be894eae7913c7b8b0d66b5f0196f53f39326afdc09d53eb2a4607b468a  contracts/party/IPartyFactory.sol
+    2182e94562a474c80798f1b792f0cab1944dc4041931712b2196962417eade7b  contracts/party/Party.sol
+    e862b7873ac378231399a3bb0452ac0e917121203706add7118df14fba7ffe01  contracts/party/PartyFactory.sol
+    1d9b6cbf337debf5fac5c879bcfe2576bfbdfff8006bab8d000cc98a15340b94  contracts/party/PartyGovernance.sol
+    45bac18b0696376499845499800f4bef5721985ae8b9b8890700ad89c1e21ade  contracts/party/PartyGovernanceNFT.sol
+    a6c27b997340ec34ddbdd433fac70db4159ff082c96dfd942a9c6867590080b9  contracts/proposals/ArbitraryCallsProposal.sol
+    14b9d3a7484a3e1b607c6f97026157a992b55ac1261ab4cd4aaeb10a416f340b  contracts/proposals/FractionalizeProposal.sol
+    7cf06db01ef962e96d6af0f0e2ab5224284f7ea8b38b25ac5bff415c54fb3def  contracts/proposals/IProposalExecutionEngine.sol
+    253783cc7c355dab07573aeeeb35d1c4ea7fcf5b9d444516a1e89ecb4deacedb  contracts/proposals/LibProposal.sol
+    818c4b7c61de8207356e8803edeb361c590c043230506340b58d5a72948b498b  contracts/proposals/ListOnOpenseaProposal.sol
+    3e047c4558d4881e58fca24e738c9b0fc17e72501e91dc09893dc7f5b1a1615d  contracts/proposals/ListOnZoraProposal.sol
+    3fbe004b4450872c60182bc7cb38852521c9dd567d700766405ec05ae6da137a  contracts/proposals/ProposalExecutionEngine.sol
+    35fcca7a918df1b2c9e02fb9aee90f4471183cf5f582f7df040c10e4186137de  contracts/proposals/ProposalStorage.sol
+    7e66db4f0ca7e314ba11be8f2e961f76ec813b2cc64cd4e711412d24387b99d7  contracts/proposals/vendor/FractionalV1.sol
+    826d674fa14f75641d936f0d115ed21260dec391142d2892168770c60e257e72  contracts/proposals/vendor/IOpenseaConduitController.sol
+    4d668f88d81debc16f76831b26be0296020a859d1a05630ad0e14636ad0157f9  contracts/proposals/vendor/IOpenseaExchange.sol
+    cd1867764528d50e5313d85132e68b95b86725ff900d34914648d3239f4ade04  contracts/tokens/ERC1155Receiver.sol
+    47514904906ca19cc19a5ea7b2d91fdc18f7b66a6603cb26bcb50a5c57a04751  contracts/tokens/ERC721Receiver.sol
+    9ee44456b0d4d0df22b63ccadaef549a8085ba551c9364ff3176059e10d2b5c3  contracts/tokens/IERC1155.sol
+    0d89143c9c1c76d743db54bf50e91eaf2bf730b00c1051ca861bf9454c1129f0  contracts/tokens/IERC20.sol
+    df79ff7ee3f415fba621bd47a8c4a4b2cb0870ea24a28dc47767ec29e9eb9b7c  contracts/tokens/IERC721.sol
+    e6631daa9cae57e264cfec711ef2cfe051caff440e72911551cd9cfbedf75a57  contracts/tokens/IERC721Receiver.sol
+    1e6c5a02010ed572745c0ba9ca939d9a8434d1547260409e2ec23b23b7aa6eba  contracts/utils/EIP165.sol
+    6b8b5b83636946f5ae9940d9b23fe2cc2bd9a30f7477b8b4e5dbdcc73acdf683  contracts/utils/Implementation.sol
+    351cc04ce4cb9e6437d5ad8d51682805a1685eeb0552b8a8602e3cb0aaf08afc  contracts/utils/LibAddress.sol
+    db468ae14f88bd4e3ada46fafa9d495969e378430b2b4a2725e0d4f4af53d165  contracts/utils/LibERC20Compat.sol
+    79c3a62d365678015c31d8a73505bcc305c76173a7dd86a5e4dc85d1d064be1f  contracts/utils/LibRawResult.sol
+    844464129a8fb01899b4acd3ffc8fc28a5b67122f66567b835521a60f4d2eb41  contracts/utils/LibSafeCast.sol
+    934be5ac56025ecdf1d70fec328d269315c20ba66608b158622ff8c0f92e2b12  contracts/utils/LibSafeERC721.sol
+    c298ec79b3942e7a4ab50c4f45821a6c530a7c407a762987fca31634e524c94a  contracts/utils/Proxy.sol
+    3dbfb0b33f72c1a864ea156460f8aca537db2d5f5f3cdfdb03570c6dec302392  contracts/utils/ReadOnlyDelegateCall.sol
+    619b797882228eea5e426226e2f0b5395bc05514fb8703cb8b802ec33b481f39  contracts/vendor/markets/IZoraAuctionHouse.sol
+  </template>
+</content-for>

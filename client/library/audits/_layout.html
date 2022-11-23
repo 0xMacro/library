@@ -6,7 +6,7 @@
 {{var issues = collection(`${page.passwordEncrypt ? 'private/' : 'public/'}${auditId}-issues`).map(Issues.normalize)}}
 {{issues.map(Issues.validate) && ''}}
 
-<div class="py-5 fixed z-20 top-0 right-0 left-0 bg-gray-100 dark:bg-gray-900">
+<div class="py-5 print:px-5 fixed print:static z-20 top-0 right-0 left-0 bg-gray-100 dark:bg-gray-900 print:bg-transparent">
   <div class="px-4 sm:px-12 lg:px-0 mx-auto max-w-3xl flex">
     <a href="https://0xmacro.com">
       <img class="h-6 dark:hidden" src="/library/logotype-t.svg" />
@@ -15,7 +15,7 @@
   </div>
 </div>
 
-<div id="audit-report" class="text-lg md:pb-12 bg-gray-100 dark:bg-gray-900">
+<div id="audit-report" class="text-lg md:pb-12 bg-gray-100 dark:bg-gray-900 print:bg-transparent">
   <section class="pt-24 min-h-screen flex flex-col">
     <div class="py-[4vh]"></div>
     <h1 class="text-6xl sm:text-7xl font-bold dark:text-white">{{page.auditTitle}}</h1>
@@ -26,7 +26,7 @@
     <p class="mb-[6vh] text-base font-ui">Presented by <a class="text-blue-500 underline" target="_blank" href="https://0xmacro.com">0xMacro</a></p>
   </section>
 
-  <section id="toc" class="Copy py-16">
+  <section id="toc" class="Copy py-16 print:pt-12 print:pb-0 print:pagebreak">
     <h2>Table of Contents</h2>
     <div class="h-4"></div>
     <ul class="list-style-none">
@@ -61,7 +61,7 @@
     </ul>
   </section>
 
-  <section id="introduction" class="Copy py-16">
+  <section id="introduction" class="Copy py-16 print:pt-12 print:pb-0 print:pagebreak">
     <h2>Introduction</h2>
 
     <p>
@@ -74,7 +74,7 @@
     <p><b class="text-red-500">Disclaimer:</b> While Macro’s review is comprehensive and has surfaced some changes that should be made to the source code, this audit should not solely be relied upon for security, as no single audit is guaranteed to catch all possible bugs.</p>
   </section>
 
-  <section id="overall" class="Copy py-16">
+  <section id="overall" class="Copy py-16 print:pt-12 print:pb-0 print:pagebreak">
     <h2>Overall Assessment</h2>
 
     <p>The following is an aggregation of issues found by the Macro Audit team:</p>
@@ -135,7 +135,7 @@
     <p>{{page.clientName}} was quick to respond to these issues.</p>
   </section>
 
-  <section id="specification" class="Copy py-16">
+  <section id="specification" class="Copy py-16 print:pt-12 print:pb-0">
     <h2>Specification</h2>
 
     <p>Our understanding of the specification was based on the following sources:</p>
@@ -143,7 +143,7 @@
     <yield name="spec" />
   </section>
 
-  <section id="source-code" class="Copy py-16">
+  <section id="source-code" class="Copy py-16 print:pt-12 print:pb-0 print:pagebreak">
     <h2>Source Code</h2>
 
     <p>The following source code was reviewed during the audit:</p>
@@ -171,7 +171,7 @@
     <p><b>Note:</b> This document contains an audit solely of the Solidity contracts listed above. Specifically, the audit pertains only to the contracts themselves, and does not pertain to any other programs or scripts, including deployment scripts.</p>
   </section>
 
-  <section id="issue-list" class="py-12">
+  <section id="issue-list" class="py-12 print:pb-0 print:pagebreak">
 
     <div class="Copy">
       <h2>Issue Descriptions and Recommendations</h2>
@@ -209,7 +209,7 @@
     </ul>
   </section>
 
-  <section id="security-levels" class="Copy py-12">
+  <section id="security-levels" class="Copy py-12 print:pb-0 print:pagebreak">
     <h2>Security Level Reference</h2>
 
     <p>We quantify issues in three parts:</p>
@@ -323,7 +323,7 @@
     </div>
   </section>
 
-  <section id="issues" class="py-12">
+  <section id="issues" class="py-12 print:pb-0 print:pagebreak">
     <div class="Copy">
       <h2>Issue Details</h2>
     </div>
@@ -357,15 +357,17 @@
             {{AuditMarkdown.renderInlineContent(issue.title)}}
           </h2>
         </div>
-        <div class="mt-5 p-4 flex dark:border-gray-600 bg-gray-200/25 dark:bg-gray-700/25 space-x-4 lg:space-x-5 overflow-x-auto">
-          <div class="flex-1 flex-shrink-0">
+        <div class="mt-5 px-4 flex dark:border-gray-600 bg-gray-200/25 dark:bg-gray-700/25 space-x-4 lg:space-x-5 overflow-x-auto nopagebreak">
+          <div class="py-4 flex-1 flex-shrink-0">
             <div class="uppercase text-xs font-medium font-ui text-gray-400">Topic</div>
             <div class="whitespace-nowrap">{{issue.topic}}</div>
           </div>
 
-          <if cond="issue.severity !== 'I'">
-            <div>
-              <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-700">Status</div>
+          <if cond="issue.status !== 'informational'">
+            <div class="py-4 self-stretch {{issue.statusNote ? 'px-4 bg-zinc-200 dark:bg-[#222]' : ''}}">
+              <div class="uppercase text-xs font-medium font-ui print:text-gray-700 {{issue.statusNote ? 'text-zinc-400' : 'text-gray-400'}}">
+                Status
+              </div>
               <div
                 class="whitespace-nowrap"
               >
@@ -398,14 +400,10 @@
                 <else>
                   {{Issues.statusNames[issue.status]}}
                 </else>
-
-                <if cond="issue.statusNote">
-                  <span class="text-xs cursor-help" data-tippy-content="{{issue.statusNote}}">✳</span>
-                </if>
               </div>
             </div>
           </if>
-          <div class="{{issue.isVuln ? '' : 'pr-2'}}">
+          <div class="py-4 {{issue.isVuln ? '' : 'pr-2'}}">
             <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-800">
               {{
                 issue.severity === 'Q' ? 'Quality Impact' :
@@ -416,7 +414,7 @@
             <div class="whitespace-nowrap">
               <if cond="issue.severity === 'I'">
                 Informational
-                <span class="text-xs cursor-help" data-tippy-content="Informational issues have no vulnerability in scope, and thus no call-to-action.">✳</span>
+                <span class="text-xs cursor-help" data-tippy-content="Informational issues have no vulnerability in scope, and thus no suggested call-to-action.">✳</span>
               </if>
               <else>
                 {{Issues.severityNames[issue.impact]}}
@@ -427,7 +425,7 @@
             </div>
           </div>
           <if cond="issue.isVuln">
-            <div>
+            <div class="py-4">
               <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-800">Likelihood</div>
               <div class="whitespace-nowrap">
                 {{Issues.severityNames[issue.chance]}}
@@ -438,7 +436,15 @@
             </div>
           </if>
         </div>
+
+        <if cond="issue.status !== 'informational' && issue.statusNote">
+          <div class="p-4 relative z-10 -mt-1 dark:border-gray-600 bg-zinc-200 dark:bg-[#222] text-sm nopagebreak">
+            {{issue.statusNote}}
+          </div>
+        </if>
+
         <div class="mt-8 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>
+
         <if cond="issue.response">
           <div class="mt-8 Copy dark:border-gray-600">
             <div class="-mb-4 text-sm uppercase font-medium text-green-800 dark:text-green-500 print:text-gray-800">
@@ -457,14 +463,14 @@
 
   <yield name="appendix" />
 
-  <section id="disclaimer" class="Copy py-16">
+  <section id="disclaimer" class="Copy py-16 print:pt-12 print:pb-0 print:pagebreak">
     <h2>Disclaimer</h2>
 
-    <p>Macro makes no warranties, either express, implied, statutory, or otherwise, with respect to the services or deliverables provided in this report, and Macro specifically disclaims all implied warranties of merchantability, fitness for a particular purpose, noninfringement and those arising from a course of dealing, usage or trade with respect thereto, and all such warranties are hereby excluded to the fullest extent permitted by law.</p>
+    <p class="print:!text-base">Macro makes no warranties, either express, implied, statutory, or otherwise, with respect to the services or deliverables provided in this report, and Macro specifically disclaims all implied warranties of merchantability, fitness for a particular purpose, noninfringement and those arising from a course of dealing, usage or trade with respect thereto, and all such warranties are hereby excluded to the fullest extent permitted by law.</p>
 
-    <p>Macro will not be liable for any lost profits, business, contracts, revenue, goodwill, production, anticipated savings, loss of data, or costs of procurement of substitute goods or services or for any claim or demand by any other party. In no event will Macro be liable for consequential, incidental, special, indirect, or exemplary damages arising out of this agreement or any work statement, however caused and (to the fullest extent permitted by law) under any theory of liability (including negligence), even if Macro has been advised of the possibility of such damages.</p>
+    <p class="print:!text-base">Macro will not be liable for any lost profits, business, contracts, revenue, goodwill, production, anticipated savings, loss of data, or costs of procurement of substitute goods or services or for any claim or demand by any other party. In no event will Macro be liable for consequential, incidental, special, indirect, or exemplary damages arising out of this agreement or any work statement, however caused and (to the fullest extent permitted by law) under any theory of liability (including negligence), even if Macro has been advised of the possibility of such damages.</p>
 
-    <p>The scope of this report and review is limited to a review of only the code presented by the Emergent team and only the source code Macro notes as being within the scope of Macro’s review within this report. This report does not include an audit of the deployment scripts used to deploy the Solidity contracts in the repository corresponding to this audit. Specifically, for the avoidance of doubt, this report does not constitute investment advice, is not intended to be relied upon as investment advice, is not an endorsement of this project or team, and it is not a guarantee as to the absolute security of the project. In this report you may through hypertext or other computer links, gain access to websites operated by persons other than Macro. Such hyperlinks are provided for your reference and convenience only, and are the exclusive responsibility of such websites’ owners. You agree that Macro is not responsible for the content or operation of such websites, and that Macro shall have no liability to your or any other person or entity for the use of third party websites. Macro assumes no responsibility for the use of third party software and shall have no liability whatsoever to any person or entity for the accuracy or completeness of any outcome generated by such software.</p>
+    <p class="print:!text-base">The scope of this report and review is limited to a review of only the code presented by the Emergent team and only the source code Macro notes as being within the scope of Macro’s review within this report. This report does not include an audit of the deployment scripts used to deploy the Solidity contracts in the repository corresponding to this audit. Specifically, for the avoidance of doubt, this report does not constitute investment advice, is not intended to be relied upon as investment advice, is not an endorsement of this project or team, and it is not a guarantee as to the absolute security of the project. In this report you may through hypertext or other computer links, gain access to websites operated by persons other than Macro. Such hyperlinks are provided for your reference and convenience only, and are the exclusive responsibility of such websites’ owners. You agree that Macro is not responsible for the content or operation of such websites, and that Macro shall have no liability to your or any other person or entity for the use of third party websites. Macro assumes no responsibility for the use of third party software and shall have no liability whatsoever to any person or entity for the accuracy or completeness of any outcome generated by such software.</p>
   </section>
 </div>
 
