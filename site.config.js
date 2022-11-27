@@ -1,9 +1,9 @@
 import endent from 'endent'
 import * as Issues from './lib/issues'
 import * as AuditMarkdown from './lib/audit-markdown'
-// import * as LearnEVM from './lib/learnevm'
+import * as LearnEVM from './lib/learnevm'
 
-export default {
+const library = {
   name: "The 0xMacro Library",
   locales: ['en'],
 
@@ -33,3 +33,20 @@ export default {
     }
   },
 }
+
+const learn_evm = {
+  name: "LearnEVM.com – A free, advanced course for Solidity Developers",
+  locales: ['en'],
+
+  static: true,
+  locals: {
+    LearnEVM,
+  },
+  templateTypes: {
+    'learn-evm-markdown'(content) {
+      return LearnEVM.renderChapterContent(content)
+    }
+  },
+}
+
+export default (process.env.LEARN_EVM ? learn_evm : library)

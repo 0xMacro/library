@@ -181,6 +181,63 @@ const exportedColors = [
   }
 ]
 
+const exportedColorsLearnEVM = [
+  {
+    "paletteName": "LearnEVM",
+    "swatches": [
+      {
+        "name": "zinc-950",
+        "color": "121315"
+      },
+      {
+        "name": "zinc-900",
+        "color": "18191C"
+      },
+      {
+        "name": "zinc-800",
+        "color": "202225"
+      },
+      {
+        "name": "zinc-700",
+        "color": "292B2F"
+      },
+      {
+        "name": "zinc-600",
+        "color": "2F3237"
+      },
+      {
+        "name": "zinc-550",
+        "color": "35373F"
+      },
+      {
+        "name": "zinc-500",
+        "color": "40444B"
+      },
+      {
+        "name": "zinc-400",
+        "color": "5A5E65"
+      },
+      {
+        "name": "zinc-300",
+        "color": "8E9299"
+      },
+      {
+        "name": "zinc-200",
+        "color": "B9BBBE"
+      },
+      {
+        "name": "zinc-100",
+        "color": "DCDDDE"
+      },
+      {
+        "name": "zinc-50",
+        "color": "F0F1F3"
+      }
+    ]
+  }
+]
+
+
 module.exports = {
   mode: 'jit',
   darkMode: 'media',
@@ -209,7 +266,10 @@ module.exports = {
         'print': {'raw': 'print'}, // @media print { ... }
       },
       colors: {
-        gray: colors.trueGray,
+        gray: {
+          ...colors.trueGray,
+          850: '#1f1f1f',
+        },
         light: '#fafafa',
         primary1: '#f7657e',
         primary2: '#3cdbc6',
@@ -228,7 +288,7 @@ module.exports = {
           900: '#18181b',
         },
 
-        ...exportedColors.map(c => c.swatches).reduce((a,b) => a.concat(b)).reduce((out, row) => {
+        ...exportedColors.concat(exportedColorsLearnEVM).map(c => c.swatches).reduce((a,b) => a.concat(b)).reduce((out, row) => {
           const pieces = row.name.split('-')
           const colorName = pieces.slice(0, pieces.length-1).join('-')
           const shade = pieces[pieces.length-1]
@@ -276,6 +336,7 @@ module.exports = {
     }
   },
   plugins: [
+    require('@tailwindcss/line-clamp'),
     require('@tailwindcss/typography'),
   ],
 }

@@ -1,0 +1,114 @@
+<page title="Learn EVM">
+
+<link rel="stylesheet" type="text/css" href="./learn-evm.css">
+
+<div class="py-12 header-gradient">
+  <div class="relative h-72 max-w-2xl flex-center mx-auto bg-white dark:bg-gray-800 border border-gray-500">
+    <div class="absolute inset-3 break-all leading-snug text-gray-300 overflow-hidden font-mono">
+      <script>
+        for(let i=0; i < 10000; i++) {
+          document.write(Math.round(Math.random()))
+        }
+      </script>
+    </div>
+
+    <div class="bg-black text-white px-8 py-4 z-10 text-4xl font-bold">
+      LearnEVM.com
+    </div>
+  </div>
+
+  <div class="pt-8 flex flex-col items-center">
+
+    <div class="max-w-2xl text-center text-2xl">
+      A free, advanced course<br/>
+      written for Solidity Developers.
+    </div>
+
+    <div class="mt-8 flex flex-col items-stretch justify-center">
+      <a
+        href="https://0xmacro.com"
+        class="p-4 pb-5 hover:dark:border-gray-300 flex-center bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500"
+      >
+        <div>Made with care by the</div>
+        <div class="self-stretch flex items-center justify-center">
+          <img class="h-8" src="/library/logo-t.png" />
+          <div class="ml-2.5 text-3xl font-bold"><code class="text-2xl">0</code>xMacro Audits Team</div>
+        </div>
+      </a>
+
+      <div class="mt-2 flex items-center justify-center">
+        <a class="p-3 border hover:bg-white dark:hover:bg-gray-800 text-xl" href="https://0xmacro.com/">Find out More</a>
+        <a class="ml-3 p-3 border hover:bg-white dark:hover:bg-gray-800 text-xl" href="https://0xmacro.com/">Request an Audit</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="py-12 flex flex-col items-center border-t dark:border-t-0">
+  <section class="max-w-xl w-full">
+    <h2 class="text-5xl text-center font-bold">Course Lessons</h2>
+
+    <div class="mt-6 flex-center">
+      <a href="#newsletter" class="btn mb-2">Sign Up for our Newsletter</a>
+      <p class="mt-3 text-lg text-center">to get notified when new material releases.</p>
+    </div>
+
+    {{var counterA = 0, counterB = 0}}
+    <for let="section of LearnEVM.outline">
+      {{void (counterA += 1)}}
+      {{void (counterB = 0)}}
+      <div class="mt-8 space-y-8 border-b dark:border-transparent">
+        <div class="p-4 border dark:border-gray-900 text-sm bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 font-mono">
+          <span class="ml-[0.3em] mr-[0.1em]">{{section.emoji}}</span>
+          {{section.title}}
+        </div>
+
+        <ul role="list" class="!mt-0 divide-y divide-gray-200 dark:divide-gray-800">
+          <for let="header of section.headers">
+            {{void (counterB += 1)}}
+            <li class="py-5 px-4 relative bg-white dark:bg-gray-800 border-l border-r dark:border-gray-800 focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-600 hover:bg-gray-50 dark:hover:bg-gray-700">
+              <div class="flex justify-between space-x-3">
+                <div class="min-w-0 flex-1">
+                  <a href="{{header.href}}" class="block focus:outline-none {{header.href ? '' : 'cursor-default'}}">
+                    <span class="absolute inset-0" aria-hidden="true"></span>
+                    <p class="truncate text-lg font-medium text-gray-900 dark:text-gray-100">
+                      <span class="mr-1 font text-sm font-mono text-gray-700 dark:text-gray-200">{{counterA}}.{{counterB}}</span>
+                      {{header.title}}
+                    </p>
+                    <p class="truncate text-sm text-gray-500 dark:text-gray-400">
+                      {{header.subtitle}}
+                    </p>
+                  </a>
+                </div>
+                <if cond="!header.href">
+                  <div class="flex-shrink-0 whitespace-nowrap text-sm text-gray-500">
+                    Coming Soon
+                  </div>
+                </if>
+              </div>
+              <!--
+              <div class="mt-1">
+                <p class="text-sm text-gray-600 line-clamp-2">Doloremque dolorem maiores assumenda dolorem facilis. Velit vel in a rerum natus facere. Enim rerum eaque qui facilis. Numquam laudantium sed id dolores omnis in. Eos reiciendis deserunt maiores et accusamus quod dolor.</p>
+              </div>
+            -->
+            </li>
+
+            <!-- More messages... -->
+          </for>
+        </ul>
+      </div>
+    </for>
+
+  </section>
+
+
+  <section id="newsletter" class="mt-16 max-w-xl w-full">
+    <h2 class="text-5xl text-center font-bold">Stay in the Loop</h2>
+
+    <p class="my-6 text-lg text-center">Sign up for our newsletter to get notified when we release more advanced content for Solidity and EVM developers –<br> Certora, Zero Knowledge, Solidity pitfalls, and more.</p>
+
+    <include src="./_newsletter-signup.html" />
+  </section>
+</div>
+<div class="h-8"></div>

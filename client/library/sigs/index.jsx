@@ -74,7 +74,7 @@ const App = cc(function() {
 
         <div class="flex justify-end">
           <button
-            class="btn"
+            class="btn-ui"
             disabled={chainId !== 1}
             onclick={sign}
           >
@@ -87,7 +87,7 @@ const App = cc(function() {
             <h3 class="dark:text-gray-200">Message signature:</h3>
             <textarea id="messageSigOutput" class="input w-full">{messageSig}</textarea>
             <button
-              class="btn"
+              class="btn-ui"
               onclick={() => {
                 messageSigOutput.focus()
                 messageSigOutput.select()

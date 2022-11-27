@@ -14,7 +14,10 @@ git submodule update
 
 npm install
 npm run init
+
+## Then run ONE of the following:
 npm run dev
+npm run dev-evm
 ```
 
 This is a Lancer project. Read more at [lancer.studio](https://lancer.studio)
