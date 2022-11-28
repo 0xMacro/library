@@ -67,3 +67,13 @@
 .prose pre {
   @apply dark:bg-zinc-700;
 }
+
+.prose aside {
+  @apply p-5;
+}
+.prose aside > *:first-child {
+  margin-top: 0;
+}
+.prose aside > *:last-child {
+  margin-bottom: 0;
+}
