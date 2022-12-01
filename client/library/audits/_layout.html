@@ -168,7 +168,12 @@
 
     <yield name="source-code" />
 
-    <p><b>Note:</b> This document contains an audit solely of the Solidity contracts listed above. Specifically, the audit pertains only to the contracts themselves, and does not pertain to any other programs or scripts, including deployment scripts.</p>
+    <if cond="page.customReviewInfo">
+      <yield name="review-info" />
+    </if>
+    <else>
+      <p><b>Note:</b> This document contains an audit solely of the Solidity contracts listed above. Specifically, the audit pertains only to the contracts themselves, and does not pertain to any other programs or scripts, including deployment scripts.</p>
+    </else>
   </section>
 
   <section id="issue-list" class="py-12">
