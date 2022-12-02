@@ -2,6 +2,7 @@
 
 
 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+ /* WARNING: Text colors must be in sync with the .HeadingAnchor class */
   @apply antialiased dark:text-white;
 }
 
@@ -17,6 +18,18 @@
 
 .prose a {
   @apply dark:text-blue-500;
+}
+.prose span.HeadingAnchorWrap {
+  display: inline-block;
+  position: absolute; top: -0.05em; left: -0.9em;
+  padding-right: 0.9em;
+  @apply opacity-0 hover:opacity-100;
+}
+.prose a.HeadingAnchor {
+  /* WARNING: Text colors must be in sync with this file's and the built in prose styles */
+  color: #171717;
+  text-decoration: none;
+  @apply dark:text-white hover:underline;
 }
 
 .prose strong {
