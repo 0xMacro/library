@@ -29,3 +29,5 @@ PUT EVERYTHING UNDER THE `client/library/` FOLDER. This is necessary due to our 
 `solc-wrapper.js` was generated via:
 
     $ browserify node_modules/solc/wrapper.js -o solc-wrapper.js -s SolcWrapper
+
+We're storing assets in git history for convenience. If repo history becomes too large, use [BFG](https://rtyley.github.io/bfg-repo-cleaner/) to clean it.

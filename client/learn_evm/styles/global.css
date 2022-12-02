@@ -18,3 +18,14 @@ body {
   pointer-events: none;
   @apply text-gray-600 hover:cursor-default;
 }
+
+.ChapterLink.-coming-soon span.title {
+  cursor: not-allowed;
+}
+.ChapterLink span.title {
+  text-decoration: underline;
+}
+.ChapterLink span.coming-soon {
+  font-size: 80%;
+  @apply text-gray-600 dark:text-zinc-300;
+}

@@ -7,7 +7,7 @@
 
 @media(prefers-color-scheme: dark) {
   .header-gradient {
-    background: linear-gradient(180deg, #32323e 0%, #000 100%);
+    background: linear-gradient(180deg, #35373F 0%, #121315 100%);
     border-radius: 10px 10px 0px 0px;
   }
 }

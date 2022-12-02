@@ -50,7 +50,7 @@
           <ol role="list" class="sm:flex items-center text-2xl sm:text-base text-gray-500 dark:text-zinc-200">
             <li class="hidden md:block mr-4">
               <a href="/" class="hover:text-gray-700 dark:hover:text-white">
-                <span class="mr-2 md:mr-4 text-xs">⚙️</span>
+                <span class="mr-2 md:mr-4 relative top-[-1px] text-xs">⚙️</span>
                 LearnEVM.com
               </a>
             </li>
@@ -80,13 +80,13 @@
 
       <div class="pt-12 flex gap-4">
         <if cond="header.prev">
-          <a href="{{header.prev.href}}" class="p-4 flex-1 block flex items-center font-ui border dark:border-zinc-400 dark:hover:border-zinc-200 text-right">
+          <a href="{{header.prev.href}}" class="p-4 flex-1 block flex items-center font-ui border dark:border-zinc-400 hover:border-gray-700 dark:hover:border-zinc-200 text-right">
             <!-- arrow-small-left -->
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
               <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12h-15m0 0l6.75 6.75M4.5 12l6.75-6.75" />
             </svg>
             <div class="flex-1 pl-4">
-              <div class="uppercase text-xs dark:text-zinc-300">Previous</div>
+              <div class="uppercase text-xs text-gray-400 dark:text-zinc-300">Previous</div>
               <div class="truncate">{{header.prev.title}}</div>
             </div>
           </a>
@@ -105,6 +105,20 @@
           </a>
         </if>
       </div>
+
+      <if cond="!header.next && header.id !== LearnEVM.lastHeader.id">
+        <div class="mt-4 prose">
+          <template type="learn-evm-markdown">
+<aside>
+
+### But wait, there's more!
+
+You've reached the end, but there is more great content to be released. [Follow us on Twitter](https://twitter.com/0xMacroDAO) to stay in the loop 🫡
+
+</aside>
+          </template>
+        </div>
+      </if>
     </div>
   </div>
 

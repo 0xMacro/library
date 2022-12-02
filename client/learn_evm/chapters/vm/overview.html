@@ -1,0 +1,144 @@
+<page layout="/chapters/_layout.html">
+
+<div class="prose">
+<template type="learn-evm-markdown">
+
+
+# The Ethereum Virtual Machine
+
+## What is a virtual machine?
+
+“EVM” stands for “Ethereum Virtual Machine”. A virtual machine is **a program that runs arbitrary instructions**. However, what makes a virtual machine different from “normal” programs is that it tries to *emulate an actual, physical machine*.
+
+What does that mean, exactly? To answer, first let’s talk about **physical machines**.
+
+### Physical Machines
+
+The term “physical machine” normally refers to a CPU – a computer’s Central Processing Unit. This a the physical chip that exists in your computer – desktop, laptop, phone, etc. – and is the part of your computer that does the most **actual work**. It’s how your computer *computes* computations.
+
+It can look something like this:
+
+![Someone holding a CPU chip by their thumb and index finger](/img/vm-overview-chip.jpg)
+
+Over the decades, CPUs have been highly, *highly* optimized for speed of execution. They can execute instructions fast – **trillions per second** fast. That's a lot of instructions.
+
+In contrast, the EVM *is not* designed to be this fast. Because of gas costs, you'll **run out of gas** before getting anywhere near that magnitude of instructions.
+
+### Virtual Machines
+
+A virtual machine is a **software program** designed to behave *like* a physical machine. That is, it's software that – like a CPU – reads, interprets, and executes instructions.
+
+The EVM is no different. It reads, interprets, and executes **instructions encoded in a smart contract's bytecode**. The tangible result from executing these instructions is updating contract state and returning data.
+
+## What is an Instruction?
+
+An instruction is a task you want your machine to perform. They are small, low-level tasks.
+
+For example, there is no instruction for high level tasks such as "make a network call" or "listen for this keystroke". Instead, you only have access to tasks like "add these two numbers together", "shift these bits", "write this value to memory", and so on.
+
+On most platforms, the anatomy of an instruction consists of:
+
+```jsx
+opcode + arguments
+```
+
+where an **opcode** is the *task* you want to perform, and the arguments are the *relevant data* you want to perform that task with.
+
+But what do these two parts actually look like? Let's inspect and learn about each one.
+
+### Opcodes
+
+First and foremost, machines operate on **binary**. Any instruction you send to a CPU is going to be sent as 0’s and 1’s in a **pre-specified format**.
+
+What format? It depends on the platform! And since we’re talking about the EVM, let’s demystify an opcode right away:
+
+Here is what the opcode for adding two numbers looks like:
+
+- `00000001`
+
+That’s right, it’s just 8 numbers of binary, which is 8 bits, which is 1 byte. This is the entirety of an EVM opcode.
+
+Now reading binary actually isn’t that fun for humans. In our line of work, we rewrite the above as **hexadecimal**. Here are two examples of how that conversion happens:
+
+```jsx
+    00000001  - ADD opcode (binary)
+=> 0000 0001
+=>    0    1
+=>      0x01  - ADD opcode (hex)
+
+    11111101  - REVERT opcode (binary)
+=> 1111 1101
+=>    F    D
+=>      0xFD  - REVERT opcode (hex)
+```
+
+This is much easier to read; it allows us to avoid counting and calculating which bits are which values, and read hex numbers and letters instead.
+
+<aside>The 0x prefix represents hexadecimal. You may see a lot of protocols use this prefix in their name too (0xMacro, 0xSplits, etc.), even when it technically isn’t hexadecimal. <br/><br/>This is because it’s common for companies in the web3 space to do so, and thus it became a mark of being associated with the web3 industry.</aside>
+
+And that's it! You just learned what the entirety of an EVM opcode looks like: a single byte of data.
+
+### Opcode Arguments
+
+You might be thinking, "but what about the arguments?".
+
+Let’s take the `ADD` example again. While some platforms require you to specify *where* the two numbers are (e.g. registers), on the EVM, arguments are **implicitly taken from the stack**.
+
+We will learn how exactly this works in <chapter>evm/stack</chapter>.
+
+### Opcodes for a Virtual Machine
+
+So what does this have to do with machines vs virtual machines and the EVM? Well, to summarize:
+
+- A virtual machines is a **software program** that behaves *like* a hardware CPU.
+- The EVM is a virtual machine (hence the name).
+- Thus, the EVM executes instructions via **opcodes**, just like a hardware machine would.
+
+## Binary as Programs
+
+How does the EVM execute binary?
+
+Conceptually, you can think of execution as three parts:
+
+1. The **bytecode**.
+    - This is the program that will be executed. It can look something like this: **`0x61020f0960405260206040f3`**
+    - It primarily consists of opcodes to run. For example, `0x61` is the PUSH2 opcode.
+    - Some opcodes take literal arguments, which are also part of the bytecode. For example, in `0x61020f`, the first byte is a PUSH2 opcode, which reads the next 2 bytes an its argument (`0x020f`).
+2. The **program counter**.
+    - This is the position of the currently running opcode.
+    - Execution starts at the leftmost byte and moves rightwards.
+    - This is similar to an index of a string.
+3. The **execution environment**.
+    - This is the stack, memory, and contract storage.
+    - Opcodes manipulate these when run.
+    - You’ll learn more about this in an upcoming chapter.
+
+### Running as Long as Possible
+
+A major point you should learn is that the EVM, when given bytecode to run, **attempts to run it as long as possible**.
+
+In other words, when executing bytecode, the EVM treats the first byte as an opcode, then runs the next byte as an opcode, and then the next, and then the next, and so on.
+
+It continues to do this until one of the following happens:
+
+1. The bytecode **returns** a value (via the RETURN opcode).
+2. The bytecode simply **stops** execution (via the STOP opcode).
+3. The bytecode **crashes**, by e.g. reaching an invalid opcode.
+4. The program counter reaches the end of the bytecode (rare).
+5. The execution environment **runs out of gas.**
+
+Because of that last one, **EVM execution is guaranteed to halt.** Even an infinite loop will eventually halt, due to the amount of gas always being a finite.
+
+Also note that execution may not always be strictly from left-to-right; the JUMP and JUMPI opcodes allow the program counter to jump to any other part of the bytecode – as long as the destination byte is a JUMPDEST byte.
+
+### Bytecode Execution Example
+
+Below is an illustration of EVM execution with a program counter. Note that the rest of the execution environment (stack, memory, storage, gas) is omitted from this visual for simplicity – we will get to those details in future chapters.
+
+<video controls>
+    <source src="/vid/vm-overview-bytecode.m4v" type="video/mp4">
+</video>
+
+
+</template>
+</div>
