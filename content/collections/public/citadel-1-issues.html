@@ -191,9 +191,6 @@
   <field name="chance">high</field>
   <field name="status">fixed</field>
   <field name="commit">e5ab3fc18d83ddf9ae5cbfff8ab8e22a647f55ae</field>
-  <field name="statusNote">
-    Provided solution fixes only the first part of the issue.
-  </field>
   <field name="content">
     ## (H-4) Miners can pre-compute mining claim and can act accordingly if it results in ship destruction
 
@@ -1165,30 +1162,13 @@
 </item>
 
 <item>
-  <field name="topic">Input Validation</field>
-  <field name="impact">low</field>
-  <field name="chance">low</field>
-  <field name="status">fixed</field>
-  <field name="commit">3a6e7a63b9f54f82a426e1005c190658d7c20a88</field>
-  <field name="content">
-    ## (L-12) Blacklisting the zero address will prevent ships from getting destroyed
-
-    `updateBlacklistedAddresses()` in BaseShips.sol does not check if the blacklisted address is a zero address. When the zero address is blacklisted, ships can not be destroyed by Game.sol `revealMiningClaim().`
-
-    **Remediations to Consider**
-
-    - Require blacklisted addresses to be not zero address.
-  </field>
-</item>
-
-<item>
   <field name="topic">Spec</field>
   <field name="impact">low</field>
   <field name="chance">medium</field>
   <field name="status">fixed</field>
   <field name="commit">ae3ebe94f0e6e912b2d6b6cb509b20094a52127b</field>
   <field name="content">
-    ## (L-13) BaseShips.sol’s `resetName()` effects can fail to stay consistent between layers
+    ## (L-12) BaseShips.sol’s `resetName()` effects can fail to stay consistent between layers
 
     The way in which BaseShips.sol’s `resetName()` interacts with Dock.sol’s `undock()` can result in a name reset not holding when a ship is docked on polygon. The name reset can also cause the naming system’s accounting to become out of sync. 
 
@@ -1248,7 +1228,7 @@
   <field name="status">fixed</field>
   <field name="commit">bef1380286568738060e91301bcefd40f88b4a15</field>
   <field name="content">
-    ## (L-14) `ConstructionBay`'s `_coreTeamSplit` variable is never set in the migrations scripts
+    ## (L-13) `ConstructionBay`'s `_coreTeamSplit` variable is never set in the migrations scripts
 
     `ConstructionBay`'s `_coreTeamSplit` variable is never set in the migrations scripts to the desired 15% as specified in the documentation.
 
@@ -1265,7 +1245,7 @@
   <field name="status">fixed</field>
   <field name="commit">367b758ac4ea405ebd3ba21ff31d965dda716eeb</field>
   <field name="content">
-    ## (L-15) L2’s `ShipTraits`'s `DEFAULT_ADMIN_ROLE` is not relinquished or transferred to governance in migration scripts
+    ## (L-14) L2’s `ShipTraits`'s `DEFAULT_ADMIN_ROLE` is not relinquished or transferred to governance in migration scripts
 
     In 5_relinquish_to_governance.js and in 3_deploy_contracts.js, L2’s `ShipTraits`'s `DEFAULT_ADMIN_ROLE` is not transferred or relinquished to governance. This is against spec.
 
@@ -1290,7 +1270,7 @@
   <field name="chance">high</field>
   <field name="status">ack</field>
   <field name="content">
-    ## (L-16) citadel-config.js’s `coreTeamAddress` and `coreTeamMultisigAddress` are the same
+    ## (L-15) citadel-config.js’s `coreTeamAddress` and `coreTeamMultisigAddress` are the same
 
     In citadel-config.js the `coreTeamAddress` and `coreTeamMultisigAddress` are the same. This goes against spec. 
 
@@ -1312,7 +1292,7 @@
   <field name="status">fixed</field>
   <field name="commit">31e2e0eaa0eb2a99fad15729f4378b8f5bb50a8c</field>
   <field name="content">
-    ## (L-17) Core Team does not receive 15% of the initial ship supply
+    ## (L-16) Core Team does not receive 15% of the initial ship supply
 
     In citadel-config.js the initial supply for the `DutchAuctionShips` contract is set at:
 
@@ -1339,7 +1319,7 @@
   <field name="status">fixed</field>
   <field name="commit">bf16d589f28728cd752fe0b9b0930d36f143935d</field>
   <field name="content">
-    ## (L-18) Citadel payment splitter is doing the wrong core/governance split
+    ## (L-17) Citadel payment splitter is doing the wrong core/governance split
 
     In citadel-config.js the payment splitter ratio is set at 50:50 instead of the spec defined 80:20 split with the governance receiving more. 
 
@@ -1356,7 +1336,7 @@
   <field name="status">fixed</field>
   <field name="commit">aef14db3e5cd356912b7c561411a08a1bcbfb5c9</field>
   <field name="content">
-    ## (L-19) ticketHash collisions are possible
+    ## (L-18) ticketHash collisions are possible
 
     In ConstructionBay.sol, users can have ticket hash collisions in their commit transactions as none of the information in the Circom circuits is required to be unique to the user. Consider the scenario where first Alice and then Bob submit bids to an auction with proof inputs: `{ auctionId : 1, bid: 1000, quantity: 1, secret: 1, usableDepositAmount: 1000}`. Bob’s commit transaction will fail to go through and he will know what Alice’s bid is if he decides to inspect etherscan. 
 
