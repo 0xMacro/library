@@ -1383,7 +1383,7 @@
   <field name="status">fixed</field>
   <field name="commit">90e826daba583b871a7692f7c644ec8220ad66fa</field>
   <field name="content">
-    ## (Q-2) `fulfillrandomness()` should not revert
+    ## (Q-2) `fulfillRandomness()` should not revert
     [per Chainlink docs](https://docs.chain.link/docs/vrf/v1/security/#fulfillrandomness-must-not-revert):
 
     > If your fulfillRandomness implementation reverts, the VRF service will not attempt to call it a second time. Make sure your contract logic does not revert.
@@ -1513,7 +1513,7 @@
   <field name="status">fixed</field>
   <field name="commit">265d3a17b50ca8ed719eb427ce85ada76c136c31</field>
   <field name="content">
-    ## (Q-6) Standard to use _msgSender() instead of msg.sender in OpenZeppelin contract extensions:
+    ## (Q-6) Use _msgSender() instead of msg.sender in OpenZeppelin contract extensions
 
     In ERC20Locked.sol, the modifier `onlySupplyAdmin()` uses `msg.sender` instead of `_msgSender()` which is defined in the inherited ContextUpgradeable contract. This isn’t a security vulnerability because no account forwarding is used, but, code uniformity is nice.
 
@@ -1534,7 +1534,7 @@
   <field name="status">fixed</field>
   <field name="commit">b6b3e6855e441c904ed4e80b4f3ffcdaf2e66afa</field>
   <field name="content">
-    ## (Q-7) Reveal circuit’s totalBid output signal is extraneous 
+    ## (Q-7) Unnecessary output signal in Reveal circuit
 
     In reveal.circom, the `totalBid` output signal is not used in any meaningful way and provides no value. Its information is already constrained in the `bid` and `quantity`’s use in the `ticketHash`.  
 
@@ -1578,9 +1578,9 @@
   <field name="status">fixed</field>
   <field name="commit">6516feddc94824df7fe0ced8a669837d65855889</field>
   <field name="content">
-    ## (Q-10) BaseShips.sol:L638 reverts a misleading error message 
+    ## (Q-10) A misleading error message in BaseShips.sol
 
-    If the amount + minted count is bigger than the team supply that does not necessarily mean all tokens are minted. Consider changing this message to include cases where a wrong amount is passed to the function. The same issue is present with other mint functions in BaseShips.
+    Error message at BaseShips:L638 is misleading. If the amount + minted count is bigger than the team supply that does not necessarily mean all tokens are minted. Consider changing this message to include cases where a wrong amount is passed to the function. The same issue is present with other mint functions in BaseShips.
   </field>
 </item>
 
@@ -1635,7 +1635,7 @@
   <field name="status">fixed</field>
   <field name="commit">06edec50bc8b86f0c7b360f2f65cbfdf368c9c83</field>
   <field name="content">
-    ## (Q-14) Interface functions do not have expected natspec documentation (e.g. IShips interface)
+    ## (Q-14) Interface functions do not have expected natspec documentation
     
     To be consistent across the codebase define natspec documentation on the interface level so that documentation can be automatically inherited (if other rules are respected) by the implementation.
   </field>
@@ -1704,7 +1704,7 @@
   <field name="status">fixed</field>
   <field name="commit">493a2521f19b896ca1f48cc902b2e5da3325cd16</field>
   <field name="content">
-    ## (Q-19) Documentation Nitpicks 
+    ## (Q-19) Documentation improvements
 
     - The following comment for `BaseShips.update(uint256 tokenId, Ship calldata ship)` is incorrect since this function is not called by the dock. It is called from the Game and ShipTraits contract.
     
@@ -2008,5 +2008,3 @@
     ```
   </field>
 </item>
-
-
