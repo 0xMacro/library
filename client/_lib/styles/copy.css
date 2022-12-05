@@ -1,4 +1,5 @@
 .Copy a {
+  overflow-wrap: break-word;
   @apply text-blue-600 hover:underline;
 }
 
@@ -45,6 +46,7 @@
   margin: 0;
   font-size: 80%;
   border-radius: 6px;
+  overflow-wrap: break-word;
 }
 
 .Copy > pre,
