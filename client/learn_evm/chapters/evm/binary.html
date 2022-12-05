@@ -31,13 +31,13 @@ For those that need a refresher, here's a quick review:
 
 ## EVM's Native Types
 
-The “types” that the EVM understands is:
+The "types" that the EVM understands are:
 
-- Unsigned numbers (`uint256`) – `ADD`, `SUB`, `LT`, `GT`, `GAS`, `CALLVALUE`, `TIMESTAMP` etc.
-- Signed numbers (`int256`) – `SIGNEXTEND`, `SDIV`, `SLT`, `SGT`, etc.
-- Binary – `AND`, `OR`, `XOR`, `BYTE`, `SHL`, `SHR`, `SHA3`, `BLOCKHASH`, etc.
-- Addresses – `ADDRESS`, `SENDER`, `CALL`, etc.
-- Contract bytecode – `CREATE`, `CODECOPY`, `EXTCODECOPY`, etc.
+- Unsigned numbers (`uint256`), supported by `ADD`, `SUB`, `LT`, `GT`, `GAS`, `CALLVALUE`, `TIMESTAMP` etc.
+- Signed numbers (`int256`), supported by `SIGNEXTEND`, `SDIV`, `SLT`, `SGT`, etc.
+- Binary, supported by `AND`, `OR`, `XOR`, `BYTE`, `SHL`, `SHR`, `SHA3`, `BLOCKHASH`, etc.
+- Addresses, supported by `ADDRESS`, `SENDER`, `CALL`, etc.
+- Contract bytecode, supported by `CREATE`, `CODECOPY`, `EXTCODECOPY`, etc.
 
 All other types that you see in Solidity are built on top of the above.
 
@@ -71,9 +71,9 @@ As hinted, each item on the stack is a full 32 bytes. Any items that an opcode p
 
 ### Delegating to Memory
 
-As large as 32 bytes is, not everything can fit in a single word. Complex data structures such as arrays and strings take *at least two* full words – one for the length, and one plus for the data.
+As large as 32 bytes is, not everything can fit in a single word. Complex data structures such as arrays and strings take *at least two* full words – one for the length, plus one or more for the data.
 
-Because of this, often times you will have to move data to memory instead of the stack. The most common example of this is the `RETURN` opcode; in order to return data from a function call, you must put that data **into memory first**, and *then* execute the `RETURN` opcode with what location in memory that data resides.
+Because of this, oftentimes you will have to move data to memory instead of the stack. The most common example of this is the `RETURN` opcode; in order to return data from a function call, you must put that data **into memory first**, and *then* execute the `RETURN` opcode with what location in memory that data resides.
 
 You'll learn more about working with memory in <chapter>evm/memory</chapter>.
 
@@ -89,9 +89,11 @@ Consider how a 32-byte key has 2^256 possible values. That's an incredibly large
 2^256 = 115,792,089,237,316,195,423,570,985,008,687,907,853,269,984,665,640,564,039,457,584,007,913,129,639,936
 ```
 
-This works out well **for storage**, since EVM storage is similar to a key-value database. An arbitrary key can be assigned an arbitrary value. It's a benefit to have such a large key space, as it helps avoid conflicts.
+This works out well **for storage**, since EVM storage is similar to a key-value database; any 32-byte key can be assigned any 32-byte value. It's a benefit to have such a large key space, as it helps avoid conflicts.
 
-But **for memory**, you will never reach anywhere near the max range. Starting from zero, any memory you use **costs additional gas** for allocation. For example, using an offset of `0xff` is fine; using an offset of `0xff000000000000000000` is not.
+But **for memory**, you will never reach anywhere near the max range. Starting from zero, any memory you use **costs additional gas** for allocation. For example, using an offset of `0xff` is fine; using an offset of `0xff000000000000000000` is not, as the EVM will try to allocate memory **from zero up to** that offset.
+
+<aside>More specifically, using a memory offset will cause the EVM to allocate any **unused** memory space up to that offset. More on that in <chapter>evm/memory</chapter>.</aside>
 
 ### Storage Values
 

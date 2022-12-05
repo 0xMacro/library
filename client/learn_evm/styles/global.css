@@ -22,6 +22,9 @@ body {
 .ChapterLink.-coming-soon span.title {
   cursor: not-allowed;
 }
+.ChapterLink a.title {
+  @apply text-zinc-100 font-light;
+}
 .ChapterLink span.title {
   text-decoration: underline;
 }

@@ -14,7 +14,7 @@ What does that mean, exactly? To answer, first let’s talk about **physical mac
 
 ### Physical Machines
 
-The term “physical machine” normally refers to a CPU – a computer’s Central Processing Unit. This a the physical chip that exists in your computer – desktop, laptop, phone, etc. – and is the part of your computer that does the most **actual work**. It’s how your computer *computes* computations.
+The term “physical machine” normally refers to a CPU – a computer’s Central Processing Unit. This is a physical chip that exists in your computer – desktop, laptop, phone, etc. – and is the part of your computer that does the most **actual work**. It’s how your computer *computes* computations.
 
 It can look something like this:
 
@@ -22,7 +22,7 @@ It can look something like this:
 
 Over the decades, CPUs have been highly, *highly* optimized for speed of execution. They can execute instructions fast – **trillions per second** fast. That's a lot of instructions.
 
-In contrast, the EVM *is not* designed to be this fast. Because of gas costs, you'll **run out of gas** before getting anywhere near that magnitude of instructions.
+In contrast, the EVM *is not* designed for this high level of throughput. Because of gas costs, you'll **run out of gas** before getting anywhere *near* that magnitude of instructions within a transaction.
 
 ### Virtual Machines
 
@@ -32,7 +32,7 @@ The EVM is no different. It reads, interprets, and executes **instructions encod
 
 ## What is an Instruction?
 
-An instruction is a task you want your machine to perform. They are small, low-level tasks.
+An instruction is a task you want your machine to perform. Each instruction is a small, low-level tasks.
 
 For example, there is no instruction for high level tasks such as "make a network call" or "listen for this keystroke". Instead, you only have access to tasks like "add these two numbers together", "shift these bits", "write this value to memory", and so on.
 
@@ -56,9 +56,9 @@ Here is what the opcode for adding two numbers looks like:
 
 - `00000001`
 
-That’s right, it’s just 8 numbers of binary, which is 8 bits, which is 1 byte. This is the entirety of an EVM opcode.
+That’s right, it’s just 8 numbers of binary – which is 8 bits, which is 1 byte. This is the entirety of an EVM opcode.
 
-Now reading binary actually isn’t that fun for humans. In our line of work, we rewrite the above as **hexadecimal**. Here are two examples of how that conversion happens:
+But as it turns out, reading binary isn’t that fun for humans. In our line of work, we rewrite the above as **hexadecimal**. Here are two examples of how that conversion happens:
 
 ```jsx
     00000001  - ADD opcode (binary)
@@ -90,7 +90,7 @@ We will learn how exactly this works in <chapter>evm/stack</chapter>.
 
 So what does this have to do with machines vs virtual machines and the EVM? Well, to summarize:
 
-- A virtual machines is a **software program** that behaves *like* a hardware CPU.
+- A virtual machine is a **software program** that behaves *like* a hardware CPU.
 - The EVM is a virtual machine (hence the name).
 - Thus, the EVM executes instructions via **opcodes**, just like a hardware machine would.
 
@@ -101,17 +101,19 @@ How does the EVM execute binary?
 Conceptually, you can think of execution as three parts:
 
 1. The **bytecode**.
-    - This is the program that will be executed. It can look something like this: **`0x61020f0960405260206040f3`**
-    - It primarily consists of opcodes to run. For example, `0x61` is the PUSH2 opcode.
-    - Some opcodes take literal arguments, which are also part of the bytecode. For example, in `0x61020f`, the first byte is a PUSH2 opcode, which reads the next 2 bytes an its argument (`0x020f`).
+    - This is the program that will be executed. It can look something like this: **`0x62020f0960405260206040f3`**
+    - It primarily consists of opcodes to run. For example, `0x62` is the `PUSH3` opcode.
+    - Some opcodes take literal arguments, which are also part of the bytecode. For example, in `0x62020f09`, the first byte (`0x62`) is a `PUSH3` opcode, which reads the next 3 bytes an its argument (`0x020f09`).
 2. The **program counter**.
-    - This is the position of the currently running opcode.
-    - Execution starts at the leftmost byte and moves rightwards.
-    - This is similar to an index of a string.
+    - This is the **position** of the currently running opcode.
+    - The program counter starts at **zero** (the leftmost byte) and increments after each opcode execution (moving rightwards).
+        - This is similar to an index of a string.
+        - Opcodes with literal arguments will increment the program counter **beyond** its arguments. For example, executing a `PUSH32` will increment the program counter by 33 bytes.
+        - The `JUMP` and `JUMPI` opcodes allow you to set the program counter directly, to any position of a `JUMPDEST` opcode.
 3. The **execution environment**.
-    - This is the stack, memory, and contract storage.
-    - Opcodes manipulate these when run.
-    - You’ll learn more about this in an upcoming chapter.
+    - This is the stack, memory, contract storage, calldata, and various fields about the running transaction.
+    - Opcodes manipulate stack, memory, and storage when executed.
+    - You’ll learn more about this in <chapter>evm/overview</chapter>.
 
 ### Running as Long as Possible
 
@@ -127,7 +129,7 @@ It continues to do this until one of the following happens:
 4. The program counter reaches the end of the bytecode (rare).
 5. The execution environment **runs out of gas.**
 
-Because of that last one, **EVM execution is guaranteed to halt.** Even an infinite loop will eventually halt, due to the amount of gas always being a finite.
+Because of that last one, **EVM execution is guaranteed to halt.** Even an infinite loop will eventually halt, due to the amount of gas always being finite.
 
 Also note that execution may not always be strictly from left-to-right; the JUMP and JUMPI opcodes allow the program counter to jump to any other part of the bytecode – as long as the destination byte is a JUMPDEST byte.
 
