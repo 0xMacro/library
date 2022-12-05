@@ -1,4 +1,5 @@
 .Copy a {
+  overflow-wrap: break-word;
   @apply text-blue-600 hover:underline;
 }
 
@@ -45,13 +46,27 @@
   margin: 0;
   font-size: 80%;
   border-radius: 6px;
+  overflow-wrap: break-word;
 }
 
-.Copy > pre {
+.Copy > pre,
+.Copy li pre,
+.Copy ol pre {
   @apply mt-8 p-4 bg-gray-200/25 dark:bg-gray-700/75 rounded-sm;
   overflow: auto;
   font-size: 80%;
   line-height: 1.45;
+}
+.Copy li pre,
+.Copy ol pre {
+  @apply mt-4;
+}
+.Copy li pre code,
+.Copy ol pre code {
+  background: none;
+  display: inline;
+  font-size: 100%;
+  @apply mt-4;
 }
 
 .Copy ul, .Copy ol {

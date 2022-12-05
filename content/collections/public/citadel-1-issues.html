@@ -1,0 +1,1977 @@
+<item>
+  <field name="topic">Insolvency</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">7061976e5802141ff3d9832df45720898e826acb</field>
+  <field name="content">
+    ## (C-1) Incorrect implementation of claimDepositorRewards may lead to insolvency of ConstructionBay
+
+    In the ConstructionBay contract, the claimDepositorRewards function enables depositors to retrieve their share of total rewards.
+
+    Implementation is meant to enable multiple claims from the same depositor as rewards accrue in `totalDepositorRewardsByAuction[auctionId]` over time.
+
+    ```jsx
+    uint256 depositAmount = _depositByAuctionByAddress[auctionId](Msg.sender];
+
+    uint256 allTimeRewards = (totalDepositorRewardsByAuction[auctionId] *
+    	depositAmount) / totalOnTimeDepositsByAuction[auctionId];
+
+    uint256 owedRewards = allTimeRewards -
+      _claimedRewardsByAuctionByAddress[auctionId](Msg.sender];
+    ```
+
+    Specification defines that rewards can be claimed after the `Punishing` state has begun.
+
+    > At any time **after the punishing state has begun**, depositors who revealed on time are eligible to claim their portion of the tax revenue for the auction.
+
+    However, with the current implementation, it is possible for depositors who have already revealed their bid to claim deposit rewards while the auction is still in state `Revealing` as there is no corresponding check to prevent that.
+
+    In this context, formula for calculating allTimeRewards is incorrect as both `totalDepositorRewardsByAuction[auctionId]` and `totalOnTimeDepositsByAuction[auctionId]` can change between subsequent calls leading to different, non-monotonically increasing, outputs.
+
+    This issue may lead to a loss of funds in the following scenario:
+
+    1. All, except large whale depositor with 0 bid, reveal their bid
+    2. All, except large whale depositor with 0 bid, claim their reward
+    3. The sum of all rewards claimed at this moment would be equal `totalDepositorRewardsByAuction[auctionId]`
+    4. Large whale depositor reveals their 0 bid increasing `totalOnTimeDepositsByAuction[auctionId]` significantly
+    5. Large whale depositor claims depositor rewards and receives ~&nbsp;`totalDepositorRewardsByAuction[auctionId]` since `depositAmount` of the whale depositor represents most of the `totalOnTimeDepositsByAuction[auctionId]` amount.
+
+    6. As a result, the system distributes **nearly 2x rewards** at the expense of the DAO's balance share and other potential depositors who haven’t closed their position.
+
+    **Remediations to Consider**
+
+    - Adding a guard to prevent reward claims unless the auction is in a `Punishing` state.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Randomness</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">7df396fac7336bd817866a9617f8441acdf95245</field>
+  <field name="content">
+    ## (H-1) Advanced users can influence which ship traits they receive from auctions
+
+    From the yellow paper’s _Ship Reveal_ section:
+
+    > _For ships introduced through the construction bay, we modulate the random seed to select each ship from a predefined list. Once a ship is selected, it is deleted from the list, so that no ship is selected more than once. For more details on the construction bay, see the [Construction bay section](https://library.citadel.game/articles/yellowpaper#construction-bay)._
+
+    More advanced users who have won a ship auction can influence what ship they receive by (1) pre-computing their received ship’s `availableShip` index and (2) only allowing a transaction to succeed if they receive a desired ship (by using services such as [Flashbots Bundles](https://docs.flashbots.net/flashbots-auction/searchers/advanced/understanding-bundles)). By waiting for other users to claim their ships, ship winners can change which ship they receive. This is due to how each claim changes which ship a reveal returns. This jeopardizes the fairness of auctions.
+
+    See the code in FixedShipTraits.sol lines 95-124:
+
+    ```solidity
+    /// @dev Reveal minted tokens' traits in separate transaction
+    function _revealTokens(uint256[] memory tokenIds, uint256[] memory seeds)
+      internal
+      override
+      returns (Ship[] memory)
+    {
+      require(
+        availableShips.length >= tokenIds.length,
+        "Not enough ships are available right now"
+      );
+
+      uint256 tokenIdsLength = tokenIds.length;
+
+      Ship[] memory result = new Ship[](tokenIds.length);
+      for (uint256 i = 0; i < tokenIdsLength; ) {
+        /* calculated index will change as ships are claimed */
+        uint256 index = seeds[i] % availableShips.length;
+        Ship memory ship = availableShips[index];
+
+        /* which ship an index points too also changes */
+        availableShips[index] = availableShips[availableShips.length - 1];
+        availableShips.pop();
+
+        result[i] = ship;
+
+        unchecked {
+          i++;
+        }
+      }
+
+      return result;
+    }
+
+    ```
+
+    This becomes more problematic when a user controls more than one ship in the auction. Every ship they own results in greater influence over the resulting moduli and indexing operations. This attack could become economically worthwhile if there is a high demand for a ship in the auction.
+
+    **Remediations to Consider**
+
+    Consider implementing a different design which does not let users influence which ship they receive, such as:
+
+    - Revealing all of the auction’s ship traits at the same time based off of a single random number. This should be done after users have claimed their shipTokenIDs as users have control over which shipTokenID\* they receive based off of the order they announce their wins.
+    - The code in ConstructionBay.sol on lines 561-572 assigns the shipTokenIDs in ascending linear order based on claiming order. This code is also influenceable by advanced users waiting for other winners to claim their shipTokenIDs.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Asset Mobility</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">d13c48be8dc60deb69205d87eb711f47e56904e9</field>
+  <field name="content">
+    ## (H-2) Funds can get locked in ConstructionBay contract
+
+    Let’s consider the scenario where no one of the auction participants revealed their bid on time (by not calling the `revealBidOnTime` function in time).
+
+    If so, the only action one can take is to call the `punish` function which does one of the following:
+
+    1. If the bid is a winning bid, no-show tax (default: 50%) and flat tax (default: 5%) are deducted from the bidder’s balance and added to the `totalDepositorRewardsByAuction` mapping:
+
+       ```solidity
+       totalDepositorRewardsByAuction[auctionId] += totalTaxAmount; // 55% of deposit
+       ```
+
+       and the remaining 45% are returned to the bidder.
+
+       ```
+       _sendToken(auctionId, ticket.bidder, remainingBalance);
+       ```
+
+    2. If the bid is not a winning bid, only flat-tax (default: 5%) is deducted from the bidder’s balance
+
+       ```solidity
+       totalDepositorRewardsByAuction[auctionId] += taxAmount;  // 5% of deposit
+       ```
+
+       and the remaining 95% are returned to the bidder.
+
+    In either of the above cases, tax amount is added to the `totalDepositorRewardsByAuction` mapping. This total tax amount would then be used in the `claimDepositorRewards` function to give bidders their proportion of the rewards.
+
+    Now the problem is that only bidders who revealed on time are eligible to claim their portion of the rewards by calling `claimDepositorRewards`. Hence, in our scenario above, no bidder can claim his proportion of the rewards. As the contract provides no other way of transferring rewards out, those rewards are locked in the contract.
+
+    We see this issue as Medium likelihood as there can be multiple cases where no bidders reveal on-time:
+
+    - Not many bidders on the auction and the few who participated didn’t reveal on time
+    - finalityDelay is set to a low value and so bidders don’t have a long enough time to reveal
+    - frontend outage during the reveal period and so there is no easy way for bidders to reveal
+
+    **Remediations to Consider**
+
+    - Adding a deadline until when rewards can be claimed. If deadline is passed, rewards can be sent to DAO address.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Asset Mobility</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">
+    Client opted to implement a zero-knowledge version of Construction Bay.
+  </field>
+  <field name="commit">7ecdce4b38ce7e2bd416dabb7894e2f91fe549c1</field>
+  <field name="content">
+    ## (H-3) Unsigned tickets will lock deposits
+
+    In the `ConstructionBay.sol`, there is no alternative to access funds if one of the signatures is invalid or missing. If the system does not sign a bid, the deposit cannot be revealed or punished, causing the funds to get locked in the contract.
+
+    There might be various reasons for an unsigned bid, the most frequent one being the off-chain system not signing bids if the requester does not have sufficient balance to cover the total and tax. From the yellowpaper:
+
+    > The system must only sign a bid if the requester has sufficient balance to cover the total and tax.
+
+    The same issue is valid with any other case that blocks ticket signing, such as the unavailability of the off-chain system.
+
+    **Remediations to Consider**
+
+    - A governance-only function to refund affected depositors.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Randomness</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">e5ab3fc18d83ddf9ae5cbfff8ab8e22a647f55ae</field>
+  <field name="content">
+    ## (H-4) Miners can pre-compute mining claim and can act accordingly if it results in ship destruction
+
+    The mining operation consists of the following 3 transactions: 1) `beginMining` 2) `completeMining` 3) `revealMiningClaim`. In the `completeMining` call, a random number is requested from the oracle that is later be used in the `revealMiningClaim` to calculate the crime outcome. If the crime outcome is 100%, then the ship will be burned.
+
+    Once the random number is returned and before calling `revealMiningClaim`, advanced users can pre-compute the crime outcome, and if the ship is destined to be destroyed, they are incentivised to not call `revealMiningClaim`.
+
+    Instead, they have the following 2 options:
+
+    ### 1. Unstake and sell the ship
+
+    Miners can complete mining and returning to the Citadel by calling `completeMining` with arguments `isReturning=true` and `outpostId=0`. In this case - as they are in the Citadel - miners could unstake their ship instead of letting the ship to be destroyed by calling the `revealMiningClaim`.
+
+    After unstaking the “to be destroyed” ship, a malicious user could sell the ship on some marketplace such as OpenSea. At this time, the buyer wouldn’t know the internal game state of the ship. Once the new buyer enters the game by staking the ship, the ship is in a “pending claim” state, meaning that the player needs to claim the rewards first before completing another mining operation. If buyer now calls `revealMiningClaim`, the ship will be destroyed.
+
+
+    **Remediations to Consider**
+
+    - In the `unstake` function, require the ship to not be in `Claiming` state.
+
+    ### 2. Retain voting privilege by never revealing the mining claim
+
+    Miners are incentivized to not finish the reveal and to just keep their ship in the pending claim state in order to not have their pilot badge burned. This way, they can retain their voting privileges associated with the pilot badge.
+
+    In consequence, this will prevent marauders from receiving the ore which corresponds to the 100% theft category as miners will not reveal these ship-destroying mining claims.
+
+    **Remediations to Consider**
+
+    - Incentivizing the miners who have had their ships destroyed to finish the reveal to properly reward the marauders, or
+    - Instrumenting another way for these ships to be destroyed which isn’t driven by the negatively impacted party.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Asset Mobility</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">90e826daba583b871a7692f7c644ec8220ad66fa</field>
+  <field name="content">
+    ## (H-5) Misconfigured belts will lock all ships mining on them
+
+    When a misconfigured (probabilities of `crimeOutcomes` or `oreBreakdown` not adding up to 100% or `_oreBreakdown.length` == 0 etc) belt gets added using `addBelt()` in Game.sol, provenance of the belt gets saved in `_provenanceByBeltId`. Since the `publishBelt()` in RewardsLib.sol checks the integrity of the published belt by comparing it with provenance, there is no way to publish or remove this belt, causing the belt to exist in an Unpublished state forever.
+
+    Unpublished belts are still available for ships to travel and start mining but ships can not `completeMining()` on them. This will result in a location that locks all ships mining on it without recourse.
+
+    **Remediations to Consider**
+
+    - Blocking traveling to non-published belts
+    - Allowing miners to stop mining non-published belts with no rewards
+    - Preventing misconfigurations in the first call to `addBelt()`
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">c5780e091cd30e58bb9fc1b1769222d57ae68857</field>
+  <field name="content">
+    ## (H-6) RedBlackTreeLib.sol `atIndex()` can return wrong values and can revert
+
+    The current implementation of RedBlackTree.sol’s `atIndex()` function on line 165 is both wrong and can revert. This will cause ConstructionBay.sol’s `submitWinningBid()` function to either (1) return the wrong winning bid amount, which goes against the spec, or (2) to itself revert and prevent anyone from claiming ships.
+
+    The condition starting on line 197 is using the wrong `cursorSelfCount` when calculating the amount to decrease the current count of the considered nodes. This will both return wrong indexes and can underflow when indexing lower indexes. 
+
+    ```solidity
+    // In RedBlackTree.sol's atIndex() 
+    } else {
+      cursor = c.left;
+      c = self.nodes[cursor]
+      // this can underflow and lead to the wrong index being returned
+      smaller -= (cursorSelfCount + nodeCount(self, c.right)); 
+    }
+    ```
+
+    The fix would be:
+
+    ```solidity
+    } else {
+      cursor = c.left;
+      c = self.nodes[cursor];
+      cursorSelfCount = c.selfCount; // add this to line 198 of the tree impl
+      smaller -= (cursorSelfCount + nodeCount(self, c.right));
+    }
+    ```
+
+    **Remediations to consider:**
+
+    - Adding the indicated line above.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">cf573b2914cd452f30c69741aa1006417191085b</field>
+  <field name="content">
+    ## (H-7) Reveals will revert if user submits same bid as someone else in same auction
+
+    ConstructionBay.sol’s used RedBlackTree implementation does not allow for re-insertion of keys and reverts if one tries. See `insert()` on line 120 of RedBlackTreeLib.sol:
+
+    ```solidity
+    function insert(
+        Tree storage self,
+        uint256 key,
+        uint256 count
+      ) internal {
+        require(key != EMPTY);
+        require(!exists(self, key)); 
+    		...
+    ```
+
+    This becomes problematic as the current `reveal()` function on line 247 of ConstructionBay.sol does not check to see if the key is duplicated before attempting insertion.
+
+    ```solidity
+    function reveal(...) { 
+    	...
+    	if (bid > 0 && quantity > 0) {
+          _state[auctionId].totalBid += bid * quantity;
+          _state[auctionId].revealedNonZeroBidCount += quantity;
+          _bidTreeByAuction[auctionId].insert(bid, quantity);
+    	}
+    ```
+
+    If a user has a duplicate bid they will be unable to complete their reveal, causing them to (1) potentially lose an auction they could’ve won and (2) forcing them to only have the option of a no-show deposit claim. The function `insert()` itself has already been modified to allow for insertions, just this line was left in. 
+
+    **Remediations to consider:**
+
+    - Removing the line in the RedBlackTree implementation to allow for modification of a key’s value.
+    - Writing a more complete testing suite for modified data structures in the future.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">d40d377c5927cf9c68e2f19c6a3ee67a3c743165</field>
+  <field name="content">
+    ## (H-8) No guarantee that `tokenId`s for auction’s ships haven’t been distributed already
+
+    Winners of auctioned ships aren’t guaranteed that the ships they have bid on have non-owned `tokenIds` in the corresponding `IShips` contract. If a `tokenId` is accidentally auctioned off twice or duplicated in some other accident, the winner of a ship will not be able to complete ConstructionBay.sol’s `claim()` function as it will revert during BaseShips.sol’s (or whatever `IShips` contract is used) `issue()` function upon the `tokenId` already existing. This will prevent auction winners from claiming their ships, claiming their rewards from depositing, and reclaiming any part of their deposit which was not part of their bid. Essentially auction winners will have their funds locked in the contract.
+
+    **Remediations to consider:**
+
+    - Keeping track of which ship `tokenId`s have been promised/distributed already and disallowing auctions which try to re-promise/distribute these same tokens.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">d90b985a7b12ff2115b4422bd5d48734a680751a</field>
+  <field name="content">
+    ## (H-9) ShipTrait.sol's `receiveRandom()` will run out of gas when receiving random counts larger than 3
+
+    Currently in ShipTrait.sol, when users try to reveal traits for ships in groups larger than 3 the code will run out of gas and revert. This is because ShipTrait.sol's `receiveRandom()` function is (1) limited to `100_000` gas total, while (2) will consume at least `27_000` gas per random requested on storage reads/manipulations alone:
+
+    ```solidity
+    function receiveRandom(
+        uint256[] calldata randoms,
+        uint256[] calldata tokenIds
+      ) external onlyRandomOracle {
+        uint256 tokenId;
+        for (uint256 i = 0; i < tokenIds.length; ) {
+          tokenId = tokenIds[i]; // sload = 2_100 gas
+          require(
+            _revealStateByTokenId[tokenId] == RevealState.PendingSeed, // sload = 2_100 gas
+            "Token seed is not pending"
+          );
+
+          // Set seedByTokenId
+          _seedByTokenId[tokenId] = randoms[i]; // from-zero sstore, 20_000 gas !!!
+          // Set reveal ready in mapping
+          _revealStateByTokenId[tokenId] = RevealState.ReadyToReveal; // non-zero sstore, 2,900
+
+          unchecked {
+            i++;
+          }
+        }
+      }
+    ```
+
+    See Ethereum’s [yellow paper](https://ethereum.github.io/yellowpaper/paper.pdf) for a list of gas-costs per opcode. The gas limit for `receiveRandom()` is set in RandomOracle.sol’s `_requestRandomWords()` on line 121:
+
+    ```solidity
+    function _requestRandomWords(
+        uint32 wordCount,
+        bytes calldata encodedCalldata,
+        bool isArray
+      ) private returns (uint256) {
+    
+    		...
+
+        uint256 requestId = coordinator.requestRandomWords(
+          _keyHash,
+          subscriptionId,
+          3,
+          100000, // limit of 100_000 gas per random callback is set here
+          wordCount
+        );
+
+        ...
+      }
+    ```
+
+    **Remediations to consider:**
+
+    - Setting a higher gas limit in RandomOracle.sol’s `_requestRandomWords()` ([max is 2,500,000](https://docs.chain.link/docs/vrf/v2/subscription/supported-networks/#polygon-matic-mainnet)) and limiting the length of tokens that can be requested in ShipTrait.sol’s `beginReveal()` to a number with a gas consumption a margin lower than the limit.
+    - Setting the `_seedByTokenId[tokenId]` variable in `beginReveal()` to something non-zero in `beginReveal()`. This will change the `20_000` gas charge for setting a zero storage slot to the gas charge of `2_900` for something non-zero. Overall this approach will cost more gas but you can avoid having to pay the cost in this gas-restricted function where reverts are harmful.
+  </field>
+</item>
+
+
+
+<item>
+  <field name="topic">Access Restriction</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">8c05fd71210ab50acb9e3ffc118f9b5c94c6529b</field>
+  <field name="content">
+    ## (M-1) `FxBaseXXXTunnel`s can have their `fxXXXTunnel` set by anyone during deployment
+
+    In FxBaseChildTunnel.sol, lines 54-60, the code which sets the `fxRootTunnel` for the `FxBaseChildTunnel` is callable by anyone:
+
+    ```jsx
+    // set fxRootTunnel if not set already
+      function setFxRootTunnel(address _fxRootTunnel) external {
+        require(
+          fxRootTunnel == address(0x0),
+          "FxBaseChildTunnel: ROOT_TUNNEL_ALREADY_SET"
+        );
+        fxRootTunnel = _fxRootTunnel;
+      }
+    ```
+
+    Same with FxBaseRootTunnel.sol, lines 71-78, for setting the `fxChildTunnel` for the `FxBaseRootTunnel`:
+
+    ```jsx
+    // set fxChildTunnel if not set already
+      function setFxChildTunnel(address _fxChildTunnel) public {
+        require(
+          fxChildTunnel == address(0x0),
+          "FxBaseRootTunnel: CHILD_TUNNEL_ALREADY_SET"
+        );
+        fxChildTunnel = _fxChildTunnel;
+      }
+    ```
+
+    This is problematic because the variables `fxRootTunnel` and `fxChildTunnel` control which tunnels the deployed protocol’s tunnels will accept messages from. The party which controls the listened to tunnel is able to execute arbitrary code, notably the `Dock`'s ore and ship minting code.
+
+    If this initialization code isn’t ran atomically with the deployment of the `FxBaseRootTunnel` and `FxBaseChildTunnel`, there exists the possibility of a malicious party submitting their own corresponding tunnel as the ‘valid’ tunnel to receive messages from. This would give the malicious party the ability to mint ore and ships as they please.
+
+    With the current deployment code this attack could happen. In the 4_enable_communication.js migrations file, lines 53-61, there is a gap between deploying the tunnels and setting their listened-to tunnel:
+
+    ```solidity
+    async function setFxReflection(Tunnel, reflection) {
+        const tunnel = await Tunnel.deployed();
+
+        if (isPolygon) {
+          await tunnel.setFxRootTunnel(reflection);
+        } else {
+          await tunnel.setFxChildTunnel(reflection);
+        }
+    ```
+
+    A worst case advanced attack could look like:
+
+    - Malicious user waits for deployment of `FxBaseRootTunnel` and immediately sets their own `FxBaseChildTunnel` as the valid root.
+    - The deployment team fails to notice this.
+    - Malicious user re-creates all of the transactions on their `FxBaseChildTunnel` that the protocol’s intended `FxBaseChildTunnel` outputs. Since the `FxBaseChildTunnel` run on Polygon this wouldn’t be too cost prohibitive.
+    - Malicious user waits for the protocol to gain value.
+    - Malicious user starts to submit their own transactions to the `FxBaseChildTunnel` as well, minting themselves the coolest ships or all the ore they want.
+    - Malicious user sells ore/ships on open market to make $.
+
+    If the advanced user’s tunnel plant is detected, the protocol would need to upgrade the tunnel and change the listened to tunnel’s address to point to the protocol controlled tunnel. This is assuming that the malicious party hasn’t minted anything yet.
+
+    **Remediations to Consider**
+
+    - (1) Restricting who can call `setFxXXXTunnel()` in both FxBaseChildTunnel.sol and FxBaseRootTunnel.sol, or
+    - (2) Deploying the `FxBaseXXXTunnel` and setting the `fxXXXTunnel` from a transaction atomically.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">8c05fd71210ab50acb9e3ffc118f9b5c94c6529b</field>
+  <field name="content">
+    ## (M-2) `setSale()` does not check for the `startTime`
+
+    There is not a check for the `startTime` of the sale in the `setSale()`in DutchAuctionShips.sol. If a time in the past gets passed into this function, the auction may start from an unexpectedly low price, letting early users mint all ships.
+
+
+    **Remediations to Consider**
+
+    - Requiring `startTime` to be bigger than the current timestamp.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Extra Code</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">8c05fd71210ab50acb9e3ffc118f9b5c94c6529b</field>
+  <field name="content">
+    ## (M-3) Dock tunnels allow governance to make arbitrary calls
+
+    The tunnels defined in StandardChildTunnel.sol and StandardRootTunnel.sol have extra code which allows the governance to run arbitrary code:
+
+    ```solidity
+    /**
+     * @notice Make arbitrary calls on behalf of this tunnel
+     * @dev Used by governance when docking calls fail
+     * @param targets The addresses of the contracts to call
+     * @param values The currency amounts to send with calls
+     * @param calldatas The calldata for every call, like function signatures and parameters
+     */
+    function replayCalls(
+      address[] calldata targets,
+      uint256[] calldata values,
+      bytes[] calldata calldatas
+    ) external onlyRole(REPLAYER_ROLE) {
+      _execute(targets, values, calldatas);
+
+      emit CallsReplayed(targets, values, calldatas);
+    }
+
+    ```
+
+    This isn’t a part of the yellow or white paper and is an extra feature that expands the attack surface of the protocol.
+
+    **Remediations to Consider**
+
+    - Removing this code.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Asset Mobility</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">e5ab3fc18d83ddf9ae5cbfff8ab8e22a647f55ae</field>
+  <field name="content">
+    ## (M-4) Ships are locked when belt corruption or theft percents are set to > 100%
+
+    In the RewardsLib.sol’s `publishBelt()`, there is no check if `_corruption` or `CrimeOutcome.tax` are set to a value greater than 100% (10_000).
+
+    Consider the following scenario after a belt was successfully published with one of these values set > 10_000:
+
+    1. The pilot (with staked ship) calls `beginMining` which sets `ShipState` to `Mining`.
+    2. The pilot calls `completeMining` which sets `ShipState` to `Claiming`.
+    3. Finally, if pilot wants to claim their rewards by calling `revealMiningClaim`, the transaction reverts if corruption or randomly chosen theft percent > 100% due to an underflow on the following line ([RewardsLib.sol, line 248](https://github.com/0xMacro/audit.citadel-1/blob/main/contracts/game/RewardsLib.sol#L248)):
+
+       ```
+       uint256 oreLost = (oreMined * tax) / FIXED_POINT_BASIS;
+       **uint256 oreRewarded = oreMined - oreLost**         // underflow
+       ```
+
+    Consequently, the ship is forever locked in `Claiming` state, and because of that, the pilot cannot do any further transactions.
+
+    **Remediations to Consider**
+
+    - Confirming `_corruption` and all `_crimeOutcomes.tax` values are less than or equal to 10_000 before publishing the belt.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">7f5d749087a10e842d5f43f241e80e7c45e78327</field>
+  <field name="content">
+    ## (M-5) Ships in the upgrading process can be unstaked
+
+    Players who `beginUpgrade()` can `unstake()` the ship before the upgrade is completed, which will result in losing the cost paid for the upgrade. If the player tries to re-stake their ship, although there is an ongoing upgrade, they won’t be able to call `completeUpgrade()` as the state of the ship is not `Upgrading` anymore.
+    This is simply because `Game.sol` only checks if the ship is in the Citadel before unstaking it and does not check what is the current `state()` of the ship.
+
+    **Remediations to Consider**
+
+    - Require the ship to be not in `Upgrading` state in `unstake()`
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">spec</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">e5ab3fc18d83ddf9ae5cbfff8ab8e22a647f55ae</field>
+  <field name="content">
+    ## (M-6) `issue()` and `update()` do not check for unique ship names
+
+    `issue()` and `update()` in the BaseShips.sol are not checking the uniqueness of the ship names, and also ship names added by these functions won’t be registered in `doesExistByName`.
+
+    These functions are implemented to get used by the Dock, but it is mentioned that governance will also use these functions for various reasons, including renaming ships. Names set by the governance using these functions can be double registered by players later. Furthermore, if the governance passes an already used name, it will result in duplicate names.
+
+    **Remediations to Consider**
+
+    - Implementing a new function specific for governance use and applying the same requirements as `setName()`
+  </field>
+</item>
+
+<item>
+  <field name="topic">Incentive Design</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">265d3a17b50ca8ed719eb427ce85ada76c136c31</field>
+  <field name="content">
+    ## (M-7) Punishment order may affect system revenue and create adverse incentives
+
+    In ConstructionBay, anyone can call `punish` function to charge tax on bidders who didn’t reveal their bids on time. In case their bids were winning bids and not all available ships in the auction have been claimed there is an additional tax - `no-show` tax. Currently `no-show` tax, which is significantly larger than normal tax (50% vs 5%), is charged only for the first `noShowShipCountByAuction`. Every other bidder after that will be charged only flat tax fee.
+
+    While the intention of the current implementation was to not charge the no-show penalty to more bidders than could have claimed during the auction, its side effect is that no-show bidders with winning bids, depending on the punishment order, will be charged significantly different tax amounts and also tax revenue for the system may vary depending on which bidders are charged.
+
+    **Remediations to Consider**
+
+    - Consider charging `no-show` tax to all bidders with winning bids who didn’t reveal their bids on time, in the case when not all available ships have already been claimed, to avoid introduction of adverse incentives.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">bc1bd05545e4e5b37c51e19a7cc8d8614cb975c2</field>
+  <field name="content">
+    ## (M-8) No guarantee auctioned ships have existing or useable `IShipTraits` contract
+
+    Winners of auctioned ships aren’t guaranteed that the ships they’ve won can be revealed as the ships’ corresponding `IShipTrait` contract could (1) not exist or (2) not have the uploads ready/complete.
+
+    **Remediations to consider:**
+
+    - Checking that the IShipTraits contract is valid and has ship uploads enabled.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">fc3cb4b4b84b5a50ecf0c0ac399afcb5d4ff1147</field>
+  <field name="content">
+    ## (M-9) ShipTraits.sol: possible to be unable to assign traits to a token range
+
+    In ShipTraits.sol’s batch creation process it is possible to create token ranges which cannot be included in a batch. This can happen if a token range is skipped in the batch creation process.
+
+    In ShipTraits.sol’s `createBatch()` function, there exists a requirement that the starting token in the batch’s range is larger than the previous’s batch’s last token:
+
+    ```solidity
+    require(
+      batchId == 1 || (params.startTokenId > _params[batchId - 1].endTokenId),
+      "Invalid token range"
+    );
+    ```
+
+    This is problematic if a batch accidentally skips tokens. The skipped tokens will not be able to be included in another batch as they will fail to meet the above requirement. This will cause there to be ships which are unable to be assigned traits.
+
+    **Remediations to consider:**
+
+    - Requiring that each created batch leave no gaps between its token range and the previous batch’s token range.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">78be472da37f95ec0d08433443fdda6b69e4d4e9</field>
+  <field name="content">
+    ## (M-10) ShipTraits.sol’s `_selectShip()` will revert if no normal ships are uploaded
+
+    ShipTraits.sol’s `_selectShip()` will revert if no normal ships are uploaded due to a modulus-by-zero error during the ship selection process:
+
+    ```solidity
+    if (seed < officerRarity && isOfficerAvailable) {
+      c = _uploads[batchId].officerShips[seed % officersLength];
+    } else {
+      // Select ship combination with Alias method
+      uint128 rarityIndex = uint128(seed) %
+        uint128(_uploads[batchId].rarityPairs.length); // will revert here
+      RarityPair memory rarityPair = _uploads[batchId].rarityPairs[rarityIndex];
+      uint128 index = seed >> 128 < rarityPair.rarity
+        ? rarityIndex
+        : rarityPair.aliaz;
+      c = _uploads[batchId].normalShips[index];
+    }
+    ```
+
+    This will cause people who have acquired ships to be unable to finish the reveal process.
+
+    **Remediations to consider:**
+
+    - Not allowing batches to be considered valid if no normal ships are uploaded.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">850eeaa02fbe356460be629fce8a302102c71878</field>
+  <field name="content">
+    ## (M-11) ShipTraits.sol’s `validateData()` will revert if no officer ships are uploaded but some are expected
+
+    ShipTraits.sol’s `validateData()` function will revert if no officer ships are uploaded but some are expected during the emit of the `ValidationFailed` event:
+
+    ```solidity
+    if (!isValid) {
+      _state[batchId].status = BatchStatus.Uploading;
+      delete _uploads[batchId];
+      delete _state[batchId].unvalidatedIndex;
+
+      emit ValidationFailed(batchId, i - 1); // this will cause underflow
+    }
+    ```
+
+    The index at this point will be equal to zero so subtracting 1 will cause a revert. This will cause the incorrectly uploaded batch to be stuck in the `BatchStatus.Validating` state.
+
+    **Remediations to consider:**
+
+    - Changing the emit event to not cause a revert when `i` is equal to zero.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">528d38bc1443ad98facdaf87f83867d8b32e25f9</field>
+  <field name="content">
+    ## (M-12) Extreme values for the `revealPeriodDuration` parameter may result in unexpected tax charges for auction participants or lead to an effectively locked ConstructionBay contract due to missing range check
+
+    In `ConstructionBay`, the auction is created in `addAuction` function callable by admin. In this function the `revealPeriodDuration` parameter is checked to be ≠ 0. However, since there is no lower bound or upper bound on the value of this parameter, unexpectedly small or large values may negatively impact the overall function of the ConstructionBay.
+
+    When `revealPeriodDuration` is extremely small (e.g. 1) auction participants who committed their bid to the auction will not have enough time to reveal their bid. As a result, from the system's perspective, they will be treated as a no-show auction participant and required to pay a no-show tax penalty.
+
+    When `revealPeriodDuration` is extremely large (e.g. `31536000` - number of seconds in 1 year), a particular auction will not end (get to `Claiming` phase) until that period passes. What exacerbates this issue is that the next auction cannot be added until the previous one ends due to the following check in the `_maximumPromisedToken` function. Effectively contract will be locked for the period defined in `revealPeriodDuration`. 
+
+    ```jsx
+    require(
+      status(lastAuctionId) == AuctionStatus.Claiming,
+      "Last auction is not complete"
+    ); 
+    ```
+
+    **Remediations to Consider**
+
+    - Add a range check for the `revealPeridDuration` parameter with sensible min and max values.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">0e42ae4653386b196fd8b2710d0d9978fe39684b</field>
+  <field name="content">
+    ## (M-13) Auction `startTime` can be in the past, while `endTime` can be too large
+
+    In ConstructionBay, the `startTime` for auction is checked to be ≠ 0 and to be less than the `endTime`, but not that is in the future. On the other hand, `endTime` doesn’t have specific validations, and by accident, extremely large values can be provided as a result.
+
+    When `startTime` is in the past depending on the other parameters (primarily *endTime* and *revealPeriodDuration*) auction may end up in a period where reveal bids are expected to be submitted even though due to the value of the same parameters no one was able to previously bid. As a result, no actions on the ConstructionBay contract will be possible until the `revealPeriodDuration` period passes and the auction ends up in `AwaitingWinningBid` phase.
+
+    When `endTime` has an extremely large value impact would be similar to when `revealPeriodDuration` value is too large - deposited assets of auction participants would be locked for a specified period of time and no new auctions would be possible to add due to the following guard in the `_maximumPromisedToken` function which prevents adding new auctions unless previous has completed.
+
+    ```jsx
+    require(
+      status(lastAuctionId) == AuctionStatus.Claiming,
+      "Last auction is not complete"
+    );
+    ```
+
+    **Remediations to Consider**
+
+    - Add validation for startTime to be in the future.
+    - Add validation for endTime to be in an expected range from startTime.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">08989888953206c14830f36d373a2dd9c761f12c</field>
+  <field name="content">
+    ## (M-14) `DutchAuctionShips.setSale()` can be called multiple times leading to unexpected behavior
+
+    In `DutchAuctionShips`, the `setSale` function can be called multiple times by the sale admin and as a result, the sale record can be changed/configured multiple times. This potentially could lead to auction behavior that is radically different than one considered to be a Dutch auction. For example, due to updates in subsequent invocations the price can increase even though it is expected to decrease over time.
+
+    **Remediations to Consider**
+
+    - Consider not allowing `setSale` invocation if the sale record has already been updated.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">437ea29b640d0c8cbceeb431fc7b0d3e3cfb61d2</field>
+  <field name="content">
+    ## (M-15) `_maximumPromisedTokenId()` can return an incorrect result
+
+    In ConstructionBay, in the `coreTeamClaim` function startTokenId is generated in the following way:
+
+    ```jsx
+    **uint256 communityShipCount = _parameters[auctionId].communityShipCount;**
+    uint256 coreTeamShipCount = _parameters[auctionId].coreTeamShipCount;
+    uint256 coreTeamClaimedCount = _state[auctionId].claimedCoreTeamCount;
+
+    ...
+
+    uint256 startTokenId = _parameters[auctionId].startTokenId +
+      communityShipCount +
+      coreTeamClaimedCount;
+    ```
+
+    On the other hand, the result of `_maximumPromisedTokenId()`, when the particular auction is not the first `ConstructioBay` auction, is calculated in the following way:
+
+    ```jsx
+    uint256 maximumIssuedTokenId = ships.maximumTokenId();
+    ...
+    uint256 startId = _parameters[lastAuctionId].startTokenId;
+    **uint256 communityCount = _state[lastAuctionId].eventualCommunityClaimCount;**
+    uint256 coreTeamCount = _parameters[lastAuctionId].coreTeamShipCount;
+
+    return
+      MathUpgradeable.max(
+        maximumIssuedTokenId,
+        startId + communityCount + coreTeamCount - 1
+      );
+    ```
+
+    Notice that here code relies on the `eventualCommunityClaimCount` value which may be less than the `communityShipCount` value used in the `coreTeamClaim` function calculation above. As a result, `_maximumPromisedTokenId` may return a result that is smaller than the maximum promised token id for the previous auction.
+
+    **Remediations to Consider**
+
+    - Make these two calculations consistent by updating `coreTeamClaim` function or `_maximumPromisedTokenId` so they rely on the same inputs.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">addressed</field>
+  <field name="content">
+    ## (M-16) `_maximumPromisedTokenId()` check can be ineffective
+
+    In `ConstructionBay`, the `_maximumPromisedTokenId()` function, as its name says, is responsible for returning the maximum promised token id which is used to prevent double selling the same tokenId. This check is necessary so that ship traits corresponding to a particular range of token ids get properly assigned.
+
+    However, if there is an overlap between auctions created in `ConstructionBay` and auctions defined by `FixedPriceShips`/`DutchAuctionShips`  (they have not been completed or they are running in parallel) which also have the capability to mint ships this check may pass even though particular tokenId may later become unavailable to a buyer who obtained it through ConstructionBay auction.
+
+    **Remediations to Consider:**
+
+    - Ensure that FixedPriceShips/DutchAuctionShips are completed and never used after transitioning to ConstructionBay auctions.
+  </field>
+  <field name="response">
+    Addressed - Only a single instance of DutchAuctionShips will exist, and its sale will complete before any ConstructionBay auctions start.
+  </field>
+</item>
+
+<item>
+  <field name="topic">3rd Party Behavior</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">f842060b39ca92286d8c177e2f55c06cc48bcb6f</field>
+  <field name="content">
+    ## (M-17) Small value for `requestConfirmations` parameter allows block miners to increase their chances to mine more valuable ships
+
+    In the `RandomOracle._requestRandomWords()` function the value of `requestConfirmations` parameter is hardcoded to 3 which is the default minimum for the Polygon chain:
+
+    ```jsx
+    uint256 requestId = coordinator.requestRandomWords(
+      _keyHash,
+      subscriptionId,
+      3,
+      2500000,
+      wordCount
+    );
+    ```
+
+    In this particular blockchain environment chain reorgs of length greater than 3 blocks are more frequent (see here [https://polygonscan.com/blocks_forked](https://polygonscan.com/blocks_forked)).
+
+    Due to the above, block miners may find it lucrative enough to perform a chain reorg in order to increase the chances of revealing more valuable ships, as they can re-request new random values. For more details check: [https://docs.chain.link/vrf/v2/security#choose-a-safe-block-confirmation-time-which-will-vary-between-blockchains](https://docs.chain.link/vrf/v2/security#choose-a-safe-block-confirmation-time-which-will-vary-between-blockchains).
+
+    Increasing `requestConfirmations` value results in an increased period of time that users will need to wait between initiating `beginReveal` and being able to perform `completeReveal`. Since the block generation period in the Polygon chain is approximately 2s, the current value indicates that the waiting period is at least 10s. Changing it to e.g. 50 would increase that waiting period to almost 2 mins.
+
+    Remediations to consider:
+
+    - Increase `requestConfirmations` parameter value to one which represents the appropriate balance for Citadel’s use case.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (L-1) Late revealers may miss the chance of minting an officer ship
+
+    The chance of revealing a pre-made officer ship is calculated as ~1% in`GenesisShipTraits.sol` and there is a fixed number of officer ships. If the ratio of officer ship count to total supply is less than 1%, late revealers won’t have a chance to mint an officer ship statistically because once the fixed number of ships is revealed `_traitsOfTokenWithSeed()` will prevent minting more
+
+    **Remediations to Consider**
+
+    - Requiring the length of `officerShips_` is greater or equal to 1% of token count(`endTokenId - startTokenId`) in GenesisShipTraits.sol’s `initialize()`
+  </field>
+  <field name="response">
+    Wont do - This is intentional
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">spec</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">68028aacf945b0e19a966786e7afdeeb5aae9841</field>
+  <field name="content">
+    ## (L-2) Case-sensitivity makes the unique name and vulgar name mechanics obsolete
+
+    Ship names are stored as bytes in `BaseShips.sol:L440` and they are case-sensitive. Users can use vulgar words by just typing some letters in upper-case or lower-case. Since blacklisting all combinations in `addBannedNames()` won’t be possible because of the huge number of different combinations, the approach taken to block vulgar names seems easily nullable.
+
+    The same issue is also valid for the uniqueness of the ship names.
+
+    **Remediations to Consider**
+
+    - Converting all letters to lowercase before storing on-chain.
+    - Removing the on-chain blacklist of names and blocking vulgar names on the client side. Vulgar names registered by directly interacting with the contract can be updated(and perhaps penalized) using the `update()` function.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">90e826daba583b871a7692f7c644ec8220ad66fa</field>
+  <field name="content">
+    ## (L-3) `setSale()` does not check for maxPublicPerWallet > 0
+
+    In DutchAuctionShips.sol’s `setSale` function, there is no check that `maxPublicPerWallet` in `Sale` struct must be greater than `0`. If `maxPublicPerWallet` is set to `0`, nothing can be minted and minting will revert with _“Can't mint more than the max”._
+
+    **Remediations to Consider**
+
+    - Adding a check for `maxPublicPerWallet` > 0. Alternatively, adding an option to treat `maxPublicPerWallet == 0` as without limit minting.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">90e826daba583b871a7692f7c644ec8220ad66fa</field>
+  <field name="content">
+    ## (L-4) No boundary checks for `daoTaxSharePercentage` in `addAuction`
+
+    In ConstructionBay.sol’s `addAuction` function, there is no upper check for the `daoTaxSharePercentage` parameter. If this parameter is set to a higher value as 10_000 (100%), than the `revealBidOnTime` call would fail with an underflow on the following line:
+
+    ```
+    stateByAuction[auctionId].token.burnFrom(
+            address(this),
+            spentAmount - daoPortion
+          );
+    ```
+
+    As a result, winning bidders cannot claim their ships and don’t get any remaining balance back (except the balance which is leftover after punishing).
+
+    **Remediations to Consider**
+
+    - Consider adding a check so that `daoTaxSharePercentage` cannot be greater than 10_000.
+
+    _Note_: The other tax parameters
+
+    - flatTaxPercentage
+    - noShowTaxPercentage
+
+    could possibly have a value greater than 10_000.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Randomness</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">90e826daba583b871a7692f7c644ec8220ad66fa</field>
+  <field name="content">
+    ## (L-5) Officer ship owners can choose which ship to reveal
+
+    `GenesisShipTraits.sol` uses a fixed array `allOfficerShips` to store all possible officer ships. This array is later used to assign officer ship traits to lucky pilots. The process is supposed to be random, but since the revealing order affects which ship will be revealed, a user can figure out they own an officer ship before revealing it and can choose which officer ship they will reveal by observing the order in the array and queued reveals.
+
+
+    The seeds that match the following conditions will reveal to an officer ship:
+    - Least significant byte % 4 == 3
+    - Second least significant byte < 10
+
+    Once such seed is returned from the oracle, a user can start watching for `completeReveal()` transactions of other officer ship revealers and front-run the one they want to reveal for themselves.
+
+    **Remediations to Consider**
+
+    - Changing the design to a synchronous reveal based on random numbers.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Asset Mobility</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">08c29195ecd2c5de5a8befcd3233c16072981206</field>
+  <field name="content">
+    ## (L-6) LINK can be locked in a deprecated RandomOracle
+
+    If a new RandomOracle implementation is deployed — for example, in order to use a newer VRFCoordinator — there is no way to transfer any unused LINK from the deprecated RandomOracle.
+
+    **Remediations to Consider**
+
+    - Updating RandomOracle.sol to be upgradeable: the balance remains with the proxy, avoiding the need for transfer. Otherwise consider implementing a transfer LINK feature with appropriate privileges.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Design</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## (L-7) Unrevealed on-sale ships can be sniped
+
+    Revealing ships is a two-step process. Users request a random number calling `beginReveal()` and once the random number arrives they make a second call to `completeReveal()`. Although the ship is not revealed until the second tx completes, malicious users can check the random number the moment oracle calls back. Using that number as a seed, traits of the ship can be calculated and the user can buy on-sale ships with high rarity even before they are revealed.
+
+    **Remediations to Consider**
+
+    - Warning users on the client side about the dangers of revealing an on-sale ship when they start a reveal.
+    - Adding this info to the documentation of the game.
+  </field>
+  <field name="response">
+    Acknowledged - Will document on website
+  </field>
+</item>
+<item>
+  <field name="topic">Asset Mobility</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">90e826daba583b871a7692f7c644ec8220ad66fa</field>
+  <field name="content">
+    ## (L-8) Ships are locked when belt is not published
+
+    In the Game.sol contract, adding a belt is a 2-step process:
+
+    1. `addBelt`
+
+    2. `publishBelt`
+
+    According to yellowpaper, adding and publishing belts retains the responsibility of the Citadel team even after control was handed over to the DAO:
+
+    > Practically, this means that The Citadel team will retain only the roles necessary to add belts, publish belts, and improve gameplay, while still allowing the governance system to revoke each of these permissions (and *not* vice versa)
+
+    Once Citadel team adds a new belt via `addBelt` function, pilots can already begin mining or roaming on the newly added belt. However, pilots cannot complete mining before the belt has been published by the Citadel team due to the following check in [RewardsLib.sol, line 148](https://github.com/0xMacro/audit.citadel-1/blob/main/contracts/game/RewardsLib.sol#L148):
+
+    ```
+    require(isBeltPublished(beltId), "Belt is not published");
+    ```
+
+    As a consequence, ships already mining on not-published belts are locked in the `Mining` state until Citadel team decides to publish the belt. This gives the Citadel team control over other players as team can decide when to publish the belt, or even don’t publish the belt at all.
+
+    **Remediations to Consider**
+
+    - Letting pilots mine or roam only when belts are published.
+    - Allow miners to stop mining non-published belts with no rewards
+  </field>
+</item>
+
+
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">a4e6572bc9a375e52e3cd35b7093a5d28c9a50d0</field>
+  <field name="content">
+    ## (L-9) Proofs cannot have `auctionID`s higher than `uint248_max` while ConstructionBay.sol can
+
+    The `BidTicketHasher()` circom component has max signal size of 248 bits. Currently ConstructionBay.sol’s accepted `auctionID` range is larger at 256 bits. Auctions added with `auctionID`s larger than 248 bits will not be able to have anyone bid on them as no one will be able to generate valid proofs.
+
+
+    Remediations to consider:
+
+    - Limiting ConstructionBay.sol’s `auctionID` `AuctionParameters` field to be no greater than 248 bits wide.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">365c2291fa0cff66f68f4c2d7ba50d9eb1656b80</field>
+  <field name="content">
+    ## (L-10) Missing validation on `AuctionParameters`’s IERC20Burnable `token` parameter
+
+    Auctions can be created that have the zero address for their payment `token` contract address. No funds are at risk but the created auction would be unusable.
+
+    **Remediations to consider:**
+
+    - Checking that the `token` parameter is not equal to zero.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">ffd3a85f518d8be8662e56267ed138d982159b53</field>
+  <field name="content">
+    ## (L-11) Users can bid at the auction even if communityShipCount is zero
+
+    In ConstructionBay, users can bid at the auction even if `communityShipCount` is zero. So in order to reclaim their funds they will be charged `flatTaxPercentage` even though they had not been able to claim any ships in the first place.
+
+    **Remediations to consider:**
+
+    - Add a guard in `ConstructionBay#commit` to prevent users from submitting bids to auction when they will not be able to claim any ships.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">ae3ebe94f0e6e912b2d6b6cb509b20094a52127b</field>
+  <field name="content">
+    ## (L-12) BaseShips.sol’s `resetName()` effects can fail to stay consistent between layers
+
+    The way in which BaseShips.sol’s `resetName()` interacts with Dock.sol’s `undock()` can result in a name reset not holding when a ship is docked on polygon. The name reset can also cause the naming system’s accounting to become out of sync. 
+
+    Currently, `undock()` will update a ship’s name on the new dock using the name sent over from the other dock:
+
+    ```solidity
+    function undock(
+      uint256[] calldata tokenIds,
+      Ship[] calldata traits,
+      bytes32[] calldata names,
+      address to
+    ) external onlyTunnel {
+       ...
+
+      for (uint256 i = 0; i < tokenIds.length; i++) {
+        bool exists = ships.exists(tokenIds[i]);
+        require(
+          !exists || ships.ownerOf(tokenIds[i]) == address(this),
+          "This ship is issued to someone else"
+        );
+
+        if (exists) {
+          // ship is updated with other layer's reported name
+          ships.update(tokenIds[i], traits[i], names[i]);
+          ships.transferFrom(address(this), to, tokenIds[i]);
+        } else {
+          ships.issue(to, tokenIds[i], traits[i], names[i]);
+        }
+
+        emit ShipUndocked(tokenIds[i], traits[i], to);
+      }
+    }
+    ```
+
+    Let’s explore the following scenario:
+
+    - ShipA is owned by the user on L1 with the name ‘shipA’, and ShipA’s representation on the L2 is owned by the dock.
+    - Governance changes ShipA’s name on L2 to ‘newNameShipA’, performing all of the name-updating and deletion logic, including setting the `doesExistByName` entry for the name to `false` on the L2.
+    - The user transfers ShipA from L1 to L2, resetting the name of ShipA on the L2 back to ‘shipA’.
+    - Currently:
+        - L1 has `doesExistByName[shipA]` as `true` and `doesExistByName[newNameShipA]` as `false`
+        - L2 has `doesExistByName[shipA]` as `false` and `doesExistByName[newNameShipA]` as `true`
+    - Issues with the above accounting status:
+        - A user can name their ShipB ‘shipA’ on the L2 and now two ships have the same name
+        - No ship has the name ‘newNameShipA’ but the name is registered as taken on the L2
+
+     **Remediations to consider:**
+
+    - Only allow name changes to occur when a ship is not docked on the L2 and have BaseShips.sol’s `_storeName()` function also update the naming system’s `doesExistByName` accounting map instead of `_setName()`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">low</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">bef1380286568738060e91301bcefd40f88b4a15</field>
+  <field name="content">
+    ## (L-13) `ConstructionBay`'s `_coreTeamSplit` variable is never set in the migrations scripts
+
+    `ConstructionBay`'s `_coreTeamSplit` variable is never set in the migrations scripts to the desired 15% as specified in the documentation.
+
+    **Remediations to consider:**
+
+    - Setting the `_coreTeamSplit` variable to the desired 15%.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">low</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">367b758ac4ea405ebd3ba21ff31d965dda716eeb</field>
+  <field name="content">
+    ## (L-14) L2’s `ShipTraits`'s `DEFAULT_ADMIN_ROLE` is not relinquished or transferred to governance in migration scripts
+
+    In 5_relinquish_to_governance.js and in 3_deploy_contracts.js, L2’s `ShipTraits`'s `DEFAULT_ADMIN_ROLE` is not transferred or relinquished to governance. This is against spec.
+
+    See that 5_relinquish_to_governance.js skips the contract’s access control transfer on line 129:
+
+    ```solidity
+    await relinquish(ShipTraits, {
+      hasAccessControl: false,
+      grantUpgradesToMultisig: true,
+    });
+    ```
+
+    **Remediations to consider:**
+
+    - Properly relinquishing control of the `ShipTraits` contract to governance.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## (L-15) citadel-config.js’s `coreTeamAddress` and `coreTeamMultisigAddress` are the same
+
+    In citadel-config.js the `coreTeamAddress` and `coreTeamMultisigAddress` are the same. This goes against spec. 
+
+    *Note: this could be due to the multisig not being setup yet or for testing purposes.*
+
+    **Remediations to consider:**
+
+    - Changing the variables to reflect the actual addresses which should not be the same.
+  </field>
+  <field name="response">
+    Acknowledged - We haven’t deployed a multisig yet
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">31e2e0eaa0eb2a99fad15729f4378b8f5bb50a8c</field>
+  <field name="content">
+    ## (L-16) Core Team does not receive 15% of the initial ship supply
+
+    In citadel-config.js the initial supply for the `DutchAuctionShips` contract is set at:
+
+    ```solidity
+      supply: {
+        publicSupply: 1583,
+        whitelistSupply: 1583,
+        coreTeamSupply: 167,
+      },
+    ```
+
+    This results in the core team receiving 5% of total ships for free instead of the spec defined 15%.
+
+    **Remediations to consider:**
+
+    - Updating citadel-config.js to give the proper 15% of ships.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">bf16d589f28728cd752fe0b9b0930d36f143935d</field>
+  <field name="content">
+    ## (L-17) Citadel payment splitter is doing the wrong core/governance split
+
+    In citadel-config.js the payment splitter ratio is set at 50:50 instead of the spec defined 80:20 split with the governance receiving more. 
+
+    **Remediations to consider:**
+
+    - Changing the citadel-config.js values to the proper 80:20 split.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">aef14db3e5cd356912b7c561411a08a1bcbfb5c9</field>
+  <field name="content">
+    ## (L-18) ticketHash collisions are possible
+
+    In ConstructionBay.sol, users can have ticket hash collisions in their commit transactions as none of the information in the Circom circuits is required to be unique to the user. Consider the scenario where first Alice and then Bob submit bids to an auction with proof inputs: `{ auctionId : 1, bid: 1000, quantity: 1, secret: 1, usableDepositAmount: 1000}`. Bob’s commit transaction will fail to go through and he will know what Alice’s bid is if he decides to inspect etherscan. 
+
+    **Remediations to Consider**:
+
+    - Adding the public key of the `msg.sender` to the commit circuit and pull the variable from the `msg.sender` variable during `commit()` ’s verification of the proof. This will remove the possibility of users accidentally having `ticketHash` collisions.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">8c05fd71210ab50acb9e3ffc118f9b5c94c6529b</field>
+  <field name="content">
+    ## (Q-1)  Wrong parameter type
+    `DutchAuctionShips.sol:L216` `_seconds()` and `_wei()` are expecting uint64 params, but they are always called with uint32 params.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">90e826daba583b871a7692f7c644ec8220ad66fa</field>
+  <field name="content">
+    ## (Q-2) `fulfillRandomness()` should not revert
+    [per Chainlink docs](https://docs.chain.link/docs/vrf/v1/security/#fulfillrandomness-must-not-revert):
+
+    > If your fulfillRandomness implementation reverts, the VRF service will not attempt to call it a second time. Make sure your contract logic does not revert.
+
+    The following methods are called from `RandomOracle.sol::fulfillrandomness()` and can potentially revert:
+
+    **RewardsLib.sol::writeMiningRandom():**
+
+    ```solidity
+    function writeMiningRandom(uint256 _random, uint256 tokenId)
+      external
+      onlyRandomOracle
+    {
+      require(_isPendingByTokenId[tokenId], "Random is not pending");
+      require(_randomByTokenId[tokenId] == 0, "Random already written");
+    ...
+    ```
+
+    **BaseShipTraits.sol::receiveRandom():**
+
+    ```solidity
+    function receiveRandom(uint256 random, uint256 tokenId)
+      external
+      onlyRandomOracle
+    {
+      require(_isPendingByTokenId[tokenId], "Token seed is not pending");
+    ```
+
+    These reverts will in turn cause `fulfillrandomness()` to revert, per RandomOracle.sol lines 80-81:
+
+    ```solidity
+    string memory errorMessage = "RandomOracle: call reverted without message";
+    Address.verifyCallResult(success, data, errorMessage);
+    ```
+
+    Consider updating `fulfillrandomness()` to emit an event in these scenarios rather than reverting.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">90e826daba583b871a7692f7c644ec8220ad66fa</field>
+  <field name="content">
+    ## (Q-3) Reveal-state tracking in BaseShipTraits.sol can be simplified
+    Presently, multiple variables are used in tracking the reveal state of a token:
+
+    - `_isPendingByTokenId`
+    - `_isRevealedByTokenId`
+    - `_seedByTokenId`
+
+    The reveal flow can more cleanly be tracked in a single state variable in conjunction with an enum. e.g.:
+
+    ```solidity
+    enum RevealState {
+      None,
+      PendingSeed,
+      ReadyToReveal,
+      Revealed
+    }
+
+    mapping(uint256 => RevealState) private _revealStateByTokenId;
+    ~~mapping(uint256 => bool) private _isPendingByTokenId;~~
+    mapping(uint256 => uint256) private _seedByTokenId; // still used, but not for state-tracking
+    ~~mapping(uint256 => bool) private _isRevealedByTokenId;~~
+    ```
+
+    In lieu of using `_isPendingByTokenId`, `_isRevealedByTokenId`, and `_seedByTokenId` to check state, subsequent logic can be simplified:
+
+    `beginReveal():`
+
+    - `_revealStateByTokenId[tokenId]` must be `RevealState.None`, and is then set to `RevealState.PendingSeed`
+
+    `receiveRandom()`:
+
+    - `_revealStateByTokenId[tokenId]` must be `RevealState.PendingSeed`, and is then set to `RevealState.ReadyToReveal`
+
+    `completeReveal()`:
+
+    - `_revealStateByTokenId[tokenId]` must be `RevealState.ReadyToReveal`, and is then set to `RevealState.Revealed`
+    - `_seedByTokenId[tokenId]` can be deleted (this variable is no longer used for state-tracking)
+
+    `isPending()`:
+
+    - returns `true` when `_revealStateByTokenId[tokenId]` is `RevealState.PendingSeed`
+
+    `isRevealed()`:
+
+    - returns `true` when `_revealStateByTokenId[tokenId]` is `RevealState.Revealed`
+
+    Note that there is currently no view function corresponding to the `RevealState.ReadyToReveal` state. Consider adding one, or replacing `isPending()` and `isRevealed()` with a generic function which returns the `RevealState` for a token (e.g. `function getRevealState(uint256 tokenId) public view returns (RevealState) { ... }`)
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">8c05fd71210ab50acb9e3ffc118f9b5c94c6529b</field>
+  <field name="content">
+    ## (Q-4) Use of `transfer` function
+    In `_refundIfOver` in DutchAuctionShips.sol, the `transfer` function is used to send back remaining ether to caller. Consider to use `AddressUpgradeable.sendValue` (see [here](https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/master/contracts/utils/AddressUpgradeable.sol#L60)) instead, as transfer function is not recommended to use anymore. Detailed explanation on why transfer shouldn’t be used anymore can be found [here](https://consensys.net/diligence/blog/2019/09/stop-using-soliditys-transfer-now/).
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">265d3a17b50ca8ed719eb427ce85ada76c136c31</field>
+  <field name="content">
+    ## (Q-5) Deployer retains `REQUESTER_ROLE` for RandomOracle
+    See RandomOracle.sol line 33, within the constructor:
+
+    ```solidity
+    _grantRole(REQUESTER_ROLE, msg.sender);
+    ```
+
+    If it is desirable that an EOA retains this feature, consider transferring this role to governance; otherwise consider removing the grant.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">265d3a17b50ca8ed719eb427ce85ada76c136c31</field>
+  <field name="content">
+    ## (Q-6) Use _msgSender() instead of msg.sender in OpenZeppelin contract extensions
+
+    In ERC20Locked.sol, the modifier `onlySupplyAdmin()` uses `msg.sender` instead of `_msgSender()` which is defined in the inherited ContextUpgradeable contract. This isn’t a security vulnerability because no account forwarding is used, but, code uniformity is nice.
+
+    ```solidity
+    modifier onlySupplyAdmin() {
+      require(_isSupplyAdmin(msg.sender), "Only supply admins supported");
+      _;
+    }
+    ```
+
+    Consider: using `_msgSender()` instead of `msg.sender`.
+  </field>
+</item>
+
+<item>
+  <field name="topic"> Extraneous Code</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">b6b3e6855e441c904ed4e80b4f3ffcdaf2e66afa</field>
+  <field name="content">
+    ## (Q-7) Unnecessary output signal in Reveal circuit
+
+    In reveal.circom, the `totalBid` output signal is not used in any meaningful way and provides no value. Its information is already constrained in the `bid` and `quantity`’s use in the `ticketHash`.  
+
+    **Remediations to consider:**
+
+    - Removing this variable from the circuit and proof.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">32fbbf2696702897167f745baaf4a001978a82bb</field>
+  <field name="content">
+    ## (Q-8) AuctionAdded event missing indexed attribute for auctionId parameter
+
+    Add an indexed attribute to auctionId parameter in AuctionAdded event declaration for easier off-chain tracking and monitoring.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Extraneous Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">2693d483a52f0d7fd84ff95e86a9bb3a50eb1d7c</field>
+  <field name="content">
+    ## (Q-9) Unnecessary cast in _isCommitProofValid
+
+    `ticketHash` which is a uint256 argument to _isCommitProofValid is cast unnecessarily.
+
+    ```jsx
+    pubSignals[0] = uint256(ticketHash);
+    ```
+  </field>
+</item>
+
+<item>
+  <field name="topic">Revert Messages</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">6516feddc94824df7fe0ced8a669837d65855889</field>
+  <field name="content">
+    ## (Q-10) A misleading error message in BaseShips.sol
+
+    Error message at BaseShips:L638 is misleading. If the amount + minted count is bigger than the team supply that does not necessarily mean all tokens are minted. Consider changing this message to include cases where a wrong amount is passed to the function. The same issue is present with other mint functions in BaseShips.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Extra Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">9c37da8a010ccf162f66ac2c0b37a97c4cd72075</field>
+  <field name="content">
+    ## (Q-11) Unnecessary check in ShipTraits.beginReveal function
+    In the `beginReveal` function, `_seedByTokenId[tokenId] == 0` check is unnecessary since it will be always satisfied when the other part of the condition `_revealStateByTokenId[tokenId] == RevealState.None` is satisfied.
+
+    ```jsx
+    require(
+      _seedByTokenId[tokenId] == 0 &&
+        _revealStateByTokenId[tokenId] == RevealState.None,
+      "Reveal already pending"
+    );
+    ```
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Access Control</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">aa9f7d52e613f96c34283da6dee8391ebfd7354f</field>
+  <field name="content">
+    ## (Q-12) Ships SUPPLY_ADMIN_ROLE is overloaded
+
+    Use a different permission role, other than SUPPLY_ADMIN_ROLE, to control access to functions in the BaseShips contract (issue and update with name parameter) which are used only by the Dock contract (bridge).
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Interfaces</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">e6d96548f1f395a84461dcef135ddc5f9367c18c</field>
+  <field name="content">
+    ## (Q-13) BaseShips.resetName function is not defined in the IShips interface
+    
+    Interfaces should define all external functions that are implemented in implementation contracts.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Comments</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">06edec50bc8b86f0c7b360f2f65cbfdf368c9c83</field>
+  <field name="content">
+    ## (Q-14) Interface functions do not have expected natspec documentation
+    
+    To be consistent across the codebase define natspec documentation on the interface level so that documentation can be automatically inherited (if other rules are respected) by the implementation.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Interfaces</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">71365aec8d6532137e73b20c45d6247db3a3c703</field>
+  <field name="content">
+    ## (Q-15) Parameter name differs in function declaration and function implementation
+    
+    In the IShips interface, functions exists, traits, nameAsBytes32, nameAsString, setName are declared with shipId parameter, while implementation of the same functions in BaseShips.sol uses a parameter named tokenId. This prevents the automatic inheritance of natspec documentation that is defined on the interface level (see Inheritance notes for NatSpec format).
+    </field>
+</item>
+
+<item>
+  <field name="topic">Interfaces</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">fd635b41456482c156acd8c0fbe8a117da3e59df</field>
+  <field name="content">
+    ## (Q-16) Add an override keyword to the interface function
+    
+    Add override keyword to functions which are implementation of functions declared in parent interfaces to more explicitly differentiate interface-related functionality from contract-specific functionality. For example, add an override keyword to functions in the BaseShips contract which are implementations of corresponding functions declared in the IShips interface.
+    </field>
+</item>
+
+
+<item>
+  <field name="topic">Access Control</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">7e2490994a3e23a72bf8a56aea4a2c55df62126a</field>
+  <field name="content">
+    ## (Q-17) Over granting of Oracle’s REQUESTOR_ROLE
+
+    In 3_deploy_contracts.js the `DutchAuctionShips` contract is given random oracle permissions when the contract does not need them
+
+    ```solidity
+    // Set up random oracle requesters
+    const randomRequesters = [ships, rewards, shipTraits];
+    await grantRole(oracle, randomRequesters, "REQUESTER_ROLE", { step });
+    ```
+    </field>
+</item>
+
+
+<item>
+  <field name="topic">Extra Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">fefc9b353e070f42362ea3c676281d99ef7f056d</field>
+  <field name="content">
+    ## (Q-18) Unneeded governancePercentage hardcode value 
+
+    In 3_deploy_contracts.js the child’s `Ship` contract has the `governancePercentage` variable hardcoded to `10_000`. This is the correct value but it is weird that it is hardcoded when it could be read from the citadel-config.js file instead.
+    </field>
+</item>
+
+<item>
+  <field name="topic">Comments</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">493a2521f19b896ca1f48cc902b2e5da3325cd16</field>
+  <field name="content">
+    ## (Q-19) Documentation improvements
+
+    - The following comment for `BaseShips.update(uint256 tokenId, Ship calldata ship)` is incorrect since this function is not called by the dock. It is called from the Game and ShipTraits contract.
+    
+    ```jsx
+    @dev This functionality is used by the dock and the ship traits generators
+    ```
+    
+    - The following comment for `BaseShips.update(uint256 tokenId, Ship calldata ship, bytes32 name)` is incorrect since this function is only called by the dock.
+        
+    ```jsx
+    @dev This functionality is used by the dock and the ship traits generators
+    ```
+        
+    - The following comment for `BaseShips.function issue(address to, uint256 id, Ship calldata ship)` is incorrect since this function is only used by the ConstructionBay.
+        
+    ```jsx
+    @dev This functionality is used by the dock and the construction bay
+    ```
+        
+    - The following comment for `BaseShips.issue(address to, uint256 id, Ship calldata ship, bytes32 name)` is incorrect since this function is only used by the dock.
+        
+    ```jsx
+    @dev This functionality is used by the dock and the construction bay
+    ```
+        
+    - In IConstructionBay, the natspec comment describing the `WithdrawalProcessed` event is incorrect
+        
+    ```
+    /// @notice Emitted when a depositor claims a refund for a neglected auction
+    event WithdrawalProcessed(uint256 indexed auctionId, uint256 amount);
+    ```
+        
+    - In IConstructionBay, the natspec comment describing the `revealPeriodDuration` struct field misses an expected unit (e.g. - in epoch seconds).
+        
+    ```
+    /// @notice The window after `endTime` during which the winning bid may be submitted
+    uint256 revealPeriodDuration;
+    ```
+        
+    - In IConstructionBay, the natspec comments describing `hasClaimed` and `ticketHash` struct fields are incorrect.
+        
+    ```solidity
+    /// @notice The token wei they've claimed in depositor rewards
+    bool hasClaimed;    
+    /// @notice The hash of the bid ticket and secret
+    uint256 ticketHash;
+    ```
+        
+    - In IShipTraits, the natspec comment misses an entry for `isComplete` parameter
+
+    ```
+    /**
+    * @notice Upload a list of ship trait combinations and weights to be used for generation
+    * @param batchId The token batch to upload for
+    * @param uploads The list of officer and normal ship combinations to upload, along with their rarities and aliases
+    */
+    function uploadData(
+      uint256 batchId,
+      BatchUploads calldata uploads,
+      bool isComplete
+    ) external;
+    ```
+        
+    - In IConstructionBay, natspec comments for multiple functions miss parameter and return value descriptions.
+    </field>
+</item>
+
+<item>
+  <field name="topic">Information</field>
+  <field name="impact">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">8e0b8067d21153700b716823ff24b4c8734bf51f</field>
+  <field name="content">
+    ## (Q-20)  Commit circuit can become under-constrained if the allowed quantity limit increases
+
+    In commit.circom, the check that usableDepositAmount is equal to or greater than the minimum amount is under-constrained and could have been circumvented if a follow-up check which limits the size of the quantity input was not present.
+
+    ```jsx
+    component amountComparator = LessThan(248);
+    signal minimumAmount;
+    minimumAmount <== bid * quantity;
+    amountComparator.in[0] <== usableDepositAmount;
+    amountComparator.in[1] <== minimumAmount;
+
+    amountComparator.out === 0;
+    ```
+
+    The following set of inputs would satisfy LessThan circuit constraints even though `bid * quantity` product, as a 254-bit number, is much larger than provided usableDepositAmount. 
+
+    ```c
+    INPUT = {
+      "usableDepositAmount": "1000000000000000000",
+      "bid": "83734101653343784507316724941668312298814564542249515196953410152519132161",
+      "quantity": "256"
+    }
+    ```
+
+    LessThan circuit, constraints the result to be a 249-bit number. However, it doesn't constrain inputs to 248-bit numbers. As a result, an attacker may provide suitable inputs which would cause underflow and satisfy the final check.
+
+    ```jsx
+    template LessThan(n) {
+      assert(n <= 252);
+      signal input in[2];
+      signal output out;
+
+      component n2b = Num2Bits(n+1);
+
+    	// n2b.in must be 249-bit number
+      // but in[0] and in[1] are not checked
+      // if they are 248-bit numbers
+      n2b.in <== in[0]+ (1 << n) - in[1];
+
+      out <== 1-n2b.out[n];
+    }
+    ```
+
+    This issue is not currently exploitable because `minimumAmount` needs to be a 254-bit number in order to exploit it. Bid and quantity can at max be 248-bit numbers due to additional constraints present in the rest of the circuit. Therefore the product of the bid and quantity could be a 254-bit number if there was not a constraint that the quantity must be less than or equal to 3.
+
+    ```jsx
+    component quantityComparator = LessThan(248);
+    quantityComparator.in[0] <== 3;
+    quantityComparator.in[1] <== quantity;
+    quantityComparator.out === 0;
+    ```
+
+    With `quantity ≤ 3` to exploit this issue `bid` needs to be 252-bit number which is not possible due to constraints in BidTicketHasher(). However, if `quantity was ≤ 64` it would be possible. In that case, an attacker could with an extremely large fake bid reveal and valid commit proof cause bidTaxes to become enormous which would prevent processing proper claims and practically lead to locked assets in the ConstructionBay contract.
+
+    **Remediations to consider:**
+
+    - No updates are required as it is not exploitable at the moment.
+    - In case there is a need to increase the quantity limit or remove the check, add Num2Bits constraints for the inputs of the `amountComparator` (minimumAmount, usableDepositAmount).
+  </field>
+</item>
+
+<item>
+  <field name="topic">Incentive Design</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">88c5f8643ba2efc36be5c97a583ba4e2a7498c67</field>
+  <field name="content">
+    ## (Q-21)  Non-intended bidder behavior could arise if the auction’s `flatTaxPercentage` is higher than its `noShowTaxPercentage`
+
+    In ConstructionBay.sol, if an auction is setup where its `flatTaxPercentage` is higher than its `noShowTaxPercentage` a user would be incentivized to (1) submit a commit where their deposit amount is close to the bid amount, (2) wait for other users to first reveal if they are going to win the auction, (3) choose to not reveal their claim if they see they won’t win in order to: (4) pay the lower fee of `flatTaxPercentage` than the `noShowTaxPercentage`. 
+
+    **Remediations to consider if this behavior is not desirable:**
+
+    - Require that the `flatTaxPercentrage` is lower than the `noShowTaxPercentage`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Incentive Design</field>
+  <field name="status">Wontdo</field>
+  <field name="content">
+    ## (I-1) Rewarding depositors who are not really bidding may be ineffective
+
+    In ConstructionBay, Citadel system rewards depositors who are depositing assets when submitting bids with 0 bid and/or 0 quantity. `flat-tax` is not charged for these users since it is proportional to `bid * quantity`, which is 0 in this case. However, these users are able to claim depositor rewards proportional to their deposit.
+
+    This has been implemented in this way initially in order to obfuscate how much real auction participants are bidding. However, due to the potentially highly predictive behavior of this type of user, their action may not provide any additional benefit to the system, as analyzing and detecting users who submitted 0 bids to the previous auctions may strongly indicate their behavior on the current auction.
+
+    In addition, the current implementation based on zero-knowledge proofs already enables individual users to hide their real bids by submitting larger `amount` and `usableAmount` when bidding.
+
+  </field>
+  <field name="response">
+    Wontdo - We’ve discussed with the team and confirmed that the the current behavior is intentional.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Incentive Design</field>
+  <field name="status">Addressed</field>
+  <field name="content">
+    ## (I-2) Depositor farmers can lose net funds if there is a token transfer tax on the used IERC20
+
+    It can be non-intuitive to deposit farmers that they can loose money on deposit farming if the auction’s specified ERC20 is one which has a token transfer tax enabled. 
+
+  </field>
+  <field name="response">
+    Addressed - Will include a warning on the construction bay frontend when transfer taxes apply
+  </field>
+</item>
+
+
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">8c05fd71210ab50acb9e3ffc118f9b5c94c6529b</field>
+  <field name="content">
+    ## (G-1) Unnecessary memory operations
+    
+    Some memory operations in `CitadelGovernor::veto()` can be eliminated by leveraging a compile-time constant for the `relinquishVetoPower()` function selector:
+
+    ```solidity
+    contract CitadelGovernor is
+      ...
+    {
+      bytes private constant SELECTOR_relinquishVetoPower = abi.encodePacked(this.relinquishVetoPower.selector);
+
+      ...
+
+      function veto(
+        ...
+
+        address[] memory us = new address[](1);
+        us[0] = address(this);
+        uint256[] memory noValue = new uint256[](1);
+        noValue[0] = 0;
+        bytes[] memory relinquishCall = new bytes[](1);
+        relinquishCall[0] = SELECTOR_relinquishVetoPower;
+
+        ...
+    ```
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">8c05fd71210ab50acb9e3ffc118f9b5c94c6529b</field>
+  <field name="content">
+    ## (G-2) Unnecessary function overrides
+    
+    Deployment cost for CitadelGovernor.sol can be reduced by eliminating unnecessary function overrides: `votingDelay()`, `votingPeriod()`, `quorum()`, `getVotes()`, `propose()`. These purely call `super.[sameMethod]`, and compilation currently succeeds without them.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">8c05fd71210ab50acb9e3ffc118f9b5c94c6529b</field>
+  <field name="content">
+    ## (G-3) MSTORE/MLOAD operations can be eliminated
+    
+    In CitadelProxyAdmin::onlyUpgrader():
+
+    ```solidity
+    modifier onlyUpgrader(TransparentUpgradeableProxy proxy) {
+      require(
+        msg.sender == owner() || msg.sender == _upgraderByProxy[address(proxy)],
+        "Sender does not have sufficient permissions"
+      );
+
+      _;
+    }
+    ```
+
+    The `upgrader != address(0)` check was unnecessary, eliminating the need for `upgrader` to be stored as a memory variable. Being used only once each, `upgrader` and `owner` variables may then be removed without sacrificing code clarity.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">90e826daba583b871a7692f7c644ec8220ad66fa</field>
+  <field name="content">
+    ## (G-4) Unnecessary Oracle Consumer
+    
+    `RandomOracleConsumer` is un-utilized within Game.sol and can be removed to reduce deployment cost.
+    This also provides an answer (”no”) to the question on line 461 of 3_deploy_contracts.js:
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">290ff84c7e06237e90e47dcead0daa9a555957f2</field>
+  <field name="content">
+    ## (G-5) Storing multiple variables in memory to save on SLOADs
+    
+    In ConstructionBay’s `revealBidOnTime` function, `stateByAuction` state variable is used multiple times. Consider to store `stateByAcution[auctionId]` into memory variable, converting multiple SLOADs into 1 SLOAD.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">290ff84c7e06237e90e47dcead0daa9a555957f2</field>
+  <field name="content">
+    ## (G-6) Storing `token` in memory to save on SLOADs
+    
+    In ConstructionBay’s `deposit` function, consider to use memory variable `token` instead of reading from storage again.
+
+    ```solidity
+    IERC20 token = stateByAuction[auctionId].token;  
+
+    uint256 contractTokenDifference = token.balanceOf(address(this));
+
+    stateByAuction[auctionId].token.transferFrom(      // use memory variable token here
+      msg.sender,
+      address(this),
+      amount
+    );
+    ```
+  </field>
+</item>
