@@ -31,12 +31,13 @@
 
     This issue may lead to a loss of funds in the following scenario:
 
-    - All, except large whale depositor with 0 bid, reveal their bid
-    - All, except large whale depositor with 0 bid, claim their reward
-    - The sum of all rewards claimed at this moment would be equal `totalDepositorRewardsByAuction[auctionId]`
-    - Large whale depositor reveals their 0 bid increasing `totalOnTimeDepositsByAuction[auctionId]` significantly
-    - Large whale depositor claims depositor rewards and receives ~`totalDepositorRewardsByAuction[auctionId]` since `depositAmount` of the whale depositor represents most of the `totalOnTimeDepositsByAuction[auctionId]` amount.
-    - As a result, the system distributed almost 2x of rewards at the expense of dao balance share and other potential depositors who haven’t yet closed their position.
+    1. All, except large whale depositor with 0 bid, reveal their bid
+    2. All, except large whale depositor with 0 bid, claim their reward
+    3. The sum of all rewards claimed at this moment would be equal `totalDepositorRewardsByAuction[auctionId]`
+    4. Large whale depositor reveals their 0 bid increasing `totalOnTimeDepositsByAuction[auctionId]` significantly
+    5. Large whale depositor claims depositor rewards and receives ~&nbsp;`totalDepositorRewardsByAuction[auctionId]` since `depositAmount` of the whale depositor represents most of the `totalOnTimeDepositsByAuction[auctionId]` amount.
+
+    6. As a result, the system distributes **nearly 2x rewards** at the expense of the DAO's balance share and other potential depositors who haven’t closed their position.
 
     **Remediations to Consider**
 
@@ -55,7 +56,7 @@
 
     From the yellow paper’s _Ship Reveal_ section:
 
-    > _For ships introduced through the construction bay, we modulate the random seed to select each ship from a predefined list. Once a ship is selected, it is deleted from the list, so that no ship is selected more than once. For more details on the construction bay, see the (Construction bay section](https://library.citadel.game/articles/yellowpaper#construction-bay)._
+    > _For ships introduced through the construction bay, we modulate the random seed to select each ship from a predefined list. Once a ship is selected, it is deleted from the list, so that no ship is selected more than once. For more details on the construction bay, see the [Construction bay section](https://library.citadel.game/articles/yellowpaper#construction-bay)._
 
     More advanced users who have won a ship auction can influence what ship they receive by (1) pre-computing their received ship’s `availableShip` index and (2) only allowing a transaction to succeed if they receive a desired ship (by using services such as [Flashbots Bundles](https://docs.flashbots.net/flashbots-auction/searchers/advanced/understanding-bundles)). By waiting for other users to claim their ships, ship winners can change which ship they receive. This is due to how each claim changes which ship a reveal returns. This jeopardizes the fairness of auctions.
 
@@ -125,7 +126,7 @@
     1. If the bid is a winning bid, no-show tax (default: 50%) and flat tax (default: 5%) are deducted from the bidder’s balance and added to the `totalDepositorRewardsByAuction` mapping:
 
        ```solidity
-       	totalDepositorRewardsByAuction[auctionId] += totalTaxAmount; // 55% of deposit
+       totalDepositorRewardsByAuction[auctionId] += totalTaxAmount; // 55% of deposit
        ```
 
        and the remaining 45% are returned to the bidder.
@@ -164,7 +165,7 @@
   <field name="chance">high</field>
   <field name="status">fixed</field>
   <field name="statusNote">
-    Client decided to implement a zero-knowledge version of Construction Bay.
+    Client opted to implement a zero-knowledge version of Construction Bay.
   </field>
   <field name="commit">7ecdce4b38ce7e2bd416dabb7894e2f91fe549c1</field>
   <field name="content">
@@ -191,7 +192,7 @@
   <field name="status">fixed</field>
   <field name="commit">e5ab3fc18d83ddf9ae5cbfff8ab8e22a647f55ae</field>
   <field name="statusNote">
-    Provided solution fixes only the first part of the issue
+    Provided solution fixes only the first part of the issue.
   </field>
   <field name="content">
     ## (H-4) Miners can pre-compute mining claim and can act accordingly if it results in ship destruction
@@ -674,9 +675,9 @@
 
     ```solidity
     require(
-          batchId == 1 || (params.startTokenId > _params[batchId - 1].endTokenId),
-          "Invalid token range"
-        );
+      batchId == 1 || (params.startTokenId > _params[batchId - 1].endTokenId),
+      "Invalid token range"
+    );
     ```
 
     This is problematic if a batch accidentally skips tokens. The skipped tokens will not be able to be included in another batch as they will fail to meet the above requirement. This will cause there to be ships which are unable to be assigned traits.
@@ -700,17 +701,17 @@
 
     ```solidity
     if (seed < officerRarity && isOfficerAvailable) {
-          c = _uploads[batchId].officerShips[seed % officersLength];
-        } else {
-          // Select ship combination with Alias method
-          uint128 rarityIndex = uint128(seed) %
-            uint128(_uploads[batchId].rarityPairs.length); // will revert here
-          RarityPair memory rarityPair = _uploads[batchId].rarityPairs[rarityIndex];
-          uint128 index = seed >> 128 < rarityPair.rarity
-            ? rarityIndex
-            : rarityPair.aliaz;
-          c = _uploads[batchId].normalShips[index];
-        }
+      c = _uploads[batchId].officerShips[seed % officersLength];
+    } else {
+      // Select ship combination with Alias method
+      uint128 rarityIndex = uint128(seed) %
+        uint128(_uploads[batchId].rarityPairs.length); // will revert here
+      RarityPair memory rarityPair = _uploads[batchId].rarityPairs[rarityIndex];
+      uint128 index = seed >> 128 < rarityPair.rarity
+        ? rarityIndex
+        : rarityPair.aliaz;
+      c = _uploads[batchId].normalShips[index];
+    }
     ```
 
     This will cause people who have acquired ships to be unable to finish the reveal process.
@@ -734,12 +735,12 @@
 
     ```solidity
     if (!isValid) {
-          _state[batchId].status = BatchStatus.Uploading;
-          delete _uploads[batchId];
-          delete _state[batchId].unvalidatedIndex;
+      _state[batchId].status = BatchStatus.Uploading;
+      delete _uploads[batchId];
+      delete _state[batchId].unvalidatedIndex;
 
-          emit ValidationFailed(batchId, i - 1); // this will cause underflow
-        }
+      emit ValidationFailed(batchId, i - 1); // this will cause underflow
+    }
     ```
 
     The index at this point will be equal to zero so subtracting 1 will cause a revert. This will cause the incorrectly uploaded batch to be stuck in the `BatchStatus.Validating` state.
@@ -1195,31 +1196,31 @@
 
     ```solidity
     function undock(
-        uint256[] calldata tokenIds,
-        Ship[] calldata traits,
-        bytes32[] calldata names,
-        address to
-      ) external onlyTunnel {
-         ...
+      uint256[] calldata tokenIds,
+      Ship[] calldata traits,
+      bytes32[] calldata names,
+      address to
+    ) external onlyTunnel {
+       ...
 
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-          bool exists = ships.exists(tokenIds[i]);
-          require(
-            !exists || ships.ownerOf(tokenIds[i]) == address(this),
-            "This ship is issued to someone else"
-          );
+      for (uint256 i = 0; i < tokenIds.length; i++) {
+        bool exists = ships.exists(tokenIds[i]);
+        require(
+          !exists || ships.ownerOf(tokenIds[i]) == address(this),
+          "This ship is issued to someone else"
+        );
 
-          if (exists) {
-    				// ship is updated with other layer's reported name
-            ships.update(tokenIds[i], traits[i], names[i]);
-            ships.transferFrom(address(this), to, tokenIds[i]);
-          } else {
-            ships.issue(to, tokenIds[i], traits[i], names[i]);
-          }
-
-          emit ShipUndocked(tokenIds[i], traits[i], to);
+        if (exists) {
+          // ship is updated with other layer's reported name
+          ships.update(tokenIds[i], traits[i], names[i]);
+          ships.transferFrom(address(this), to, tokenIds[i]);
+        } else {
+          ships.issue(to, tokenIds[i], traits[i], names[i]);
         }
+
+        emit ShipUndocked(tokenIds[i], traits[i], to);
       }
+    }
     ```
 
     Let’s explore the following scenario:
@@ -1272,9 +1273,9 @@
 
     ```solidity
     await relinquish(ShipTraits, {
-          hasAccessControl: false,
-          grantUpgradesToMultisig: true,
-        });
+      hasAccessControl: false,
+      grantUpgradesToMultisig: true,
+    });
     ```
 
     **Remediations to consider:**
@@ -1316,11 +1317,11 @@
     In citadel-config.js the initial supply for the `DutchAuctionShips` contract is set at:
 
     ```solidity
-    supply: {
-          publicSupply: 1583,
-          whitelistSupply: 1583,
-          coreTeamSupply: 167,
-        },
+      supply: {
+        publicSupply: 1583,
+        whitelistSupply: 1583,
+        coreTeamSupply: 167,
+      },
     ```
 
     This results in the core team receiving 5% of total ships for free instead of the spec defined 15%.
@@ -1406,17 +1407,17 @@
 
     ```solidity
     function receiveRandom(uint256 random, uint256 tokenId)
-        external
-        onlyRandomOracle
-      {
-        require(_isPendingByTokenId[tokenId], "Token seed is not pending");
+      external
+      onlyRandomOracle
+    {
+      require(_isPendingByTokenId[tokenId], "Token seed is not pending");
     ```
 
     These reverts will in turn cause `fulfillrandomness()` to revert, per RandomOracle.sol lines 80-81:
 
     ```solidity
-      string memory errorMessage = "RandomOracle: call reverted without message";
-      Address.verifyCallResult(success, data, errorMessage);
+    string memory errorMessage = "RandomOracle: call reverted without message";
+    Address.verifyCallResult(success, data, errorMessage);
     ```
 
     Consider updating `fulfillrandomness()` to emit an event in these scenarios rather than reverting.
@@ -1500,7 +1501,7 @@
     See RandomOracle.sol line 33, within the constructor:
 
     ```solidity
-      _grantRole(REQUESTER_ROLE, msg.sender);
+    _grantRole(REQUESTER_ROLE, msg.sender);
     ```
 
     If it is desirable that an EOA retains this feature, consider transferring this role to governance; otherwise consider removing the grant.
@@ -1519,9 +1520,9 @@
 
     ```solidity
     modifier onlySupplyAdmin() {
-        require(_isSupplyAdmin(msg.sender), "Only supply admins supported");
-        _;
-      }
+      require(_isSupplyAdmin(msg.sender), "Only supply admins supported");
+      _;
+    }
     ```
 
     Consider: using `_msgSender()` instead of `msg.sender`.
@@ -1796,9 +1797,9 @@
 
     ```c
     INPUT = {
-        "usableDepositAmount": "1000000000000000000",
-        "bid": "83734101653343784507316724941668312298814564542249515196953410152519132161",
-        "quantity": "256"
+      "usableDepositAmount": "1000000000000000000",
+      "bid": "83734101653343784507316724941668312298814564542249515196953410152519132161",
+      "quantity": "256"
     }
     ```
 
