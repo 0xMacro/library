@@ -1,0 +1,46 @@
+<page
+  clientName="Nori"
+  reportDate="December 9, 2022"
+  auditTitle="Nori A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/nori-dot-eco/contracts"
+  repoCommitHash="083d8d8eef5d652b600b0044242d517252d20406"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from October 17, 2022 to November 4, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+7056fd9913a5c317b553d6a9fe4cc0c3322f242cc82fe50f77d231186f1e2396  contracts/AccessPresetPausable.sol
+d4b98ccb638f502664e3d23297d7c079c818691f093e9abb706d1c6ec9b03fea  contracts/ArrayLib.sol
+c443ac56c985b3f8f7fa8e236b7da7b159f9400b9e02944c8d3da9da8ff0a4d5  contracts/BridgedPolygonNORI.sol
+1d774367201dd40c4a50e7f9bc16f6830d5743c4727dafeadef15ccf439f088e  contracts/Certificate.sol
+36fa7705a131aaf5e36718a7274444b4c62fa19861b3125486fd5ae468789244  contracts/ERC20Preset.sol
+7260b8c45c5fc7f32d3dfdd44b739cbd5f1e5911f6204dd927a904367c312bd2  contracts/Errors.sol
+7b052a885d0351eaa8d8a23da76f7828d2ec79f8f56496cbc624fb8b00048c45  contracts/LockedNORI.sol
+109fbd485c33632aa9bb5ce0aa5fb9d6bf6ffea39a50ebdd6cab34802fd9c28b  contracts/LockedNORILib.sol
+5cb548a2f4687d3b154536a5fb7f343502358e6f8d9ccf241745b870d2803f0e  contracts/Market.sol
+8b007002bce82582b9549341afee0f5c88b3a0f2546fa9327572786d8e6ae8ac  contracts/NORI.sol
+2e8c5ca12ce5569fe4c5a6d4fb054ac187ca29d2bfc97d90be1a951e6ebf23b2  contracts/Removal.sol
+4a3b66289dcf6fd470c0efcd9c3a78ff71fde8cd71452e51dd19d1cacc8e47c4  contracts/RemovalIdLib.sol
+f606b486d5306f3d72f791cda8b45cab1e9c879d9cb802d141564b79390913a8  contracts/RemovalsByYearLib.sol
+8aa1b5d4cbaf616982c4ef019945d81225689f81f1cc63bd386257105c9dd185  contracts/RestrictedNORI.sol
+7cbdf2eea0fcfde36814fce6b46a2559aa2624ebe376f2b9a8add04541bde4df  contracts/RestrictedNORILib.sol
+  </template>
+</content-for>
+
