@@ -197,7 +197,7 @@
                 issue.severity === 'Q' ? 'bg-blue-300 dark:text-black' :
                 'bg-gray-200 dark:text-black'
               }} {{
-                issue.status === 'fixed' ? 'line-through' : ''
+                Issues.isAddressed(issue.status) ? 'line-through' : ''
               }} {{
                 doubleDigits ? 'text-[0.6rem]' : 'text-xs'
               }}"
