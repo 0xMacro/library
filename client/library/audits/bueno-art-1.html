@@ -1,0 +1,49 @@
+<page
+  clientName="Bueno.art"
+  reportDate="December 8th, 2022"
+  auditTitle="Bueno.art A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://etherscan.io/address/0xa01599e0f84816564547043784f74ec134da596b#code"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from November
+    28, 2022 to December 2, 2022.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Deployed Address:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>1e814698a0c6ce2d6d6fc3fed6260211086858d4</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    3bdafa453088eef1188fcfce64d7a887eff3251fdcab1a0a48d01b7c3aed5ed8  contracts/Bueno721Drop.sol
+    5c9d62b41495435ad582673874a45911cf18e6a5dcff39f9222d17d28ebe7daf  contracts/BuenoFactory.sol
+  </template>
+</content-for>
+
+</page>

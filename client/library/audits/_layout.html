@@ -122,7 +122,7 @@
                     {{subset.filter(i => i.status === 'wontdo').length || '-'}}
                   </td>
                   <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
-                    {{subset.filter(i => i.status === 'fixed' || i.status === 'addressed').length || '-'}}
+                    {{subset.filter(i => Issues.isAddressed(i.status)).length || '-'}}
                   </td>
                 </tr>
               </if>
@@ -197,7 +197,7 @@
                 issue.severity === 'Q' ? 'bg-blue-300 dark:text-black' :
                 'bg-gray-200 dark:text-black'
               }} {{
-                issue.status === 'fixed' ? 'line-through' : ''
+                Issues.isAddressed(issue.status) ? 'line-through' : ''
               }} {{
                 doubleDigits ? 'text-[0.6rem]' : 'text-xs'
               }}"
@@ -333,7 +333,7 @@
     </div>
     <for let="issue of issues">
       {{var doubleDigits = +issue.tag.split('-')[1] >= 10}}
-      {{var isAddressed = issue.status === 'fixed' || issue.status === 'addressed'}}
+      {{var isAddressed = Issues.isAddressed(issue.status)}}
       <section id="{{issue.tag}}">
         <div class="mt-12 pt-12 border-t dark:border-gray-600"></div>
         <div class="flex">
@@ -403,6 +403,9 @@
                 </else-if>
                 <else>
                   {{Issues.statusNames[issue.status]}}
+                  <if cond="issue.status === 'fixedprivate'">
+                    <span class="text-sm relative top-[-1px]">(closed source)</span>
+                  </if>
                 </else>
               </div>
             </div>

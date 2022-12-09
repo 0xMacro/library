@@ -1,0 +1,387 @@
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (H-1) Public Mint can revert when total project mints exceed the Public Mint limit
+
+In Bueno721Drop.sol’s `_checkPublicMintConditions()` and `airdropPublic()`, the wrong accounting variable is used to gauge if enough tokens are available for a public mint. This will result in public mints which should succeed to fail. The below condition on line 557, and a similar condition on line 302, is used to check if the public mint has enough tokens left to satisfy the user request:
+
+```solidity
+  if (_totalMinted() + quantity > baseSettings.maxSupply) {
+      revert SoldOut();
+  }
+```
+
+The checks use `_totalMinted()`, which tracks all mints which have occurred included phase mints, instead of just the amount of public mints which have happened so far. The needed variable of total public mints so far is not actually tracked in the code anywhere.
+
+The current code will revert when the amount of mints which have occurred globally in the project exceeds the total amount of mints available to the public mints.
+    
+**Remediations to Consider:**
+
+- Keep track of the number of public mints and use that as the comparison instead of `_totalMinted()` in `_checkPublicMintConditions()` and `airdropPublic()`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (H-2) Ending a phase will increase the Public Mint limit by too much
+
+
+The spec specifics that the remaining supply of a phase should be transferred to the `mintPublic` roll-over phase. Currently, instead of the remaining phase supply being transferred, an ended phase’s whole initial supply is transferred in Bueno721Drop.sol’s `endPhase()`:
+
+```solidity
+/**
+ * @dev Permanently closes a phase by capping the supply & releasing it
+ */
+function endPhase(uint256 phaseIndex) public onlyOwner {
+    // if the phase never had supply, there is nothing to do
+    if (saleState.phases[phaseIndex].maxSupply == 0) {
+        revert InvalidPhase();
+    }
+
+    // transfer the supply to the global supply
+    baseSettings.maxSupply += saleState.phases[phaseIndex].maxSupply;
+
+    // remove the supply from the phase
+    saleState.phases[phaseIndex].maxSupply = 0;
+}
+```
+
+This is problematic because during a phase’s mint functions this `maxSupply` field is not decreased. This results in the `mintPublic`'s supply being increased by too much, possibly creating tokens that have no associated artwork.
+
+
+
+**Remediations to consider:**
+
+- Only increasing the `baseSetting`'s `maxSupply` by the difference of a phase’s `maxSupply` and `amountMinted`.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (M-1) No validation on project’s total initial token supply
+
+In Bueno721Drop.sol’s `initialize()` function, no check is made to ensure that the total amount of available tokens matches any specified number. Considering the importance of only selling a specific number of tokens which have associated art, combined with the complexity of setting up the initial phases and public mint token limits, we’d recommend adding a check in `initialize()` to ensure that the intended number of tokens are actually put up for sale. 
+
+**Remediations to consider:**
+
+- Adding a check in `initialize()` to verify the number of tokens for sale match what is intended.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (M-2) `mintBatch()` can fail to enforce `BaseSettings.maxPerWallet`
+
+In Bueno721Drop.sol’s `mintBatch()` function, users can mint more tokens than what is specified in the project’s `BaseSettings.maxPerWallet`. This is because the check for the limit is made using the total number of minted tokens per user in the mint checking functions on lines 482, 531, and 561:
+
+```Solidity
+    if (
+        baseSettings.maxPerWallet > 0 &&
+        _numberMinted(wallet) + quantity > baseSettings.maxPerWallet
+    ) {
+        revert ExceedMaxPerWallet();
+    }
+```
+
+This is problematic because `mintBatch()` only mints the tokens for the phases once at the end of the function, so these checks will fail to account for the total number of tokens a user has minted in the earlier phases processed by the batch. For example, assume that the `BaseSettings.maxPerWallet` is 5 and user Alice uses `mintBatch()` to mint 4 tokens in two different phases. Alice will have successfully minted 8 tokens when the global max was 5 which is against spec.
+
+**Remediations to consider:**
+
+- Minting tokens per phase processed. Or,
+- Checking for the global max once at the end of `mintBatch()`.
+
+  </field>
+
+  </item>
+
+  <item>
+  <field name="topic">Spec</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (M-3) `mintBatch()` can be used to skirt `maxPerTransaction` limits
+
+
+    In Bueno721Drop.sol, users can use the `mintBatch()` function to work around the `PhaseSettings.maxPerTransaction` limit by buying from the same phase multiple time during the transaction call. This is spec breaking.
+
+**Remediations to consider:**
+
+- Not allowing users to purchase from the same phase multiple times in `mintBatch()`.
+
+  </field>
+
+  </field>
+    <field name="response">
+Note: `maxPerTransaction` removed altogether
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (L-1) Missing validation that specified IDs in `activatePhase()` are valid phase IDs
+
+    In Bueno721Drop.sol’s `activatePhase()` function, there is no guarantee that the activated phases in the `phaseIndices` array are valid phases. This violates the principal that the internal state of the contract is consistent. 
+
+    **Remediations to consider:**
+
+    - Checking that the activated phases exist.
+
+  </field>
+    <field name="response">
+Note: This method was refactored as part of the Q-1 suggestion, and shares a commit SHA
+  </field>
+</item>
+
+<item>
+  <field name="topic">Interoperability</field>
+  <field name="impact">low</field>
+  <field name="chance">high</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (L-2) Missing suggested OperatorFilterRegistry's function coverage on `setApprovalForAll()` and `approve()` 
+
+ It is suggest that use of OpenSea’s `OperatorFilterRegistry` includes coverage of the `setApprovalForAll()` and `approve()` functions. This is to ensure that tokens cannot be listed on platforms which they will not be able to be sold on. See OpenSea’s [example contract](https://github.com/ProjectOpenSea/operator-filter-registry/blob/main/src/example/ExampleERC721.sol) for implementation guidance. 
+
+**Remediations to consider:**
+
+- Adding the onlyAllowedOperatorApproval() modifier to Bueno721Drop.sol’s `setApprovalForAll()` and `approve()` functions.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (L-3) Owner of `Bueno721Drop` unable to update Royalty settings post launch
+
+Currently there is no way for the owner of a `Bueno721Drop` to update the Royalty info for their project. As market conditions and community preferences can change over time, not being able to update Royalty settings can lead to decreased project success.
+
+**Remediations to consider:**
+
+- Adding the ability for owners to change their project’s Royalty settings.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (L-4) `withdraw()` doesn’t work as intended 
+
+
+    In Bueno721Drop.sol, the `withdraw()` function has non-intended behavior due to the possibility of malicious actors and the existence of the public `release()` function inherited from [PaymentSplitterUpgradeable.sol](https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/master/contracts/finance/PaymentSplitterUpgradeable.sol#L150). The function can fail to work as intended in the following ways: 
+
+1. The `onlyOwner` modifier isn’t effective as anyone can call `release()` for any address and initiate a payment release for a payee.
+
+2. If someone does utilize the `release()` function, subsequent calls made to `withdraw()` before the contract’s next money-gaining event will fail. This is due to `release()` reverting when an account has no money to claim.
+
+    
+
+3. If there is a malicious user who reverts on money transfers to themselves, then they can prevent the `withdraw()` function from ever finishing an execution.
+
+
+**Remediations to consider:**
+
+- Removing the `withdraw()` function and just relying on the `PaymentSplitterUpgradeable`’s `release()` function. Or,
+- Restrict access to `PaymentSplitterUpgradeable`’s `release()` function to only the owner and allowing the owner to specify which addresses to pay out in `withdraw()`. *Note: this remediation might be giving too much power to the owner of the contract.*
+
+  </field>
+
+  </field>
+    <field name="response">
+Note: Updated to prevent reverting in case of 0 releasable funds for a payee. We are not worried about the bad actor case, as this is a convenience method and `PaymentSplitter.release()` can still be individually called
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (L-5) Users can overpay
+
+    In Bueno721Drop.sol, users are able to pay more than needed for their NFT purchases. This is due to the price checks being written as a greater-than instead of an equal-to in the condition checking functions:
+
+  ```solidity
+  if (balance < quantity * baseSettings.price) {
+      revert InvalidPrice();
+  }
+  ```
+
+This can lead to poor user experience if users overpay. 
+
+**Remediations to consider:**
+
+- Changing the checking functions to check for equal-to conditions and restructure `mintBatch()` to handle under/over payments inside of that function.
+
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (L-6) No check that `mintBatch()` arrays are formatted correctly
+
+In Bueno721Drop.sol, no check is made to ensure that the argument arrays are of the same size. This can lead to array-out-of bound errors which aren’t user friendly to debug.
+
+**Remediations to consider:**
+
+- Checking that all input arrays are of the same size.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (Q-1) Keeping track of active phases with an array is an anti-pattern
+    *Note: this is a code quality suggestion and not a security suggestion. The code changes suggested here are slightly larger than the changes suggested in other issues found so far. We will leave it up to your teams’s discretion on time vs. code quality tradeoff on whether to implement this suggestion.*
+
+Bueno721Drop.sol currently uses an array to keep track of the active phases. This isn’t necessarily problematic from a security perspective but it is a Solidity anti-pattern.
+
+Using an array to keep track of active phases isn’t recommended because as more phases are active, more gas is spent verifying and updating the active phases.
+
+For example, in the `activatePhase()` function, if you have 100 active phases and you want to deactivate a single phase, you have to re-write storage slots the remaining 99 phases (which is gas intensive):
+
+```solidity
+/**
+ * @dev Specify which phases are active. By omitting phase indices, you are effectively closing those phases
+ * Public sale can be simultaneously activated via `_isPublicActive` argument.
+ */
+function activatePhase(uint64[] calldata phaseIndices, bool _isPublicActive)
+    external
+    onlyOwner
+{
+    saleState.activePhaseIds = phaseIndices;
+
+    if (_isPublicActive != isPublicActive) {
+        isPublicActive = _isPublicActive;
+    }
+}
+```
+
+Additionally, searching to see if a phase is active will grow in gas intensity with the size of the list: 
+
+```solidity
+function isPhaseActive(uint256 phaseIndex) internal view returns (bool) {
+    uint256 activePhaseLength = saleState.activePhaseIds.length;
+    for (uint256 i = 0; i < activePhaseLength; ) {
+        if (saleState.activePhaseIds[i] == phaseIndex) return true;
+
+        // activePhaseLength has a maximum value of 2^256 - 1
+        unchecked {
+            ++i;
+        }
+    }
+
+    return false;
+}
+```
+
+Best practice solidity coding typically includes keeping the gas cost of running a section of code the same ************at any scale************. This is because (1) users have to pay gas costs directly and (2) there is a hard limit to the amount of gas a transaction can take, capped currently at [30 million gas units per block](https://ethereum.org/en/developers/docs/gas/#block-size). This can lead to non-intuitive functioning of array-based code.
+
+For example, the code suggests that the number of phases is capped at `2**64`, but it is actually capped at the amount of gas which is consumed by the `initializer()` function. Considering that a single storage slot write costs `20_000` per non-zero write*, a user would consume the 30 million block gas limit setting a single storage slots for 1500 phases.
+
+Due to the unique runtime environment of the EVM you’ll find developers utilizing map data structures with additional helper tracking variables instead of using arrays.
+
+**Remediations to consider:**
+
+- Using a map data structure to keep track of if a phase is active or not. This can be achieved by replacing the `uint64[] activePhaseIds` with a `mapping(uint256 => bool)` paired with metadata about the max phase ID. This will remove the loop from `isPhaseActive()` and the code in `activatePhase()` can be modified in a variety of ways to still allow for multiple phases to be toggled at once. Or,
+- Adding a `bool` into the `PhaseSettings` struct indicating if a phase is active or not instead of the `uint64[] activePhaseIds` structure. Additionally make other similar changes listed above. 
+
+\* See gas costs for opcodes on [page 27 of the EVM yellow paper](https://ethereum.github.io/yellowpaper/paper.pdf)
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (Q-2) No events are emitted to track state changes
+    Currently no events are emitted to track state changes in Bueno721Drop.sol. It is a good practice to include events in contracts in general. Without them there is no easy way to track the history of the projects. In addition, they're useful for front end applications interacting with contracts. We’d recommend adding events to all functions which change any state internally in the contract.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (Q-3) `getActivePhases()` can be external
+    The function `getActivePhases()` in Bueno721Drop.sol can be marked as external instead of public as there are no internal uses of the function.
+
+  </field>
+      <field name="response">
+Note: Removed as part of 2fd1b5ac8504c642d73c783cb6d2362da5e2883f
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (Q-4) `hasAllowlist` variable redundant in `PhaseSettings` struct
+    The variable `hasAllowlist` could be known from checking if the `merkleRoot` variable is equal to zero or not.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (Q-5) `withdraw()` does not need reentrancy guard
+    The function `withdraw()` does not need a reentrancy guard because it and the functions it calls all follow the
+    checks-effects-interaction pattern. 
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## (G-1) Initializing variables to default value wastes gas
+    Line 108 and 120 listed below can be removed. The default state of a variable is already equal to zero.
+  </field>
+</item>
