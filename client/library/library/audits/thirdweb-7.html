@@ -1,0 +1,109 @@
+<page
+  clientName="thirdweb"
+  reportDate="December 21st, 2022"
+  auditTitle="thirdweb A-7"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from November 28, 2022 to December 7, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>
+      <a href="https://github.com/thirdweb-dev/contracts/tree/v3.2.7/docs" target="_blank">Relevant documentation</a> for the in-scope contracts.
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank">
+        {{page.repoUrl.split('/').slice(-1)[0]}}
+      </a>
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash:</b>
+      <code>99c889c3f08868f8193d98d5ab82bb1ff8ecea75</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts as part of TokenStake contract audit:</p>
+
+  <template type="file-hashes">
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  contracts/openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    ab7e40d1b333d675e23d9d4a4c70836c508b2e8b890cf1c6f3dc554424d1215d  contracts/lib/CurrencyTransferLib.sol
+    839869bd411a4e68c9a59d2a0c394a087641eeeadeda4956a255dc3179110cc3  contracts/interfaces/IWETH.sol
+    569cd0b266ff404aeac1a4266a1535121e47907ef1dcea2d55f4c036a11f758e  contracts/openzeppelin-presets/token/ERC20/utils/SafeERC20.sol
+    f26adf2080a8611b95fb06653a7476aade9dfae3fcc36b212aee46e0aa914f7f  contracts/eip/interface/IERC20.sol
+    e63c27c95600ee1886258f2e588bc6e00a8b6224bfba341c1b05a78baa3755e1  contracts/lib/TWAddress.sol
+    e2b7ba9418f86c2049b1ad85faae6d019bcf432307b61f36eeb025d3be77c615  contracts/extension/ContractMetadata.sol
+    f0b7ac93fba3fbb8a71bd76da822cceec0fa86b20418835a228c67d06176eaec  contracts/extension/interface/IContractMetadata.sol
+    e11e8f40eb775c0ccc34b746b03a08e584f626b94fdde1396f538c3a76c487d4  contracts/extension/PermissionsEnumerable.sol
+    b4958ce026d4c0c93dae5e671aabed246531c448e1e081d0ba6dc590c3377393  contracts/extension/interface/IPermissionsEnumerable.sol
+    333d596baf00c08da55bc1671da3f5df65c4a1d9e8d5639e910d1c23ffb7f980  contracts/extension/interface/IPermissions.sol
+    645d29f8042f1318e9b307f5e85e4408bde24ee6fcb81202a82e23cd8b549587  contracts/extension/Permissions.sol
+    333d596baf00c08da55bc1671da3f5df65c4a1d9e8d5639e910d1c23ffb7f980  contracts/extension/interface/IPermissions.sol
+    d1fa327e26529fe1048a230a9fdaa183da21f9418729b665e0d57f68f136de0b  contracts/lib/TWStrings.sol
+    16bc29a644b43fb9d1c29fd11d06e502d351934e51c1ae127e113dac8c3bf713  contracts/extension/Staking20Upgradeable.sol
+    3bf8b010deb83bc35f3fd2c1a3fef2dd0cc679108cfcd19003dceb1dd9619259  contracts/extension/interface/IStaking20.sol
+  </template>
+
+
+  <p>We audited the following contracts as part of NFTStake contract audit:</p>
+
+  <template type="file-hashes">
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  contracts/openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    ab7e40d1b333d675e23d9d4a4c70836c508b2e8b890cf1c6f3dc554424d1215d  contracts/lib/CurrencyTransferLib.sol
+    839869bd411a4e68c9a59d2a0c394a087641eeeadeda4956a255dc3179110cc3  contracts/interfaces/IWETH.sol
+    569cd0b266ff404aeac1a4266a1535121e47907ef1dcea2d55f4c036a11f758e  contracts/openzeppelin-presets/token/ERC20/utils/SafeERC20.sol
+    f26adf2080a8611b95fb06653a7476aade9dfae3fcc36b212aee46e0aa914f7f  contracts/eip/interface/IERC20.sol
+    e63c27c95600ee1886258f2e588bc6e00a8b6224bfba341c1b05a78baa3755e1  contracts/lib/TWAddress.sol
+    e2b7ba9418f86c2049b1ad85faae6d019bcf432307b61f36eeb025d3be77c615  contracts/extension/ContractMetadata.sol
+    f0b7ac93fba3fbb8a71bd76da822cceec0fa86b20418835a228c67d06176eaec  contracts/extension/interface/IContractMetadata.sol
+    e11e8f40eb775c0ccc34b746b03a08e584f626b94fdde1396f538c3a76c487d4  contracts/extension/PermissionsEnumerable.sol
+    b4958ce026d4c0c93dae5e671aabed246531c448e1e081d0ba6dc590c3377393  contracts/extension/interface/IPermissionsEnumerable.sol
+    333d596baf00c08da55bc1671da3f5df65c4a1d9e8d5639e910d1c23ffb7f980  contracts/extension/interface/IPermissions.sol
+    645d29f8042f1318e9b307f5e85e4408bde24ee6fcb81202a82e23cd8b549587  contracts/extension/Permissions.sol
+    333d596baf00c08da55bc1671da3f5df65c4a1d9e8d5639e910d1c23ffb7f980  contracts/extension/interface/IPermissions.sol
+    d1fa327e26529fe1048a230a9fdaa183da21f9418729b665e0d57f68f136de0b  contracts/lib/TWStrings.sol
+    e5790681a79244dc79ac78554ed3802d7dd5e8e6df6a961eba17e76f4b975550  contracts/extension/Staking721Upgradeable.sol
+    9575a51df8e3c950d53ab4916ef50ad60698f59267484cc77cd98841e247629d  contracts/extension/interface/IStaking721.sol
+  </template>
+
+
+  <p>We audited the following contracts as part of EditionStake contract audit:</p>
+
+  <template type="file-hashes">
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  contracts/openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    ab7e40d1b333d675e23d9d4a4c70836c508b2e8b890cf1c6f3dc554424d1215d  contracts/lib/CurrencyTransferLib.sol
+    839869bd411a4e68c9a59d2a0c394a087641eeeadeda4956a255dc3179110cc3  contracts/interfaces/IWETH.sol
+    569cd0b266ff404aeac1a4266a1535121e47907ef1dcea2d55f4c036a11f758e  contracts/openzeppelin-presets/token/ERC20/utils/SafeERC20.sol
+    f26adf2080a8611b95fb06653a7476aade9dfae3fcc36b212aee46e0aa914f7f  contracts/eip/interface/IERC20.sol
+    e63c27c95600ee1886258f2e588bc6e00a8b6224bfba341c1b05a78baa3755e1  contracts/lib/TWAddress.sol
+    e2b7ba9418f86c2049b1ad85faae6d019bcf432307b61f36eeb025d3be77c615  contracts/extension/ContractMetadata.sol
+    f0b7ac93fba3fbb8a71bd76da822cceec0fa86b20418835a228c67d06176eaec  contracts/extension/interface/IContractMetadata.sol
+    e11e8f40eb775c0ccc34b746b03a08e584f626b94fdde1396f538c3a76c487d4  contracts/extension/PermissionsEnumerable.sol
+    b4958ce026d4c0c93dae5e671aabed246531c448e1e081d0ba6dc590c3377393  contracts/extension/interface/IPermissionsEnumerable.sol
+    333d596baf00c08da55bc1671da3f5df65c4a1d9e8d5639e910d1c23ffb7f980  contracts/extension/interface/IPermissions.sol
+    645d29f8042f1318e9b307f5e85e4408bde24ee6fcb81202a82e23cd8b549587  contracts/extension/Permissions.sol
+    333d596baf00c08da55bc1671da3f5df65c4a1d9e8d5639e910d1c23ffb7f980  contracts/extension/interface/IPermissions.sol
+    d1fa327e26529fe1048a230a9fdaa183da21f9418729b665e0d57f68f136de0b  contracts/lib/TWStrings.sol
+    a7c9d1a429a83e8dcac52d57cd30f41fde67562620385f251c3f764ce9c4ad39  contracts/extension/Staking1155Upgradeable.sol
+    5e39ff49f56e075e5111dd66a8d83a153aed331ef5af8762f491247295cd542a  contracts/eip/interface/IERC1155.sol
+    fa855b955f07067c48640f60f887f5fff038408b97f797c56ef3b982ca6cb763  contracts/extension/interface/IStaking1155.sol
+  </template>
+</content-for>
+
