@@ -1,0 +1,288 @@
+<!--
+    - fix links, eurler link dead
+    - reply to kurts comments
+    - is it cool if i changed the wordings, esp considering client replied to them?
+-->
+<item>
+    <!--
+    - removed the test
+    - added "according a validation test we did" to specify what we are referring to
+    - should we include the supplementary doc here and make it public?
+    - shilling strategy: TWAP content
+    - to a wider audience
+    -->
+    <field name="topic">Sandwich Attack</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## (M-1) Sandwich attacks causes loss to Maker under volatile market conditions
+
+        ### Background
+
+        `DSS-KILN` allows anyone to call `fire()` in a permissionless way to swap one asset for another.
+
+        To avoid sandwich attacks, `kiln` uses
+
+        1. the TWAP i.e. Time Weighed Average Price returned by `quote()` and
+        1. `yen` i.e. mupliticative factor for accepting swap slippage
+
+        to calculate the minimum amount of `buy` tokens to accept in the swap.
+
+        `amountMin` **calculation in source:**
+        ```
+        uint256 amountMin = (_yen != 0) ? quote(_path, amount, uint32(scope)) * _yen / WAD : 0;
+        ```
+
+        ### Issue
+
+        **However**, notice the `quote()` that is derived from TWAP can lag behind the spot price because averages like TWAP **by-design lags behind the spot price** when spot price sharply changes.
+        Concretely, in a swap A->B, when B sharply drop in price, `quote()` lags behind the spot price and overvalues the asset to purchase.
+        
+        However, when the TWAP `amountOut` lags the spot price `amountOut` due to the volatility which we will quantify below, it allows anyone to execute a profitable sandwich attack even if the `yen` value is kept high. 
+
+        Consequently, arbitrager is incentivized to execute a sandwich attack even if the yen value is kept high. The crypto market is generally volatile, and 5 to 10% movement within hours is expected.
+
+        Here is the inital usecase for `Kiln` communicated by the Maker team, the following sections will quantify that arbitrage loss can be larger than expected.
+
+        > We do, however believe that for the initial planned amount lot of 30K dai, over the planned path of [DAI, 0.01%, USDC, 0.05%, WETH, 0.3%, MKR], sandwiching would most likely be unprofitable due to the Uniswap fees on the 2 trades (even with min amount as 0, and even before accounting for gas).
+        This can be roughly checked in any given moment by simulating a "`buy mkr -> kiln.fire(lot=30K) -> sell mkr`" sequence in a single tx, and checking if there is dai profit.
+
+        ### Attack Overview
+
+        Consider a lag between TWAP and the spot of 10%. In this case, `quote` would return an `amountOut` that is 10%
+        lower than the spot price `amountOut`.
+
+        Noticing this, an attacker can almost guarantee that they are the one to call `fire()` as soon as
+        `kiln` is ready to swap again by using off-chain bots to call their malicious contract and
+        spending enough on priority fees.
+
+        Specifically:
+
+        1. Take a flash loan of `attackAmount` worth of WETH.
+        (the optimal `attackAmount` fluctuates with the market and liquidity concentration).
+        1. Swap WETH for MKR, on `path = abi.encodePacked(WETH, uint24(3000), MKR);`.
+        1. Execute `fire()` on `KilnUniV3.sol`.
+        1. Swap MKR back to WETH.
+        1. Repay flash loan with fee `attackAmount` + `flashLoanFee`.
+        1. Profit for the attacker and loss for MakerDAO.
+
+        ### Quantifying Loss
+
+        1. <a href="#appendix-m1-poc" class="hover:underline">Proof of concept for the attak above</a>.
+        1. This [trading data analysis](https://www.notion.so/0xmacro/MakerDAO-1-TWAP-Lag-and-Arbitrage-Loss-5ee753d73d4f49dda61c4d566e99f925) uses 3 months data to show the average and worst loss and discusses further using 2nd TWAP as a solution.
+
+        ### Remediations
+
+        - Using a 2nd TWAP to detect price deviation and revert when necessary (refer to trading data analysis above for detail).
+        - Using a [TWAMM](https://www.paradigm.xyz/2021/07/twamm), like FraxSwap, to greatly reduce the likelihood of
+        sandwich attacks.
+        - Using off-chain oracles to get pricing information.
+        - Dropping `lot` size to smaller amount like `15_000 DAI`. We could not turn a profit in the above test using
+        `15_000 DAI` and 10% lag, but this may not hold in all market conditions.
+
+    </field>
+    <field name="response">
+	Thank you for finding this sandwiching case. Indeed for every usage of dss-kiln the liquidity status along the path should be taken into account and `lot` should be selected carefully. Off chain oracles or TWAMMs should be considered for later versions.
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## (L-1) The buy token may not be the token that is actually bought and transferred to the recipient
+
+        The token that gets bought is the last token stated in the `path`.
+
+        However, this token may not necessarily be the same as the `buy` token set in the constructor.
+
+        Therefore, a different token can be bought that is not the `buy` token and `sell` tokens will be lost.
+
+        <a href="#appendix-l1-poc" class="hover:underline">Proof of concept</a>
+
+        ### Remediations
+
+        - When the path is set, ensure that the last token in the path is the `buy` token.
+        - Document this behavior sufficiently for external users.
+    </field>
+
+    <field name="response">
+    	The buy token should be configured carefully and validated prior to deployment.
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+## (L-2) `Rug` event will be emitted even when the transfer of `sell` tokens fails
+
+In KilnBase.sol line 96, there is no guarantee that the `sell` token reverts when the `transfer` function fails. The transfer could be unsuccessful and return `false`, and the `Rug` event will still be emitted. This could cause confusion for the authority and users of the contract.
+
+### Remediation to Consider
+
+- Call `safeTransfer` instead of `transfer`.
+- Document that `Rug` events for tokens that return `false` on `transfer` failure can be duplicated.
+    </field>
+    <field name="response">
+    	Although using a token that only relies on a return value is possible, we think it is generally rare and unlikely for Maker to do. Therefore we would rather not complicate the code as long as it is not a clear security issue.
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">high</field>
+    <field name="status">addressed</field>
+    <field name="repoPath">pull/12</field>
+    <field name="content">
+
+## (Q-1) Misleading documentation on the `yen` value
+
+Regarding `yen`, the [README.md](https://github.com/makerdao/dss-kiln#yen-default-1000000000000000000-ie-wad-or-100) states: 
+
+“By **lowering** this value you can seek to trade at a better than average price, or by **raising** the value you can account for price impact or additional slippage.” (bold added)
+
+However, the opposite is true.
+
+Consider switching `lowering` and `raising`.
+    </field>
+    <field name="response">
+    	Switched "lowering" and "raising" as suggested.
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">high</field>
+    <field name="status">addressed</field>
+    <field name="repoPath">pull/12</field>
+    <field name="content">
+
+## (Q-2) `scope` can overflow when cast from `uint32` to `int32`
+
+This will cause the `arithmeticMeanTick` to be incorrect, which will result in an incorrect value returned from `_getQuoteAtTick()`. However, currently, `scope` values as low as `4 hours` revert with `OLD` [(source)](https://github.com/Uniswap/v3-core/blob/05c10bf6d547d6121622ac51c457f93775e1df09/contracts/libraries/Oracle.sol#L226) so this scenario is particularly unlikely.
+
+Consider changing `require(data <= type(uint32).max, "KilnUniV3/scope-overflow");` to `require(data <= type(int32).max, "KilnUniV3/scope-overflow");` in `KilnUniV3.sol`.
+    </field>
+    <field name="response">
+    	Now checking `scope` is lower than `type(int32).max`
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+
+## (Q-3) If `_min(GemLike(sell).balanceOf(address(this)), lot)` is greater than `type(uint128).max`, the swap will fail
+
+In `TwapProduct.sol` line 49, an overflow error will occur if the `amountIn` being swapped is greater than `type(uint128).max.` The amount being swapped is the minimum amount of `GemLike(sell).balanceOf(address(this))` and `lot` in `KilnBase.sol`. 
+
+However, nothing is preventing either of these two values from being greater than `type(uint128).max.` If both of them are greater than this value, the swap will revert in an overflow error.
+    </field>
+    <field name="response">
+    	We think the explicit require in `quote` is enough for this low probability case.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Liquidity</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+## (Q-4) Illiquidity in UNIV3 pool incentivizes oracle attack
+
+Illiqudity comes in 3 forms: no liquidity, skewed, and concentrated.
+
+Using a TWAP of pool with **no liquidity** is easily manipulated. For example, for an A -> B swap, attacker can, at virtually no cost, bring the price of A close to 0 by selling A into the pool, and keep the price there for some number of blocks to change the TWAP.
+
+For a **concentrated** pool, the attacker can sell A into the pool until B liquidity is consumed, then the scenario is reduced to the no liquidity case. As the liquidity is concentrated, loss to slippage is small compared to a skewed pool.
+
+For a **skewed** pool, the attacker can sell A into the pool as in the concentrated case, but loss to slippage is higher because of the above-market price attacker is paying for B.
+
+Consider providing sufficient documentation and warning, for Maker’s proposal draft and stakeholders as well as public users, on how to detect illiquidity.
+
+[More materials from Euler.](https://www.euler.finance/blog/euler-protocols-oracle-risk-grading-system)
+    </field>
+    <field name="response">
+    	Thank you for highlighting these considerations. They should be taken into account and monitored per deployment.
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## (Q-5) `fire()` will revert if `sell` token is not the same as the first token stated in the path
+    
+        The token that the Kiln tries to sell is the first token stated in the `path`.
+    
+        However, this token may not necessarily be the same as the `sell` token set in the constructor.
+        
+        Therefore, the Kiln can try to sell a different token, but will revert since the Router only has approval to transfer the `sell` token.
+    
+        ### Remediations
+    
+        - When the path is set, ensure that the first token in the path is the `sell` token.
+        - Document this behavior.
+    </field>
+    <field name="response">
+    	The sell token should be configured carefully and validated prior to deployment.
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+## (Q-6) Incomplete configuration changes may allow undesirable swaps
+
+Kilns expose separate functions to update individual configuration value. This potentially requires users to perform multiple transactions to effect the full set of changes. This incurs higher gas costs, and also creates risk in that the parameters may be only partially updated to their final state when `fire()` is triggered, which may allow undesirable swaps to be executed.
+
+### Remediations
+
+Consider updating the contract to allow the entire set of configurations to be updated atomically.  For example:
+
+- Consider adding a function allowing all configurations to be modified at once.
+- Consider implementing support for multi-call capabilities.
+    </field>
+    <field name="response">
+    	The single value configuration is the common practice in Maker contracts but indeed requires changes to be done carefully and to be validated prior to deployment. 
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">low</field>
+    <field name="status">addressed</field>
+    <field name="repoPath">pull/12</field>
+    <field name="content">
+## (Q-7) Misleading documentation regarding trading price
+
+The [README.md](https://github.com/makerdao/dss-kiln#kilnuniv3-twap-trading) states:
+
+- “the KilnUniV3 implementation will only buy tokens when it can trade at a price *better* than the previous 1 hour average.”
+- “By default, `yen` is set to `WAD`, which will require that a trade will only execute when the amount received is *better* than the average price over the past `scop` period.”
+
+However, KilnUniV3.sol calculates the average price over the past `scope` period and only buys tokens when it can trade at a price better **or the same as** the previous 1 hour average as seen on line [165](https://github.com/Uniswap/v3-periphery/blob/main/contracts/SwapRouter.sol#L165) of Uniswap V3’s SwapRouter.sol.
+
+### Remediations
+
+Change the documentation to state: 
+
+- “the KilnUniV3 implementation will only buy tokens when it can trade at a price better than or the same as the previous 1 hour average.”
+- “By default, `yen` is set to `WAD`, which will require that a trade will only execute when the amount received is better than or the same as the average price over the past `scope` period.”
+    </field>
+    <field name="response">
+Fixed documentation to use "better or the same" phrasing.
+    </field>
+</item>

