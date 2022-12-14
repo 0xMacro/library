@@ -1,7 +1,7 @@
 <page clientName="Maker" reportDate="December 12th, 2022" auditTitle="Maker A-1" auditVersion="1.0.0"
   repoUrl="https://github.com/makerdao/dss-kiln"
   layout="/library/audits/_layout.html" customRepoInfo customReviewInfo
-  appendixLinks="#appendix-m1-poc::M-1 Proof of Concept;;#appendix-l1-poc::L-1 Proof of Concept">
+  appendixLinks="#appendix-m1-poc::M-1 Proof of Concept;;#appendix-l1-poc::L-1 Proof of Concept;;#appendix-q3-poc::Q-3 Proof of Concept;;#appendix-q5-poc::Q-5 Proof of Concept">
   <content-for name="schedule">
     The security audit was performed by the Macro security team from November
     7, 2022 to November 15, 2022.
@@ -76,7 +76,7 @@ As per our conversations, Maker's initial plan is to execute `fire()` of lot siz
 
 **Proof of Concept**
 
-```solidity
+```
 	
 // forge test --use solc:0.8.14 --rpc-url=$ETH_RPC_URL --match testTWAPMispriceShortPath --fork-block-number 15992230 -vvvv
 
@@ -168,7 +168,7 @@ is equivalent to `yen = WAD`  AND `quote` returning value 10% lower than spot pr
 <content-for name="appendix">
   <section id="appendix-l1-poc" class="Copy py-16">
     <template type="audit-markdown">
-	## L-1: Proof of Concept
+## L-1: Proof of Concept
 
 To demonstrate the issue, copy the following content into `src/KilnUniV3.t.sol` and run `forge test --use solc:0.8.14 --rpc-url="$ETH_RPC_URL" -vvv --match-test testFireWithIncorrectBuyPath`.
 
@@ -198,4 +198,63 @@ function testFireWithIncorrectBuyPath() public {
     </template>
   </section>
 </content-for>
+
+<content-for name="appendix">
+  <section id="appendix-q3-poc" class="Copy py-16">
+    <template type="audit-markdown">
+## Q-3: Proof of Concept
+
+Copy the following content into `src/KilnUniV3.t.sol` and run `forge test --use solc:0.8.14 --rpc-url="$ETH_RPC_URL" -vvv --match-test testFireWithMaxLot`.
+
+```
+function testFireWithMaxLot() public {
+    mintDai(address(kiln), type(uint128).max + 1);
+    assertEq(GemLike(DAI).balanceOf(address(kiln)), type(uint128).max + 1);
+    kiln.file("yen", 80 * WAD / 100);
+    kiln.file("lot", type(uint128).max + 1);
+    vm.expectRevert("TwapProduct/amountIn-overflow");
+    kiln.fire();
+}
+```
+    </template>
+  </section>
+</content-for>
+
+<content-for name="appendix">
+  <section id="appendix-q5-poc" class="Copy py-16">
+    <template type="audit-markdown">
+## Q-5: Proof of Concept
+
+To demonstrate this issue, copy the following content into `src/KilnUniV3.t.sol`
+
+and run `forge test --use solc:0.8.14 --rpc-url="$ETH_RPC_URL" -vvv --match-test testFireWithIncorrectSellPath`
+
+```
+function mintUSDC(address usr, uint256 amt) internal {
+        deal(USDC, usr, amt);
+        assertEq(GemLike(USDC).balanceOf(address(usr)), amt);
+}
+
+function testFireWithIncorrectSellPath() public {
+        mintUSDC(address(kiln), 50_000 * WAD);
+        mintDai(address(kiln), 50_000 * WAD);
+
+        assertEq(GemLike(USDC).balanceOf(address(user)), 0);
+        assertEq(GemLike(MKR).balanceOf(address(user)), 0);
+
+        kiln.file("path", abi.encodePacked(USDC, uint24(100), DAI));
+
+        assertEq(kiln.sell(), DAI);
+        assertEq(kiln.buy(), MKR);
+
+        // This fails due to mismatch between kiln sell token and path
+        vm.expectRevert();
+        kiln.fire();
+}
+```
+    </template>
+  </section>
+</content-for>
+
 </page>
+

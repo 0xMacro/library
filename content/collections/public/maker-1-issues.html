@@ -286,3 +286,154 @@ Change the documentation to state:
 Fixed documentation to use "better or the same" phrasing.
     </field>
 </item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">TODO</field>
+    <field name="status">addressed</field>
+    <field name="repoPath">pull/12</field>
+    <field name="content">
+## (I-1) Attackers can use a flash-swap to sandwich attack low-`yen` swaps, resulting in potentially significant losses due to manipulated slippage
+
+An attacker can execute `fire()` inside a flash-loan callback in which they sandwich attack the kiln `path` pools. The impact - and attractiveness - of such an attack is controlled by `amountMin`, which is partially controlled by `yen`: [[ref](https://github.com/makerdao/dss-kiln/blob/v0.0.1-alpha/src/KilnUniV3.sol#L109)]
+
+```solidity
+uint256 amountMin = (_yen != 0) ? quote(_path, amount, uint32(scope)) * _yen / WAD : 0;
+```
+
+The most damaging conditions occur when `yen` is 0: `amountMin` is also 0. This allows swaps to complete with unbounded slippage and/or price impact. The potential for damage decreases linearly as `yen` increases, until it yields an `amountMin` corresponding to the market price or its TWAP value.
+
+For example, consider a simple UniV3Kiln with `path` = `abi.encodePacked(WETH, uint24(3000), MKR)`. and `yen` = `0`. An attacker can take a large WETH flash-loan, and inside its callback:
+
+1. Swap the loaned WETH for MKR in the same pool as `path`
+2. Execute `kiln.fire()`, now based on highly unfavorable slippage
+3. Swap their MKR for WETH, now based on highly favorable slippage
+4. Repay their loaned WETH and take profit
+
+In this way an attacker can create a flash-loan to set a level of slippage which forces `amountOut` down to `amountMin`. See the Validation section below for a test which demonstrates the above attack.
+
+**Remediations to Consider**
+
+- Consider limiting the minimum value of `yen`.
+    </field>
+    <field name="response">
+Added a warning in the source and Readme for cautiously using yen = 0 or other low values.
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">TODO</field>
+    <field name="status">addressed</field>
+    <field name="repoPath">pull/12</field>
+    <field name="content">
+## (I-2) Attackers can use a flash-swap to sandwich attack swaps when `scope = 0`, resulting in potentially significant losses due to manipulated slippage
+
+This issue is very similar to I-1 in impact.
+
+- **Validation**
+    
+    Modify the first line of `testFlashLoanAttack()` from H-1 as follows:
+    
+    ```solidity
+    
+    	function testFlashLoanAttack() public {
+    		//kiln.file("yen", 0); //commented out
+    		kiln.file("yen", 98 * WAD / 100);
+        kiln.file("scope", 0);
+    		//remaining is unchanged
+    		...
+    	}
+    }
+    ```
+    
+
+**Remediations to Consider**
+
+Consider enforcing a sane minimum when setting `scope` in `file(bytes32 what, uint256 data)` and removing support for `scope == 0` in `_consult()`.
+
+
+    </field>
+    <field name="response">
+"Removed support for scope = 0.
+
+Added a warning in the source and Readme for cautiously using low scope values."
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">TODO</field>
+    <field name="status">ack</field>
+    <field name="content">
+## (I-3) Sharp downward price movement of token A will necessitate a low `yen` value
+
+Imagine the following scenario:
+
+- Swapping A→B
+- `yen` = `WAD`
+- `scope` = `6 hours`
+- The price of A is going down over the last 6 hours, with a sharp decrease in the last 30 minutes.
+
+As long as `yen` = `WAD` and the upward trend continues, all calls to `fire()` will revert because the TWAP-based `amountMin` will be higher than what is received based on spot price. A `yen` value of ~0.75 or less may be needed in some scenarios to maintain consistent purchasing during a steady price drop for A.
+
+Keep this in mind considering that MakerDAO has expressed not wanting to manually monitor `yen`.
+
+    </field>
+    <field name="response">
+Depending on the needs of the specific use case (maximizing revenues or throughput, always avoiding sandwich attacks, etc..) `yen` might need to be adjusted over time.
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">TODO</field>
+    <field name="status">ack</field>
+    <field name="content">
+## (I-4) Sharp upward price movement of token A may** result in sandwich attack
+
+Imagine the following scenario:
+
+- Swapping A→B
+- `yen` = `WAD`
+- `scope` = `6 hours`
+- The price of A is going up over the last 6 hours, with a sharp increase in the last 30 minutes.
+
+As long as the upward trend continues, the `TWAPedOut` will be significantly lower than the `currentPriceOut`, potentially resulting in a sandwich attack. 
+
+This problem is exacerbated by lower values of `yen`. Imagine a swap where `yen` = `WAD`  and but the delta between the TWAP amount out and the spot amount out alone may not be large enough to make a sandwich attack profitable. However, the implicit scaling down of `amountOutMinimum` due to lagging TWAP price, and the explicit scaling down by `yen` = `98 * WAD / 100` may make such an attack profitable.
+
+Keep this in mind considering that MakerDAO has expressed not wanting to manually monitor `yen`.
+
+    </field>
+    <field name="response">
+Depending on the needs of the specific use case (maximizing revenues or throughput, always avoiding sandwich attacks, etc..) `yen` might need to be adjusted over time.
+    </field>
+</item>
+
+<item>
+    <field name="topic">TODO</field>
+    <field name="impact">TODO</field>
+    <field name="status">ack</field>
+    <field name="content">
+## (I-5) TWAP Oracles have become less secure after the transition from Proof of Work to Proof of Stake.
+
+Due to the adoption of PoS, the next block proposer is known 6 minutes and 24 seconds in advance. If a validator knows it’s in control of two consecutive blocks, it can now ensure that it back-runs its manipulation in the second block - something which was impossible to know in PoW.
+
+As an example:
+
+- A validator can swap a large amount of one asset into the pool in the first block.
+- Then swap the same amount in the opposite direction in the second block.
+- An oracle update will occur at the manipulated price of the first block.
+
+This manipulation is done risk free since the validator/manipulator has full control over transaction ordering in the second block, making it impossible for arbitrageurs to interfere.
+
+This requires a large amount of capital, but the more blocks a validator has in a row, the cost of manipulation decreases and becomes more feasible. 
+
+If the TWAP oracle gets manipulated, this can affect the `amountMin` value that KilnUniV3 calculates in `_swap`. It can cause the `amountMin` to be lower than expected and slippage to occur. Lower values of `yen` can exacerbate the problem.
+    </field>
+    <field name="response">
+If multi-block oracle manipulation becomes a common problem the usage of this version of dss-kiln would need to be revised.
+    </field>
+</item>
+
