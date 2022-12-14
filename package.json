@@ -6,8 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "lancer build",
+    "build-evm": "LEARN_EVM=1 LANCER_CLIENT_DIR=client/learn_evm LANCER_STATIC_DIR=public/learn_evm lancer build",
     "init": "lancer init",
     "dev": "lancer dev",
+    "dev-evm": "LEARN_EVM=1 LANCER_CLIENT_DIR=client/learn_evm LANCER_STATIC_DIR=public/learn_evm lancer dev",
     "postinstall": "patch-package"
   },
   "engines": {
@@ -19,9 +21,11 @@
   "dependencies": {
     "@0xmacro/trim": "^0.9.2",
     "@ethereumjs/vm": "^5.5.3",
-    "@lancer/studio": "^0.20.0",
+    "@lancer/studio": "^0.20.1",
+    "@tailwindcss/line-clamp": "^0.4.2",
     "@tailwindcss/typography": "^0.4.1",
     "@types/mithril": "^2.0.8",
+    "alpinejs": "^3.10.5",
     "assert": "^2.0.0",
     "browserify-fs": "^1.0.0",
     "crypto-browserify": "^3.12.0",

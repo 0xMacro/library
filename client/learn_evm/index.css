@@ -1,0 +1,25 @@
+@import '../_lib/styles/copy.css';
+
+.header-gradient {
+  background: radial-gradient(#f6f6f6, #ffffff);
+  border-radius: 10px 10px 0px 0px;
+}
+
+@media(prefers-color-scheme: dark) {
+  .header-gradient {
+    background: linear-gradient(180deg, #35373F 0%, #121315 100%);
+    border-radius: 10px 10px 0px 0px;
+  }
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}

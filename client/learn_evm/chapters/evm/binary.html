@@ -1,0 +1,118 @@
+<page title="Binary and Types on the EVM" layout="/chapters/_layout.html">
+
+<div class="prose">
+<template type="learn-evm-markdown">
+
+
+# Binary and Types on the EVM
+
+Solidity has many useful types: `uint256`, `bool`, `string`, `struct`, `mapping`, arrays, and so on.
+
+However, **the EVM itself does not have any awareness of these types**. There are no opcodes that deal with or are aware of most Solidity types. Instead, they deal with much lower level types, as we will see below.
+
+## A Review of Binary
+
+If you're already familiar with binary and bytes, feel free to skip this section.
+
+For those that need a refresher, here's a quick review:
+
+- Binary is a string of zero's and one's (0's and 1's)
+- Each 0 or 1 is called a **bit**.
+- 8 bits = 1 byte — for example, `0101 1000` is one byte (the space in between is just to make it more readable).
+- Binary is raw data. It doesn't have a type.
+- However, we can **interpret** binary values *as* a type.
+    - By “we”, I mean we as humans, or we as the programs we write.
+    - For example, we can interpret `0101 1000` as an **unsigned integer,** converting each bit to its respective power of 2:
+        - `0+64+0+16 + 8+0+0+0` = `88`
+    - On the other hand, we *could* interpret the same value as [ASCII](https://en.wikipedia.org/wiki/ASCII), which is the letter `x`.
+- 1 byte has 256 possible values.
+    - `0000 0000`, `0000 0001`, `0000 0010`, `0000 0011`, `0000 0100`, etc.
+    - As an unsigned integer, the minimum value for 1 byte is `0`, while the maximum is `255`.
+
+## EVM's Native Types
+
+The "types" that the EVM understands are:
+
+- Unsigned numbers (`uint256`), supported by `ADD`, `SUB`, `LT`, `GT`, `GAS`, `CALLVALUE`, `TIMESTAMP` etc.
+- Signed numbers (`int256`), supported by `SIGNEXTEND`, `SDIV`, `SLT`, `SGT`, etc.
+- Binary, supported by `AND`, `OR`, `XOR`, `BYTE`, `SHL`, `SHR`, `SHA3`, `BLOCKHASH`, etc.
+- Addresses, supported by `ADDRESS`, `SENDER`, `CALL`, etc.
+- Contract bytecode, supported by `CREATE`, `CODECOPY`, `EXTCODECOPY`, etc.
+
+All other types that you see in Solidity are built on top of the above.
+
+Note that *any* value in the EVM – whether on the stack, in memory, or storage – is all just binary, and only **interpreted** as a type the moment an opcode *operates* on that data.
+
+## The 256-bit word size
+
+A **word size** is something that all machines have – it's the “natural chunk size” of data that they operate in.
+
+But what does that mean?
+
+Fundamentally, your computer has limits. It has a limited amount of memory, a limited amount of disk space, and so on.
+
+The same kind of limit exists at the lowest level of binary. For a machine, **stack items** must have a limit of *some* length.
+
+**The EVM's stack item size is its word size: 256 bits (32 bytes)**.
+
+This means every stack item is exactly 256 bits. No more, no less. A single boolean, for example, will take a full 256 bits on the stack, even though booleans only need one bit to be fully represented. That's potentially a lot of unused space.
+
+<aside>
+
+Note again, just to be clear: The EVM has no built-in concept of a boolean.
+
+</aside>
+
+EVM's large word size has many implications about how you can interact with the system. Let's explore each one.
+
+### Data Size for a Stack Item
+
+As hinted, each item on the stack is a full 32 bytes. Any items that an opcode puts on the stack will be exactly this size; there is no way to specify otherwise.
+
+### Delegating to Memory
+
+As large as 32 bytes is, not everything can fit in a single word. Complex data structures such as arrays and strings take *at least two* full words – one for the length, plus one or more for the data.
+
+Because of this, oftentimes you will have to move data to memory instead of the stack. The most common example of this is the `RETURN` opcode; in order to return data from a function call, you must put that data **into memory first**, and *then* execute the `RETURN` opcode with what location in memory that data resides.
+
+You'll learn more about working with memory in <chapter>evm/memory</chapter>.
+
+### Key Space
+
+When working with memory, you specify a **memory offset** – a 32-byte offset, starting from zero, of where your data resides in memory.
+
+When working with storage, you specify a **storage key** – a 32-byte key, of any value, of where you want to read or write a 32-byte value of data.
+
+Consider how a 32-byte key has 2^256 possible values. That's an incredibly large number:
+
+```solidity
+2^256 = 115,792,089,237,316,195,423,570,985,008,687,907,853,269,984,665,640,564,039,457,584,007,913,129,639,936
+```
+
+This works out well **for storage**, since EVM storage is similar to a key-value database; any 32-byte key can be assigned any 32-byte value. It's a benefit to have such a large key space, as it helps avoid conflicts.
+
+But **for memory**, you will never reach anywhere near the max range. Starting from zero, any memory you use **costs additional gas** for allocation. For example, using an offset of `0xff` is fine; using an offset of `0xff000000000000000000` is not, as the EVM will try to allocate memory **from zero up to** that offset.
+
+<aside>More specifically, using a memory offset will cause the EVM to allocate any **unused** memory space up to that offset. More on that in <chapter>evm/memory</chapter>.</aside>
+
+### Storage Values
+
+Contract storage values are also limited to 256 bits. This is one benefit to having the word size so large; you can store and retrieve large values – such as keccak hashes – much easier.
+
+For example, if the EVM were 64-bit instead, you would have to break up an address into three 64-bit storage slots, complicating reads and writes.
+
+### ABI Encoding
+
+When you send a message to call a function, you send function arguments along with it. These arguments are encoded using ABI encoding, which generally encodes data using EVM's word size.
+
+This means, just like the stack example, encoding a `bool` for a function call will take a full 32 bytes in the ABI encoded message. That's potentially a lot of unused space.
+
+You'll learn more about ABI encoding in the ABI chapters, specifically in <chapter>abi/anatomy</chapter>.
+
+### Keccak Hashes
+
+Another benefit for the 256-bit word size is the convenience of working with keccak hashes, which take a full 32 bytes. These hashes can be manipulated directly on the stack.
+
+
+</template>
+</div>

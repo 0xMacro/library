@@ -1,0 +1,52 @@
+<page title="The EVM Execution Environment" layout="/chapters/_layout.html">
+
+<div class="prose">
+<template type="learn-evm-markdown">
+
+
+# The EVM Execution Environment
+
+The **environment** in which bytcode is executed is the collection of *resources* that bytecode has access to.
+
+Specifically, bytecode has access to:
+
+- The stack
+- Memory
+- Contract storage
+- A finite amount of gas
+- Various fields of information about the running transaction, including calldata, the running contract, and its caller.
+
+In the following chapters, we will go over the first three in greater detail.
+
+<aside>A somewhat unique aspect of the EVM is that **it has no registers.** Registers are slots where you can temporarily stash data to pull out a bit later. In the name of simplicity, the designers of the EVM opted not to include them.</aside>
+
+## Three Worlds of Data
+
+The stack is not the only data location you have to work with. Specifically, you have access to:
+
+- The stack. Push, pop, dupe, and swap are the base operations you have access to.
+- Memory. A location to read/write data that will only last as long as a function call
+  - This is an EVM function call, to be clear; Solidity sometimes has a different definition of a function call, as we'll learn in <chapter>raw/internal</chapter>.
+- Storage. A location to read/write data that will persist across function calls and transactions.
+
+<aside>You also have access to calldata, although one could argue calldata is read-only memory.</aside>
+
+And that's it. These three data locations make up the execution environment that all contracts run in on-chain.
+
+In the following chapters, we’ll discuss the details of working with each one.
+
+
+## Function Call Environments
+
+Generally speaking, **each function call gets its own, isolated execution environment.** Namely:
+
+- A new, empty stack.
+- New, empty memory.
+- Access to the running contract address’s storage.
+- A finite amount of gas to run.
+
+The details of how function calls work is described in <chapter>fn/actor</chapter>. For now, just keep in mind that function calls do not share stack nor memory.
+
+
+</template>
+</div>
