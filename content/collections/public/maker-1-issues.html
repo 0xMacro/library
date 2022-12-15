@@ -1,91 +1,79 @@
-<!--
-    - fix links, eurler link dead
-    - reply to kurts comments
-    - is it cool if i changed the wordings, esp considering client replied to them?
--->
 <item>
-    <!--
-    - removed the test
-    - added "according a validation test we did" to specify what we are referring to
-    - should we include the supplementary doc here and make it public?
-    - shilling strategy: TWAP content
-    - to a wider audience
-    -->
     <field name="topic">Sandwich Attack</field>
     <field name="impact">high</field>
     <field name="chance">medium</field>
     <field name="status">ack</field>
     <field name="content">
-        ## (M-1) Sandwich attacks causes loss to Maker under volatile market conditions
+## (M-1) Sandwich attacks cause loss to Maker under volatile market conditions
 
-        ### Background
+### Background
 
-        `DSS-KILN` allows anyone to call `fire()` in a permissionless way to swap one asset for another.
+The motivation for `DssKiln` is to help a DAO to implement a dollar-cost-average asset buying strategy. In particular, implement it in a permissionless way. This is useful for example for buying back the DAO’s governance tokens e.g. MKR. 
 
-        To avoid sandwich attacks, `kiln` uses
+Specifically, `DssKiln` allows anyone to call `fire()` in a permissionless way to swap `sell` tokens for `buy` tokens.
 
-        1. the TWAP i.e. Time Weighed Average Price returned by `quote()` and
-        1. `yen` i.e. mupliticative factor for accepting swap slippage
+To avoid sandwich attacks targeting `kiln`'s swaps, `kiln` uses
 
-        to calculate the minimum amount of `buy` tokens to accept in the swap.
+1. the Uniswap V3 TWAP (Time Weighed Average Price) i.e. `quote()`, and
+2. `yen` i.e. multiplicative factor for accepting swap slippage
 
-        `amountMin` **calculation in source:**
-        ```
-        uint256 amountMin = (_yen != 0) ? quote(_path, amount, uint32(scope)) * _yen / WAD : 0;
-        ```
+to calculate the minimum amount of `buy` tokens to accept in the swap.
 
-        ### Issue
+`amountMin` calculation in source:
 
-        **However**, notice the `quote()` that is derived from TWAP can lag behind the spot price because averages like TWAP **by-design lags behind the spot price** when spot price sharply changes.
-        Concretely, in a swap A->B, when B sharply drop in price, `quote()` lags behind the spot price and overvalues the asset to purchase.
-        
-        However, when the TWAP `amountOut` lags the spot price `amountOut` due to the volatility which we will quantify below, it allows anyone to execute a profitable sandwich attack even if the `yen` value is kept high. 
+```
+uint256 amountMin = (_yen != 0) ? quote(_path, amount, uint32(scope)) * _yen / WAD : 0;
+```
 
-        Consequently, arbitrager is incentivized to execute a sandwich attack even if the yen value is kept high. The crypto market is generally volatile, and 5 to 10% movement within hours is expected.
+Here is the initial use case for `Kiln` communicated by the Maker team indicating it is unlikely there is a profitable attack, which we will try to disprove.
 
-        Here is the inital usecase for `Kiln` communicated by the Maker team, the following sections will quantify that arbitrage loss can be larger than expected.
+> We do, however believe that for the initial planned amount lot of 30K dai, over the planned path of [DAI, 0.01%, USDC, 0.05%, WETH, 0.3%, MKR], sandwiching would most likely be unprofitable due to the Uniswap fees on the 2 trades (even with min amount as 0, and even before accounting for gas).
+This can be roughly checked in any given moment by simulating a "buy mkr -> kiln.fire(lot=30K) -> sell mkr" sequence in a single tx, and checking if there is dai profit.
+> 
 
-        > We do, however believe that for the initial planned amount lot of 30K dai, over the planned path of [DAI, 0.01%, USDC, 0.05%, WETH, 0.3%, MKR], sandwiching would most likely be unprofitable due to the Uniswap fees on the 2 trades (even with min amount as 0, and even before accounting for gas).
-        This can be roughly checked in any given moment by simulating a "`buy mkr -> kiln.fire(lot=30K) -> sell mkr`" sequence in a single tx, and checking if there is dai profit.
+### Issue
 
-        ### Attack Overview
+The `quote()` derived from TWAP can lag behind the spot price because averages like TWAP **by-design lag behind the spot price** when the spot price sharply changes.
 
-        Consider a lag between TWAP and the spot of 10%. In this case, `quote` would return an `amountOut` that is 10%
-        lower than the spot price `amountOut`.
+Concretely, in a swap from A to B, **when B sharply drops in price, `quote()` overvalues the `buy` token incentivizing a sandwich attack**. In the paragraphs below, we will quantitatively show there is indeed overvaluation due to volatile prices.
 
-        Noticing this, an attacker can almost guarantee that they are the one to call `fire()` as soon as
-        `kiln` is ready to swap again by using off-chain bots to call their malicious contract and
-        spending enough on priority fees.
+### Attack Overview
 
-        Specifically:
+Consider a lag between TWAP and the spot of 10%. In this case, `quote()` would return an `amountOut` that is 10% lower than the spot price `amountOut`. In other words, accepting trades that are 10% overvalued.
 
-        1. Take a flash loan of `attackAmount` worth of WETH.
-        (the optimal `attackAmount` fluctuates with the market and liquidity concentration).
-        1. Swap WETH for MKR, on `path = abi.encodePacked(WETH, uint24(3000), MKR);`.
-        1. Execute `fire()` on `KilnUniV3.sol`.
-        1. Swap MKR back to WETH.
-        1. Repay flash loan with fee `attackAmount` + `flashLoanFee`.
-        1. Profit for the attacker and loss for MakerDAO.
+Noticing this, an attacker can almost guarantee that they are the one to call `fire()` as soon as
+`kiln` is ready to swap again by using off-chain bots to call their malicious contract and
+spending enough on priority fees.
 
-        ### Quantifying Loss
+Specifically:
 
-        1. <a href="#appendix-m1-poc" class="hover:underline">Proof of concept for the attak above</a>.
-        1. This [trading data analysis](https://www.notion.so/0xmacro/MakerDAO-1-TWAP-Lag-and-Arbitrage-Loss-5ee753d73d4f49dda61c4d566e99f925) uses 3 months data to show the average and worst loss and discusses further using 2nd TWAP as a solution.
+1. Take a flash loan of `attackAmount` worth of WETH (the optimal `attackAmount` fluctuates with the market and liquidity concentration).
+2. Swap WETH for MKR, on the trade `path = abi.encodePacked(WETH, uint24(3000), MKR);`.
+3. Execute `fire()` on `KilnUniV3.sol`.
+4. Swap MKR back to WETH.
+5. Repay flash loan with fee `attackAmount` + `flashLoanFee`.
+6. Profit for the attacker and loss for MakerDAO.
 
-        ### Remediations
+### Quantifying Loss
 
-        - Using a 2nd TWAP to detect price deviation and revert when necessary (refer to trading data analysis above for detail).
-        - Using a [TWAMM](https://www.paradigm.xyz/2021/07/twamm), like FraxSwap, to greatly reduce the likelihood of
-        sandwich attacks.
-        - Using off-chain oracles to get pricing information.
-        - Dropping `lot` size to smaller amount like `15_000 DAI`. We could not turn a profit in the above test using
-        `15_000 DAI` and 10% lag, but this may not hold in all market conditions.
+1. [(TODO) Proof of concept for the attack above](https://www.notion.so/MakerDAO-1-Dumping-Ground-for-Copy-Editing-2d6efb17ba0240858608ce3a93b3d2a0).
+2. This [trading data analysis](https://www.notion.so/MakerDAO-1-TWAP-Lag-and-Arbitrage-Loss-5ee753d73d4f49dda61c4d566e99f925) uses 3 months of data to show the average and worst loss and discusses using 2nd TWAP as remediation.
 
+### Remediation
+
+- Using a 2nd TWAP to detect price deviation and revert when necessary.
+- Using a [TWAMM](https://www.paradigm.xyz/2021/07/twamm), like FraxSwap, greatly reduce the likelihood of
+sandwich attacks.
+- Using off-chain oracles to get pricing information.
+- Dropping `lot` size to a smaller amount like `15_000 DAI`. We could not turn a profit in the above test using `15_000 DAI` and 10% lag, but this may not hold in all market conditions.
     </field>
     <field name="response">
 	Thank you for finding this sandwiching case. Indeed for every usage of dss-kiln the liquidity status along the path should be taken into account and `lot` should be selected carefully. Off chain oracles or TWAMMs should be considered for later versions.
     </field>
 </item>
+
+
+
 
 <item>
     <field name="topic">TODO</field>
@@ -186,6 +174,8 @@ Consider changing `require(data <= type(uint32).max, "KilnUniV3/scope-overflow")
 In `TwapProduct.sol` line 49, an overflow error will occur if the `amountIn` being swapped is greater than `type(uint128).max.` The amount being swapped is the minimum amount of `GemLike(sell).balanceOf(address(this))` and `lot` in `KilnBase.sol`. 
 
 However, nothing is preventing either of these two values from being greater than `type(uint128).max.` If both of them are greater than this value, the swap will revert in an overflow error.
+
+<a href="#appendix-q3-poc" class="hover:underline">Proof of concept</a>
     </field>
     <field name="response">
     	We think the explicit require in `quote` is enough for this low probability case.
@@ -233,6 +223,7 @@ Consider providing sufficient documentation and warning, for Maker’s proposal 
     
         - When the path is set, ensure that the first token in the path is the `sell` token.
         - Document this behavior.
+<a href="#appendix-q5-poc" class="hover:underline">Proof of concept</a>
     </field>
     <field name="response">
     	The sell token should be configured carefully and validated prior to deployment.
@@ -315,6 +306,7 @@ In this way an attacker can create a flash-loan to set a level of slippage which
 **Remediations to Consider**
 
 - Consider limiting the minimum value of `yen`.
+<a href="#appendix-i1-poc" class="hover:underline">Proof of concept</a>
     </field>
     <field name="response">
 Added a warning in the source and Readme for cautiously using yen = 0 or other low values.
@@ -352,7 +344,7 @@ This issue is very similar to I-1 in impact.
 
 Consider enforcing a sane minimum when setting `scope` in `file(bytes32 what, uint256 data)` and removing support for `scope == 0` in `_consult()`.
 
-
+<a href="#appendix-i2-poc" class="hover:underline">Proof of concept</a>
     </field>
     <field name="response">
 "Removed support for scope = 0.
