@@ -1,0 +1,678 @@
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">spec</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">dc9092fdffadf2c320d83e46daa6a774be711fd7</field>
+  <field name="content">
+## (H-1) Calling `Removal.release()` does not fully un-list from the Market, allowing the burned `removalId` to be swapped into a new Certificate and the supplier to receive rewards
+
+Any listed amount of a Removal being released will be burned within Removal.sol, which prevents the subsequent call to `Market.release()` from properly un-listing the Removal.
+
+See Removal.sol lines 692-694 below. Note that the `_burn()` is called prior to invoking `_market.release()`:
+
+```solidity
+  function _releaseFromMarket(uint256 id, uint256 amount) internal {
+    super._burn({from: this.marketAddress(), id: id, amount: amount});
+    _market.release(id, amount);
+```
+
+Within Market.sol `release()` lines 277-286, the `balanceOf()` will be zero, preventing `_removeActiveRemoval()` from being invoked.
+
+```solidity
+  uint256 removalBalance = _removal.balanceOf({
+    account: address(this),
+    id: removalId
+  });
+  if (amount == removalBalance) {
+    _removeActiveRemoval({
+      removalId: removalId,
+      supplierAddress: supplierAddress
+    });
+  }
+```
+
+This leaves the `removalId` in the suppliers `_listedSupply`, such that a Market.sol `swap()` can potentially associate the orphaned `removalId` into a new Certificate and the supplier to receive unearned bpNori tokens, as long as the holdback percentage is not ≥ 100.
+
+**Remediations to Consider**
+
+Consider updating Market.sol `release()` logic to account for the tokens being burned within Removal.sol.
+  </field>
+  <field name="response">
+Resolution: we elected to resolve this not by swapping the order of _burn and market.release, which creates a pattern that makes reentrancy vulnerabilities more possible with future changes (we get a Slither warning about that), but instead to change the check inside market.release to check whether the market contract’s balance for the removal in question is now 0, in which case the removal is removed from the sale queue.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">b784642373d59c89d3702d5855cc258342392baf</field>
+  <field name="content">
+## (H-2) Holders of RestrictedNORI tokens can claim bpNori tokens earlier than intended
+
+In *RestrictedNORI.sol*, holders should be able to claim their bpNori tokens based on a linear schedule mechanism, meaning that for a schedule duration of 10 years, a holder can claim 10% of his tokens after 1 year. 
+
+Due to how the claimable amount is calculated, a holder can claim more than 10% of tokens (even up to 100%) by repeatedly withdrawing some amount and transferring the remaining amount to another account. 
+
+Depending on how many holders are attached to the schedule, the consequences can differ. 
+
+**Scenario 1: 1 holder is attached to the schedule**
+
+1)  A schedule is created with a 10 year schedule duration
+
+2) Holder_1 has 1000 tokens locked up
+
+3) After 1 year, Holder_1 claims his tokens by calling the `withdrawFromSchedule` function with the maximum claimable amount of 100 tokens (10% of 1000). 
+
+4) Holder_1 transfers his remaining balance (900 tokens) to another account he owns, let’s call it Holder_1b.
+
+5) Holder_1b now can claim another 90 tokens (10% of 900).
+
+As a consequence, the holder claimed 190 tokens instead of the allowed 100 tokens. 
+    
+**Scenario 2: Multiple holders are attached to the schedule**
+
+In case multiple holders are attached to the schedule, Holder_1 can repeat step 3-5 until the schedule’s maximum claimable amount is reached. 
+
+As a consequence, when enough balance is in the schedule pool, a holder can claim up to 100% of his tokens much earlier than intended by the schedule.
+    
+
+**Remediations to Consider**
+
+When `withdrawFromSchedule` is called, the `schedule.claimedAmountsByAddress` is updated to reflect the total amount of claimed tokens for the specific holder’s address. Currently, this value is not being copied over to the new holder when tokens are transferred from one holder to another. Consider to update `safeTransferFrom` and `safeBatchTransferFrom` functions, so that the  `schedule.claimedAmountsByAddress` amount is applied to the address where tokens are transferred to.
+  </field>
+  <field name="response">
+  Resolution: to minimize scope of the change we elected to restrict token transfers for this release with the intention of revisiting the transfer bookkeeping in a future release. safeTransferFrom and safeBatchTransferFrom are now disabled and the math that governs claimable tokens should not allow over-withdrawing for any given holder.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">1e95699232ec408eef8cfb7523176b84de2203f2</field>
+  <field name="content">
+## (H-3) LockedNORI grantees can bypass vesting logic, withdrawing their full grant almost immediately
+
+LockedNORI.sol extends from `deprecated/ERC777PresetPausablePermissioned.sol`, which implements `batchSend()`. This method is not overridden to revert in `LockedNORI.sol`, allowing a grant recipient to transfer their unlocked amount to another address. This will draw down their `balanceOf()` amount but leave the `vestedBalanceOf()` amount unchanged, allowing the attacker to repeatedly siphon the vested balance amount via `batchSend()` until their full balance has been transferred. If sent to an address without a granting schedule, the full balance is immediately withdraw-able.
+    
+**Remediations to Consider**
+
+Consider overriding `batchSend()` to revert, as `send()` presently does.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">1e95699232ec408eef8cfb7523176b84de2203f2</field>
+  <field name="content">
+## (H-4) LockedNORI grantees can block calls to `revokeUnreleasedTokens()`, allowing them to withdraw their full amount upon vesting
+
+LockedNORI is a partial ERC777 implementation, which supports the `_callTokensToSend()` callback as part of `_burn()`. A malicious grantee can register an ERC1820-compliant contract as an `ERC777TokenSender`, which can be coded to revert on any send callbacks that the grantee did not initiate.  This allows them to default-disallow LockedNORI sends, which will cause `revokeUnreleasedTokens()` to revert. They can subsequently allow sends prior to calling `withdrawTo()`, for any vested tokens.
+    
+
+**Remediations to Consider**
+
+Consider overriding the ERC777’s `_mint()`, `_burn()`, and `_send()` functions with a version that does not call `_callTokensToSend()`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">b82d8b5ba38416ed96a110bb8cea49e0f80840ce</field>
+  <field name="content">
+## (M-1) Any supplier that doesn’t accept ERC1155 tokens will revert when they are minted `RestrictedNORI`, breaking the entire market’s swap mechanism
+
+*RestrictedNORI.sol* implements ERC1155, which supports the `onERC1155Received` callback as part of the minting (see [here](https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/v4.8.0/contracts/token/ERC1155/ERC1155Upgradeable.sol#L481)), thus requiring recipients of token transfers (including burn and mint) to “accept” the reception of tokens.
+
+Any supplier can register a contract’s address as the `supplierAddress` that does not accept ERC1155 tokens. As a result, the entire market’s swap mechanism would break, since it would revert whenever RestrictedNORIs are minted to the affected `supplierAddress`.
+
+See Market.sol lines [812-815](https://github.com/nori-dot-eco/contracts/blob/083d8d8eef5d652b600b0044242d517252d20406/contracts/Market.sol#L812-L815):
+
+```solidity
+  _restrictedNORI.mint({                      
+    amount: restrictedSupplierFee,
+    removalId: removalIds[i]
+  });
+```
+
+and the subsequent minting in RestrictedNORI.sol lines [448-451](https://github.com/nori-dot-eco/contracts/blob/083d8d8eef5d652b600b0044242d517252d20406/contracts/RestrictedNORI.sol#L448-L451):
+
+```solidity
+  address supplierAddress = RemovalIdLib.supplierAddress({
+    removalId: removalId
+  });
+
+  // audit: this is where the swap transaction reverts
+  super._mint({to: supplierAddress, id: projectId, amount: amount, data: ""});
+```
+
+Once the affected supplier has been selected as current supplier (thus `_currentSupplierAddress` points to the affected supplier), all subsequent calls to the market’s `swap` function will revert.
+
+Note that the *Market.sol*’s `swapFromSupplier` function can still be used as long as the specified supplier address doesn’t reject on minting. However, one of the market’s core principle - of having a fair, consistent selling order - can only be achieved via the `swap` function. 
+
+**Remediations to Consider**
+
+Consider adding appropriate error handling to Market.sol, so that the swap function doesn’t revert when minting is rejected by a supplier. Thus, whenever a supplier that doesn’t accept ERC1155 tokens has been identified, an appropriate event could be emitted signaling the releaser role to release the affected removals from the market.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">7ed463b6cd10b6e5236e77f8bf2039c0bd43a766</field>
+  <field name="content">
+## (M-2) BridgedPolygonNORI can be deposited beyond a recipient’s grant limit, permanently locking the bpNORI
+
+The `depositFor()` function allows additional amounts to be deposited beyond a recipient’s grant amount.  This locks the bpNORI amount in LockedNORI; `balanceOf()` will show the additional amount, but it cannot be withdrawn by the recipient.
+
+**Remediations to Consider**
+
+Consider disallowing deposits beyond recipient grant amount. The simplest solution may be to reduce grant creation+funding into a single transactional operation, such as implementing the recommendation of L-2 and also deleting the `depositFor()` function entirely.  If this is not feasible, consider adding additional logic checks to `depositFor()`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">addressed</field>
+  <field name="commit">56898e8ccfbd50a33a75f40f4812a22c7e5378cf</field>
+  <field name="content">
+## (M-3) RestrictedNORI.revokeUnreleasedTokens() can revoke tokens for unreleased Removals and/or amounts
+
+RestrictedNORI:revokeUnreleasedTokens() does not perform any validation that the project or release amount corresponds to Removals that were actually released. This allows for unreleased Removals, or amounts in excess of released amounts, to be revoked. 
+    
+**Remediations to Consider**
+
+Consider updating the design of `RestrictedNORI.sol:revokeUnreleasedTokens()` to be callable only from `Removal.sol:release()`,  for only the specific Removal amount that was released.
+  </field>
+  <field name="response">
+  - Revocation of restricted NORI is at the project level by design and it’s valid for release of carbon in one field to spill over and cause revocation of RestrictedNORI attributed to other removals in the project.
+- Resolution: To improve transparency around the reason for a revocation we added a removal ID to the revocation event to provide a stronger link between release of a removal and the subsequent revocation call.   In the future we intend to further automate the connection between release, revocation and replacement of released removals attributed to a certificate.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">513e82ec444f0f2bf7dbc6880d8f7ac8b5ec4548</field>
+  <field name="content">
+## (M-4) Previously sold Removal can be re-listed and re-sold in the Market
+
+Removal.sol `consign()` does not validate the `from` argument, which allows previously sold Removals locked in a Certificate to be re-sold in the Market. This can divert funds from legitimately unsold market Removals by double-paying for re-listed Removals. The removal’s supplier will also be double paid.
+
+**Remediations to Consider**
+
+Consider adding validation to `consign()` to prevent re-listing Removals currently owned by the Certificate.
+
+Note that Removals actively listed in the Market can also be re-consigned, but no ill-effects were found. For correctness, consider also validating that the `from` address is not the Market.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">b0fb74119ffb59bc2dd4c47ee2a7b7470077e088</field>
+  <field name="content">
+## (M-5) No boundary check for `holdbackPercentage` in `mintBatch`
+
+In *Removal.sol’s* `mintBatch` function, a `holdbackPercentage` > 100% can be passed and the affected removals can be listed in the market (via `consign` function). If so, a subsequent call to the *Market.sol’s* `swap` function would revert due to an underflow on line [811](https://github.com/nori-dot-eco/contracts/blob/083d8d8eef5d652b600b0044242d517252d20406/contracts/Market.sol#L811). 
+
+This could stop the whole market’s swap mechanism from functioning if the affected removal is selected as the next removal in the `_allocateSupply` or `_allocateSupplySingleSupplier` functions.
+
+**Remediations to Consider**
+
+Consider adding an upper limit of 100 for holdbackPercentage.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">c4fb5509ba7ee7738529b3690e99ee4775c58b2c</field>
+  <field name="content">
+## (M-6) Selection of next supplier is not working as expected
+
+In Market.sol’s `swap` function, removals should be allocated and purchased from suppliers in a round-robin way. Meaning that the oldest removal of the 1st supplier being listed is used up first, then the oldest removal of the 2nd supplier is used up, and so on.
+
+However, currently removals are allocated as follows: Once a removal is fully used up, the current supplier is incremented twice, resulting in skipping the next supplier in the list. Consider the following scenario:
+
+1) 3 suppliers get listed in *Market.sol* in the following order:
+
+- *Supplier_A* lists a removal with amount of 1 * 10**18
+- *Supplier_B* lists a removal with amount of 1 * 10**18
+- *Supplier_C* lists removal with amount of 1 * 10**18
+
+2) A user purchases an amount of 1.5 * 10**18 via the Market.sol’s `swap` function
+
+3) In the subsequent `_allocateSupply` function, the removal of *Supplier_A* will be fully used up taking 1 * 10 ** 18 and the remaining amount of 0.5 * 10 ** 18 will be taken from *Supplier_C* - completely leaving out *Supplier_B*.
+
+See Market.sol lines [978-989](https://github.com/nori-dot-eco/contracts/blob/083d8d8eef5d652b600b0044242d517252d20406/contracts/Market.sol#L978-L989) below. Note that the current supplier is incremented twice, once in `removeActiveRemoval` (which sets *Supplier_B* as current supplier) and once by calling `incrementCurrentSupplierAddress` (which sets *Supplier_C* as current supplier). This leads to skipping *Supplier_B* and taking removals from *Supplier_C* instead.
+
+```solidity
+_removeActiveRemoval({   
+    removalId: removalId,
+    supplierAddress: _currentSupplierAddress
+});
+if (
+    /**
+    *  If the supplier is the only supplier remaining with supply, don't bother incrementing.
+    */
+  _suppliers[_currentSupplierAddress].next != _currentSupplierAddress 
+) {
+    _incrementCurrentSupplierAddress();
+}
+```
+    
+**Remediations to Consider**
+
+Consider to only call `_incrementCurrentSupplierAddress()` if the current supplier hasn’t been already incremented in the `_removeActiveRemoval` function.
+  </field>
+  <field name="response">
+
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+## (L-1) Removal.release() does not release removal IDs that are owned by the consignor role
+
+When `removal.release()` is called, removals should first be burned from unlisted balances, second from listed balances and third from certificates. Unlisted balances can include removals that are owned by the supplier or owned by the consignor role. 
+
+However, when the `release()` function is called, removals are never burned from the consignor role. This means listed removals and removals owned by certificates can be burned before all unlisted removals are burned.
+  </field>
+  <field name="response">
+- The consigner role is intended to be used only during the initial migration.  We plan to monitor it to make sure removals are not sitting there and will remove the consignment role and code in a future release once the migration is complete.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">7ed463b6cd10b6e5236e77f8bf2039c0bd43a766</field>
+  <field name="content">
+## (L-2)  LockedNORI allowed to enter insolvent state for existent grants, creating potential shortfall and/or trust concerns
+
+LockedNORI.sol offers the ability to `createGrant()` without also locking the associated `totalAmount`. This creates a potential avenue in which the locked BridgedPolygonNORI is capable of being insufficient to cover all extant grants, such that some grantees may not be able to withdraw upon vesting/unlocking.
+
+Note that should this occur, the shortfall can be remedied via `depositFor()`, which reduces this from a Medium to a Low severity vulnerability.
+    
+**Remediations to Consider**
+
+Consider enforcing that grant-holders’ BridgedPolygonNORI is sufficient to cover all grants at time of grant creation. For example, consider adding logic to `createGrant()` which also mints LockedNORI and transfers bpNORI to cover the `totalAmount`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">dd95911eadb14dc8ec848d0f19e703d55d9a564f</field>
+  <field name="content">
+## (L-3)  `_purchaseAmounts` in Certificate.sol can show a false amount that was actually purchased for the certificate
+
+When migrating removals to the certificate contract, the consignor role can input a `certificateAmount` that is not equal to the total balance of all corresponding removal tokens included in that certificate. This can cause confusion when the underlying removals are released and the certificates need to be topped back up to their original amounts.
+
+**Remediations to Consider**
+
+Validate that the `certificateAmount` is the sum of all of the `removalAmounts` .
+  </field>
+</item>
+
+<item>
+  <field name="topic">Interoperability</field>
+  <field name="impact">medium</field>
+  <field name="impactNote">Depends on the external contract's assumptions</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">3ef6f64ccfbdf7665e4ff4ea5bda92b2c2c8f866</field>
+  <field name="content">
+## (L-4) `supportsInterface` incorrectly implemented in Certificate.sol
+
+Due to how inheritance in Solidity works, the `supportsInterface` function in *Certificate.sol* does not support ERC721 and ERC721Metadata IDs. Thus, any call to `supportsInterface` with ERC721 interface ID (`0x80ac58cd`) or ERC721Metadata interface ID (`0x5b5e139f`), returns false. 
+
+**Remediations to Consider**
+
+Consider to manually add those interface IDs:
+
+```solidity
+  function supportsInterface(bytes4 interfaceId)
+    public
+    view
+    override(
+      AccessControlEnumerableUpgradeable,
+      ERC721AUpgradeable,
+      IERC721AUpgradeable
+    )
+    returns (bool)
+  {
+    return super.supportsInterface({interfaceId: interfaceId})
+    || interfaceId == 0x80ac58cd || interfaceId == 0x5b5e139f;  
+  }
+  ```
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">aeb8906d2fb97649e4144df069bee22c03ee1960</field>
+  <field name="content">
+## (Q-1) Protocol users cannot readily verify that `migrate()` applied the correct `ceritificateAmount` for the supplied Removal `amounts`
+
+The process which begins with `Removal.migrate()` ends with a call to `Certificate._receiveRemovalBatch()`, which only stores `certificateAmount` on chain, and only emits `removalAmounts`. Users cannot readily validate that both values are correct.
+
+Consider adding `certificateAmount` to the `ReceiveRemovalBatch` event, or alternatively calculating `certificateAmount` on-chain.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">4d3fa755b140d7020c711cab601c282c6bc08934</field>
+  <field name="content">
+## (Q-2) Eliminate cyclic dependencies by changing types or utilizing interfaces
+
+Cyclic dependencies make it complex to reason about contract relationships and dependencies; and can also prohibit certain analysis and deployment tooling from functioning (e.g. `npx hardhat flatten` can fail due to cyclic dependency).
+
+Some examples of cyclic dependencies found:
+
+- Removal.sol ←→ RestrictedNORI.sol (through Market.sol)
+- Certificate.sol ←→ Removal.sol (through Market.sol)
+
+In some cases, only the dependency address is used (e.g. Certificate.sol only depends on the Removal address): in these cases, consider removing the contract-typed dependency and replacing it with an `address` type.
+
+In other cases a restricted set of functions are used (e.g. RestrictedNORI.sol depends upon Removal.getProjectId()). Consider implementing an interface for the depended-upon functions, and replacing contract dependencies with interface dependencies.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">aeb8906d2fb97649e4144df069bee22c03ee1960</field>
+  <field name="content">
+## (Q-3) Improve readability of Market.sol function definitions
+
+The functions `_allocateSupply()` and `_allocateSupplySingleSupplier()` specify `returns()` statements that do not include variable names.  For example:
+
+```solidity
+  returns (
+    uint256,
+    uint256[] memory,
+    uint256[] memory,
+    address[] memory
+  )
+```
+
+The lack of variable names within the `returns()` portion of the function definition impairs code readability. Consider adding variable `returns()` names for both functions.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+## (Q-4) Minimize `unchecked{}` scope to reduce risk of introducing vulnerabilities
+
+There are currently seven location in RestrictedNORI.sol where an `unchecked{}` block is used, which all follow a similar pattern:
+
+```solidity
+  // Skip overflow check as for loop is indexed starting at zero.
+  unchecked {
+    for (uint256 i = 0; i < ...bounding value...; ++i) {
+      ...loop logic...
+    }
+  }
+```
+
+This explicitly leaves all loop logic unchecked, whereas the comment suggests the intention is to leave only `++i` unchecked.
+
+Fortunately, `unchecked` does not extend into library calls made from within an `unchecked{}` block.  This prevented a High vulnerability which would have allowed a Supplier to withdraw all of their RestrictedNORI as soon as only 1 token was withdrawable. See the Validation section below.
+
+As such, this code is presently only vulnerable to being brittle: the conditions for a High vulnerability have been created by an `unchecked{}` block, but are avoided by side-effects: Library code called from an `unchecked{}` block is itself checked.  Should a future refactor pull the vulnerable logic out of the library and into RestrictedNORI.sol, the vulnerability will surface.  The Validation section below emulates the effects of such a refactor, and illustrates the High vulnerability that would result.
+
+To reduce resilience against these risks, consider minimizing the scope of `unchecked{}` blocks to the smallest amount possible. For example, the above pattern could be updated to:
+
+```solidity
+  for (uint256 i = 0; ...predicate...; ) {
+    ...loop logic...
+
+    // Skip overflow check as for loop is indexed starting at zero.
+    unchecked{ ++i; }
+  }
+```
+  </field>
+    <field name="response">
+Won’t fix for now.  Will keep an eye on it
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">aeb8906d2fb97649e4144df069bee22c03ee1960</field>
+  <field name="content">
+## (Q-5) Incorrect `@notice` comment
+
+The `@notice` comment on LockedNORI.sol line [694](https://github.com/nori-dot-eco/contracts/blob/083d8d8eef5d652b600b0044242d517252d20406/contracts/LockedNORI.sol#L694) appears to be incorrect. Suspect copy-paste from the `_vestedBalanceOf()` `@notice` on line [704](https://github.com/nori-dot-eco/contracts/blob/083d8d8eef5d652b600b0044242d517252d20406/contracts/LockedNORI.sol#L704)
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">c7e43ee13941210ccd5d39efed6703765d337ca1</field>
+  <field name="content">
+## (Q-6) ArrayLib.sol: `sum()` allows overflow
+
+The present implementation will not revert when the summation overflows. There are no related security vulnerabilities with present usages of `sum()`.     
+
+**Remediations to Consider**
+
+Consider updating the implementation to revert on overflow, to mitigate future introduction of vulnerabilities.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">46c58163da4cb1d8e5324c8c5d878c6fa3117c58</field>
+  <field name="content">
+## (Q-7) ArrayLib.sol: `slice()` mutates the original array
+
+The implementation of `slice()` overwrites the original array’s value at index = `to` to the value of `to-from`, and returns that memory location as the `ret` array. This behavior has the following unexpected consequences:
+
+- When `from == 0`: The original array `arr` will be truncated in size to `to-from` elements
+- When `from > 0`: The original array `arr` will have the value at index `from-1` overwritten to `to-from`
+
+Due to these mutations, subsequent code that continues to use the original array after `slice()` is called on it may behave unpredictably. There are no related security vulnerabilities with present usages of `slice()`.
+ 
+**Remediations to Consider**
+
+Consider updating the implementation to leave the original array un-mutated, to mitigate future introduction of vulnerabilities.
+
+Alternatively, if truncation of the memory array is intended (given the present use of `slice()` and the circumstances outlined in G-1), consider renaming and refactoring `slice()` accordingly (e.g. `truncate(uint256 newLength)`) Care should be taken in the implementation such that the truncation length does not exceed the original length; and in the naming and documentation to make very clear that this has mutative effects.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">aeb8906d2fb97649e4144df069bee22c03ee1960</field>
+  <field name="content">
+## (Q-8) Documentation out of date 
+
+NORI.sol’s documentation [here](https://github.com/nori-dot-eco/contracts/blob/083d8d8eef5d652b600b0044242d517252d20406/docs/README.md#nori-nori) states that minting and burning should be disabled. 
+
+However, NORI.sol inherits ERC20BurnableUpgradeable which contains a public `burn()`
+
+function without any access control/reversion. When called, this will destroy the specified amount of tokens from the caller. 
+
+Since the Nori Team stated, “There is not currently any business case for preventing burning of that token so it sounds like the docs are out of date but the implementation is ok”, the documentation is considered out of date.
+
+**Remediations to Consider**
+
+Update the spec to not mention that burning is disabled to avoid confusion for users.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">51f81b1e54be18f6706b09be17ebebf0e5b7800e</field>
+  <field name="content">
+## (Q-9) Lack of testing on NORI.sol
+
+NORI.sol does not have any tests regarding its functionality.
+
+**Remediations to Consider**
+
+Create `NORI.t.sol` and `NORI.test.ts` files under the contracts/test folder to test its functionality.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">dd95911eadb14dc8ec848d0f19e703d55d9a564f</field>
+  <field name="content">
+## (G-1) Reduce array sizes in `_allocateSupply()` before summing and returning
+
+`_allocateSupply()` will allocate memory arrays for `ids` , `amounts`, and with a length that matches the total number of Market listings, which may greatly exceed the number of allocated removals. `_allocateSupplySingleSupplier()` has similar logic. Each of these methods will sum over `amounts` before returning, which may largely be empty values when array length is much higher than allocated supply.
+
+Consider moving the re-sizing logic present in `_fulfullOrder()` to each of these functions: prior to `sum(amounts)`. This will save gas costs of summing over empty values.
+
+Gas savings are substantial: in a test case of 10,000 total listed removals, calling `swap()` for `1 ether` of removals incurs ~680,000 less gas.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">e18269165084527362c3af76cc917b799b19b0ce</field>
+  <field name="content">
+## (G-2) LockedNori.sol  `_beforeTokenTransfer()`: declare variables only when needed
+
+Two variables are always set but not always used: `ownerHasSufficientUnlockedBalance` and `ownerHasSufficientWrappedToken`.  See lines [678-688](https://github.com/nori-dot-eco/contracts/blob/083d8d8eef5d652b600b0044242d517252d20406/contracts/LockedNORI.sol#L678-L688):
+
+```solidity
+  bool ownerHasSufficientUnlockedBalance = amount <= unlockedBalanceOf(from);
+  bool ownerHasSufficientWrappedToken = amount <= balanceOf(from);
+  if (isBurning && operatorIsNotSender && operatorIsGrantAdmin) {
+    // Revocation
+    require(balanceOf(from) >= amount, "lNORI: insufficient balance");
+  } else if (!isMinting) {
+    // Withdrawal
+    require(
+      ownerHasSufficientUnlockedBalance && ownerHasSufficientWrappedToken,
+      "lNORI: insufficient balance"
+    );
+  }
+```
+
+Consider re-using `ownerHasSufficientWrappedToken`, which is always checked; and relying on boolean short-circuiting to only check vested balance when necessary. For example:
+
+```solidity
+  bool ownerHasSufficientWrappedToken = amount <= balanceOf(from);
+  if (isBurning && operatorIsNotSender && operatorIsGrantAdmin) {
+    // Revocation
+    require(ownerHasSufficientWrappedToken, "lNORI: insufficient balance");
+  } else if (!isMinting) {
+    // Withdrawal
+    require(
+      ownerHasSufficientWrappedToken && amount <= unlockedBalanceOf(from),
+      "lNORI: insufficient balance"
+    );
+  }
+```
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">e18269165084527362c3af76cc917b799b19b0ce</field>
+  <field name="content">
+## (G-3) LockedNori.sol `_unlockedBalanceOf()`: declare variables only when needed
+
+`vestedBalance` is always set but not always utilized, see lines [746-759](https://github.com/nori-dot-eco/contracts/blob/083d8d8eef5d652b600b0044242d517252d20406/contracts/LockedNORI.sol#L746-L759):
+
+```solidity
+  uint256 vestedBalance = _hasVestingSchedule(account)
+    ? grant.vestingSchedule.availableAmount(atTime)
+    : grant.grantAmount;
+  if (grant.exists) {
+    balance =
+      MathUpgradeable.min(
+        MathUpgradeable.min(
+          vestedBalance,
+          grant.lockupSchedule.availableAmount(atTime)
+        ),
+        grant.grantAmount
+      ) -
+      grant.claimedAmount;
+  }
+```
+
+Consider moving the `vestedBalance` variable into the `if()` block.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">e18269165084527362c3af76cc917b799b19b0ce</field>
+  <field name="content">
+## (G-4) `whenNotPaused` modifier is not needed on several external and public functions in Removal.sol, Certificate.sol, and RestrictedNORI.sol
+
+In Removal.sol, `mintBatch()`, `addBalance()`, `consign()`, `migrate()`, `release()`, `safeTransferFrom()`, and `safeBatchTransferFrom()` functions do not need the `whenNotPaused` modifier because they all call `beforeTokenTransfer()` which also has the `whenNotPaused` modifier. This is also the case in Certificate.sol regarding the `onERC1155BatchReceived()` function and in RestrictedNORI.sol regarding the `revokeUnreleasedTokens()` function.
+
+**Remediations to Consider**
+
+Remove the `whenNotPaused` modifier on these functions to save on gas
+  </field>
+</item>
+
+
+
+
