@@ -76,31 +76,33 @@ sandwich attacks.
 
 
 <item>
-    <field name="topic">TODO</field>
+    <field name="topic">Configuration</field>
     <field name="impact">high</field>
     <field name="chance">low</field>
     <field name="status">ack</field>
     <field name="content">
-        ## (L-1) The buy token may not be the token that is actually bought and transferred to the recipient
+## (L-1) The buy token may not be the token that is actually bought and transferred to the recipient
 
-        The token that gets bought is the last token stated in the `path`.
+The token that gets bought is the last token stated in the `path`.
 
-        However, this token may not necessarily be the same as the `buy` token set in the constructor.
+However, this token may not necessarily be the same as the `buy` token set in the constructor.
 
-        Therefore, a different token can be bought that is not the `buy` token and `sell` tokens will be lost.
+Therefore, a different token can be bought that is not the `buy` token and `sell` tokens will be lost.
 
-        <a href="#appendix-l1-poc" class="hover:underline">Proof of concept</a>
+[Proof of concept](#appendix-l1-poc)
 
-        ### Remediations
+### Remediation
 
-        - When the path is set, ensure that the last token in the path is the `buy` token.
-        - Document this behavior sufficiently for external users.
+- When the path is set, ensure that the last token in the path is the `buy` token.
+- Document this behavior sufficiently for external users.
     </field>
 
     <field name="response">
     	The buy token should be configured carefully and validated prior to deployment.
     </field>
 </item>
+
+
 
 
 <item>
