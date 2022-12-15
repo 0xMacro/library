@@ -5,10 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "lancer build",
+    "build": "LANCER_CLIENT_DIR=client/library lancer build",
     "build-evm": "LEARN_EVM=1 LANCER_CLIENT_DIR=client/learn_evm LANCER_STATIC_DIR=public/learn_evm lancer build",
     "init": "lancer init",
-    "dev": "lancer dev",
+    "dev": "LANCER_CLIENT_DIR=client/library lancer dev",
     "dev-evm": "LEARN_EVM=1 LANCER_CLIENT_DIR=client/learn_evm LANCER_STATIC_DIR=public/learn_evm lancer dev",
     "postinstall": "patch-package"
   },
