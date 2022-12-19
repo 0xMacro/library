@@ -39,7 +39,7 @@
         
         ### Attack Overview
         
-        Consider TWAP being 10% above the spot price. a) `quote()` would return an `amountOut`  10% lower than b) the `amountOut` derived from spot price. In other words, `kiln` accepts trades that are 10% overvalued.
+        Consider TWAP for B being 10% above the spot price. a) `quote()` would return an `amountOut`  10% lower than b) the `amountOut` derived from spot price. In other words, `kiln` accepts trades that are 10% overvalued.
         
         Noticing this, an attacker can almost guarantee themself as the caller of `fire()` as soon as
         `kiln` is ready to swap again by using off-chain bots to call their malicious contract and
@@ -125,7 +125,7 @@
     <field name="content">
         ## (Q-1) Misleading documentation on the `yen` value
         
-        Regarding `yen`, [README.md](https://github.com/makerdao/dss-kiln) states: “By **lowering** this value you can seek to trade at a better than average price, or by **raising** the value you can account for price impact or additional slippage.” (bold added). However, the opposite is true.
+        Regarding `yen`, [README.md](https://github.com/makerdao/dss-kiln/blob/a4bd20c8c57a6dcb3535d3568a91e16c5353a831/README.md#yen-default-1000000000000000000-ie-wad-or-100) states: “By **lowering** this value you can seek to trade at a better than average price, or by **raising** the value you can account for price impact or additional slippage.” (bold added). However, the opposite is true.
         
         ### Remediation
         
@@ -274,12 +274,12 @@ Consider updating the contract to allow the entire set of configurations to be u
     <field name="content">
         ## (Q-7) Misleading documentation regarding trading price
         
-        The [README.md](https://github.com/makerdao/dss-kiln#kilnuniv3-twap-trading) states:
+        The [README.md](https://github.com/makerdao/dss-kiln/blob/a4bd20c8c57a6dcb3535d3568a91e16c5353a831/README.md#kilnuniv3-twap-trading) states:
         
         - “the KilnUniV3 implementation will only buy tokens when it can trade at a price *better* *than* the previous 1 hour average.”
         - “By default, `yen` is set to `WAD`, which will require that a trade will only execute when the amount received is *better* *than* the average price over the past `scope` period.”
         
-        However, `KilnUniV3.sol` calculates the average price over the past `scope` period and only buys tokens when it can trade at a price better **or the same as** the previous 1-hour average, as seen on line [165](https://github.com/Uniswap/v3-periphery/blob/main/contracts/SwapRouter.sol#L165) of Uniswap V3’s `SwapRouter.sol`.
+        However, `KilnUniV3.sol` calculates the average price over the past `scope` period and only buys tokens when it can trade at a price better **or the same as** the previous 1-hour average, as seen on line [165](https://github.com/Uniswap/v3-periphery/blob/eb0852f33c9135474ebdaf753994a6a01d8c9d36/contracts/SwapRouter.sol#L165) of Uniswap V3’s `SwapRouter.sol`.
         
         ### Remediation
         
@@ -300,7 +300,7 @@ Consider updating the contract to allow the entire set of configurations to be u
     <field name="content">
         ## (I-1) Attackers can use flash-swap to sandwich attack low-`yen` swaps, resulting in potentially significant losses due to manipulated slippage
         
-        An attacker can execute `fire()` inside a flash-loan callback: they sandwich attack the kiln `path` pools. The impact and attractiveness of such an attack are controlled by `amountMin`, which is partially controlled by `yen` ([ref](https://github.com/makerdao/dss-kiln/blob/v0.0.1-alpha/src/KilnUniV3.sol#L109)).
+        An attacker can execute `fire()` inside a flash-loan callback: they sandwich attack the kiln `path` pools. The impact and attractiveness of such an attack are controlled by `amountMin`, which is partially controlled by `yen` ([ref](https://github.com/makerdao/dss-kiln/blob/a4bd20c8c57a6dcb3535d3568a91e16c5353a831/src/KilnUniV3.sol#L109)).
         
         The `amountMin` calculation is:
         
@@ -400,8 +400,7 @@ Depending on the needs of the specific use case (maximizing revenues or throughp
 </item>
 
 <item>
-    <field name="topic">TODO</field>
-    <field name="impact">TODO</field>
+    <field name="topic">Sandwich Attack</field>
     <field name="status">ack</field>
     <field name="content">
         ## (I-5) TWAP Oracles have become less secure after the transition from Proof of Work to Proof of Stake
