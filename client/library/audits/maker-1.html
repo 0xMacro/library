@@ -168,45 +168,40 @@
     </section>
   </content-for>
 
-
-
-
   <content-for name="appendix">
     <section id="appendix-l1-poc" class="Copy py-16">
       <template type="audit-markdown">
-## (L-1) Proof of Concept
-
-To demonstrate the issue, copy the following content into `src/KilnUniV3.t.sol` and run `forge test --use solc:0.8.14 --rpc-url="$ETH_RPC_URL" -vvv --match-test testFireWithIncorrectBuyPath`.
-
-```
-function testFireWithIncorrectBuyPath() public {
-	  mintDai(address(kiln), 50_000 * WAD);
-	  	
-	  assertEq(GemLike(MKR).balanceOf(address(user)), 0);
-	  
-	  kiln.file("yen", 80 * WAD / 100);
-	  
-	  assertEq(GemLike(WETH).balanceOf(address(user)), 0);
-	  
-	  // Configure path to buy WETH
-	  kiln.file("path", abi.encodePacked(DAI, uint24(100), USDC, uint24(500), WETH));
-	  assertEq(kiln.path(), abi.encodePacked(DAI, uint24(100), USDC, uint24(500), WETH));
-	  
-	  // Show that kiln buy is still MKR
-	  assertEq(kiln.buy(), MKR);
-	  kiln.fire();
-	  
-	  // Swap results in acquiring the non-buy token
-	  assertEq(GemLike(MKR).balanceOf(address(user)), 0);
-	  assertTrue(GemLike(WETH).balanceOf(address(user)) > 0);
-}
-```
+          ## (L-1) Proof of Concept
+          
+          To demonstrate the issue, copy the following content into `src/KilnUniV3.t.sol` and run `forge test --use solc:0.8.14 --rpc-url="$ETH_RPC_URL" -vvv --match-test testFireWithIncorrectBuyPath`.
+          
+          ```
+          function testFireWithIncorrectBuyPath() public {
+          	  mintDai(address(kiln), 50_000 * WAD);
+          
+          	  assertEq(GemLike(MKR).balanceOf(address(user)), 0);
+          
+          	  kiln.file("yen", 80 * WAD / 100);
+          
+          	  assertEq(GemLike(WETH).balanceOf(address(user)), 0);
+          
+          	  // Configure path to buy WETH
+          	  kiln.file("path", abi.encodePacked(DAI, uint24(100), USDC, uint24(500), WETH));
+          	  assertEq(kiln.path(), abi.encodePacked(DAI, uint24(100), USDC, uint24(500), WETH));
+          
+          	  // Show that kiln buy is still MKR
+          	  assertEq(kiln.buy(), MKR);
+          	  kiln.fire();
+          
+          	  // Swap results in acquiring the non-buy token
+          	  assertEq(GemLike(MKR).balanceOf(address(user)), 0);
+          	  assertTrue(GemLike(WETH).balanceOf(address(user)) > 0);
+          }
+          
+          ```
       </template>
     </section>
   </content-for>
-
-
-
 
   <content-for name="appendix">
     <section id="appendix-q3-poc" class="Copy py-16">
