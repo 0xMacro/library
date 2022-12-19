@@ -1,0 +1,51 @@
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">0ce18a1ae31c302aa4d6c25f9716b1e6b4bbc3bb</field>
+  <field name="content">
+    ## [M-1] CoCreateProject Admin is not transferrable
+
+    A CoCreateProject contract has the concept of a “contract owner” via the `admin` variable, separate from the `AccessControlUpgradeable` library contract it already inherits.
+
+    However, this `admin` address is not modifiable. Consider writing a function so that a current `admin` can transfer to a new address.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Consistency</field>
+  <field name="content">
+    ## [I-1] Admin may get out of sync on future state updates
+
+    When a new ProjectToken contract is deployed, it adopts its parent CoCreateProject’s contract owner as its own owner:
+
+    ```solidity
+    _transferOwnership(_coCreateProject.getContractOwner());
+    ```
+
+    This pattern only reads the owner once. If the parent CoCreateProject were to change contract owners, the child ProjectToken’s owner would be out of sync.
+
+    **The Co:Create team has expressed this is acceptable**, and it’s not a requirement for the two owner values to be in sync. We report this only for informational purposes.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Consistency</field>
+  <field name="content">
+    ## [I-2] Roles may get out of sync on future state updates
+
+    When CoCreateProject is first deployed, it assigns its `contractOwner` multiple roles:
+
+    ```solidity
+    _setupRole(PROJECT_ADMIN_ROLE, contractOwner);
+    _setupRole(GOVERNANCE_ROLE, contractOwner);
+    ```
+
+    Secondly, CoCreateProject’s `transferContractOwner()` allows transferring its `contractOwner` to a new address.
+
+    However, transferring in this way does not set up the new `contractOwner` with the above two initially assigned roles.
+
+    Consider this when transferring contract owner. If the new `contractOwner` should have the same authority as the previous, then the previous roles must be configured manually.
+  </field>
+</item>

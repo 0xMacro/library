@@ -1,0 +1,34 @@
+@import '../../library/styles/global.css';
+@import './_prose.css';
+
+body {
+  @apply dark:bg-zinc-600 dark:text-zinc-100;
+}
+
+.SidebarLink {
+  @apply flex items-center py-2 text-sm rounded-md;
+}
+.SidebarLink.-active {
+  @apply bg-gray-100 dark:bg-zinc-500 text-blue-700 dark:text-zinc-200 font-medium;
+}
+.SidebarLink.-inactive {
+  @apply text-gray-600 dark:text-zinc-200 hover:bg-gray-50 dark:hover:bg-zinc-700 hover:text-gray-900 dark:hover:text-gray-200 hover:opacity-80;
+}
+.SidebarLink.-disabled {
+  pointer-events: none;
+  @apply text-gray-600 hover:cursor-default;
+}
+
+.ChapterLink.-coming-soon span.title {
+  cursor: not-allowed;
+}
+.ChapterLink a.title {
+  @apply text-zinc-100 font-light;
+}
+.ChapterLink span.title {
+  text-decoration: underline;
+}
+.ChapterLink span.coming-soon {
+  font-size: 80%;
+  @apply text-gray-600 dark:text-zinc-300;
+}

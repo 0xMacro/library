@@ -1,0 +1,51 @@
+<div
+  class="box-content flex flex-col max-w-[calc(80vw)] md:w-[20rem] h-screen fixed left-0 top-0 z-20 md:sticky md:left-auto bg-light dark:bg-zinc-600 transition-transform overflow-y-auto md:overflow-show border-r-4 md:border-r-0 border-zinc-700"
+  :class="{ 'translate-x-0': sidebarOpen, '-translate-x-full md:translate-x-0': !sidebarOpen }"
+>
+  <div class="flex flex-col md:h-0 flex-1">
+    <div class="flex-1 flex flex-col px-4 pb-4 overflow-y-auto">
+
+      <div class="mt-8 space-y-3">
+        <for let="topic of LearnEVM.outline">
+          <h3 class="">
+            <span class="ml-[0.3em] mr-[0.1em] text-sm">{{topic.emoji}}</span>
+            {{topic.title}}
+          </h3>
+          <nav class="mt-2.5 flex-1 px-2 space-y-1">
+            <for let="header of topic.headers">
+              {{var active = header.href === page.location.pathname}}
+              <a
+                href="{{header.href}}"
+                class="SidebarLink group {{active ? '-active' : header.href ? '-inactive' : '-disabled'}}"
+              >
+                <div class="h-6 w-6 rounded-full flex-center">
+                  <if cond="active">
+                    <div class="h-1 w-1 bg-blue-700 dark:bg-zinc-200 rounded-full"></div>
+                  </if>
+                  <else>
+                    <div class="h-1 w-1 bg-gray-300 dark:bg-zinc-400 rounded-full"></div>
+                  </else>
+                </div>
+                <span class="ml-1">
+                  {{header.title}}
+                  <if cond="!header.href">
+                    <span class="dark:text-gray-500">(coming&nbsp;soon)</span>
+                  </if>
+                </span>
+              </a>
+
+            </for>
+          </nav>
+        </for>
+      </div>
+
+    </div>
+
+    <div class="p-4 flex flex-shrink-0 bg-gray-100 dark:bg-zinc-700">
+      <a href="https://0xmacro.com" class="px-1 flex items-center flex-shrink-0 text-lg dark:font-light dark:text-gray-300">
+        <img class="h-5 w-auto mr-2 dark:hidden" src="https://learn.0xmacro.com/img/logotype-t.svg" alt="0xMacro Logo">
+        <img class="h-5 w-auto mr-2 hidden dark:block" src="https://learn.0xmacro.com/img/logotype-t-ondark.svg" alt="0xMacro Logo">
+      </a>
+    </div>
+  </div>
+</div>

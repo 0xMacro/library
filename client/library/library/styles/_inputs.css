@@ -1,10 +1,14 @@
 
-.btn {
+.btn-ui {
   @apply text-sm bg-gray-800 dark:bg-gray-200 text-gray-100 dark:text-gray-800 py-1 px-2 rounded-sm;
 }
-.btn[disabled] {
+.btn-ui[disabled] {
   cursor: not-allowed;
   @apply bg-gray-500 text-gray-300;
+}
+
+.btn {
+  @apply text-lg font-bold bg-gray-800 dark:bg-gray-200 text-gray-100 dark:text-gray-800 py-1.5 px-4 rounded-full;
 }
 
 textarea.input,

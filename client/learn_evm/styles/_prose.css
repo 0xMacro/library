@@ -1,0 +1,100 @@
+/* Extensions to tailwind's typography plugin */
+
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+ /* WARNING: Text colors must be in sync with the .HeadingAnchor class */
+  @apply antialiased dark:text-white;
+}
+
+.prose h1 {
+  @apply text-4xl md:text-5xl;
+}
+
+.prose p, .prose ul > li, .prose ol > li {
+  letter-spacing: 0.02em;
+  word-spacing: 0.025em;
+  @apply text-gray-800 dark:text-zinc-100;
+}
+
+.prose a {
+  @apply dark:text-blue-500;
+}
+.prose span.HeadingAnchorWrap {
+  display: inline-block;
+  position: absolute; top: -0.05em; left: -0.9em;
+  padding-right: 0.9em;
+  @apply opacity-0 hover:opacity-100;
+}
+.prose a.HeadingAnchor {
+  /* WARNING: Text colors must be in sync with this file's and the built in prose styles */
+  color: #171717;
+  text-decoration: none;
+  @apply dark:text-white hover:underline;
+}
+
+.prose strong {
+  @apply dark:text-white;
+}
+
+.prose blockquote {
+  @apply dark:border-zinc-700;
+}
+.prose blockquote > p {
+  @apply text-xl text-gray-600 dark:text-zinc-300;
+}
+
+.prose aside {
+  @apply p-4 rounded-sm text-base bg-blue-100 dark:bg-blue-900 border dark:border-none border-blue-300
+    dark:text-blue-300;
+}
+.prose aside .AsideContent {
+  @apply flex;
+}
+.prose aside .AsideContent > svg {
+  @apply flex-shrink-0 h-6 w-6;
+}
+.prose aside .AsideContent > div {
+  @apply flex-1 ml-2 md:ml-3;
+}
+
+.prose aside.-instructor-notes > div:first-child {
+  cursor: pointer;
+}
+.prose aside.-instructor-notes .AsideContent {
+  @apply mt-6;
+}
+.prose aside.-instructor-notes .AsideContent > div > *:first-child {
+  margin-top: 0;
+}
+
+.prose tbody tr {
+  @apply dark:border-zinc-600;
+}
+.prose tbody td {
+  @apply leading-snug p-3 dark:text-zinc-100;
+}
+
+.prose code {
+  padding: .15em .35em;
+  margin: 0;
+  font-size: 85%;
+  border-radius: 6px;
+  @apply font-normal dark:text-zinc-100 bg-gray-200/75 dark:bg-zinc-700;
+}
+.prose pre {
+  @apply dark:bg-zinc-700;
+}
+
+.prose code::before, .prose code::after {
+  content: "";
+}
+
+.prose aside {
+  @apply p-5;
+}
+.prose aside > *:first-child {
+  margin-top: 0;
+}
+.prose aside > *:last-child {
+  margin-bottom: 0;
+}

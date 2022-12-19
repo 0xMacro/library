@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<title>{{ page.title }} | {{ site.name }}</title>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<meta lancer>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cutive+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="/styles/global.css">
+
+<div
+  x-data="{ sidebarOpen: false }"
+  class="flex justify-center min-h-screen"
+>
+  <div class="flex-1 dark:bg-zinc-550 md:dark:bg-transparent"></div>
+  <include src="chapters/_sidebar.html">
+
+  <div class="md:pl-4 max-w-2xl w-full dark:bg-zinc-550">
+    <div class="flex md:hidden">
+      <button
+        class="mt-6 px-6 flex items-center"
+        @click="sidebarOpen = true"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+
+        <div class="ml-2 mt-[2px]">Menu</div>
+      </button>
+
+      <div class="flex-1"></div>
+
+      <a class="mx-3 mt-3 pt-3 px-3 flex items-center relative top-[1px]" href="/">
+        <span class="mr-[0.3rem] text-xs">⚙️</span>
+        LearnEVM.com
+      </a>
+    </div>
+
+    <div
+      class="pt-8 pb-16 mx-6 md:mx-8"
+      @click="sidebarOpen = false"
+    >
+      {{var topic = LearnEVM.topicByHref[page.location.pathname]}}
+      {{var header = LearnEVM.headerByHref[page.location.pathname]}}
+
+      <if cond="header">
+
+        <nav class="mt-4 sm:mt-0 mb-10 sm:mb-14 p-4 md:p-0 flex bg-gray-100 dark:bg-zinc-600 md:bg-transparent" aria-label="Breadcrumb">
+          <ol role="list" class="sm:flex items-center text-2xl sm:text-base text-gray-500 dark:text-zinc-200">
+            <li class="hidden md:block mr-4">
+              <a href="/" class="hover:text-gray-700 dark:hover:text-white">
+                <span class="mr-2 md:mr-4 relative top-[-1px] text-xs">⚙️</span>
+                LearnEVM.com
+              </a>
+            </li>
+            <li>
+              <div class="mr-4 flex items-center">
+                <svg class="hidden md:block mr-4 h-5 w-5 flex-shrink-0 text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M5.555 17.776l8-16 .894.448-8 16-.894-.448z" />
+                </svg>
+                <a href="{{topic.headers[0].href}}" class="hover:text-gray-700 dark:hover:text-white">{{topic.title}}</a>
+              </div>
+            </li>
+            <li class="mt-1 sm:mt-0">
+              <div class="flex items-center">
+                <span class="sm:hidden mr-3 relative top-[0.1em] font-ui">└─</span>
+                <svg class="hidden sm:block mr-4 h-5 w-5 flex-shrink-0 text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M5.555 17.776l8-16 .894.448-8 16-.894-.448z" />
+                </svg>
+                <a href="{{header.href}}" class="hover:text-gray-700 dark:hover:text-white">{{header.title}}</a>
+              </div>
+            </li>
+          </ol>
+        </nav>
+
+      </if>
+
+      <yield>
+
+      <div class="pt-12 flex flex-col-reverse sm:flex-row gap-4">
+        <if cond="header.prev">
+          <a href="{{header.prev.href}}" class="p-4 flex-1 block flex items-center font-ui border dark:border-zinc-400 hover:border-gray-700 dark:hover:border-zinc-200 text-right">
+            <!-- arrow-small-left -->
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12h-15m0 0l6.75 6.75M4.5 12l6.75-6.75" />
+            </svg>
+            <div class="flex-1 pl-4">
+              <div class="uppercase text-xs text-gray-400 dark:text-zinc-300">Previous</div>
+              <div class="truncate">{{header.prev.title}}</div>
+            </div>
+          </a>
+        </if>
+
+        <if cond="header.next">
+          <a href="{{header.next.href}}" class="p-4 flex-1 block flex items-center font-ui border dark:border-zinc-400 hover:border-gray-700 dark:hover:border-zinc-200">
+            <div class="flex-1 pr-4">
+              <div class="uppercase text-xs text-gray-400 dark:text-zinc-300">Next</div>
+              <div class="truncate">{{header.next.title}}</div>
+            </div>
+            <!-- arrow-small-right -->
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h15m0 0l-6.75-6.75M19.5 12l-6.75 6.75" />
+            </svg>
+          </a>
+        </if>
+      </div>
+
+      <if cond="!header.next && header.id !== LearnEVM.lastHeader.id">
+        <div class="mt-4 prose">
+          <template type="learn-evm-markdown">
+<aside>
+
+### But wait, there's more!
+
+You've reached the end, but there is more great content to be released. [Follow us on Twitter](https://twitter.com/0xMacroDAO) to stay in the loop 🫡
+
+</aside>
+          </template>
+        </div>
+      </if>
+    </div>
+  </div>
+
+  <div class="w-32 hidden xl:block dark:bg-zinc-550"></div>
+  <div class="flex-1 dark:bg-zinc-550"></div>
+</div>
+
+<script src="/chapters/layout.js"></script>
