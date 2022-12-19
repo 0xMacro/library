@@ -59,9 +59,9 @@
           
           To compute the arbitrage loss, in particular the worst-case scenario, this proof of concept will:
           
-          1. assume a lag of 10% between a) TWAP oracle b) spot price,
-          2. use the Uniswap V3 MKR-ETH 0.3% pool as the trading venue, and
-          3. use the pool’s state on 2022/11/17 on mainnet (block number 15992230); in particular, the pool’s reserve amounts.
+          1. assume a) TWAP being 10% higher than b) spot price,
+          2. attack WETH to MKR swaps and use the Uniswap V3 MKR-ETH 0.3% pool as the trading venue, and
+          3. use the pool’s state on 2022/11/17 on mainnet (block number 15992230); in particular, use the pool’s reserve amounts.
           
           ### **Findings**
           
@@ -76,8 +76,8 @@
           
           - **The estimated loss for MakerDAO would be `364.9 MKR` = 3.649 MKR * 100.**
           - **The estimated gain for the attacker would be `41.9 WETH` = 0.419 WETH * 100.**
-          - `**364.9 MKR` * `$660.00` (current market price of `MKR`) = `$240,834` loss for Maker.**
-          - `**$240,834` / 3 million DAI = an overall loss of 8.0278%**
+          - **`364.9 MKR` * `$660.00` (current market price of `MKR`) = `$240,834` loss for Maker.**
+          - **`$240,834` / 3 million DAI = an overall loss of 8.0278%**
           
           ### **Proof of Concept [1]**
           
@@ -161,9 +161,9 @@
           
           ```
           
-          ### How the assumption `yen` is made
+          ### [1] How the assumption `yen` is made
           
-          For emulating a price lag, note that a) `yen = 90 * WAD / 100` and b) `quote` returning value close to spot-price-derived `amountOut` is equivalent to c) `yen = WAD` and d) `quote` returning a value 10% lower than spot price `amountOut`.
+          For emulating an over-valuation due to price lag, note that a) `yen = 90 * WAD / 100` and b) `quote` returning value close to spot-price-derived `amountOut` is equivalent to c) `yen = WAD` and d) `quote` returning a value 10% lower than spot price `amountOut`.
       </template>
     </section>
   </content-for>

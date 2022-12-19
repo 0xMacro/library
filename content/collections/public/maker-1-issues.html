@@ -39,7 +39,7 @@
         
         ### Attack Overview
         
-        Consider a lag between TWAP and the spot price of 10%. a) `quote()` would return an `amountOut`  10% lower than b) the `amountOut` derived from spot price. In other words, `kiln` accepts trades that are 10% overvalued.
+        Consider TWAP being 10% above the spot price. a) `quote()` would return an `amountOut`  10% lower than b) the `amountOut` derived from spot price. In other words, `kiln` accepts trades that are 10% overvalued.
         
         Noticing this, an attacker can almost guarantee themself as the caller of `fire()` as soon as
         `kiln` is ready to swap again by using off-chain bots to call their malicious contract and
