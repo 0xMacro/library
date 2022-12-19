@@ -103,22 +103,19 @@
     <field name="chance">low</field>
     <field name="status">ack</field>
     <field name="content">
-## (L-2) `Rug` event will be emitted even when the transfer of `sell` tokens fails
-
-In KilnBase.sol line 96, there is no guarantee that the `sell` token reverts when the `transfer` function fails. The transfer could be unsuccessful and return `false`, and the `Rug` event will still be emitted. This could cause confusion for the authority and users of the contract.
-
-### Remediation to Consider
-
-- Call `safeTransfer` instead of `transfer`.
-- Document that `Rug` events for tokens that return `false` on `transfer` failure can be duplicated.
+        ## (L-2) `Rug` event will be emitted even when the transfer of `sell` tokens fails
+        
+        In `KilnBase.sol` line 96, there is no guarantee that the `sell` token reverts when the `transfer` function fails. The transfer could be unsuccessful and return `false`, and the `Rug` event will still be emitted. This could cause confusion for the authority and users of the contract.
+        
+        ### Remediation
+        
+        - Call `safeTransfer` instead of `transfer`.
+        - Document that `Rug` events for tokens that return `false` on `transfer` failure can be incorrect.
     </field>
     <field name="response">
     	Although using a token that only relies on a return value is possible, we think it is generally rare and unlikely for Maker to do. Therefore we would rather not complicate the code as long as it is not a clear security issue.
     </field>
 </item>
-
-
-
 
 <item>
     <field name="topic">TODO</field>
