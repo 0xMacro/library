@@ -1,0 +1,375 @@
+<item>
+  <field name="topic">Locked Assets</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="statusNode">commits: 99dcb243690ce3a637979687b597275a8fb0e290, a10df026b20c4934d481fb2b1a55853224d28e22</field>
+  <field name="commitTree">a10df026b20c4934d481fb2b1a55853224d28e22</field>
+  <field name="content">
+    ## (C-1) Contract admins can lock staked tokens in the contract
+
+    In all three staking contracts, administrator role members (`DEFAULT_ADMIN_ROLE`) have permission to set and change the staking parameters `rewardsPerUnitTime` and `timeUnit`.
+
+    By setting `timeUnit = 0`, the `_calculateRewards()` logical math would try to execute a division by zero and, by setting `rewardsPerUnitTime` to a high value such as `type(uint256).max`, the operation will result in an overflow. Both of these parameter configurations will make every attempt of the user to withdraw, stake new tokens, or claim rewards revert, essentially breaking the entire contract and locking the existent tokens in the staking contract.
+
+    In the latest case, the value of `rewardsPerUnitTime` could be less than the max value, depending on the time lapsed and the amount staked.
+
+    ```solidity
+    function _calculateRewards(address _staker) internal view virtual returns (uint256 _rewards) {
+      Staker memory staker = stakers[_staker];
+      _rewards = ((((block.timestamp - staker.timeOfLastUpdate) * staker.amountStaked) * rewardsPerUnitTime) / timeUnit);
+    }
+    ```
+
+    These conditions are **irreversible**: all subsequent parameter changes will revert due to the reward update logic.
+
+    **Remediations to Consider**
+
+    For `timeUnit= 0`:
+
+    - Requiring the `timeUnit` value to be always higher than zero.
+
+    For `rewardsPerUnitTime`:
+
+    - Executing an [overflow check](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.8.0/contracts/utils/math/SafeMath.sol#L42-L57) and ignoring the rewards result if overflow.
+    - Allowing users to withdraw no matter the staking conditions.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Incorrect Rewards</field>
+  <field name="impact">spec</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">548d5a9f2f71333f92618dbebf3fb6feef837f34</field>
+  <field name="content">
+    ## (H-1) TokenStake.sol rewards can be over- or under-awarded when the staking and reward tokens have different decimals
+
+    The documentation for `setRewardRatio()` explains:
+
+    > Set rewards per unit of time. Interpreted as (numerator/denominator) rewards per second/per day/etc based on time-unit. For e.g., ratio of 1/20 would mean 1 reward token for every 20 tokens staked.
+
+    This is correct in cases where the staking and reward tokens have identical decimal values. Otherwise, rewards will be over- or under-awarded by orders of magnitude equivalent to the decimal difference.
+
+    **Remediations to Consider**
+
+    Consider accounting for both token decimals in reward calculations.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Incorrect Rewards / Asset Loss</field>
+  <field name="impact">spec</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">20c0b9a4c39398bb1841cb34c1902d533d31f2d9</field>
+  <field name="content">
+    ## (H-2) TokenStake.sol: Tokens with a tax on transfer will account for inaccurate amounts
+
+    If a token with on-transfer fees is set up as the staked token, the `stake()` function will store an inaccurate `amount`.  As a result:
+
+    - Rewards will be calculated from higher staked amounts than actually present in the contract.
+    - Returned amount from `getStakeInfo()` will not reflect the actual balances of the contract and staked amount.
+    - Withdrawals of the full staked `amount` will transfer non-corresponded tokens from other stakers.
+    - For a TokenStake with a unique stake, calling withdraw with the `amount` returned from `getStakeInfo()` will revert. To claim rewards the user would have to manually check the balances in the contract and use the actually transferred tokens.
+
+    **Remediations to Consider**
+
+    Consider, in the `_stake()` logic, using the balance of the contract before and after transferring the tokens to account for the corresponding amounts per staker.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Limit</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">commits: 4f571568a53c7e9403269a3f32cf3965faf36d84, 13a8af2e19f18a1d70d306a9910c57ce7d8cc8cd</field>
+  <field name="commitTree">13a8af2e19f18a1d70d306a9910c57ce7d8cc8cd</field>
+  <field name="content">
+    ## (M-1) Block gas limit can be exceeded during `setTimeUnit()` and `setRewardsPerUnit()` when staker count grows
+
+    This applies to all three staking implementations. The admin will no longer be able to call these functions, preventing the admin from increasing / decreasing / halting staking reward configuration. The admin may be forced to continue to support the present configurations, or halt funding entirely: in this case users will have no on-chain signal that rewards are no longer supported. This can increase the likelihood of cases where user `unclaimedRewards` exceeds budgeted supply, resulting in reward loss.
+
+    This occurs because these methods calculate and update rewards for every staker in `stakerArray`. The gas cost will exceed the [current block gas](https://etherscan.io/blocks) limit of 30M when staker counts climb past:
+
+    - ~1,000 for TokenStake.sol
+    - ~1,000 for NFTStake.sol
+    - ~725 for EditionStake.sol
+
+    Note that the transaction gas cost may become prohibitively high for admin users well before the block gas limit is reached, with fewer stakers.
+
+    **Remediations to Consider**
+
+    Consider altering the staking and rewards logic to not require state modification for every staker. One such reference implementation is the Synthetix [StakingRewards.sol](https://github.com/Synthetixio/synthetix/blob/v2.79.1/contracts/StakingRewards.sol) contract.
+
+    Alternatively, consider including these limitations in developer documentation, potentially also noting increasing gas costs as these limits are approached.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Locked Assets</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">dc44c159e933f974b248824e343e2d26d197b203</field>
+  <field name="content">
+    ## (M-2) ERC721 and ERC1155 tokens safe-transferred directly to contract will be locked and unrecoverable
+
+    Once transferred, the token cannot be recovered via `withdraw()`. This occurs because NFTStake.sol supports `onERC721Received()` which allows any safe transfer to succeed, but only correctly accounts for the staking if `stake()` is used. Similar conditions exist for EditionStake.sol.
+
+    This finding is not concerned with non-safe transfers of ERC721 tokens: these cannot be prevented, and are generally discouraged when sending tokens to a new address.
+
+    **Remediations to Consider**
+
+    Consider implementing a state variable toggle to allow safe transfers only from within `stake()`. A generalized example:
+
+    ```solidity
+    contract ... {
+        uint8 private isStaking = 1;
+
+        ...
+
+        function _stake(...) ... {
+        ...
+            isStaking = 2;
+            IERCx(...).safeTransferFrom(...);
+            isStaking = 1;
+        ...
+        }
+
+        function onERCxReceived(...) {
+            require(isStaking == 2);
+            ...
+        }
+    }
+    ```
+
+    Note that some method locations may need to be refactored to pursue this approach.
+  </field>
+</item>
+
+<item>
+  <field name="topic">ERC20 Exploit</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">0927837e05e2f8669f09dfae4a3e99f0b7821470</field>
+  <field name="content">
+    ## (M-3) TokenStake.sol: Double entry-point ERC20 tokens could be drained from the staking contract
+
+    A double entry-point ERC20 Token is an ERC20 with a proxy pattern that allows users (and contracts) to interact directly with the target contract, skipping the proxy. Since it is possible to interact with both the proxy and the target directly, the token has two entry points.
+
+    By setting a TokenStake contract with both these addresses as reward and token, admins could drain rewards and staked tokens equally.
+
+    This issue was presented a few months ago with every [Synthetix asset](https://hackmd.io/rjL7eQdwRB2mpZ31K4ltmw) and the [TUSD contract](https://blog.openzeppelin.com/compound-tusd-integration-issue-retrospective/) and was later patched after realizing several interactions with DeFi contracts caused vulnerabilities. Naturally, this does not mean that this vulnerability can never arise again, as there might be more tokens out there with multiple entry points.
+
+    **Remediations to Consider**
+
+    Consider adding a state to track the deposited rewards with a pull mechanism and add or subtract when adding/claiming rewards to keep rewards and staked amounts independent.
+  </field>
+</item>
+
+<item>
+  <field name="topic">ERC165 Spec</field>
+  <field name="impact">spec</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">874856ad31e5270ddf0c1631957e821d0a386721</field>
+  <field name="content">
+    ## (L-1) Incorrect ERC165 implementation for NFTStake and EditionStake
+
+    ERC165 is not correctly implemented, which will yield `false` when these contracts are queried for the interfaces they are intended to support. This may block some token transfers.
+
+    **Remediations to Consider**
+
+    Per the [ERC165 spec](https://eips.ethereum.org/EIPS/eip-165), consider updating `supportsInterface()` to also return true when `interfaceId` is `0x01ffc9a7`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">ERC721</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">commits: dc44c159e933f974b248824e343e2d26d197b203, a10df026b20c4934d481fb2b1a55853224d28e22</field>
+  <field name="commitTree">a10df026b20c4934d481fb2b1a55853224d28e22</field>
+  <field name="content">
+    ## (Q-1) NFT tokens do not transfer via `safeTransferFrom()` during `stake()`
+
+    Staking721Upgradeable.sol [does not use](https://github.com/thirdweb-dev/contracts/blob/v3.2.7/contracts/extension/Staking721Upgradeable.sol#L188) `safeTransferFrom()` within `stake()`, rendering NFTStake.sol’s `onERC721Received()` unused.
+
+    **Remediations to Consider**
+
+    Consider updating `stake()` logic to call `safeTransferFrom()`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">ERC2771</field>
+  <field name="impact">low</field>
+  <field name="status">ack</field>
+  <field name="statusNote">A partial fix was submitted which did not include an update for Permissions.sol. The Response field below pertains to the code at this state.</field>
+  <field name="content">
+    ## (Q-2) Normalize support for ERC2771 trusted forwarder
+
+    The prebuilt contracts NFTStake.sol, EditionStake.sol, TokenStake.sol partially support trusted forwarders via `_msgSender()`, but their dependencies do not (e.g. Permissions.sol, Staking721Upgradeable.sol, etc). Notably, attempts to call Permissions.sol methods: `grantRole()`, `revokeRole()`, `renounceRole()`,  or the `onlyRole()` modifier on NFTStake, EditionStake, TokenStake (or contracts derived from them) via trusted forwarder will apply the changes to the trusted forwarder address, not the intended transaction originator.  This could have unintended consequences, such as inadvertently granting admin privileges to all transactions sent through a forwarder.
+
+    Consider implementing support for `_msgSender()` in all dependency contracts.  OpenZeppelin does this by adding [Context](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/Context.sol) as a common base class. We recommend something similar. If this is not possible in the short term, we recommend pulling ERC2771 support out from these implementations of TokenStake, NFTStake, EditionStake until a more wholistic solution is adopted.
+  </field>
+  <field name="response">For Q-2, we want to go ahead with the current implementation. Although permissions doesn't support the gasless setup, those actions will be limited to admin, or a few wallets. The purpose right now was to enable gasless for staking specific txns, for majority of the users. Admin related limitations can be documented for now.
+  We'll update Permissions and other extensions with gasless setup in later releases, as these are extended in other contracts as well.</field>
+</item>
+
+<item>
+  <field name="topic">Code Duplication</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">2744f3fdac1a0405b46ddded62623c9938f7823f</field>
+  <field name="content">
+    ## (Q-3) Reentrancy init called twice
+
+    `__ReentrancyGuard_init()` is being called both in the parent (Staking721Upgradeable.sol, Staking1155Upgradeable.sol, and Staking20Upgradeable.sol) and child (NFTStake.sol, EditionStake.sol, and TokenStake.sol) contract `initialize()` functions. Consider removing this initialization call from the NFTStake.sol, EditionStake.sol, and TokenStake.sol contracts.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Extensibility</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">4f571568a53c7e9403269a3f32cf3965faf36d84</field>
+  <field name="content">
+    ## (Q-4) Duplicated logic is prone to introducing defects during customization
+
+    Staking721Upgradeable.sol — and the ERC20 and ERC1155 counterparts — implement the following identical logic for updating a single user’s unclaimed rewards within both `_updateUnclaimedRewardsForStake()` and `_updateUnclaimedRewardsForAll()` :
+
+    ```solidity
+    uint256 rewards = _calculateRewards(_staker);
+    stakers[_staker].unclaimedRewards += rewards;
+    stakers[_staker].timeOfLastUpdate = block.timestamp;
+    ```
+
+    A user who customizes `_updateUnclaimedRewardsForStake()` must also remember to customize `_updateUnclaimedRewardsForAll()`, otherwise unexpected defects may be introduced.
+
+    Rather than duplicating logic, consider calling `_updateUnclaimedRewardsForStake()` from `_updateUnclaimedRewardsForAll()`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Validation</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">4470dfb67a282d82ff28118ba60f2eb2884f6023</field>
+  <field name="content">
+    ## (Q-5) `unitTime` and `rewardsPerUnitTime` setter functions don’t check for new input data
+
+    Admins can mistakenly call these functions with the same value already set, unnecessarily incurring considerably high gas costs, depending on the number of stakers. To avoid this, consider requiring different input data from the already stored values.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Extensibility</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">ccc4d2d38f2b839ff78bdc9972aa9f4d27643036</field>
+  <field name="content">
+    ## (Q-6) `getStakeInfo` should be `external`
+
+    This view function performs multiple loops on unbounded arrays. For an external view function it won’t be an issue, but since the function visibility is public it could suggest the use of it from inside the contract. Consider updating this method to be `external`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">User Experience</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">2e04cd872c4541c63f2c0b6263a1ad8cd8e67ea8</field>
+  <field name="content">
+    ## (Q-7) Missing reward balance information
+
+    Staking contracts provide no ready insight into reward balances or withdrawals. Users will have to locate and inspect transaction activity of the reward token contract to confirm availability of rewards.
+
+    Consider increasing the availability of reward metadata on-contract. For example:
+
+    - Adding a `view` method to return present reward balance
+    - Emitting an event when `withdrawRewardTokens()` is called.
+  </field>
+</item>
+
+<item>
+  <field name="topic">User Experience</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (Q-8) Staking1155Upgradeable `claimRewards` function for each token id
+
+    For ERC1155 staking contracts (EditionStake.sol and Staking1155Upgradeable.sol), the `claimRewards()` function differs from the other two staking contracts; this one is done for each `tokenId` individually, different from claiming all rewards with one call the other contracts have. This implies every user would need to execute one transaction for each `tokenId` staked, causing high amounts of gas and actions for a non-fungible ERC1155 design.
+
+    EditionStake.sol supports multi-call, which might be a solution when using that contract specifically, but not for contracts inheriting from Staking1155Upgradeable. 
+
+    Consider having a function for claiming all rewards for the total amount of tokens staked and one for individual claims per token ID if desired.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">ce8c3ab63d770af4a27895d182b78b6ca06269d5</field>
+  <field name="content">
+    ## (G-1) Halt array iteration after staker removed during `withdraw()`
+
+    See [Staking721Upgradeable.sol](https://github.com/thirdweb-dev/contracts/blob/v3.2.7/contracts/extension/Staking721Upgradeable.sol#L213-L218):
+
+    ```solidity
+    for (uint256 i = 0; i < stakersArray.length; ++i) {
+        if (stakersArray[i] == msg.sender) {
+            stakersArray[i] = stakersArray[stakersArray.length - 1];
+            stakersArray.pop();
+        }
+    }
+    ```
+
+    This will cycle over the entire `stakerArray`, even after the intended operation is completed. Consider calling `break` at the end of the `if` block, as is implemented in the other two staking contracts (Staking1155Upgreadable.sol and Staking20Upgreadable.sol).
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">d5abb53ef89541dad1d7408839eef9a70db839a1</field>
+  <field name="content">
+    ## (G-2) Loop reading from storage array length
+
+    In Staking721Upgreadable.sol, [line 213](https://github.com/thirdweb-dev/contracts/blob/v3.2.7/contracts/extension/Staking721Upgradeable.sol#L213-L218), we have the following logic inside the `_withdraw()` function:
+
+    ```solidity
+    for (uint256 i = 0; i < stakersArray.length; ++i) {
+        if (stakersArray[i] == msg.sender) {
+            stakersArray[i] = stakersArray[stakersArray.length - 1];
+            stakersArray.pop();
+        }
+    }
+    ```
+
+    Both `stakersArray.length` and `starkersArray[i]` inside the if statement can be optimized by storing them in memory, as is currently implemented in the other two staking contracts (Staking1155Upgreadable.sol and Staking20Upgreadable.sol).
+
+    Another optimization is to use the `stakersArray[i] = stakersArray[stakersArray.length - 1]` from memory too, this can be added to all three contracts.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="statusNote">The originally reported issue was partially remediated with the M-1 fixes. A remaining gas issue was reported during fixes review: "Admins that wish to change both settings at once will end up with two new entries in the conditions mapping. This incurs extra storage writes for the admin, and incurs extra storage reads for every user during stake/withdraw/claimRewards. If both updates land in the same block, it’s just a gas concern as noted. Otherwise, the new condition for the first updated setting will have a non-zero duration, causing rewards to be accumulated on an unintended (incomplete) staking configuration." The Response section below pertains to this remaining gas issue.</field>
+  <field name="content">
+    ## (G-3) High gas when calling both `setTimeUnit()` and `setRewardsPerUnitTime()`
+
+    Admins that want to change both values will need to call each method separately, which will both invoke `_updateUnclaimedRewards()`, which can become expensive as the number of stakers increase.
+
+    Consider implementing an additional method to update both settings at once, requiring only a single call to `_updateUnclaimedRewards()`.
+  </field>
+  <field name="response">For G-3, we're not making any changes right now. Relying on multicall for updating both conditions at once.</field>
+</item>
+
