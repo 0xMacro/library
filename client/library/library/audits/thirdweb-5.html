@@ -1,0 +1,32 @@
+<page
+  clientName="thirdweb"
+  reportDate="November 11th, 2022"
+  auditTitle="thirdweb A-5"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  passwordEncrypt="env:PAGE_PASS_THIRDWEB_5_AND_6"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from September 26, 2022 to October 7, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>A provided audit handoff document provided through Notion.</li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts:</p>
+
+  <template type="file-hashes">
+    095c5b160446f675c3832f9166294639cb389ceef74be3d51a4bc8339c46423f  contracts/drop/DropERC20.sol
+    cc9d276ed99ce1d54755937c449dddcc28a40872aa2f8ad4fea8b54fafa83c28  contracts/drop/DropERC721.sol
+    2272277a6d1b0f41da26ffc32313adba43ad3f7fb691371a3fba241f28edfb8b  contracts/drop/DropERC1155.sol
+  </template>
+</content-for>
