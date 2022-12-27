@@ -1,0 +1,70 @@
+<item>
+  <field name="topic">Data Model</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">addressed</field>
+  <field name="statusNote">Documented the limitations of new design.</field>
+  <field name="commit">6ce0b210a1b4a5c3975c23de06e74d94c95d00fb</field>
+  <field name="content">
+    ## (M-1) Merkle claiming and normal claiming occupy the same state space
+
+    When claiming, ClaimCondition’s `quantityLimitPerWallet` is validated and incremented. This also happens for Merkle proof claiming, a situation where:
+
+    - An admin creates a merkle node with a specified limit, currency, and price per token for a specific address
+    - The admin gives the proof of said node to a user
+    - The user mints using said proof, “overriding” the default settings of the current claim condition.
+
+    This all works as advertised. However, **both** normal claims *and* Merkle proof claims validate and increment `quantityLimitPerWallet`. This means the admin and user are vulnerable to subtle usage pitfalls. For example, take the following scenario:
+
+    - Admin creates an NFT drop where each token costs 1 WETH to mint.
+    - Admin wishes to grant user X permission to mint 2 tokens at 0.25 WETH, and 4 tokens at 0.5 WETH.
+
+    In this scenario, several issues may occur:
+
+    1. Knowing user X should be able to mint 2 + 4 tokens, admin adds two merkle leaves with `quantityLimitPerWallet` set to 6. However, this allows user X to mint 6 tokens at 0.25 WETH.
+    To do this properly, the admin must update the merkle tree twice – the second time *only after* user X has fully minted the first.
+    2. Knowing user X should only be able to mint 2 and 4 tokens for 0.25 WETH and 0.5 WETH respectively, admin sets one leaf’s `quantityLimitPerWallet` to be 2, and the other to be 4. However, this only allows user X to mint 4 tokens total (instead of 6).
+    3. Knowing user X needs to mint one price at a time, admin sets *one* leaf’s `quantityLimitPerWallet` to be 2 for 0.25 WETH. However, in the meantime, user X has minted one token at the normal price; they can now only claim 1 token at the discounted price.
+
+    Other contracts / software systems that maintain merkle trees for these drop contracts might also create more severe vulnerabilities for themselves.
+
+    To help avoid the above confusions, consider:
+
+    1. Adding an optional namespace key in `struct AllowlistProof`, to allow limitations per topic (e.g. a specific currency/price) instead of just per address; or
+    2. Documenting the limitations & pitfalls of the current implementation.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="response">
+    Not fixing.
+
+    Moving to ERC721-A for all NFT Drops.
+  </field>
+  <field name="content">
+    ## (Q-1) 721a Transfer Costs
+
+    Transferring a token from a large mint batch may cost [a very high amount of gas](https://github.com/chiru-labs/ERC721A/issues/145).
+
+    Consider implementing an optional max batch size, and consider including / referring to docs about how to optimally transfer minted tokens ([example](https://www.alchemy.com/blog/erc721-vs-erc721a-batch-minting-nfts)).
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="response">Not fixing right now.</field>
+  <field name="content">
+    ## (Q-2) Ability to set individual claim count
+
+    In the previous version of the contracts, a `setWalletClaimCount()` function was available for an admin to manually set an addresses’s claim count.
+
+    In the current version, no such function exists.
+
+    Consider implementing a similar function, if it is desirable for an admin to be able to manually update these values without having to deal with merkle proofs.
+  </field>
+</item>
