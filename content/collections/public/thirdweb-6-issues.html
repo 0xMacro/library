@@ -1,0 +1,322 @@
+<item>
+  <field name="topic">Data Integrity</field>
+  <field name="impact">critical</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">c12591c70d8366d3b23047ba4f160b1e8faacd44</field>
+  <field name="content">
+    ## (C-1) Marketplace funds can be drained due to lack of auction payout accounting
+
+    A seller (auction creator) uses `collectAuctionPayout()` to collect their payout after the auction closes with a winning bid. The payout is in the currency specified when creating the auction.
+
+    In v2, the payout amount was calculated with `_winningBid.pricePerToken * _targetListing.quantity`. The function then afterwards set each of these values to zero, preventing future payouts.
+
+    However, in v3, payout is specified in the dedicated field `_winningBid.bidAmount`. This means that, although quantity is set to zero like in v2, the `_winningBid.bidAmount` remains the same. This allows an attacker to call this function as many times as they want, draining all funds of that currency from the Marketplace contract.
+
+    For example:
+
+    - Assume 100 WETH is escrowed in a marketplace contract.
+    - An attacker creates an auction selling an ERC-721 token (doesn’t matter which one) with a buyout price of 50 WETH
+    - Attacker buys out their the auction, paying 50 WETH to the marketplace contract.
+    - Attacker calls `collectAuctionPayout()` and collects 50 WETH.
+    - Attacker continues to call `collectAuctionPayout()`, receiving 50 WETH each time, until marketplace funds are drained (in this case, 2 additional times).
+
+    Consider only allowing a payout if `_targetAuction.quantity` is zero, or using a separate field (e.g. `payoutTimestamp`) to track when a seller has received their payout.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Frontrunning</field>
+  <field name="impact">critical</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">85bb739bbdcbed09b922f1fa8472eca46a6296e6</field>
+  <field name="content">
+    ## (C-2) Unsafe listing update allows seller front-run to buyer purchase
+
+    In DirectListings, sellers can list their ERC-721 or ERC-1155 tokens for sale and buyers can purchase them directly.
+
+    However, a malicious seller front-run a purchase by updating critical fields using `updateListing`, causing the buyer to receive something **different** from what was originally listed.
+
+    To illustrate, consider the current user flow for a direct, non-reserved, listing:
+
+    1. Seller creates a listing by calling `createListing`.
+    2. Buyer purchases the Token by calling `buyFromListing`.
+
+    In between step 1 and 2, a malicious seller can listen for a `buyFromListing` transaction and front-run it using `updateListing` to update `tokenId` and `assetContract` before the buyer completes their purchase. These values can be set to anything, including an asset contract that the attacker controls.
+
+    Consider disallowing changes to `tokenId` and `assetContract` to existing listings.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Integrity</field>
+  <field name="impact">critical</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">f27e825acc00df0c842c5ebad840ccaa930a40a1</field>
+  <field name="content">
+    ## (C-3) Auction creator collecting payout causes buyer to lose their purchased tokens
+
+    In a Marketplace contract, after an ERC-1155 auction has completed, 2 actions happen: the auction creator collects their payment, and the bidder collects their token. This is executed in `collectAuctionPayout` and `collectAuctionTokens`, respectively.
+
+    In V2, a bid had two separate fields: `Listing.quantity` and `Offer.quantityWanted`:
+
+    - When an auction creator collects their payout, the former is used and then set to zero, preventing further payouts.
+    - When a buyer collects their payout, the latter is used and then set to zero, preventing further payouts.
+
+    However, in V3, **both payouts use the same field:** `Auction.quantity`:
+
+    - When an auction creator collects their payout, `Auction.quantity` is used and then set to zero (note this **does not** prevent further payouts, as described in C-1).
+    - When a buyer collects their payout, **they don’t receive what they purchased** when the auction creator collects their payout before the buyer.
+
+    When this happens, a buyer’s purchased tokens are stuck in the Marketplace contract indefinitely.
+
+    Consider using a separate field to track bid payout, similar to what was used in [V2](https://github.com/thirdweb-dev/contracts/blob/main/contracts/marketplace/Marketplace.sol#L661).
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Integrity</field>
+  <field name="impact">critical</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">ac92985990163c7bb643198636b9061bea40f701</field>
+  <field name="content">
+    ## (C-4) Auction token collection not tracked enables stealing ERC-1155 tokens
+
+    A bidder uses `collectAuctionTokens` to collect the auction tokens after winning an EnglishAuction.
+
+    In V2, a bid a `Offer.quantityWanted` field. Upon the buyer collecting their payout, this field would be set to zero, preventing further payouts.
+
+    However, in V3, no state is modified or checked to prevent multiple payouts from happening. For ERC-1155 auctions, this allows an attacker to receive more tokens than they bought. For example:
+
+    - Suppose a victim auctions an ERC-1155 token, ID for which is 999. This is auction #1.
+    - Attacker creates an identical auction, except buyout price is 1 wei of the ERC20 currency; this is auction #2.
+    - Attacker buys out their own auction for 1 wei, which transfers the token immediately to attacker’s wallet.
+    - A**ttacker calls `collectAuctionTokens` on auction #2 until there is no more ID=999 tokens left in the marketplace**
+    - in this case, attacker collects the token escrowed by auction #1 for free.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Algorithms</field>
+  <field name="impact">spec</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">3fb0cb4bc7c5aff601e8fb1f88e9a79ca02af22b</field>
+  <field name="content">
+    ## (H-1) Out of order lazy minting in TieredDrop causes incorrect claims
+
+    TieredDrop is an NFT drop contract that allows users to claim with a specified priority of “tiers”.
+
+    Thirdweb’s docs for `lazyMintWithTier()` state:
+
+    > The same tier can be re-used multiple times, and that does not need to happen on consecutive calls to the function. The contract will always appropriately track what NFTs belong to what tier.
+    >
+
+    This allows an “out of order” lazy mint. For example, if there are three tiers, X, Y, and Z, then the following is a valid mint pattern:
+
+    - Mint 10 X
+    - Mint 10 Y
+    - Mint 30 Z
+    - Mint 10 X
+
+    This creates 20 X tokens, 10 Y tokens, and 30 Z tokens available to mint.
+
+    When claiming, the docs state:
+
+    > As a result, the claimer receives the specified total no. of NFTs, and the particular tiers of NFTs distributed to the claimer **are determined by the provided order of priority of tiers.**
+    >
+
+    However, when claiming, the NFTs distributed **are also determined by the order of lazy minting.**
+
+    Taking the above example, this means if a user were to mint 25 tokens with tier priority `[Y, X]` (note Y having priority over X), then they would receive:
+
+    - 10 from tier Y (ids 10-19)
+    - 10 from tier Z (ids 20-29)
+    - 5 from tier X (ids 0-4)
+
+    Consider an algorithm that takes out-of-order lazy minting into account, or update the docs to specify this behavior.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Upgradability</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">2a7f026ee0792a56227e0052c25716be28d6d46f</field>
+  <field name="content">
+    ## (M-1) `setExtension` allows selector clashes enables incorrect select-extension mapping
+
+    Map’s `setExtension()` creates a mapping from a function selector to a contract address that implements that function. This allows `MarketplaceEntrypoint` to delegate calls to any number of other approved contracts, achieving the same core goals as [EIP-2535](https://eips.ethereum.org/EIPS/eip-2535).
+
+    However, `setExtension()` can overwrite an existing mapping, since it does not validate whether the selector is already assigned. This can silently cause problems if/when thirdweb decides to deploy a contract with a function selector that clashes with a previous, already-deployed function selector.
+
+    Consider splitting `setExtension` into two functions: `addExtension` and `replaceExtension`. Similar to EIP-2535, this will help catch scenarios where two or more extensions implement the same function selector.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Integrity</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">9a61ca8d3b5e8f1a7a47d53dbd7cf575c5cecc7e</field>
+  <field name="content">
+    ## (L-1) Create listing start timestamp accuracy
+
+    DirectListings’s `createListing()` allows `startTimestamp` to be within 60 minutes behind the current block timestamp. This allows a newly created listing to be recorded as having started potentially up to an hour ago.
+
+    While this poses no risk for thirdweb’s current contracts, it is in fact a data inaccuracy. If other contracts (thirdweb or 3rd party) or off-chain software were to use this value for business logic, the inaccuracy could affect calculations or introduce vulnerabilities.
+
+    Consider updating `startTimestamp` to be the current block timestamp upon listing create to maintain data integrity.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">9a61ca8d3b5e8f1a7a47d53dbd7cf575c5cecc7e</field>
+  <field name="content">
+    ## (L-2) Creating listings with start time in the past can cause dead listings
+
+    DirectListings’s `createListing()` allows `startTimestamp` to be within 60 minutes behind the current block timestamp. This means that a listing could potentially end as soon as it is created.
+
+    Consider requiring that `endTimestamp` is not in the past, with or without a buffer (e.g. must be 5 minutes before end).
+  </field>
+</item>
+
+<item>
+  <field name="topic">User Experience</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">552fbe2e17efffc7d2fe1fb4141cbf12dcabe2ba</field>
+  <field name="content">
+    ## (L-3) Buyer can overpay when using buyout option
+
+    In EnglishAuctions, a bidder can use the buy out option to directly purchase a token from the auction. The buy out price is defined as: "The total bid amount for which the bidder can directly purchase the auctioned items and close the auction as a result."
+
+    However, the buyer can bid higher than the buy out option and instead of paying the buy out amount, they pay their bid amount.
+
+    A quick illustration of this:
+
+    1. The auction that a bidder is interested in has a `buyoutBidAmount` of 100.
+    2. Bidder bids 120, surpassing the `buyoutBidAmount`.
+    3. Instead of paying 100, they end up paying 120. The bidder overpays.
+
+    Consider:
+
+    - Forcing the collection amount to be the `buyoutBidAmount` instead of the incoming bid amount, or
+    - Reverting if the incoming bid amount is greater than the `buyoutBidAmount`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Model</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">d473cc5cdae0861b3f957df57e188dd0ede7a1b0</field>
+  <field name="content">
+    ## (L-4) Off-chain application might block itself from buying listing
+
+    A listing has two sources of truth for pricing:
+
+    1.  `Listing.currency` and `Listing.pricePerToken`.
+    2. `DirectListingsStorage.isCurrencyApprovedForListing` and `DirectListingsStorage.currencyPriceForListing`.
+
+    Although `approveCurrencyForListing()` disallows approving a currency that is currently the listing’s currency, it’s still possible to enter a state where a currency is set in both places. For example:
+
+    1. Create a listing with WETH as the currency.
+    2. Approve DAI as a currency with a price of 100 per token.
+    3. Call `updateListing()` to update the listing to DAI with a price of 50 per token.
+
+    After this, the listing now has two DAI prices.
+
+    In `buyFromListing()`, the `isCurrencyApprovedForListing` price takes precedence. If a contract or off-chain application were to use `Listing.pricePerToken` in this scenario, it would always revert.
+
+    Consider:
+
+    1. Disallowing updating a listing’s `currency` to be an approved currency, or
+    2. Using `isCurrencyApprovedForListing` as a single source of truth.
+
+    If (b) is considered, also consider combining `isCurrencyApprovedForListing` and `currencyPriceForListing` into a compacted struct – reducing uint256 to e.g. uint252 – to reduce storage slot usage.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Extra Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">e85243adeb0feb203db5fc9844e9d19772fa9c30</field>
+  <field name="content">
+    ## (Q-1) `_validateOwnershipAndApproval` is not needed for creating auctions
+
+    As part of creating a new auction, `_validateOwnershipAndApproval()` is called to validate whether the `msg.sender` has ownership over the token(s) and granted approvals to the marketplace.
+
+    However it is not needed because `_transferAuctionTokens()` will be called as part of creating the auction and it will revert if the owner does not own the tokens and/or has not granted the marketplace an approval.
+
+    Consider removing `_validateOwnershipAndApproval()`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Unused Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">d14d82ef59c0484eb3fc388ff473e45fdbba28f8</field>
+  <field name="content">
+    ## (Q-2) Unused state variable
+
+    In Map.sol, `allSelectors` is unused, causing `getAllSelectorsRegistered()` to always return an empty array. Consider using or removing this variable and function.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">medium</field>
+  <field name="status">wontdo</field>
+  <field name="response">Not fixing — for now. This is a great suggestion and we’ll have a larger eng. discussion for incorporating this across our contracts which distribute NFTs.</field>
+  <field name="content">
+    ## (Q-3) Minting is always all-or-nothing
+
+    During TieredDrop.sol’s `claimWithSignature()`, the following require statement dictates that the full requested quantity must be available:
+
+    ```solidity
+    require(remaningToDistribute == 0, "Insufficient tokens in tiers.");
+    ```
+
+    However, this may give some users a poor experience. For example, if a user attempts to claim 10 tokens during a heated drop event, but the number of available falls to 9, the user will get zero tokens even though they may be happy with 9.
+
+    Consider allowing partial quantity fills, perhaps via a boolean or minimum amount parameter.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Model</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="response">Not fixing. Given that thirdweb’s smart contracts serve a wide NFT user base, we’re open to users issuing tokenIds greater than type(uint128).max</field>
+  <field name="content">
+    ## (G-1) Struct compaction
+
+    In LazyMintWithTier.sol, `struct TokenRange`'s two fields could reasonably be compacted to (uint128, uint128) from (uint256, uint256), to save a cold SSTORE on mint and a cold SLOAD on use.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Redundant Computation</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">a2ef7598ed0a16efa28e4daccc4cf7be47ec45e1</field>
+  <field name="content">
+    ## (G-2) Loop variables
+
+    In TierdDrop.sol’s `getTokensInTier()`, the `bytes32 hashOfTier` variable can be pulled outside the loop, as its value only needs to be computed once.
+  </field>
+</item>

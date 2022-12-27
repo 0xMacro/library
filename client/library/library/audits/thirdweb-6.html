@@ -1,0 +1,80 @@
+<page
+  clientName="thirdweb"
+  reportDate="November 17th, 2022"
+  auditTitle="thirdweb A-6"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  customRepoInfo
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from October 14, 2022 to November 4, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>A provided audit handoff document provided through Notion.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank">
+        {{page.repoUrl.split('/').slice(-1)[0]}}
+      </a>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash <b>(Marketplace):</b>
+      <code>38df19415e92cc9514b55e25102a10ca835ba2d1</code>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash <b>(TieredDrop):</b>
+      <code>63da8c73c5f0b0c911e4dc54e067d6760a360393</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts as part of Marketplace contract audit:</p>
+
+  <template type="file-hashes">
+    9ab930008d0bd84c62cf0d986b0bf8ed78f4a086ab789860c1a5b0703754b9fe  contracts/marketplace/IMap.sol
+    99c8759d3b393428613a910a25c936ac150107fe8e2069459daa976f7b77bdaa  contracts/marketplace/IMarketplace.sol
+    51367c23eb703ce2dd807e743d85013240ba0d715b76b38f309b88df131db802  contracts/marketplace/Map.sol
+    8deae2b3840c5fb49995b78750e483f66620c4ac6c5f4485a4311e579869aaa1  contracts/marketplace/direct-listings/DirectListingsLogic.sol
+    7b2d907a0f1e6e7d85d040e64312d349981111648e462200890ce3b2eb5c7c85  contracts/marketplace/direct-listings/DirectListingsStorage.sol
+    285add33baf30ca56d6bb0cf23b6a9f28efc5d5cebcc63f40a8ff36f6df08d38  contracts/marketplace/english-auctions/EnglishAuctionsLogic.sol
+    333c4d7b082f3af984918c2662d000a01f9acd2ad9494debf26b4643fd339c8a  contracts/marketplace/english-auctions/EnglishAuctionsStorage.sol
+    8c4b4626c102014763156be128a4f017a940d95c12a9d067c29f51ca1a6c5bcf  contracts/marketplace/entrypoint/InitStorage.sol
+    a71b3d34132bee735967bda33efcfdff28286871a4731ae09648d0868ce26931  contracts/marketplace/entrypoint/MarketplaceEntrypoint.sol
+    e749e540e00d26ddc399839f247bc682f26dd7207b62094f76530f2a92b8a57f  contracts/marketplace/extension/ContractMetadata.sol
+    14d948e13a418e4fc4143afaed847d131bdced85f2de15f802017b7f9d4ee4f7  contracts/marketplace/extension/ContractMetadataStorage.sol
+    f0267e676d506453bf069834e594a8bc09358118eb9167b3185e188808cc61e2  contracts/marketplace/extension/ERC2771Context.sol
+    3e39b49f49187adc5b0204e948fe6295625497a54fef9f560e95c5a7f59a8fdd  contracts/marketplace/extension/ERC2771ContextConsumer.sol
+    db23bba0849ebe49fe4c0b650908d367f678b27255d2b391234ed80a6211e08a  contracts/marketplace/extension/ERC2771ContextStorage.sol
+    0d37a422289e052deaf50cc7ae6c9e4953afc9f3863a47e2a877cce82131cf04  contracts/marketplace/extension/IContext.sol
+    f40715d06e060ccb48e32e6c0b70e607fe784929d00c352f8f9221e46b2e9825  contracts/marketplace/extension/Permissions.sol
+    4eb0f3fdf109d70a97e9a55f7f678bf794cff047e68f8daf3c95a4e19adc1d21  contracts/marketplace/extension/PermissionsEnumerable.sol
+    c1d03daa525f9ac9ac80ba0843b20dae7f02531ad916a8b63cefdcb3cb50fe53  contracts/marketplace/extension/PermissionsEnumerableStorage.sol
+    69906d4f45aaf43e91397bba1e7a82886e5f91976dea73abf14b6a0eadba4072  contracts/marketplace/extension/PermissionsStorage.sol
+    8c17f63c3205c9852bfb577435d9e9e5bac8b10db1d8e0fbe10931deff75e70b  contracts/marketplace/extension/PlatformFee.sol
+    98c243ad513664a26d28d68911e054ea369fd3b03e235ea2a64382f5c96bd13e  contracts/marketplace/extension/PlatformFeeStorage.sol
+    fef56e40ae4e0ac6cf2e1330b2055b2774a1b4f0441c9ff2a62d454419d01900  contracts/marketplace/extension/ReentrancyGuard.sol
+    156c48fb3d78a28a3ef5c5078fea4926cec7fe681e06015fcf25867a1b71f31c  contracts/marketplace/extension/ReentrancyGuardStorage.sol
+    c936fa4eb508ecdf3fb6e29a12fcc358a3a5547a0f370bfd1808d9e467255ecf  contracts/marketplace/offers/OffersLogic.sol
+    65f28ce5fe81d7be573f2af4cd4a75372c560f6a70ed2155ec043bcfe2041eb4  contracts/marketplace/offers/OffersStorage.sol
+  </template>
+
+  <p>We audited the following contracts as part of TieredDrop contract audit:</p>
+
+  <template type="file-hashes">
+    4092cc97a7ab7dd98ec2856bcb72c54a28735a57cca29499a9d281b4bcfd6e8e  contracts/tiered-drop/TieredDrop.sol
+  </template>
+</content-for>
