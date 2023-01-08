@@ -1,0 +1,69 @@
+<page
+  clientName="Sommelier Finance"
+  reportDate="January 9, 2022"
+  auditTitle="Sommelier A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  repoCommitHash="760dc9cff074b379f1fd18b3d5c646761050ab34"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from November 28, 2022 to December 23, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>Publicly available Sommelier Finance documentation.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+a29bca2fae4dc622b90346b1f7852453e3503a840701be2a7464e27b2895d385  src/CellarFactory.sol
+13e6b5d9e57feb9b67551c78212c7b89888a26de8ffe66b98c0dffd603394dad  src/CellarRouter.sol
+1f2b7370db86782a53f80550f488d895d9e003f03fd16ccbac49d78ec688aa48  src/Registry.sol
+7216b4241f3d7498590837d192defc08cc772e04017850fd97a4cf6a122a15c6  src/base/Cellar.sol
+c08eadbc13ed403dc0bda19bbfb2c2ea19dda7b7fbba0e49b4b014a691556be4  src/base/CellarInitializable.sol
+034ad547f0d49172d9675eeda9e7455d848a93e3488f651a58918e7abd0b31c0  src/base/ERC20.sol
+7339b94d56e93300c814ab96cc984f3f3411d11160a5937b6ec11c02962534bd  src/base/ERC4626.sol
+cbe4ba9c787b262b1b77a83a9969ff9a716d88f09048d175c1a0d00ee4414e14  src/base/Multicall.sol
+83a15e116064dc682a367cc52c5d45d8e1d951534bf4bc55c966dfd626f46ea1  src/base/SafeTransferLib.sol
+af2afbee5468fabae1780eb7e576714edcc66bb10e0ae6bb650ca644a309bbe5  src/interfaces/ICellarRouter.sol
+806b8683bafde540975057eed16fa387b6948bd39c4a4920438c16d90034e72d  src/interfaces/ICellarRouterV1_5.sol
+66750c8a92b3c8a68fef6e3ac1c251803a3b8450a718f46f7621496751b8d967  src/interfaces/ICellarStaking.sol
+0dc13ae1f9a72dfbf71d34a400b2bc245c5b91d4f4301f3b45ecddad5cd5c6ce  src/interfaces/ICellarV1_5.sol
+0d976a972ff63255c5b191b610d7aabe2c43e2918db8e37ee15a28ed3f958586  src/interfaces/IMulticall.sol
+355a17582931dd2eb6fdac9474d2145f41c660cf547624f913e5693a724a1a72  src/interfaces/external/DataTypes.sol
+6d94860fa2048a78e972a60df6869f95c6c9816ca77ac1295221c3977451b028  src/interfaces/external/IAaveToken.sol
+4a3a658744c35c28be6f4bd4984427e3383173a2f7186a89f3ca10dafbbb91df  src/interfaces/external/IChainlinkAggregator.sol
+0ed58af3419766ab14c9c3554614e2b24ef41af0111cc69f4928f64088519092  src/interfaces/external/ICurveFi.sol
+18cf0d11b734b6ad0b67244ee013ad78a9bc06d62fd49781a4717d37cb1e564c  src/interfaces/external/ICurvePool.sol
+e09c292aa38c53f6282949761962ef1b8b22f9ea00201477b515a3b44dd37c90  src/interfaces/external/IGravity.sol
+964f63843ce11c53aaf1e015fb5f7042089687ff4deada92011c948a7b5cf8ff  src/interfaces/external/IPool.sol
+7c84dacfbe52dcab2b6eab5d007568333a7377278a5b634204e1de7c99621bf3  src/interfaces/external/IPoolAddressesProvider.sol
+b1b5ea5db6e598cf9396b64754c4fd2397ff86c6c870b8daf870c5ec427477f6  src/interfaces/external/IUniswapV2Router02.sol
+07e54f895d2e96a922fd26ed7936c3ca432047815f40b9651d613cb73fcb8d81  src/interfaces/external/IUniswapV3Router.sol
+ca370339d135937d8416110f324034c0306b7ea6be57e34843ea7a653dfdd8fa  src/modules/adaptors/Aave/AaveATokenAdaptor.sol
+26134deb7d44f89d35518cae52e99d03afa061f3f685e367323ab8cac0369562  src/modules/adaptors/Aave/AaveDebtTokenAdaptor.sol
+e593629ffda30369d8fe1fcb36d997f0930ebb783ed616589c2974bbc9fc05d2  src/modules/adaptors/BaseAdaptor.sol
+a1811b8d3e9f6ee312564bf18bc1995791c592d54c50630c9eaef8d925ce3499  src/modules/adaptors/Compound/CTokenAdaptor.sol
+b9fe6e24df7c28a984c0cb1a665d514d586659d0d084542b06bfd7d6ece8ec42  src/modules/adaptors/ERC20Adaptor.sol
+3298b08a490b75023836191f7d420abe00032a62b157ce89096fec509571b07a  src/modules/adaptors/Sommelier/CellarAdaptor.sol
+f99dab91dc3cd744485c88bf4dd5d9bd99c6225984ec8babe33b64ab5d7fc3b7  src/modules/adaptors/UniSwap/UniswapV3Adaptor.sol
+a8bf1e395d5c1460238ddef2f4885707da66a625d647d4eabc19932a46451773  src/modules/adaptors/VestingSimpleAdaptor.sol
+e34df27205ee255508264c0d4f36c57500e1899a0e84a63f0b61ddb28409316b  src/modules/price-router/PriceRouter.sol
+c092a79d9e7cd77d1403a098f0a4af88cf302a874627f13b957c3187392fb811  src/modules/swap-router/SwapRouter.sol
+a6fed1c60674485153703934b62962b4312af3c45259599c3981727b679806c8  src/modules/vesting/VestingSimple.sol
+cb399505b6b295199f621ad41a02702ee10e406f36dd37d020473cd94c344fc9  src/utils/Math.sol
+d34f2b62e595176746bf032429bff1529a4665fc14a9c953c1508fb354b48e00  src/utils/SigUtils.sol
+1ef52fb12ef961528b14aeb556138932e8f0e9fd681e11bdd872e01df6b25d6d  src/utils/Uint32Array.sol
+  </template>
+</content-for>
+
