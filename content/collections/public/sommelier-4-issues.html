@@ -3,7 +3,7 @@
   <field name="impact">high</field>
   <field name="chance">high</field>
   <field name="status">fixed</field>
-  <field name="commit">d4e40c7d835250e425e38f12eb36bcc00fa531f1</field>
+  <field name="commitTree">1ce92f2718395eae4b8cb4c2547b014848ce0959</field>
   <field name="content">
     ## (H-1) `Cellar::_withdrawInOrder` calculations round down due to division before multiplication, which may leave LP’s assets in the Cellar
 
@@ -105,7 +105,7 @@ To simplify the implementation, consider defining new state `holdingPosition` (t
   <field name="impact">high</field>
   <field name="chance">medium</field>
   <field name="status">fixed</field>
-  <field name="commit">873185e305f27b215efded32690f5a63bce063f4</field>
+  <field name="commitTree">c57555681ce9a099986ddbb82f493e812afe3421</field>
   <field name="content">
    ## (H-4) `minHealthFactor` is Strategist controlled, potentially making Cellar Aave accounts liquidatable
 
@@ -161,7 +161,7 @@ A constant minimum health factor, HFMIN, has been added to lines 71-73 of AaveAT
 <item>
   <field name="topic">Trust Model</field>
   <field name="impact">high</field>
-  <field name="chance">medium</field>
+  <field name="chance">low</field>
   <field name="status">addressed</field>
   <field name="commit">873185e305f27b215efded32690f5a63bce063f4</field>
   <field name="content">
@@ -201,7 +201,7 @@ However, consider using extra caution when designing a solution.
     2. Also because of the fees present in `submitLogicCall`, which will eventually result in bots trying to claim them. In the worst case for Strategists, the Cellar’s Aave account will be liquidatable before they can backrun with a liquidation call, leaving the liquidation opportunity to others.
   </field>
   <field name="response">
-While we’ve added a lower bound to the min health factor as described in [H-4], we found no additional action was needed for this scenario, and believe the likelihood to be much lower than the reported “Medium”, due to the following mitigating factors:
+While we’ve added a lower bound to the min health factor as described in [H-4], we found no additional action was needed for this scenario due to the following mitigating factors:
 
 1) The hypothetical oracle price drop described in the issue (1%) is double that of Chainlink’s widest deviation threshold, which is 0.5%, making the opportunity less profitable.
 
@@ -412,6 +412,7 @@ Consider changing `getExchangeRate` in `UniswapV3Adaptor.balanceOf()` to somethi
 ```
 
 And then using the `numerator` and `denominator` when returning the balance:
+
 `return amount0 + (amount1 * numerator) / denominator / (10**token1.decimals());`
   </field>
 </item>
@@ -513,75 +514,20 @@ Consider modifying the event to have both the `owner` and the `receiver` as argu
 </item>
 
 <item>
-  <field name="topic">3rd Party Behavior</field>
-    <field name="impact">low</field>
-  <field name="status">ack</field>
-  <field name="content">
-    ## (Q-2) `AaveATokenAdaptor::deposit` calls deprecated Aave function
-
-As per the documentation in `IPool.sol` `deposit` is deprecated - “Deprecated: Use the `supply` function instead"
-
-```solidity
-/**
-  *@notice Supplies an `amount` of underlying asset into the reserve, receiving 
-    in return overlying aTokens.
-  * - E.g. User supplies 100 USDC and gets in return 100 aUSDC
-  *@dev Deprecated: Use the `supply` function instead**
-  *@param asset The address of the underlying asset to supply
-  *@param amount The amount to be supplied
-  *@param onBehalfOf The address that will receive the aTokens, same as msg.sender 
-  *  if the user wants to receive them on his own wallet, or a different address 
-  *  if the beneficiary of aTokens is a different wallet
-  *@param referralCode Code used to register the integrator originating the 
-  *  operation, for potential rewards. 0 if the action is executed directly by the 
-  *  user, without any middle-man
-  **/
-  function deposit(
-    address asset,
-    uint256 amount,
-    address onBehalfOf,
-    uint16 referralCode
-  ) external;
-```
-
-Consider calling `pool().supply` instead of `pool().deposit`. The arguments are identical.
-  </field>
-  <field name="response">
-The current adaptors integrate with AAVE V2, for which deposit is not deprecated, and no supply function is supported. In a future AAVE V3 adaptor implementation, we would use supply.
-  </field>
-</item>
-
-<item>
-  <field name="topic">Coding Standards</field>
-    <field name="impact">low</field>
-  <field name="status">ack</field>
-  <field name="content">
-    ## (Q-3) `PriceRouter::checkUpkeep` does not use `AutomationCompatible::cannotExecute` modifier
-
-As per the [Chainlink Automation Documentation](https://docs.chain.link/chainlink-automation/compatible-contracts/#checkupkeep-function), “It is a best practice to import the `AutomationCompatible.sol`contract and use the `cannotExecute` modifier to ensure that the method can be used only for simulation purposes.”
-
-Consider importing `AutomationCompatible` instead of `AutomationCompatibleInterface` and adding the `cannotExecute` modifier to`PriceRouter::checkUpkeep`.
-  </field>
-  <field name="response">
-The execute modifier is not required for `checkUpkeep`, since `checkUpkeep` is already specified as a `view` function and thus cannot update state. No code changes were made.
-  </field>
-</item>
-
-<item>
   <field name="topic">Comments</field>
     <field name="impact">low</field>
   <field name="status">fixed</field>
   <field name="commit">475ef73765d0e295ae53b2f377658b2830c5ab19</field>
   <field name="content">
-    ## (Q-4) Dead link in comments in `Multicall.sol`
+    ## (Q-2) Dead link in comments in `Multicall.sol`
 
 Consider changing:
 
-`* From: [https://github.com/Uniswap/v3-periphery/contracts/base/Multicall.sol](https://github.com/Uniswap/v3-periphery/contracts/base/Multicall.solto)` 
+`* From: https://github.com/Uniswap/v3-periphery/contracts/base/Multicall.sol`
 
 to 
 
-`* From: [https://github.com/Uniswap/v3-periphery/blob/1d69caf0d6c8cfeae9acd1f34ead30018d6e6400/contracts/base/Multicall.sol](https://github.com/Uniswap/v3-periphery/blob/1d69caf0d6c8cfeae9acd1f34ead30018d6e6400/contracts/base/Multicall.sol)`
+`* From: https://github.com/Uniswap/v3-periphery/blob/1d69caf0d6c8cfeae9acd1f34ead30018d6e6400/contracts/base/Multicall.sol`
   </field>
 </item>
 
@@ -591,7 +537,7 @@ to
   <field name="status">fixed</field>
   <field name="commit">475ef73765d0e295ae53b2f377658b2830c5ab19</field>
   <field name="content">
-    ## (Q-5) Lack of human readable IDs for dependency contracts, in `Registry.sol`
+    ## (Q-3) Lack of human readable IDs for dependency contracts, in `Registry.sol`
 
 The dependency contracts
 
@@ -632,7 +578,7 @@ However, not all dependency-IDs are named and only the Price Router has a consta
   <field name="status">fixed</field>
   <field name="commit">475ef73765d0e295ae53b2f377658b2830c5ab19</field>
   <field name="content">
-    ## (Q-6) `getCurveV2DerivativeStorage` is an unused mapping in PriceRouter.sol
+    ## (Q-4) `getCurveV2DerivativeStorage` is an unused mapping in PriceRouter.sol
 
 In PriceRouter.sol, line [936](https://github.com/PeggyJV/cellar-contracts/blob/main/src/modules/price-router/PriceRouter.sol#L936) declares `getCurveV2DerivativeStorage`. 
 
@@ -643,30 +589,12 @@ Consider removing this unused mapping or using `getCurveV2DerivativeStorage` for
 </item>
 
 <item>
-  <field name="topic">Extra Code</field>
-    <field name="impact">low</field>
-  <field name="status">ack</field>
-  <field name="content">
-    ## (Q-7) `aavePool` is set twice to the same address
-
-`aavePool` is initialized in `Cellar.sol` to `0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A`.
-
-It is also set in `CellarInitializable.initialize()` to the same address.
-
-Consider setting `aavePool` only one time.
-  </field>
-    <field name="response">
-The code was left as-is: because aavePool is a non-constant value in Cellar.sol, it would not be stored in the deployed implementation contract for a CellarInitializable deployed via a factory. As such, it must be set in the initialize function.
-  </field>
-</item>
-
-<item>
   <field name="topic">Comments</field>
     <field name="impact">low</field>
   <field name="status">fixed</field>
   <field name="commit">475ef73765d0e295ae53b2f377658b2830c5ab19</field>
   <field name="content">
-    ## (Q-8) `Uint32Array.sol` comments are misleading
+    ## (Q-5) `Uint32Array.sol` comments are misleading
 
 In `Uint32Array.sol`, the comments mention `uint256` integers and `uint256[]` arrays. 
 
@@ -681,7 +609,7 @@ Consider switching the comments to reflect the appropriate integer/array.
     <field name="impact">low</field>
   <field name="status">ack</field>
   <field name="content">
-    ## (Q-9) The `constructor` in Cellar.sol does not initialize anything
+    ## (Q-6) The `constructor` in Cellar.sol does not initialize anything
 
 CellarFactory.deploy deterministically deploys cellars using Open Zeppelin Clones and initializes the cellars in CellarInitializable.initialize(). Therefore, the initializations in the constructor of Cellar.sol are unnecessary. Consider removing them.
   </field>
@@ -695,7 +623,7 @@ No code changes were made - the Sommelier team desires that Cellar.sol remain a 
     <field name="impact">medium</field>
   <field name="status">ack</field>
   <field name="content">
-    ## (Q-10) Consider warning exiting LPs that they are leaving guaranteed returns behind during vesting
+    ## (Q-7) Consider warning exiting LPs that they are leaving guaranteed returns behind during vesting
 
 Since there is ongoing vesting, an LP is leaving guaranteed returns behind if they exit their position before the vesting is complete. This may not be immediately obvious to LPs, and may incentivize them to stay as LPs for longer.
   </field>
