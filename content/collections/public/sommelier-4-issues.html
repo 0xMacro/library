@@ -9,7 +9,7 @@
 
 This issue is similar to M-2, in that they both involve dividing, and then using the result from the division to multiply later.
 
-`uint256 totalWithdrawableBalanceInAssets` multiplies `withdrawableBalance` with `exchangeRate`, but `exchangeRate` may lose precision due to Solidity division. This may cause a user to not receive all of the `assets` from the cellar that they are entitled to. See the Validation test for an example where `WETH` is left in the `Cellar`, that belongs to the LP.
+`uint256 totalWithdrawableBalanceInAssets` multiplies `withdrawableBalance` with `exchangeRate`, but `exchangeRate` may lose precision due to Solidity division. This may cause a user to not receive all of the `assets` from the cellar that they are entitled to.
     
 **Remediations to Consider** 
 
@@ -57,8 +57,6 @@ This can can manifest in a number of ways:
     - Attacker profits, draining funds from the Cellar/LPs. Cellar/LPs are stuck with worthless `AttackCoin`.
 
 As the value in the Cellar rises, it becomes more profitable and attractive to attack. For example, a malicious strategist could take ~ `300_000e18` `DAI` out of a `100_000_000e18` `DAI` Cellar, given the default `allowedRebalanceDeviation`. This attack can also be repeated by calling `callOnAdaptor` many times, but the rate limiting that will be put in place on the Sommelier chain side should help mitigate its repeatability.
-
-The following validation test shows a strategist accidentally making the swap into an untracked asset and the amount of WETH left in the Cellar after the LP calls `redeem`.
 
 **Remediations to Consider** 
 
@@ -181,12 +179,12 @@ Consequently, strategists are incentivized to sandwich attack around an oracle p
 
 For example, borrow WETH using USDC as collateral
 
-1. Wait for a TX for Chainlink USDC price drop to enter into the mempool
-2. Front run TX and borrow WETH to bring health factor lower e.g. 1.02 (below 1 is liquidatable) [1]
-3. Chainlink USDC-USD price drop executes
-4. Backrun a TX to liquidate collateral 
-    1. Health factor was 1.02 before Chainlink’s TX
-    2. Suppose USDC price update is -3%, new health factor becomes < 1 after price update tx executes
+  1. Wait for a TX for Chainlink USDC price drop to enter into the mempool
+  2. Front run TX and borrow WETH to bring health factor lower e.g. 1.02 (below 1 is liquidatable) [1]
+  3. Chainlink USDC-USD price drop executes
+  4. Backrun a TX to liquidate collateral 
+    - Health factor was 1.02 before Chainlink’s TX
+    - Suppose USDC price update is -3%, new health factor becomes < 1 after price update tx executes
 
 **Remediations to Consider** 
 
@@ -244,7 +242,7 @@ Confusing the LP’s health factor for the Cellar’s health factor can lead to 
 
 1. Consider changing `msg.sender` to `address(this)` to correctly represent the cellar’s address in `AaveATokenAdaptor:withdraw` 
 2. Consider defining 2 different helper functions to help with readability for reading Cellar address in `delegatecall` and `staticcall` context to reduce the amount of mental translation needed for the readers
-    1. Note one can leverage Solidity’s modifiers and declare `_cellarDelegateCaller` as mutative even it is not, so that using `_cellarDelegateCaller` in a non-mutative context will be a compile-time error
+  - Note one can leverage Solidity’s modifiers and declare `_cellarDelegateCaller` as mutative even it is not, so that using `_cellarDelegateCaller` in a non-mutative context will be a compile-time error
 3. `function _cellarDelegateCaller() internal() returns (address);` i.e. `address(this)`
 4. `function _cellarStaticCaller() internal view() returns (address);` i.e. `msg(sender)`
 
@@ -657,7 +655,7 @@ All comments were updated to reference `uint32` in Uint32Array.sol.
   <field name="content">
     ## (Q-6) The `constructor` in Cellar.sol does not initialize anything
 
-CellarFactory.deploy deterministically deploys cellars using Open Zeppelin Clones and initializes the cellars in CellarInitializable.initialize(). Therefore, the initializations in the constructor of Cellar.sol are unnecessary. Consider removing them.
+`CellarFactory.deploy` deterministically deploys cellars using Open Zeppelin Clones and initializes the cellars in `CellarInitializable.initialize()`. Therefore, the initializations in the constructor of Cellar.sol are unnecessary. Consider removing them.
   </field>
   <field name="response">
 No code changes were made - the Sommelier team desires that Cellar.sol remain a standalone deployable contract, independent from use of the factory. Both factory and direct deployments should be supported.
