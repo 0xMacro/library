@@ -1,0 +1,123 @@
+<page title="Binary and Types on the EVM" layout="/chapters/_layout.html">
+
+<div class="prose">
+<template type="learn-evm-markdown">
+
+
+# Why Learn ABI Encoding?
+
+Whether you’re aware of it or not, Application Binary Interfaces (ABIs) are used **everywhere** within the inner workings smart contracts and typical Ethereum transactions. As a Solidity / EVM developer, you will *inevitably* run into strange and unusual scenarios where solid knowledge of ABIs will *guide* you to solving the obstacles you face.
+
+In short, ABIs are used **any time a contract needs to respond to a function call.**
+
+As you can imagine, this can be very common. Let’s explore the common situations where ABIs are used:
+
+- <toc>Transaction Data</toc>
+- <toc>Contract-to-Contract Function Calls</toc>
+- <toc>Hardhat & Frontend Applications</toc>
+- <toc>Smart Contract Design Patterns</toc>
+
+## Transaction Data
+
+Any time you call a contract function on-chain using your wallet, you are sending an ABI-encoded function call.
+
+A common example of using ABI-encoded transaction data is making a trade on [Uniswap](https://uniswap.org). Let’s say you want to swap ETH for USDC. You would:
+
+- Visit the [swap page](https://app.uniswap.org/#/swap) web frontend and connect your wallet.
+- Select ETH and USDC, enter in an amount, and click “Swap”:
+
+<div class="w-2/3 mx-auto">
+
+![Swapping ETH to USDC on Uniswap's web ui](/img/abi-swap-1.png)
+
+</div>
+
+Upon clicking that button, the page’s JavaScript **prepares an ABI encoding** of the function selector and arguments, and prompts you (via e.g. MetaMask) to **create and send** a transaction **with that ABI encoded data as the transaction’s `data` field**, to be sent to the contract you’re using to trade.
+
+To continue this example, let’s take a look at what this data *looks* like, and in a future chapter we will learn the details of the encoding algorithm itself.
+
+Below is a screenshot of what the MetaMask prompt could look like after clicking the “Confirm Swap” button:
+
+<div class="w-1/2 mx-auto">
+
+![MetaMask confirmation dialog](/img/abi-swap-2.png)
+
+</div>
+
+Note the `HEX` tab – that’s what we want to look at next:
+
+![MetaMask confirmation dialog showing the HEX tab](/img/abi-swap-3.png)
+
+See that `HEX DATA: 420 BYTES` field? This is what ABI encoded data looks like! It may look scary now, but after completing the next few chapters, you will have a solid understanding of what this data is really doing.
+
+## Contract-to-Contract Function Calls
+
+The `HEX DATA` we just saw above is **the exact same format of data** that contracts use to *interact* with each other **on-chain**.
+
+Concretely, any time you see an external function call in Solidity:
+
+```solidity
+uint result = someExternalContract.foo(10);
+```
+
+This call compiles down to code that:
+
+1. **Constructs** an ABI-encoded message (i.e. the function selector + arguments),
+2. and **sends** that message to the `someExternalContract` address using the CALL opcode (more on that opcode later).
+3. The contract bytecode located at the `someExternalContract` address then **interprets** that call, **ABI-decoding** the incoming message, running its own logic, and eventually **ABI-encoding** a return value.
+4. The calling contract receives back the return value, **ABI-decodes** it, and continues execution.
+
+Here is some Solidity code that is roughly equivalent to the above code snippet:
+
+```solidity
+// This Solidity code:
+//
+//    uint result = someExternalContract.foo(10);
+//
+// is roughly equivalent to the following:
+//
+(bool success, bytes memory returnData)
+  = someExternalContract.call(abi.encodeWithSignature('foo(uint256)', [10]));
+
+require(success, "foo failed");
+
+(uint result) = abi.decode(returnData, (uint));
+```
+
+There are more detail we could cover, but we’ll stop here and move on since this is only the introductory “why should I learn this?” lesson 🙂
+
+## Hardhat & Frontend Applications
+
+Both [Hardhat](https://hardhat.org) and frontend applications use [ethers.js](https://docs.ethers.io/v5/) or something similar. This library allows you to write JavaScript code that looks like this:
+
+```solidity
+await greeterContract.setGreeting("Hello!");
+```
+
+This is nice, but how does ethers.js know what this function should do? It’s because of **the contract’s ABI declarations** that get generated during compilation.
+
+For example, when you compile Solidity with Hardhat, Hardhat generates JSON files that look like the following:
+
+![Example JSON Hardhat output of a compiled Solidity smart contract](/img/abi-artifacts.png)
+
+In this example:
+
+- Hardhat compiled a Greeter.sol, generating a file located at `artifacts/contracts/Greeter.sol/Greeter.json`
+- This file contains the ABI: The declared **interface** of this contract. In other words, these are the functions that the contract is “promising” to the world that it will respond to, in some form or fashion.
+- Ethers.js **reads this file**, and uses the `abi` array to **generate** JavaScript functions that can be used like the `await greeterContract.setGreeting("Hello!")` snippet above.
+
+## Smart Contract Design Patterns
+
+Lastly, understanding ABIs will open the gate to fully understanding:
+
+- **Ethereum Improvement Proposals (EIPs).** Proposals to Ethereum must consider all edge cases, and much of these considerations are at the binary data level.
+- **Solidity’s low-level `externalContract.call()`.** ABIs are part of the low-level concept that [the Solidity docs refers to](https://docs.soliditylang.org/en/v0.8.16/control-structures.html#external-function-calls).
+- **DAO proposal systems.** Governance voting for on-chain execution is exactly ABI-encoded function calls stored in a voting proposal struct.
+- **Gasless transactions.** [EIP-2771](https://eips.ethereum.org/EIPS/eip-2771) *extends* ABI calldata for its own needs.
+- **Contract proxy patterns,** especially how function calls are delegated.
+- **Deploying contracts through a multisig,** and its tricky function signature & arguments.
+- Much, much more 🤓
+
+
+</template>
+</div>
