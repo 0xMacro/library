@@ -30,6 +30,9 @@ This issue is similar to M-2, in that they both involve dividing, and then using
     
     With the remediations from M-2 and the `totalWithdrawableBalanceInAssets` change, assets will no longer be erroneously left inside the Cellar.
   </field>
+    <field name="response">
+`_withdrawInOrder` has been updated to use a scaling factor, the `PRECISION_MULTIPLIER` introduced on line 840 in Cellar.sol. These multipliers are used in the `withdrawInOrder` accounting logic (lines 866-893). This approach also necessitated the creation of a new struct, `WithdrawPricing` (lines 827-835) in order to get around stack-too-deep errors in the fixed implementation.
+  </field>
 </item>
 
 <item>
@@ -45,13 +48,13 @@ While `allowedRebalanceDeviation` puts a limit on the damage, a strategist can s
 
 This can can manifest in a number of ways:
 
-1. Accidentally. The strategist swapped into an untracked positions with no malicious intent.
-2. On purpose. A malicious strategist can do the following:
-    1. Create an ERC20, let’s call it `AttackCoin`. Only the attacker’s EOA holds `AttackCoin`.
-    2. Create a UniswapV3 pool between the Cellar base asset and `AttackCoin` and provide liquidity. There is no risk to the attacker at this stage because no one else holds `AttackCoin`, meaning that no one can drain the base asset liquidity that they provided to the pool. The Attacker doesn’t need to provide much liquidity, because they also control the `amountOutMin` argument.
-    3. Call `callOnAdaptor` to swap the base asset for `AttackCoin`. The value will be the max amount allowed through `allowedRebalanceDeviation`.
-    4. Use the EOA to swap `AttackCoin` for the base asset and remove all remaining liquidity from pool.
-    5. Attacker profits, draining funds from the Cellar/LPs. Cellar/LPs are stuck with worthless `AttackCoin`.
+  1. Accidentally. The strategist swapped into an untracked positions with no malicious intent.
+  2. On purpose. A malicious strategist can do the following:
+    - Create an ERC20, let’s call it `AttackCoin`. Only the attacker’s EOA holds `AttackCoin`.
+    - Create a UniswapV3 pool between the Cellar base asset and `AttackCoin` and provide liquidity. There is no risk to the attacker at this stage because no one else holds `AttackCoin`, meaning that no one can drain the base asset liquidity that they provided to the pool. The Attacker doesn’t need to provide much liquidity, because they also control the `amountOutMin` argument.
+    - Call `callOnAdaptor` to swap the base asset for `AttackCoin`. The value will be the max amount allowed through `allowedRebalanceDeviation`.
+    - Use the EOA to swap `AttackCoin` for the base asset and remove all remaining liquidity from pool.
+    - Attacker profits, draining funds from the Cellar/LPs. Cellar/LPs are stuck with worthless `AttackCoin`.
 
 As the value in the Cellar rises, it becomes more profitable and attractive to attack. For example, a malicious strategist could take ~ `300_000e18` `DAI` out of a `100_000_000e18` `DAI` Cellar, given the default `allowedRebalanceDeviation`. This attack can also be repeated by calling `callOnAdaptor` many times, but the rate limiting that will be put in place on the Sommelier chain side should help mitigate its repeatability.
 
@@ -73,7 +76,7 @@ Sommelier believes this is an acceptable trade-off of risk vs. system complexity
 </item>
 
 <item>
-  <field name="topic">Incentive Design</field>
+  <field name="topic">Use Cases</field>
   <field name="impact">high</field>
   <field name="chance">medium</field>
   <field name="status">fixed</field>
@@ -97,6 +100,9 @@ To simplify the implementation, consider defining new state `holdingPosition` (t
 
 - When mutating the underlying array with `removePosition` consider checking if `creditPositions[toRemoveindex]` refers to `holdingPosition` instead and revert if needed
 - Consider removing the code dealing with the holding position in `swapPositions` **because the notion of the holding position is represented as a name instead of an index**
+  </field>
+    <field name="response">
+As suggested, use of `holdingIndex` has been changed to use of `holdingPosition`, with checks modified to check the `positionId` for removal of the holding position (line 239-240 of Cellar.sol), and `swapPositions` code dealing with the holding position removed.
   </field>
 </item>
 
@@ -154,7 +160,7 @@ Notes
 4. This issue can happen regardless of strategist’s intention. Strategists can set a dangerous (< 1) `minHealthFactor`, so an excessive withdrawal of Aave collateral can happen
   </field>
   <field name="response">
-A constant minimum health factor, HFMIN, has been added to lines 71-73 of AaveATokenAdaptor.sol and lines 51-53 of AaveDebtTokenAdaptor.sol. This value is checked against the strategist-set minHealthFactor on lines 121-123 of AaveATokenAdaptor.sol and lines 140-142 of AaveDebtTokenAdaptor.sol, putting a hard lower bound on the minimum AAVE health factor and preventing the strategist from liquidating themselves.
+A constant minimum health factor, `HFMIN`, has been added to lines 71-73 of AaveATokenAdaptor.sol and lines 51-53 of AaveDebtTokenAdaptor.sol. This value is checked against the strategist-set `minHealthFactor` on lines 121-123 of AaveATokenAdaptor.sol and lines 140-142 of AaveDebtTokenAdaptor.sol, putting a hard lower bound on the minimum AAVE health factor and preventing the strategist from liquidating themselves.
   </field>
 </item>
 
@@ -201,7 +207,7 @@ However, consider using extra caution when designing a solution.
     2. Also because of the fees present in `submitLogicCall`, which will eventually result in bots trying to claim them. In the worst case for Strategists, the Cellar’s Aave account will be liquidatable before they can backrun with a liquidation call, leaving the liquidation opportunity to others.
   </field>
   <field name="response">
-While we’ve added a lower bound to the min health factor as described in [H-4], we found no additional action was needed for this scenario due to the following mitigating factors:
+While we’ve added a lower bound to the min health factor as described in [H-4], we found no additional action was needed for this scenario, and believe the likelihood to be much lower than the reported “Medium”, due to the following mitigating factors:
 
 1) The hypothetical oracle price drop described in the issue (1%) is double that of Chainlink’s widest deviation threshold, which is 0.5%, making the opportunity less profitable.
 
@@ -246,16 +252,19 @@ Confusing the LP’s health factor for the Cellar’s health factor can lead to 
 
 - [https://docs.aave.com/risk/v/aave-v2/asset-risk/risk-parameters#liquidation-threshold](https://docs.aave.com/risk/v/aave-v2/asset-risk/risk-parameters#liquidation-threshold)
   </field>
+    <field name="response">
+The `withdrawFromAave` function in AaveATokenAdaptor.sol was updated to use the correct address on line 250.
+  </field>
 </item>
 
 <item>
-  <field name="topic">Incentive Design</field>
+  <field name="topic">Spec</field>
   <field name="impact">medium</field>
   <field name="chance">high</field>
   <field name="status">fixed</field>
   <field name="commit">52c8d6ad1ada8e7f9bd00b0d2ee9bde6b8fdf259</field>
   <field name="content">
-    ## (M-2) `PriceRouter::getValue()` may return a different result from PriceRouter::getValues() due to order of operations and division before multiplication
+    ## (M-2) `PriceRouter::getValue()` may return a different result from `PriceRouter::getValues()` due to order of operations and division before multiplication
 
 The cause for this discrepancy is `getValue()` and `getValues()` swap the ordering of steps 2 and 3 as outlined below. Multiplication and division are mathematically commutative, but division in Solidity takes the floor, which makes the operation not commutative.
 
@@ -282,6 +291,9 @@ Consider grouping all multiplication together first, and then doing all division
 `valueInQuote += (amounts[i] * basePrice * 10**quoteDecimals) / 10**baseAsset.decimals() / quotePrice;` 
 
 Also, consider having `getValue()` and `getValues()` follow more similar code paths so they return the same value for the same pricing call. One option is to have `getValue()` construct the proper arguments and call `_getValues()` instead of calling `getExchangeRate()`.
+  </field>
+      <field name="response">
+The Price Router was updated in multiple areas of PriceRouter.sol to use more consistent math and a common internal logic function, `_getValueInQuote`.
   </field>
 </item>
 
@@ -343,6 +355,9 @@ Some `ERC20` tokens return `false` when `transferFrom` fails instead of revertin
 
 Consider using `safeTransferFrom` instead of `transferFrom` in `VestingSimple::deposit`.
   </field>
+    <field name="response">
+This was fixed on line 178 of VestingSimple.sol.
+  </field>
 </item>
 
 
@@ -375,6 +390,11 @@ Also consider defining a standardized hook to allow Adaptor authors to define cu
   if (!BaseAdaptor(adaptor).isPositionTrustworthy(positionData)) 
     revert ...
 ```
+  </field>
+      <field name="response">
+This was fixed by adding an `assetsUsed` field to the common adaptor interface (see base implementation on lines 113-119 of BaseAdaptor.sol). `UniswapV3Adaptor` then overrode the `assetUsed` function to report both LP tokens (lines 181-189), which were stored in the previously-defined `adaptorData`.
+
+Finally, `assetsUsed` was added to the price router support check on lines 274-279 of `Registry.sol`, ensuring that any asset used based on the adaptor’s own reporting is supported by the price router.
   </field>
 </item>
 
@@ -415,6 +435,9 @@ And then using the `numerator` and `denominator` when returning the balance:
 
 `return amount0 + (amount1 * numerator) / denominator / (10**token1.decimals());`
   </field>
+        <field name="response">
+A scaling factor, `precisionPrice`, was added to the `balanceOf` calculation in UniswapV3Adaptor.sol (lines 93-170). This value is derived from the decimals of the token.
+  </field>
 </item>
 
 <item>
@@ -432,7 +455,7 @@ And then using the `numerator` and `denominator` when returning the balance:
 Consider implementing a check to assert that no value is being lost from the `Cellar` and transferred to a `VestingSimple` contract.
   </field>
   <field name="response">
-  As discussed in [H-2] above, there are myriad ways to misappropriate assets within the allowedRebalanceDeviation, and any usage of supported adaptors to perform such an action does not require remediation. The Sommelier team is aware of its chosen security trade-offs and believes the combination of on-chain and off-chain security architecture described in the [H-2] response to be the optimal approach for its use case.
+  As discussed in [H-2] above, there are myriad ways to misappropriate assets within the `allowedRebalanceDeviation`, and any usage of supported adaptors to perform such an action does not require remediation. The Sommelier team is aware of its chosen security trade-offs and believes the combination of on-chain and off-chain security architecture described in the [H-2] response to be the optimal approach for its use case.
   </field>
 </item>
 
@@ -472,6 +495,9 @@ The `s.vested` `amount` argument in `emit Withdraw(msg.sender, depositIds[i], s.
 
 Consider changing `s.vested` to `shares` when emitting `Withdraw` in `VestingSimple::withdrawAll`.
   </field>
+    <field name="response">
+This was resolved by storing a `vested` value before resetting the storage slot to 0, on line 238 of VestingSimple.sol, and using the `vested` value for event emission on line 248.
+  </field>
 </item>
 
 <item>
@@ -488,6 +514,9 @@ When cellars are initialized in `CellarInitializable.initialize()` , the `holdin
     **Remediations to Consider**
 
 In `CellarInitializable.initialize()`, consider checking to make sure that `holdingIndex` is less than `_creditPositions.length()`
+  </field>
+      <field name="response">
+Resolved via use of `holdingPosition`, as described by the response to [H-3].
   </field>
 </item>
 
@@ -511,6 +540,11 @@ However, in the `withdrawAnyFor()` `Withdraw` event, the first argument is `msg.
 
 Consider modifying the event to have both the `owner` and the `receiver` as arguments.
   </field>
+        <field name="response">
+Resolved by adding a fourth parameter to the event signature, for both the `user` (the owner of the deposit) and `receiver` (the address receiving the withdrawal). 
+
+In addition, this parameter separation was added to the deposit event, and both events were renamed to `VestingWithdraw` and `VestingDeposit` respectively, in order to eliminate overlap with the ERC4626-compliant `Deposit` and `Withdraw` events of the cellar.
+  </field>
 </item>
 
 <item>
@@ -528,6 +562,9 @@ Consider changing:
 to 
 
 `* From: https://github.com/Uniswap/v3-periphery/blob/1d69caf0d6c8cfeae9acd1f34ead30018d6e6400/contracts/base/Multicall.sol`
+  </field>
+  <field name="response">
+The specified link was updated on line 9 of Multicall.sol.
   </field>
 </item>
 
@@ -570,6 +607,9 @@ However, not all dependency-IDs are named and only the Price Router has a consta
     
 - Consider changing the usage of `registry.getAddress` to use human readable IDs. For example, `registry.getAddress(registry.PRICE_ROUTER_REGISTRY_SLOT())` instead of `PriceRouter(registry.getAddress(2))`.
   </field>
+    <field name="response">
+All calls to `registry.getAddress` in Cellar.sol were updated to use readable constants instead of integers - lines 497 and 1402.
+  </field>
 </item>
 
 <item>
@@ -585,6 +625,9 @@ In PriceRouter.sol, line [936](https://github.com/PeggyJV/cellar-contracts/blob/
 However, this mapping is never used because whenever a CurveV2 derivative asset is added/set up, the underlying token addresses of the Curve pool are stored in `getCurveDerivativeStorage` instead of `getCurveV2DerivativeStorage` 
 
 Consider removing this unused mapping or using `getCurveV2DerivativeStorage` for CurveV2 assets.
+  </field>
+      <field name="response">
+The specified mapping was deleted from PriceRouter.sol.
   </field>
 </item>
 
@@ -602,6 +645,9 @@ However, `uint32` integers and `uint32[]` arrays are being used.
 
 Consider switching the comments to reflect the appropriate integer/array.
   </field>
+        <field name="response">
+All comments were updated to reference `uint32` in Uint32Array.sol.
+  </field>
 </item>
 
 <item>
@@ -614,6 +660,9 @@ Consider switching the comments to reflect the appropriate integer/array.
 CellarFactory.deploy deterministically deploys cellars using Open Zeppelin Clones and initializes the cellars in CellarInitializable.initialize(). Therefore, the initializations in the constructor of Cellar.sol are unnecessary. Consider removing them.
   </field>
   <field name="response">
+No code changes were made - the Sommelier team desires that Cellar.sol remain a standalone deployable contract, independent from use of the factory. Both factory and direct deployments should be supported.
+  </field>
+          <field name="response">
 No code changes were made - the Sommelier team desires that Cellar.sol remain a standalone deployable contract, independent from use of the factory. Both factory and direct deployments should be supported.
   </field>
 </item>
