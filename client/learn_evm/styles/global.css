@@ -23,7 +23,7 @@ body {
   cursor: not-allowed;
 }
 .ChapterLink a.title {
-  @apply text-zinc-100 font-light;
+  @apply text-gray-700 dark:text-zinc-100 font-light;
 }
 .ChapterLink span.title {
   text-decoration: underline;
