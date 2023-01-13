@@ -1,0 +1,156 @@
+<page title="Binary and Types on the EVM" layout="/chapters/_layout.html">
+
+<div class="prose">
+<template type="learn-evm-markdown">
+
+
+# The Anatomy of an ABI-Encoded Function Call
+
+As we learned in <chapter>abi/overview</chapter>, ABI encoding is used everywhere in smart contract interaction and development. The primary use case is to **encode** function calls to *send* to smart contracts, expecting those smart contract to **interpret** that message and consequently run the code you want.
+
+In this lesson, we will learn *precisely* what one of these function call messages might look like. There is binary involved, but it’s relatively simple when broken down.
+
+## Introduction
+
+Here’s a full example of an ABI-encoded function call:
+
+<div class="wrap-code-block"></div>
+
+```solidity
+0x71a6155e00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000036162630000000000000000000000000000000000000000000000000000000000
+```
+
+In an EVM function call, this data becomes the **calldata** for a contract to decode and interpret as it sees fit.
+
+Let’s learn how to pick it apart.
+
+First off, the encoded message above intends to call this [silly, rudimentary] function:
+
+```solidity
+interface Example {
+    function setGreeting(bool exclaim, string greeting, uint x) external;
+}
+```
+
+(This is written as a Solidity interface only for convenience; ABI encoding is not Solidity-exclusive, although Solidity certainly uses it to handle function calls).
+
+A contract (or any other code working with ABIs) **must** be aware of the interface of `setGreeting()` in order to both **encode** *and/or* **decode** ABI messages for it. In other words, you can’t derive any types from the message itself; you must know the types **beforehand**. Keep this in mind throughout the lesson.
+
+Now let’s dive a little deeper. An ABI-encoded function call has two main parts:
+
+1. <toc>The Function Selector</toc>
+2. <toc>The Function Arguments</toc>
+
+## The Function Selector
+
+A function selector is a 4-byte “identifier” for specifying which function you want to call. We write “identifier” in quotes, because it’s not a *unique* identifier; there’s a chance for two functions to have the **same** function selector, and that chance is **significant enough** to be a security concern, especially when working with advanced smart contract patterns such as upgradability (but more on that later).
+
+Here is a brief description of how a function selector is generated:
+
+1. Put the function name and all its parameter types (excluding names) into a string in a specific format.
+2. Take the keccak256 hash of that string.
+3. Take the first 4 bytes of that hash.
+
+In JavaScript:
+
+```jsx
+let ethers = require('ethers');
+let bytestring = ethers.utils.toUtf8Bytes('setGreeting(bool,string,uint256)');
+let hash = ethers.utils.keccak256(bytestring);
+
+// 2 chars for the 0x prefix; 8 chars for the 4 bytes.
+let selector = hash.substring(0, 2 + 8);
+
+selector //=> "0x71a6155e"
+```
+
+Take a closer look at the string used in the code example. Note that:
+
+- The parameter *names* are omitted
+- The types are all explicit (e.g. `uint256` instead of `uint`)
+- Solidity-specific concepts are omitted (such as `memory` for a `string` parameter)
+- The name & params must be in this exact format – the parenthesis, the commas, and the lack of spaces.
+
+Since we’re *only* taking the first four bytes of a hash, it’s easy to imagine many *other* hashes having the **same** first four bytes, hence the potential for a conflict.
+
+On the other hand, function selectors will *always* be four bytes. This is beneficial because they are so common; every time you want to **define** a function or **call** a function in bytecode, you will be working with a function selector. Only needing 4 bytes vs a full 32 bytes can save a lot of bytecode size.
+
+## The Function Arguments
+
+Now it’s time to dig into the algorithm for ABI-encoding function call **arguments**. Key things to note about this algorithm:
+
+- **Types must be know ahead of time.** In other words, types *are not* self-describing. For example, if you receive the value `0x01`, you can't tell – based on the value alone – if it's a number, a boolean, an address, etc. This is why you *must* know the **function’s interface** to know what type you’re working with.
+- **Not part of the EVM.** ABI encoding is a *convention*. The EVM technically doesn’t “know” what a string or boolean is (see <chapter>evm/binary</chapter>). ABI encoding is a standard that – thankfully – pretty much everyone implements, which enables high interoperability across the smart contract ecosystem.
+- **Also used elsewhere.** Function call **return values** and **event data** both use this same algorithm to encode & decode their values.
+
+### Data Type Breakdown
+
+Recall that we are working with this ABI-encoded function call (the example from above):
+
+<div class="wrap-code-block"></div>
+
+```solidity
+0x71a6155e00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000036162630000000000000000000000000000000000000000000000000000000000
+```
+
+to a contract that claims to have this interface:
+
+```solidity
+interface Example {
+    function setGreeting(bool exclaim, string greeting, uint x) external;
+}
+```
+
+To pick this ABI-encoded message apart, the first thing we want to do is split it into three sections:
+
+1. **Function Selector:** The 4 bytes of selector, as explained in the previous section.
+2. **Parameters:** One word (32 bytes) for each parameter the function expects.
+3. **Complex Data (if any):** The data for complex types that don’t fit into a single word (string, array, etc.)
+
+Splitting up our example into these sections, we get:
+
+```
+0x // Discarded; not part of the data sent, only a prefix for human eyes.
+
+// 1. Function Selector
+71a6155e
+
+// 2. Parameters
+0000000000000000000000000000000000000000000000000000000000000001 - bool
+0000000000000000000000000000000000000000000000000000000000000060 - string offset
+0000000000000000000000000000000000000000000000000000000000000001 - uint256
+
+// 3. Complex Data
+0000000000000000000000000000000000000000000000000000000000000003 - string length
+6162630000000000000000000000000000000000000000000000000000000000 - string data
+```
+
+Several things to note:
+
+- In the Parameters section, there is **one word** (32 bytes) for each parameter.
+- For the simple data types (bool and uint256), the data is **directly** in that word (`true` and `1` respectively, both represented as the binary value `0x1`).
+- For the complex data types (string), the data *is not* directly in that word. Instead, the word is a **byte-count offset** to the real data
+    - In this case, `0x60` is a byte offset to **where the string data starts**.
+    - `0x60` is `96` in decimal. Thus the string data begins 96 bytes from the beginning of the Parameters section.
+    - 96 bytes is **3 words** (32 bytes * 3). So this is in effect skipping the entire Parameters section, and points to the beginning of the Complex Data section.
+
+For **string** data specifically:
+
+- The **first word** of string data is the **length** of the string. In this case, `0x3`
+- The next `floor(L / 32) + 1` words is the **UTF-8 encoded string data** itself. In this case, `0x616263`, which is the string `"abc"` in UTF-8.
+
+Based on this analysis, combined with knowledge of the `Example`/`setGreeting` interface, we can deduce that this ABI-encoded function call is equivalent to the following function call written in Solidity:
+
+```solidity
+Example(someAddress).setGreeting(true, "abc", 1);
+```
+
+## Conclusion
+
+- An ABI-encoded function call is the function selector + its arguments.
+- Simple arguments (like uints and booleans) get encoded directly.
+- Complex arguments (like strings) get encoded with an offset + an arbitrary data length.
+- This data all becomes **calldata** during an EVM function call.
+
+
+</template>

@@ -92,6 +92,12 @@
   content: "";
 }
 
+.prose .wrap-code-block + pre {
+  white-space: pre-wrap;
+  overflow: auto;
+  word-wrap: break-word;
+}
+
 .prose aside {
   @apply p-5;
 }
