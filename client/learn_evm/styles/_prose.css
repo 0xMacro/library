@@ -1,5 +1,8 @@
 /* Extensions to tailwind's typography plugin */
 
+.prose {
+  max-width: 70ch;
+}
 
 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
  /* WARNING: Text colors must be in sync with the .HeadingAnchor class */
