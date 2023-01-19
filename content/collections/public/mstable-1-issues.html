@@ -1,0 +1,457 @@
+### [H-1] `removeVault()` will block the governor from removing underlying vaults
+
+**Impact**: High
+
+**Likelihood**: High
+
+In *SameAssetUnderlyingsAbstractVault.sol*, `removeVaults()` accepts a `vaultIndex` to remove the corresponding vault from `_activeUnderlyingVaults`, and the index is required to be less than the length of `_activeUnderlyingVaults`.
+
+```solidity
+uint256 newUnderlyingVaultsLen = _activeUnderlyingVaults.length - 1;
+require(vaultIndex <= newUnderlyingVaultsLen, "Invalid from vault index");
+```
+
+We also noticed the same `vaultIndex` is used to get the `underlyingVaultIndex` from the `vaultIndexMap` later.
+
+```solidity
+uint256 underlyingVaultIndex = vaultIndexMapMem.map(vaultIndex);
+```
+
+This means if the governor wants to remove the nth vault in the vaultMap, it requires having at least n active vaults. However, this is not always the case, as previously removed vaults will still occupy their indexes on the map, and that will block the governor from removing active vaults. Since there is a limit of total active vaults, the issue will also block the governor from adding new vaults once after adding 15 vaults
+
+
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">3226f67a1d18cc5a2e55a2d9f50d348bf459d9c2</field>
+    <field name="content">
+        ## [H-1] `removeVault()` will block the governor from removing underlying vaults
+        
+        In *SameAssetUnderlyingsAbstractVault.sol*, `removeVaults()` accepts a `vaultIndex` to remove the corresponding vault from `_activeUnderlyingVaults`, and the index is required to be less than the length of `_activeUnderlyingVaults`.
+        
+        ```solidity
+        uint256 newUnderlyingVaultsLen = _activeUnderlyingVaults.length - 1;
+        require(vaultIndex <= newUnderlyingVaultsLen, "Invalid from vault index");
+        ```
+        
+        We also noticed the same `vaultIndex` is used to get the `underlyingVaultIndex` from the `vaultIndexMap` later.
+        
+        ```solidity
+        uint256 underlyingVaultIndex = vaultIndexMapMem.map(vaultIndex);
+        ```
+        
+        This means if the governor wants to remove the nth vault in the vaultMap, it requires having at least n active vaults. However, this is not always the case, as previously removed vaults will still occupy their indexes on the map, and that will block the governor from removing active vaults. Since there is a limit of total active vaults, the issue will also block the governor from adding new vaults once after adding 15 vaults
+
+        **Remediations to Consider**
+
+- Change the *require* statement at [line 251](https://github.com/mstable/metavaults/blob/1657b7ed2f8b964783487a0d68f973c70036bdfb/contracts/vault/allocate/SameAssetUnderlyingsAbstractVault.sol#L251) to use the map’s indexes count and not active underlying vaults length.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">spec</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">daf7f423f02e3ce557f9eb67b8663b42bc1e4334</field>
+    <field name="content">
+        ## [H-2] Meta vault doesn’t fully comply with ERC-4626 standard
+
+        
+        EIP-4626 states the following (see [here](https://eips.ethereum.org/EIPS/eip-4626#security-considerations)):
+        
+        > Finally, EIP-4626 Vault implementers should be aware of the need for specific, opposing rounding directions across the different mutable and view methods, as it is considered most secure to favor the Vault itself during calculations over its users:
+        > 
+        > - If (1) it’s calculating how many shares to issue to a user for a certain amount of the underlying tokens they provide or (2) it’s determining the amount of the underlying tokens to transfer to them for returning a certain amount of shares, it should round *down*.
+        > - If (1) it’s calculating the amount of shares a user has to supply to receive a given amount of the underlying tokens or (2) it’s calculating the amount of underlying tokens a user has to provide to receive a certain amount of shares, it **should round *up*.**
+        
+        As stated above, ERC-4626 expects the result returned from the following functions of *AbstractVault.sol* to be rounded up:
+        
+        ```solidity
+        function _previewWithdraw(uint256 assets) 
+            internal view virtual 
+            returns (uint256 shares)
+        
+        function _previewMint(uint256 shares) 
+            internal view virtual 
+            returns (uint256 assets)
+        ```
+        
+        Due to how Solidity division works, the current implementation of those two functions currently rounds the result down - thus not conforming to ERC-4626 standard. The other function behave as expected by the ERC-4626 standard.
+        
+        Not fully conforming to ERC-4626 might cause some integration problems for other protocols that can lead to wide range of issues for both parties.
+
+        **Remediations to Consider**
+- Consider to change the `_previewWithdraw` and `_previewMint` function of *AbstractVault.sol* (and any overriden functions) accordingly, so that the result is rounded up. A reference implementation from OpenZeppelin can be found [here](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/14f98dbb581a5365ce3f0c50bd850e499c554f72/contracts/token/ERC20/extensions/ERC4626.sol). Check out line [114](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/14f98dbb581a5365ce3f0c50bd850e499c554f72/contracts/token/ERC20/extensions/ERC4626.sol#L114) and [119](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/14f98dbb581a5365ce3f0c50bd850e499c554f72/contracts/token/ERC20/extensions/ERC4626.sol#L119) where the results are rounded up.
+    </field>
+  </item>
+  
+    <item>
+        <field name="topic">Use Cases</field>
+        <field name="impact">high</field>
+        <field name="chance">low</field>
+        <field name="status">wontdo</field>
+        <field name="content">
+            ## [M-1] Incorrect calculation of `assetsPerShare` when underlying vault is paused
+            
+
+            In *SameAssetUnderlyingsAbstractVault.sol*, the function `totalAssets()` calculates the number of assets in the underlying vaults via `.maxWithdraw` function. 
+            
+
+            See `_totalUnderlyingAssets` function:
+            
+            ```solidity
+            function _totalUnderlyingAssets() internal view returns (uint256 totalUnderlyingAssets) {
+                    // Get the assets held by this vault in each of in the active underlying vaults
+                    uint256 len = _activeUnderlyingVaults.length;
+            
+                    for (uint256 i = 0; i < len; ) {
+                        totalUnderlyingAssets += _activeUnderlyingVaults[i].maxWithdraw(address(this));
+                        unchecked {
+                            ++i;
+                        }
+                    }
+            ```
+            
+            If an underlying vault is paused, `.maxWithdraw` returns 0, thus lowering the number of total assets calculated in the `totalAssets()` function. 
+            As `totalAssets()` is used to calculate the `assetsPerShare` value, pausing an underlying vault affects the asset-to-share ratio. In particular, e.g. a deposit will return an increased portion of shares.  
+            Thus, while one of the underlying vaults is paused, a user can deposit assets and will receive an increased number of shares as opposed to when all underlying vaults are unpaused.
+
+            **Remediations to Consider**
+
+            Dont rely on `.maxWithdraw` function when calculating the total number of asset in the underlying vaults. Instead, the `.previewRedeem` function could be used to retrieve the actual number of assets for an underlying vault.
+        </field>
+        <field name="response">
+            Since we control the pause functionality over the underlying vaults in the current scope, this is not an issue. We will pause/un-pause meta vaults and underlying vaults simultaneously.
+            At the same time, we appreciate Macro for pointing this out because this is important for future meta vaults (where we can have 3rd party underlying vaults)
+        </field>
+    </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">acc53385506356c42d8b1559ab27b8010330f1bc</field>
+    <field name="content">
+        ## [M-2] Meta vaults cannot re-add underlying vaults after removal
+
+        In [line 238](https://github.com/mstable/metavaults/blob/1657b7ed2f8b964783487a0d68f973c70036bdfb/contracts/vault/allocate/SameAssetUnderlyingsAbstractVault.sol#L238) of *SameAssetUnderlyingsAbstractVault.sol*, assets are approved to the max uint256 amount using `SafeERC20.safeApprove`. According to the documentation within *SafeERC20.sol*:
+
+        ```solidity
+        safeApprove should only be called when setting an initial allowance,
+        or when resetting it to zero. To increase and decrease it, use
+        'safeIncreaseAllowance' and 'safeDecreaseAllowance'
+        ```
+        
+        If the vault manager removes an underlying vault and tries to re-add it, the transaction will revert.
+
+        **Remediation to Consider**
+
+- When removing a vault, consider resetting the allowance to 0 using `_asset.safeApprove(underlyingVault, 0)`
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">4548074c1bd20463305b72198a9c92b02aff773b</field>
+    <field name="content">
+        ## [M-3] Redemption and mint may return an incorrect amount
+        
+        A user is able to deposit assets for shares and redeem them subsequently by calling `deposit` and `redeem` , respectively. The `redeem` function:
+        
+        1.  Calculates the assets to redeem by calling `_previewRedeem` which uses the current `assetsPerShare`
+        2. Updates the `assetsPerShare` using `_checkAndUpdateAssetPerShare`
+        3. Transfer assets and burn the shares
+        
+        In the `_previewRedeem` function, the shares-to-assets amount is calculated using `_convertToAssets` :
+        
+        ```solidity
+        function _convertToAssets(uint256 shares)
+                internal
+                view
+                virtual
+                override
+                returns (uint256 assets)
+          {
+                assets = (shares * assetsPerShare) / ASSETS_PER_SHARE_SCALE;
+          }
+        ```
+        
+        The issue occurs when the underlying vaults assets change but the metavault does not update `assetsPerShare`. When this happens, and no actions occur in which `_checkAndUpdateAssetPerShare` gets called, users will be redeeming assets proportional to an outdated `assetsPerShare`.
+        
+        A similar issue can also be found in the `_mint` function that warrants a remedy as well:
+        
+        ```solidity
+        function _mint(uint256 shares, address receiver)
+            internal
+            virtual
+            override
+            returns (uint256 assets)
+        {
+            assets = _previewMint(shares);
+            _checkAndUpdateAssetPerShare(assets);
+            _transferAndMint(assets, shares, receiver, false);
+        }
+        ```
+        
+        This issue is rated as medium taking into account the scenario that the `assetPerShare` fails to update.
+
+        **Remediation to Consider**
+
+- Move `_checkAndUpdateAssetPerShare(assets)` to before `_previewRedeem(shares)` in `_redeem`
+- Move `_checkAndUpdateAssetPerShare(assets)` to before `_previewMint` in `_mint`
+    </field>                                    
+  </item>
+
+    <item>
+        <field name="topic">Input Validation</field>
+        <field name="impact">high</field>
+        <field name="chance">low</field>
+        <field name="status">fixed</field>
+        <field name="commit">6e8b6b503f73a80bdd987835d1e0fc2a739823e9</field>
+        <field name="content">
+            ## [M-4] No upper bound for the initialization of performance fee
+            In [line 45](https://github.com/mstable/metavaults/blob/1657b7ed2f8b964783487a0d68f973c70036bdfb/contracts/vault/fee/PerfFeeAbstractVault.sol#L45) of *PerfFeeAbstractVault.sol*, the `performanceFee` can be initialized with a uint256 value. The store `performanceFee` should be a number scaled to 6 decimals to represent the percentage shares to mint as a fee. It should have max value of `1000000` , which represents 100%. 
+
+            Currently, there is no check to make sure that value initialized for `performanceFee` is less than `1000000` (similar to what is in `setPerformanceFee`).
+
+            The impact of this issue is rated high because if the fee is set sufficiently high, it may not be changeable. This is due to [line 118](https://github.com/mstable/metavaults/blob/1657b7ed2f8b964783487a0d68f973c70036bdfb/contracts/vault/fee/PerfFeeAbstractVault.sol#L118) where `_chargePerformanceFee` is called before a new fee is set. The function `_chargePerformanceFee` may use the erroneously high `performanceFee` in an attempt to calculate `feeShares`. This will cause an overflow and revert.
+            
+            **Remediation to Consider**
+
+            - Adding a similar require check as the `setPerformanceFee` in the `_initialize` function
+                ```solidity
+                    require(_performanceFee <= FEE_SCALE, "Invalid fee");
+                ```
+    </field>
+    </item>
+
+    <item>
+        <field name="topic">Use Cases</field>
+        <field name="impact">medium</field>
+        <field name="chance">low</field>
+        <field name="status">wontdo</field>
+        <field name="content">
+            ## [L-1] Paused vault can be removed even if it holds assets
+            
+            In *SameAssetUnderlyingsAbstractVault.sol*, the `removeVault` function includes the following:
+            
+            ```solidity
+            // Withdraw all assets from the underlying vault being removed.
+            uint256 underlyingShares = _activeUnderlyingVaults[underlyingVaultIndex].maxRedeem(   
+                address(this)
+            );
+            if (underlyingShares > 0) {    
+                _activeUnderlyingVaults[vaultIndex].redeem(
+                    underlyingShares,
+                    address(this),
+                    address(this)
+                );
+            }
+            ```
+            
+            In case the underlying vault is paused, `maxRedeem` returns 0 and thus redeeming the assets will be skipped. Subsequently, the vault will be removed. 
+            
+            As a consequence, paused vaults will be removed but the underlying assets will not be redeemed. This results in locked assets in the underlying vault and an increased `assetsPerShare` value so that users will receive an increased portion of shares when depositing.
+        
+            **Remediations to Consider**
+
+            Note that the issue can be manually remedied by re-adding the vault, unpausing it, and then removing the unpaused vault. This lowers the issue from High to Medium severity. 
+
+            Consider the following for the issue to not occur at all:
+
+            - Only allow vault removal for unpaused vaults
+        
+        </field>
+        <field name="response">
+            Very much on the tangent of [M-1]. Furthermore, as Macro noted, this can be fixed by re-adding the vault, unpausing and removing. Also, we want to interact with underlying vaults using only IERC4626 methods.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Protocol Design</field>
+        <field name="impact">medium</field>
+        <field name="chance">low</field>
+        <field name="status">fixed</field>
+        <field name="commit">6e8b6b503f73a80bdd987835d1e0fc2a739823e9</field>
+        <field name="content">
+            ## [L-2] `removeVault()` may block single source withdraws
+
+            In *SameAssetUnderlyingsAbstractVault.sol*, `removeVaults()` accepts a `vaultIndex` to remove the corresponding vault from `_activeUnderlyingVaults`, but there is no check that assures the removed vault is not the single source vault.
+            
+            In *PeriodicAllocationAbstractVault.sol*, `_sourceAssets()` is used to withdraw assets from underlying vaults, and amounts smaller or equal to `singleVaultSharesThreshold` are withdrawn from the single source vault.
+            
+            Since `resolveVaultIndex()` reverts for non-active vaults, deactivating that vault will block all single source withdraws.
+
+            **Remediations to Consider**
+
+            - Consider checking if the removed vault is the single source vault.
+        </field>
+    </item>
+
+     
+    <item>
+        <field name="topic">Code Quality</field>
+        <field name="impact">low</field>
+        <field name="status">fixed</field>
+        <field name="commit">6e8b6b503f73a80bdd987835d1e0fc2a739823e9</field>
+        <field name="content">
+            ## [Q-1] Inconsistent zero address check for vault manager
+
+            Generally, it is not required to check for address zero. However, in *VaultManagerRole.sol*, the function`setVaultManager` checks for `address(0)`, but `_initialize` does not. 
+            
+            **Remediation to Consider**
+            - [Line 66](https://github.com/mstable/metavaults/blob/1657b7ed2f8b964783487a0d68f973c70036bdfb/contracts/shared/VaultManagerRole.sol#L66) can be removed to increase code consistency and decrease code size, or
+            - Adding an `address(0)` check (similar to to the function`setVaultManager`) for code consistency. However, if there is an emphasis on code size, this is not recommended.
+
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Code Quality</field>
+        <field name="impact">low</field>
+        <field name="status">fixed</field>
+        <field name="commit">6e8b6b503f73a80bdd987835d1e0fc2a739823e9</field>
+        <field name="content">
+            ## [Q-2] Unused imports
+
+            The following imports in *PerfFeeAbstractVault.sol* are not required and can be removed:
+            
+            ```solidity
+            import { AbstractVault } from "../AbstractVault.sol"
+            import { VaultManagerRole } from "../../shared/VaultManagerRole.sol";
+            
+            ```
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Code Quality</field>
+        <field name="impact">low</field>
+        <field name="status">fixed</field>
+        <field name="commit">6e8b6b503f73a80bdd987835d1e0fc2a739823e9</field>
+        <field name="content">
+            ## [Q-3] Misleading comment
+
+            In *SameAssetUnderlyingsAbstractVault.sol*, `rebalance()` is explained as follows
+            
+            ```solidity
+            /**
+             * @notice `VaultManager` rebalances the assets in the underlying vaults.
+             * This can be moving assets between underlying vaults, moving assets in underlying
+             * vaults back to this vault, or moving assets in this vault to underlying vaults.
+             */
+            ```
+            
+            However, the function can not be used for moving assets in underlying vaults back to this vault, or moving assets in this vault to underlying vaults. In our discussion with mStable team, they confirmed this by stating:
+            
+            > When withdrawing assets from one vault to the other , the metavault is only a transit point
+            >
+        </field>
+    </item>
+
+
+    <item>
+        <field name="topic">Upgradability</field>
+        <field name="status">ack</field>
+        <field name="content">
+            ## [I-1] Storage can get corrupted on upgrade
+
+            For upgradable contracts, it is recommended to implement storage gaps (`__gap`). 
+
+            > Storage gaps are a convention for reserving storage slots in a base contract, allowing future versions of that contract to use up those slots without affecting the storage layout of child contracts.
+            > 
+            
+            In particular, if a new variable is added in a parent contract, the additional variable can overwrite the beginning of the storage layout of the child contract. 
+            
+            Lets consider the following example:
+            
+            ```solidity
+            abstract contract AssetPerShareAbstractVault is AbstractVault {
+                /// @notice Scale of the assets per share. 1e26 = 26 decimal places
+                uint256 public constant ASSETS_PER_SHARE_SCALE = 1e26;
+            
+                /// @notice Assets per share scaled to 26 decimal places.
+                uint256 public assetsPerShare;
+            ```
+            
+            AssetPerShareAbstractVault inherits from AbstractVault, but AbstractVault is not upgrade-safe as it doesn’t define storage gaps. If we now want to upgrade AbstractVault.sol by e.g. adding an additional state variable, the additional variable can potentially overwrite any of the variables defined in AssetPerShareAbstractVault or any other child contracts. 
+            
+            For further explanation see here: [https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#storage-gaps](https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#storage-gaps)
+            
+            **Note:** Upgrading current deployed contracts to support storage gaps is not recommended as it might corrupt the storage layout. However, consider to define storage gaps for any new contracts being deployed.
+            
+            As stated [here](https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#storage-gaps), OpenZeppelin recommends storage gaps to avoid storage collisions between different versions of logic contracts. An alternative approach to avoid storage collisions is to utilise the [unstructured pattern](https://docs.openzeppelin.com/upgrades-plugins/1.x/proxies#unstructured-storage-proxies). The unstructured pattern is usually used to avoid storage collisions between proxy contract and logic contract, but can also be extended to avoid storage collisions between different versions of logic contracts. Thus, when a parent contract needs to be upgraded by adding an additional state variable, the new variable needs to be stored on a sufficiently random storage slot instead of using Solidity’s regular storage slots.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Incentive Design</field>
+        <field name="status">ack</field>
+        <field name="content">
+            ## [I-2] Call frequency of `chargePerformanceFee()` may change the charged fee for volatile assets
+
+            `chargePerformanceFee()` in *PerfFeeAbstractVault.sol* can be freely called by the Vault Manager. There are no problems with the current vaults because they have yield-bearing tokens as the underlying asset, and assets per share should never decrease.
+            After noticing the comments in *PerfFeeAbstractVault.sol* and having a discussion with the mStable team, we learned more about future plans for having vaults with riskier strategies. With these vaults, it is possible to see occasional decreases in assets per share. We want to inform the team and the readers that for such vaults, the frequency of the fee collection may dramatically change the fee charged, and it may make sense to introduce a cooldown to `chargePerformanceFee()`.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Gas Limit</field>
+        <field name="status">ack</field>
+        <field name="content">
+            ## [I-3] `withdraw()` and `redeem()` may revert with OOG error
+
+            `_withdraw()` and `_redeem()` in *PeriodicAllocationAbstractVault.sol* are gas-intensive functions, and they may revert with OOG (out-of-gas) errors in certain setups, blocking some users from withdrawing their assets. It is quite difficult to guess which underlying vaults will be used in the future, but since these underlying vaults will keep most of the assets in their own underlying vaults, they also need to withdraw from them to support bigger withdrawals.
+            When a big enough withdrawal request is received in a setup with a large number of underlying vaults (currently limited to 15), and all these vaults keeping assets in their own underlying vaults, it will cause cascading balance calculation, withdrawal, and rebalance operations. This situation is something to be aware of when adding new underlying vaults into the system.
+        </field>
+    </item>
+ 
+    <item>
+        <field name="topic">Gas Optimization</field>
+        <field name="impact">low</field>
+        <field name="status">fixed</field>
+        <field name="commit">6e8b6b503f73a80bdd987835d1e0fc2a739823e9</field>
+        <field name="content">
+            ## [G-1] No check if `performanceFee` is 0
+
+            In *PerfFeeAbstractVault.sol*, `performanceFee` can be set to `0` either via the `_initialize` or via the `setPerformanceFee` function. `chargePerformanceFee` doesn’t check for `performanceFee == 0` so it goes through the function of `_chargePerformanceFee,` and only returns on line 
+
+            ```solidity
+            if (feeShares > 0) {
+            ```
+            
+            Consider to only call `_chargePerformanceFee` when `performanceFee` > 0.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Gas Optimization</field>
+        <field name="impact">low</field>
+        <field name="status">fixed</field>
+        <field name="commit">6e8b6b503f73a80bdd987835d1e0fc2a739823e9</field>
+        <field name="content">
+            ## [G-2] Unnecessary use of uint256 for performanceFee
+
+            In *PerfFeeAbstractVault.sol*, the state variable `performanceFee` is meant to be less than `FEE_SCALE` (1e6) so a `uint24` will be sufficient. Consider changing `performanceFee` to `uint24`.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Gas Optimization</field>
+        <field name="impact">low</field>
+        <field name="status">fixed</field>
+        <field name="commit">6e8b6b503f73a80bdd987835d1e0fc2a739823e9</field>
+        <field name="content">
+            ## [G-3] Unnecessary control variable initialization of for loops
+
+            In each `for` loop, the control variable (e.g. `i`) is initialized to 0. Since it is always initialized to 0 upon creation, this is redundant. Consider removing the assignment from various points in the contract to save gas.
+        </field>
+    </item>
