@@ -1,0 +1,76 @@
+<page
+  clientName="Double"
+  reportDate="January  20th, 2023"
+  auditTitle="Double A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/double2win/v1"
+  repoCommitHash="be522ba55229c70e6e5085507d5b3cedd4adf4c4"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_DOUBLE_1"
+
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from December 19, 2022 to December 28, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>
+      <a href="{{page.repoUrl}}" target="_blank">Relevant documentation</a> for the in-scope contracts.
+    </li>
+
+  </ul>
+</content-for>
+
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank">
+        {{page.repoUrl.split('/').slice(-1)[0]}}
+      </a>
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash:</b>
+      <code>{{page.repoCommitHash}}</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    c63456d2356e15f385c9d94de025160f8044e2692ed6b271f73f82cc50b17f0c  contracts/AMMVault.sol
+    e6ca5e092f8b453774b8bcb967016e6f7445710b00ad6b8497118857a4bd4563  contracts/AMMVaultPolicy.sol
+    0da36903494a6e69ea5754305c037713ec9d90e4a13a20edbd702947b1c23331  contracts/AssetVault.sol
+    c4c0a1d86777d25fcecd5a04146052ddc3cd913ac457d0223d99737ec99861a0  contracts/ClubManager.sol
+    818dd87f5d3a931e41618d73fce7a25ad1ee43ce766a201a68ccde041b3d29d4  contracts/DoubleDip.sol
+    d97b824cdb54d1923a889351165b1c919ab651e8285b17fe10f835d27d27b533  contracts/DoubleDipJoy.sol
+    c08fe5ebdbd8d920fac2f5912bb9ee2c1fe84f4e18bb9dc76943c72e5d39309e  contracts/DoubleDownClub.sol
+    cddfdba0c4f1fb3966b2f07c2884dcb528293076661cbc8e96dedba30d8f4120  contracts/DoubleDownClubDescriptor.sol
+    4354aa4d79b031b9a543dea85e4822822a612bbe9f5f7899350ffeb7fded68fa  contracts/LpBundles.sol
+    109e23cc2024e5b00a45846c41d0713c14764fa141e02c77aa7cfe1ce251c26a  contracts/RewardStorage.sol
+    5b8f4d16927282bb19a9931214ef00adfb1b327a2cdf49293a8083f7b74c22a7  contracts/UniswapV2LPMigration.sol
+    5bfb824cac4819b0dbb847341b72b3ca9d2d8f0af2374003a8b5ff4e27505908  contracts/UniswapV2Utils.sol
+    821a81e58ad796c9aeea105623f02f7c0ffcdfa718ff888421d062d5954f3478  contracts/UniswapV2Vault.sol
+    0b896feaa7aae67761a68bfb407bf81a10d76546af6b9781f327b35631adabd2  contracts/interfaces/IAMMVaultPolicy.sol
+    8d2b2dfe1b4b6bbcd28c81e8b3a6abcfdadc5fdc140c1a807fa4e10198e178a0  contracts/interfaces/IAssetVault.sol
+    e3e4899dcf89897cdf66aecde2ed5104876cfeb694b7347ca2b73e2ce09c385e  contracts/interfaces/IClubManager.sol
+    6466403db3009e38cebc94d5a591d9de9377ce87799d91f77544ba1993d3b975  contracts/interfaces/IDoubleDip.sol
+    0543979d1d7f8acfe9726210b65bc8ef540bd4fb6c4a594f6448a67e9a66bcac  contracts/interfaces/IDoubleDipJoy.sol
+    d7441fdf191dd23eec191662584d3de6d5c3445cc1d1926a5647560e94eb32d6  contracts/interfaces/IDoubleDownClub.sol
+    38b614f79e3f003423e8045e6348fb3ed9c9cb8e6d34442df7ca2f555ccb03b0  contracts/interfaces/IDoubleDownClubDescriptor.sol
+    ec20addbf1824d8090a04ec165232c6933380fdd3a92e851f2e080899e501d59  contracts/interfaces/IRewardStorage.sol
+    5b2c2b714ee1fed474136246d355cd9df58597535acd2c6ff6f7f6c2a41e3abc  contracts/interfaces/IUniswapV2LPMigration.sol
+    4d6e69042da7d7cfaeca81f1872e7bb13a7e3b4d937e20577b3062ae898a9d8e  contracts/interfaces/IUniswapV2Vault.sol
+  </template>
+
+
+</content-for>
+
