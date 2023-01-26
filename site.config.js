@@ -36,6 +36,7 @@ const library = {
 
 const learn_evm = {
   name: "LearnEVM.com – A free, advanced course for Solidity Developers",
+  origin: 'https://learnevm.com',
   locales: ['en'],
 
   static: true,
