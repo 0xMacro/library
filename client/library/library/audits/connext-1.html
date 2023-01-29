@@ -1,0 +1,88 @@
+<page
+  clientName="Connext"
+  reportDate="January 31, 2023"
+  auditTitle="Connext A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/connext/nxtp"
+  repoCommitHash="5bb508f6ac4ad1572cca74ef297c2f57260e700c"
+  passwordEncrypt="env:PAGE_PASS_CONNEXT_1"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from November 21, 2022 to December 30, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>Connext documentation.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the messaging layer contracts within this repository:</p>
+  <p>./packages/deployments/contracts/contracts/messaging/*</p>
+  <template type="file-hashes">
+    b04e5f16da3c2e690dea5e7478895e9ebbf20688ca27356c75d2dad2b5fa9c83  messaging/MerkleTreeManager.sol
+    ac7a3c5f9d087585984ceeeb68073897c3c32150c9bbc456bd09fc7829beb49e  messaging/RootManager.sol
+    a6b25f07ae326a0c990cc53aa82e112e88260025e2989627cb863870f446131c  messaging/WatcherClient.sol
+    3fcd1ffad12481e534c05b62ece31ee02109e16a144a6db94d72c6428261bdc5  messaging/WatcherManager.sol
+    78a29659b3f55e4ac2f5b6a0f489048ea552c77b8371530a21bc255c6c5515f5  messaging/connectors/ConnectorManager.sol
+    8293745321f85eae032d63b8d3170c64509e3443844aee7aa0ad54b6c462fb34  messaging/connectors/Connector.sol
+    d73ff15a5409670d4b1d0272168fb17a13659810057d201ce1076b5c57001f42  messaging/connectors/GasCap.sol
+    0d138e14b7b8c80b54463580155c834af445580a838c70cb86a13a20ff1ef226  messaging/connectors/HubConnector.sol
+    fd7371b75d87409264673fb242cd1c7f5554ac975241451e71ff2eba43bd58bb  messaging/connectors/SpokeConnector.sol
+    34583a69beb6430e1d3a563e2672bbb64e7316d8eb25ca2bbd62868b8cd77303  messaging/interfaces/IConnectorManager.sol
+    18e69eed4b7226e8650fa078fab7cc47600f4bdd24652ffb2e38d23c3e7fc5a6  messaging/interfaces/IConnector.sol
+    2bf30b5788b487ddaa1e44333f999aa16ba71e7ab5ef4c476e3905bd3f00a53a  messaging/interfaces/IHubConnector.sol
+    cd9c247436a3baeca59201b1cab92367da901b383b7fbeacb48fb6f9acb8b421  messaging/interfaces/IMessageRecipient.sol
+    18ee786f0d242a7bcabb9ff77d39c959a2c65be034dcfab007f56b54f32c3f8a  messaging/interfaces/IOutbox.sol
+    d1dcb24dae1549066036e00c9eac5293411dd899177295f6f401031e624af3be  messaging/interfaces/IRootManager.sol
+    288a2eae98b98f448a1784d9e6364be1a4af2c143e5356aa0406dad85af3e525  messaging/libraries/DomainIndexer.sol
+    cf54d747e95bf480174358083973c2d6debe35258373ca347713acbccd352671  messaging/libraries/MerkleLib.sol
+    94a5fac9b6cb07b4a1cd073d3dddd87daa3a685e70f3cd3b75904447b3901318  messaging/libraries/Message.sol
+    ff36dbfcbbd5d0e9424c5bd1444019bb2cc0ca44433e6c4087a280340cb0cf43  messaging/libraries/Queue.sol
+    6662c61c68e2486ed87256592563fb276aac74afc9415323115243cce850845c  messaging/libraries/RateLimited.sol
+    87d280e2d06519059325ab834b9900419746856d85b60787e8a9c93fcb4e4fc6  messaging/connectors/arbitrum/ArbitrumHubConnector.sol
+    14b7f477967ed36f59a4064105fa205a5bd285c36f404d9356f118f9b04c2c3d  messaging/connectors/arbitrum/ArbitrumSpokeConnector.sol
+    ed253029ffb2eca8f4d8f1a226fa0610f32bb6f418c2acfd53ad64ed81cdb8a4  messaging/connectors/gnosis/GnosisBase.sol
+    54cf16bff7396f71e8e7d7548116909d42eb9a7b49295e45c2616a4b1c8cce28  messaging/connectors/gnosis/GnosisHubConnector.sol
+    fe3cedb8caddd00e09fd5a9d7c4c53725e1866f9921fe8cc64e54d6190701b31  messaging/connectors/gnosis/GnosisSpokeConnector.sol
+    6a3b62900ecdb67676093b6af8c8e3361caf30448b7fe40b53419e6bcfb58f17  messaging/connectors/mainnet/MainnetSpokeConnector.sol
+    d8b354631ffbf6f36df45295a363994c18a32b160ab3fc7a973b6a1993cd1e14  messaging/connectors/multichain/BaseMultichain.sol
+    7d3456e8f38b28721aed2d6c17525706de7263be640d5c44a4d380084ab942c6  messaging/connectors/multichain/MultichainHubConnector.sol
+    51da17d1fbc15abd0945a40a0c872dcc19b2f3ce5edf82a8f63290d1cb6823da  messaging/connectors/multichain/MultichainSpokeConnector.sol
+    8ba3dc99a2bb0fa668fdec812a3c35115c21ae78207c1e0056b7b72e9507960e  messaging/connectors/optimism/BaseOptimism.sol
+    55c1f9ab5be09dba9418f713e50ad97e51f5f0aec24f412bdd2acb3c153e82fd  messaging/connectors/optimism/OptimismHubConnector.sol
+    08dae0f5c8060dcf44c840f01eff9373e81c5cd4501204fa7bd379dc089318e4  messaging/connectors/optimism/OptimismSpokeConnector.sol
+    dfab6c988dfed12aa0b8c13b11fae4d04a665c4642405f50d3c60deaa78a9aad  messaging/connectors/polygon/PolygonHubConnector.sol
+    e22fba656c80a81bd879fd73ca0026db61e13f0b094d223ad782b36b15d6377e  messaging/connectors/polygon/PolygonSpokeConnector.sol
+    a95e5d3d8f09dd15698bca8e37764d809caab057fcc863993c568b7e6f1b7a77  messaging/connectors/zksync/ZkSyncHubConnector.sol
+    642ddae5ca662fe45a10d26c46c4aff41ac0038372756e67223876c836c6622a  messaging/connectors/zksync/ZkSyncSpokeConnector.sol
+    92b521a95f598ce0f877a5b5940b0a637c24c3d4274ff3b61111b72c4d5bb8cd  messaging/interfaces/ambs/GnosisAmb.sol
+    e258ec102a07a48e83a5fdfddbee8fb844fcc5ce7323597c45f22db299566bcb  messaging/interfaces/ambs/Multichain.sol
+    11d50d23ed041d8a6c49b34619b1e599c20bfc3aba3456d526e0c4df8426f0b6  messaging/connectors/optimism/lib/BytesUtils.sol
+    98a171631172141e2b4e02ff8e015301aa1e5f0e58845d6a1d327cb290f73724  messaging/connectors/optimism/lib/MerkleTrie.sol
+    8223ba09aba13533219ed1c9cb6d396ef0590b0d0ee32845466aab7bf0e67607  messaging/connectors/optimism/lib/OVMCodec.sol
+    7e6adeadf5623b8f89e559174c9f9a55b9b412c864b152fa48d15882df4a4ae0  messaging/connectors/optimism/lib/PredeployAddresses.sol
+    76e76bb2aa3f12ce7d52fd69f6733288ce5473819ca36e6a3300c781fa090224  messaging/connectors/optimism/lib/RLPReader.sol
+    2d473d117746578acfe2c88205f65241be2ce0f18a8794fbd441080cfe3f615b  messaging/connectors/optimism/lib/SecureMerkleTrie.sol
+    ae7e13370677a5df6786dd121809840f8e22982fa5f9bb8ebde204c63c21f618  messaging/connectors/polygon/lib/ExitPayloadReader.sol
+    b70d7ffd7d5ab3007ce6e13c57a7cd304180ab3c3864ec6cbfdb0ba3fc2d1f59  messaging/connectors/polygon/lib/MerklePatriciaProof.sol
+    f187ccc12759743534e57730ae104b3aa9b7aaf59a0df58b7c7bdcf7fd5f2675  messaging/connectors/polygon/lib/Merkle.sol
+    e7edbbe6035d5c8ffb8b8ec1b2003af590efef17c35de7004239476d96351a94  messaging/connectors/polygon/lib/RLPReader.sol
+    d63f27b678da5e58ab1f6335570a2f4c5620002496a576dd5549b51f4e941305  messaging/connectors/polygon/tunnel/FxBaseChildTunnel.sol
+    1a2f3af04b7ec69ed3c3b95c76663c69de4d2c15aa6dc511560241a908b89699  messaging/connectors/polygon/tunnel/FxBaseRootTunnel.sol
+    12b515cf01596623a6b28a8c780674f857ac9fadf70b1e044a59e6d022e2a2b2  messaging/interfaces/ambs/arbitrum/ArbitrumL2Amb.sol
+    405f2b482c0bbc02345474728c02f80995728744d75287ee10be8eabed273c80  messaging/interfaces/ambs/arbitrum/IArbitrumInbox.sol
+    643d51f5ea21073a79a035b41e20d009033f726a59fb97e507a93bc7cd4faaef  messaging/interfaces/ambs/arbitrum/IArbitrumOutbox.sol
+    8652b5338730072da4627db8a4860d0b879660a8002bfa9130bfc4ac3466e804  messaging/interfaces/ambs/arbitrum/IArbitrumRollup.sol
+    6f6624ca88102449213de14caf004af12784419802bee31c80548f9f7eb23599  messaging/interfaces/ambs/optimism/IStateCommitmentChain.sol
+    1ef13616e80e6337a0dc0c72be02e9ae47f5b39b451ccfc36b4b2f04a1d3cdf1  messaging/interfaces/ambs/optimism/OptimismAmb.sol
+
+  </template>
+</content-for>
+
