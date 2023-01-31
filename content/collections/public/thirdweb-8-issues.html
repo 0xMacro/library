@@ -108,7 +108,7 @@
     <field name="content">
         ## (M-3) Native tokens can get locked in the contract
        
-        In SignatureDrop1155OperatorCheck.sol and SignatureDrop1155.sol contracts, signature mint requests can include `pricePerToken` and a **`currency`.** This price can be in native tokens (e.g. ETH) or any other ERC20 tokens. 
+        In SignatureDrop1155OperatorCheck.sol and SignatureDrop1155.sol contracts, signature mint requests can include `pricePerToken` and a `currency`. This price can be in native tokens (e.g. ETH) or any other ERC20 tokens. 
         
         Suppose in a mint request, the currency in a request is different from the native token, and by mistake, a user calls `mintWithSignature()` sending a `msg.value =! 0`. In that case, this transaction will succeed, and the native tokens sent will be locked inside the contract.
     
