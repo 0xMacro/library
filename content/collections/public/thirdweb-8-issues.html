@@ -1,0 +1,149 @@
+<item>
+    <field name="topic">Locked Assets</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">a10df026b20c4934d481fb2b1a55853224d28e22</field>
+    <field name="content">
+        ## (C-1) Cannot withdraw native tokens from Account
+        
+        `Account::_validateCallConditions` contains `require(msg.value == _value, "Account: incorrect value sent.");`. This require statement enforces that only the same amount of ether that just came in with `msg.value` can be sent out using the `value` argument. The implications of this require statement are that existing ether in an Account can never be sent out, effectively making ether withdrawals from an Account impossible.
+        
+        Any initial account balances sent in to `AccountAdmin::createAccount` will also be locked.
+    
+        **Remediations to Consider**
+
+        Consider removing `require(msg.value == _value, "Account: incorrect value sent.");` from `Account::_validateCallConditions`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Locked Assets</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">commits: 05f24cdc457b814b716637431a29e46f215e37b1, 771ca3938ca3d2dc8648ffcb9664646b6ba7e317</field>
+    <field name="commitTree">771ca3938ca3d2dc8648ffcb9664646b6ba7e317</field>
+    <field name="content">
+        ## (H-1) Removing the last signer will lock assets in the contract
+        
+        Removing roles in Account.sol executes without making any checks on current signers, and there is no mechanism to rescue locked funds from the contract. This may result in bricking the account if a signer (maliciously or not) removes the last account with sufficient permissions to withdraw funds.
+        
+        Since these contracts are supposed to be used by a wide variety of users and they support external calls, we believe the probability of a user removing the last signer is not negligible.
+    
+        **Remediations to Consider**
+
+        There is no easy way to keep track of all signers with permission to withdraw funds in the current setup. Because of that, we recommend enforcing at least one admin signer with full permissions to exist after every `removeAdmin()`
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">20ddc9eeacecaa837ad1417002a97a8632537637</field>
+    <field name="content">
+        ## (H-2) Arbitrary code execution facilitated by `isApprovedForFunction` / `approveSignerForFunction`
+        
+        Once a signer has a function selector in `*isApprovedForFunction()*`, they can run any arbitrary code on any contract.
+        
+        One example: If a signer is approved to call an arbitrary `payable` function on any contract the signer can steal all native ether from the Account by deploying a contract with an identical function selector.   
+    
+        **Remediations to Consider**
+
+        Consider removing *`isApprovedForFunction()`* and only allowing calls to approved contracts.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">d19d0bde95cb168cdb0e677fb62eeec6c7822cc4</field>
+    <field name="content">
+        ## (M-1) The signer registry in AccountAdmin can go out of sync with roles in Account
+      
+        (add/remove){Role}() in Account.sol are fail-safe functions, and they don’t revert in cases where underlying calls to AccountAdmin.sol fail. Instead, they set the role in Account.sol and silently catch the reverted error. This may cause AccountAdmin and Account contracts to go out of sync, and a signer with a role in Account may lose its entry in the signer registry in AccountAdmin.
+        
+        The issue may cause a signer with a role not to be able to `*relay()*` calls in AccountAdmin, and a discrepancy between two contracts because `*getAllAccountsOfSigner()*` and `*getAllSignersOfAccount()*` will miss a signer with the correct role.
+        
+        It’s worth mentioning that if Account.sol is used as a standalone wallet contract (without a `controller`), the `try-catch` statement would always revert, as stated in the solidity [documentation](https://docs.soliditylang.org/en/latest/control-structures.html#try-catch):
+        
+        > If an error happens during the decoding of the return data inside a try/catch-statement, this causes an exception in the currently executing contract and because of that, it is not caught in the catch clause.
+        >
+
+        **Remediations to Consider**
+
+        Prevent addresses from having both roles in `AccountAdmin` as outlined in the code snippet below. This will still allow for the use case where an `Account` exists without an `AccountAdmin`, but keeps updates when there are both atomic. Also, consider adding a check in `addSigner` that the signer doesn’t already have the Admin role, and adding a check in `addAdmin` that the signer doesn’t already have the signer role. This way, with or without an `AccountAdmin` , `Account` will behave identically.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3cbdf62949ec5f8fdb85c0421eddb015f4a7b65b</field>
+    <field name="content">
+        ## (M-2) Signers approved to interact with the Account contract can demote admins
+       
+        Account admins can allow or disallow signers to interact with any function in a contract by calling *`approveSignerForContract()`*. If an admin allows a signer to interact with the Account contract itself, that signer will acquire the same permissions as admins, allowing them to demote the previous admin and essentially gain control over the account.   
+        
+        *Note:* This needs to be performed by an admin, but since the proper way to give those permissions would be adding a new admin, this could lead to unintentional takeovers from signers.
+    
+        **Remediations to Consider:**
+
+        Disallow `approveSignerForContract` with the Account as a `_target`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Locked Assets</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">50087892aa6071195f5840222bc1d8e89f3b7ada</field>
+    <field name="content">
+        ## (M-3) Native tokens can get locked in the contract
+       
+        In SignatureDrop1155OperatorCheck.sol and SignatureDrop1155.sol contracts, signature mint requests can include `pricePerToken` and a **`currency`.** This price can be in native tokens (e.g. ETH) or any other ERC20 tokens. 
+        
+        Suppose in a mint request, the currency in a request is different from the native token, and by mistake, a user calls *`mintWithSignature()`* sending a `msg.value =! 0`. In that case, this transaction will succeed, and the native tokens sent will be locked inside the contract.
+    
+        **Remediations to Consider:**
+
+        Consider adding a check to verify that, for requests with non-native token claim prices, the `msg.value` is `0`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">spec</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">e624c0997046a8bf0050f9abc408713fe1a8c24c</field>
+    <field name="content">
+        ## (L-1) Accounts can call `addSignerToAccount` with arbitrary parameters
+
+        AccountAdmin.sol *`addSignerToAccount()`* function has the modifier *`onlyAssociatedAccount`* as a restriction. However, any Account created from the AccountAdmin can call this function with arbitrary `accountId` and `signer` as parameters, changing the internal registry inside AccountAdmin.sol from other accounts since the `pairHashToAccount` mapping will be set to a value even if the Account does not correspond to that `accountId`.
+        
+        Any Account can deny other's account creation calls by **adding** signers in the AccoundAdmin.sol contract. Also, applications that rely on the external view functions of this contract could become out of sync with the account's actual permissions.
+    
+        **Remediations to Consider:**
+
+        Saving the `accountId` inside Account.sol, and adding a check that asserts the Account calling the function corresponds to the respective `accountId`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="status">wontdo</field>
+    <field name="impact">low</field>    
+    <field name="content">
+        ## (Q-1) *`setMaxTotalSupply`* and *`setSaleRecipientForToken`* do not check for new input data
+
+        This applies to both, SignatureDrop1155OperatorCheck.sol and SignatureDrop1155.sol **contracts*.* An event from these functions will be emitted even if the “new” value was already set. **Consider checking that the input parameters are different from the state values.
+    </field>
+  </item>
