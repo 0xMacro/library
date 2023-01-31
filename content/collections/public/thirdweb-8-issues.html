@@ -33,7 +33,7 @@
     
         **Remediations to Consider**
 
-        There is no easy way to keep track of all signers with permission to withdraw funds in the current setup. Because of that, we recommend enforcing at least one admin signer with full permissions to exist after every `removeAdmin()`
+        There is no easy way to keep track of all signers with permission to withdraw funds in the current setup. Because of that, we recommend enforcing at least one admin signer with full permissions to exist after every `removeAdmin()`.
     </field>
   </item>
 
@@ -46,13 +46,13 @@
     <field name="content">
         ## (H-2) Arbitrary code execution facilitated by `isApprovedForFunction` / `approveSignerForFunction`
         
-        Once a signer has a function selector in `*isApprovedForFunction()*`, they can run any arbitrary code on any contract.
+        Once a signer has a function selector in `isApprovedForFunction()`, they can run any arbitrary code on any contract.
         
         One example: If a signer is approved to call an arbitrary `payable` function on any contract the signer can steal all native ether from the Account by deploying a contract with an identical function selector.   
     
         **Remediations to Consider**
 
-        Consider removing *`isApprovedForFunction()`* and only allowing calls to approved contracts.
+        Consider removing `isApprovedForFunction()` and only allowing calls to approved contracts.
     </field>
   </item>
 
@@ -67,7 +67,7 @@
       
         (add/remove){Role}() in Account.sol are fail-safe functions, and they don’t revert in cases where underlying calls to AccountAdmin.sol fail. Instead, they set the role in Account.sol and silently catch the reverted error. This may cause AccountAdmin and Account contracts to go out of sync, and a signer with a role in Account may lose its entry in the signer registry in AccountAdmin.
         
-        The issue may cause a signer with a role not to be able to `*relay()*` calls in AccountAdmin, and a discrepancy between two contracts because `*getAllAccountsOfSigner()*` and `*getAllSignersOfAccount()*` will miss a signer with the correct role.
+        The issue may cause a signer with a role not to be able to `relay()` calls in AccountAdmin, and a discrepancy between two contracts because `getAllAccountsOfSigner()` and `getAllSignersOfAccount()` will miss a signer with the correct role.
         
         It’s worth mentioning that if Account.sol is used as a standalone wallet contract (without a `controller`), the `try-catch` statement would always revert, as stated in the solidity [documentation](https://docs.soliditylang.org/en/latest/control-structures.html#try-catch):
         
@@ -89,7 +89,7 @@
     <field name="content">
         ## (M-2) Signers approved to interact with the Account contract can demote admins
        
-        Account admins can allow or disallow signers to interact with any function in a contract by calling *`approveSignerForContract()`*. If an admin allows a signer to interact with the Account contract itself, that signer will acquire the same permissions as admins, allowing them to demote the previous admin and essentially gain control over the account.   
+        Account admins can allow or disallow signers to interact with any function in a contract by calling `approveSignerForContract()`. If an admin allows a signer to interact with the Account contract itself, that signer will acquire the same permissions as admins, allowing them to demote the previous admin and essentially gain control over the account.   
         
         *Note:* This needs to be performed by an admin, but since the proper way to give those permissions would be adding a new admin, this could lead to unintentional takeovers from signers.
     
@@ -110,7 +110,7 @@
        
         In SignatureDrop1155OperatorCheck.sol and SignatureDrop1155.sol contracts, signature mint requests can include `pricePerToken` and a **`currency`.** This price can be in native tokens (e.g. ETH) or any other ERC20 tokens. 
         
-        Suppose in a mint request, the currency in a request is different from the native token, and by mistake, a user calls *`mintWithSignature()`* sending a `msg.value =! 0`. In that case, this transaction will succeed, and the native tokens sent will be locked inside the contract.
+        Suppose in a mint request, the currency in a request is different from the native token, and by mistake, a user calls `mintWithSignature()` sending a `msg.value =! 0`. In that case, this transaction will succeed, and the native tokens sent will be locked inside the contract.
     
         **Remediations to Consider:**
 
@@ -127,7 +127,7 @@
     <field name="content">
         ## (L-1) Accounts can call `addSignerToAccount` with arbitrary parameters
 
-        AccountAdmin.sol *`addSignerToAccount()`* function has the modifier *`onlyAssociatedAccount`* as a restriction. However, any Account created from the AccountAdmin can call this function with arbitrary `accountId` and `signer` as parameters, changing the internal registry inside AccountAdmin.sol from other accounts since the `pairHashToAccount` mapping will be set to a value even if the Account does not correspond to that `accountId`.
+        AccountAdmin.sol `addSignerToAccount()` function has the modifier `onlyAssociatedAccount` as a restriction. However, any Account created from the AccountAdmin can call this function with arbitrary `accountId` and `signer` as parameters, changing the internal registry inside AccountAdmin.sol from other accounts since the `pairHashToAccount` mapping will be set to a value even if the Account does not correspond to that `accountId`.
         
         Any Account can deny other's account creation calls by **adding** signers in the AccoundAdmin.sol contract. Also, applications that rely on the external view functions of this contract could become out of sync with the account's actual permissions.
     
@@ -142,8 +142,8 @@
     <field name="status">wontdo</field>
     <field name="impact">low</field>    
     <field name="content">
-        ## (Q-1) *`setMaxTotalSupply`* and *`setSaleRecipientForToken`* do not check for new input data
+        ## (Q-1) `setMaxTotalSupply` and `setSaleRecipientForToken` do not check for new input data
 
-        This applies to both, SignatureDrop1155OperatorCheck.sol and SignatureDrop1155.sol **contracts*.* An event from these functions will be emitted even if the “new” value was already set. **Consider checking that the input parameters are different from the state values.
+        This applies to both, SignatureDrop1155OperatorCheck.sol and SignatureDrop1155.sol contracts. An event from these functions will be emitted even if the “new” value was already set. Consider checking that the input parameters are different from the state values.
     </field>
   </item>
