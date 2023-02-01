@@ -1,0 +1,512 @@
+<item>
+  <field name="topic">Locked Assets</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">370c3648267e5fb31b992b743198e0b977b06ad5</field>
+  <field name="content">
+    ## (H-1) Unset `VestingWallet` in `CoCreateLaunch::componentContracts`can cause loss of funds for `Treasury` when calling `transferERC20BatchWithVesting`
+
+    `transferERC20BatchWithVesting` will successfully execute when `vestingWalletImp = address(0).`  In this scenario, the entire `amount` of `erc20ContractAddr` will be locked in the cloned `vestingWallet` contract.
+
+    **Remediations to Consider**
+
+    Consider requiring in `getImplementationForType` that `componentContracts[componentType]` != `address(0)`. This will ensure that if “VestingWallet” isn’t set, `Treasury::transferERC20BatchWithVesting` will revert.
+
+    With this change, `require(implementation != address(0), "Invalid implementation address");` can be removed from `CoCreateProject::_deployProxy` and `CoCreateProject::deployUUPSProxy`.  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">370c3648267e5fb31b992b743198e0b977b06ad5</field>
+  <field name="content">
+    ## (H-2) `CoCreateProject::contractOwner` has no power over actual ownership of the project
+
+    `contractOwner` is the address that is assigned as the owner of a `CoCreateProject` in `initialize()`, and `transferContractOwner()` can be used to transfer the ownership of the contract to another address. However, this address does not have any rights on the actual ownership of the contract.
+
+    The `PROJECT_ADMIN_ROLE` is used to authorize the admin functions in the project contract, and the `contractOwner` can not add or remove any roles. This means `contractOwner` is obsolete, and transferring the ownership won’t have any effects, as the previous owner with the admin role will still have all the rights to call every function, and the new owner can not change that.
+
+    **Remediations to Consider**
+
+    - The owner should have a special role and should have grant & revoke role privileges.
+    - `transferContractOwner()` should update the roles properly.
+    - Gated functions should use correct modifiers. </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">bc6ba643ecfc6df6a17367f065d7dd92190042f7</field>
+  <field name="content">
+    ## (H-3) `TokenClaim::claim` merkle proof `node` does not include the token `address` , which allows a claimer to claim any token in the contract
+
+    If `TokenClaim` is used with multiple tokens, a user can claim all of them with the largest `amount` that they were granted. This is because `bytes32 node = keccak256(abi.encodePacked(index, account, amount))` does not contain the `address` of the token.
+
+    Remediation To Consider:
+
+    - Consider including the token address in the MerkleTree nodes and proof, along with the index, account, and amount.  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">370c3648267e5fb31b992b743198e0b977b06ad5</field>
+  <field name="content">
+    ## (M-1) `Treaury::transferERC20BatchWithVesting()` does not check for the size of the array params
+
+    The batch transfer function in Treasury.sol does not check if the array parameters have the same size. Passing different-sized arrays as params may cause loss of funds or out-of-bounds panic errors.
+
+    **Remediations to Consider**
+
+    - Require all the array sizes to be equal to each other.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">bc6ba643ecfc6df6a17367f065d7dd92190042f7</field>
+  <field name="content">
+    ## (M-2) `TokenClaim::claim()` does not handle unsafe tokens correctly and may lock funds
+
+    `claim()` in TokenClaim.sol transfers the amount to the claimer as follows:
+
+    ```solidity
+    require(IERC20(token).transfer(account, amount), "TokenClaim: Transfer failed.");
+    ```
+
+    Although this operation will work for the majority of the tokens, some implementations of ERC20 do not return a `bool true` as expected. For example, widely used tokens [BNB](https://etherscan.io/token/0xB8c77482e45F1F44dE1745F52C74426C631bDD52#code) and [OMG](https://etherscan.io/token/0xd26114cd6EE289AccF82350c8d8487fedB8A0C07#code) and some lesser-known tokens that are listed [here](https://medium.com/coinmonks/missing-return-value-bug-at-least-130-tokens-affected-d67bf08521ca) do not follow the standard correctly.
+
+    When the user tries to use TokenClaim for such tokens, the funds will be locked in the contract without the possibility of remediation.
+
+    Check [here](https://twitter.com/Uniswap/status/1072286773554876416?s=20&t=iHQZ1kvl9Ydzj4aPSKikow) for a similar issue that happened before in Uniswap.
+
+    **Remediations to Consider**
+
+    - Use OZ’s [SafeERC20](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol) `safeTransfer()` to handle ERC20 transfers.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">spec</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">370c3648267e5fb31b992b743198e0b977b06ad5</field>
+  <field name="content">
+    ## (L-1) `CoCreateLaunch::components` array is never filled
+
+    `components` is a private string array in CoCreateLaunch.sol that is never filled with data. From the implementation, we assume that the array is supposed to hold component types in use, but `addComponentContract()` does not push to the array.
+
+    There is also a function `getComponents()` in the same contract that acts as a getter for that array, but since the array is always empty, it returns an empty array. In ICoCreateLaunch.sol we noticed this comment:
+
+    ```solidity
+    /**
+    * @notice returns all the implementation address for all components added to Co:Create launch
+    */
+    ```
+
+    The comment suggests the function should return addresses for all components but the function itself returns an array of strings.
+
+    **Remediations to Consider**
+
+    - Properly populate and update the array.
+    - Or, remove the array and the getter function if it is not needed.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Consistency</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">370c3648267e5fb31b992b743198e0b977b06ad5</field>
+  <field name="content">
+    ## (L-2) `CoCreateLaunch::updateComponentContract()` is not atomic and may return a wrong value
+
+    `updateComponentContract()` in CoCreateLaunch.sol updates the components in a project by using `removeComponentContract()` and `addComponentContract()`. However, neither of these functions revert when they fail to perform the action. If one of these functions fails to update the implementation for a `componentType` and the other one succeeds, `updateComponentContract()` returns `false` even though it updates a component.
+
+    **Remediations to Consider**
+
+    - Make `updateComponentContract()` atomic by requiring `addComponentContract()` and `removeComponentContract()` to return true.
+    - Or make both `addComponentContract()` and `removeComponentContract()` revert if they fail to perform the operation instead of returning a value(See [Q-8)](https://www.notion.so/Co-Create-2-Preliminary-Audit-Report-external-private-d363991801084fbcb2c6c4cf23bfe31f).  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="status">wontdo</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="content">
+    ## (L-3) `CoCreateProject::transferContractOwner()` is a single step ownership change and passing a wrong address may lose ownership forever
+
+    `transferContractOwner()` transfers the ownership to a new address and it is a single-transaction ownership change. This means passing a wrong address to this function will cause losing the ownership forever. Since the owner of this contract is a user and not governance there is a higher possibility of this issue happening.
+
+    **Remediations to Consider**
+
+    - Implementing a multistep ownership change where the owner first nominates an address as the new owner and nominated address needs to claim the ownership by making a second transaction.
+  </field>
+  <field name="response">
+    The functions are already gated by access and we expect our users to be careful while changing.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">bc6ba643ecfc6df6a17367f065d7dd92190042f7</field>
+  <field name="content">
+    ## (L-4) ProjectToken may be unmintable
+
+    `initialize()` in ProjectToken.sol does not check if the token is actually mintable. If the token is fixed supply and the initial supply is also 0, the owner won’t be able to mint any project tokens. Since the project token is immutable, the issue can not be remediated.
+
+    **Remediations to Consider**
+
+    - Ensure the initial supply is not zero for fixed-supply tokens.  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">bc6ba643ecfc6df6a17367f065d7dd92190042f7</field>
+  <field name="content">
+    ## (Q-1) `public` functions can be marked as `external`
+
+    This will save gas. The following functions can be marked `external`:
+
+    - `UpgradeGate::validateUpgrade`
+    - `CoCreateLaunch::updateComponentContract`
+    - `CoCreateProject::isExistingComponent`
+    - `CoCreateProject::deployProxy`
+    - `ProjectToken::updateAllowlist`
+    - `ProjectToken::mintBatch`
+    - `CoCreateProject::getContractOwner`
+    - `CoCreateERC721A::setBaseURI`
+    - `CoCreateERC721A::setMintLimit`
+ </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">bc6ba643ecfc6df6a17367f065d7dd92190042f7</field>
+  <field name="content">
+    ## (Q-2) `UpgradeGate::registerPath` and `UpgradeGate::unregisterPath`should revert if already set
+
+    If `validUpgradePath[newImpl][currentImpl]`already is true in `registerPath` or if it is already `false` in `unregisterPath`, these functions should revert. As written, in these scenarios `NewUpgradePathRegistered` / `UpgradePathUnRegistered` will be emitted even when the values don’t change.
+
+    Consider requiring that `validUpgradePath[newImpl][currentImpl]` isn’t already the intended value in each function.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">bc6ba643ecfc6df6a17367f065d7dd92190042f7</field>
+  <field name="content">
+    ## (Q-3) `CoCreateProject::transferContractOwner`should revert if already owner
+
+    If `newOwner == contractOwner` this function should revert. As written, in this scenario `ContractOwnerChanged` will be emitted even when the values don’t change.
+
+    Consider requiring that `contractOwner != newOwner` . Also consider dropping the return boolean value.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (Q-4) Unnecessary `nonReentrant` modifiers in `Treasury`
+
+    Every function in `Treasury` that has `nonReentrant` also has `onlyOwner`. This means that only the `Treasury` owner could reenter, if the owner was also a smart contract. The owner already has total control of all funds in the `Treasury` , so `nonReentrant` provides no benefits and costs extra gas.
+
+    Consider removing all `nonReentrant` modifiers in `Treasury` and removing the imported `ReentrancyGuard`.
+
+  </field>
+  <field name="response">
+    We do not want to remove the nonReentrant. Especially with attacks like read-only-reentrancy.
+    We would like to have some extra security in this case.  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">bc6ba643ecfc6df6a17367f065d7dd92190042f7</field>
+  <field name="content">
+    ## (Q-5) Use of `memory` arguments in `external` functions instead of `calldata`
+
+    Using `calldata` will save gas. Consider changing `memory` function arguments to `calldata` in:
+
+    - `Treasury::transferERC20BatchWithVesting`
+    - `CoCreateLaunch::deployCoCreateProject`
+    - `CoCreateProject::deployProjectToken`
+    - `CoCreateProject::deployTreasury`
+    - `CoCreateProjectFactory::deployCoCreateProject`
+  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (Q-6) Some functions don’t need to be `virtual`
+
+    `virtual` is used to allow inheriting contracts to override these functions.
+
+    Consider removing the `virtual` keywords on these two functions if you do not plan to have other contracts inherit this one.
+
+    - `NFTCollectorRewards::pause`
+    - `NFTCollectorRewards::unpause`
+    - `CoCreateProject::deployProjectToken`
+    - `CoCreateProject::_checkContractOwner`
+    - `CoCreateProject::deployTreasury`
+    - `CoCreateProject::deployProxy`
+    - `CoCreateProject::deployUUPSProxy`
+    - `CoCreateProject::getCoCreate`
+    - `CoCreateProject::getProjectToken`
+    - `CoCreateProject::getTreasuries`
+    - `CoCreateProject::getContractOwner`
+    - `CoCreateProject::isExistingComponent`
+    - `CoCreateProject::transferContractOwner`
+    - `ProjectToken::_beforeTokenTransfer`
+    - `ProjectToken::_authorizeUpgrade`
+    - `ProjectToken::_afterTokenTransfer`
+    - `ProjectToken::_mint`
+    - `ProjectToken::_burn`
+    - `ProjectToken::_approve`
+    - `ProjectToken::validateTokenOperation`
+  </field>
+  <field name="response">
+    We are going to keep these virtual mainly because for upgradeable contracts like CoCreateProject and ProjectToken we want to keep flexibility of overriding and inheriting for future upgrades.
+    Similar with NFTcollectorRewards as well  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">bc6ba643ecfc6df6a17367f065d7dd92190042f7</field>
+  <field name="content">
+    ## (Q-7) `NFTCollectorRewards::depositEth`and `NFTCollectorRewards::depositToken` should revert on 0 amounts
+
+    If `msg.value == 0` in `depositEth` or `amount == 0` in `depositToken` these functions should revert. As written, in this scenario `PoolRefreshed` will be emitted even when the values don’t change.
+
+    Consider requiring that `msg.value > 0` / `amount > 0` .
+  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (Q-8) `CoCreateLaunch::addComponentContract() CoCreateLaunch::removeComponentContract()` are inconsistent with behavior on failing inputs
+
+    They require the conditionals related to `componentContracts` to be valid and they revert if they are not, but conditionals related to `existingComponentContracts` fail silently without warning and they are reflected in the return value.
+  </field>
+  <field name="response">
+    We don’t think this is an issue since it is a feature requirement on our part.  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">bc6ba643ecfc6df6a17367f065d7dd92190042f7</field>
+  <field name="content">
+    ## (Q-9) `CoCreateLaunch` lacks events
+
+    Consider emitting events for important state changes, such as creating and updating components for off-chain observability.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (Q-10) `ProjectToken::initialize()` No name or symbol check
+
+    The token contract does not check if the name and symbol actually exist and if the lengths are between some limits. This may lead to tokens without name and symbols or very long names and symbols.
+  </field>
+  <field name="response">
+    We do not want to pose any arbitrary size limits for users here and reason for no validation.  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (Q-11) `CoCreateProject::_checkContractOwner()` is only used once
+
+    The line can be moved into the modifier instead and use the variable instead of calling the function.
+
+    ```solidity
+    require(contractOwner == _msgSender(), "Caller is not Contract owner");
+    ```
+  </field>
+  <field name="response">
+    We have decided to not fix and not sure if this is an issue. </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (Q-12) `CoCreateERC721A::setBaseURI` and `CoCreateERC721A::setMintLimit`should revert if already set
+
+    If `baseURI` already equals `baseURI_` or `mintLimit` already equals `mintLimit_`, these functions should revert. As written, in these scenarios `BaseURIUpdated` / `MintLimitUpdated` will be emitted even when the values don’t change.
+
+    Consider requiring that `mintLimit`  / `baseURI` isn’t already the intended value in each function.
+  </field>
+  <field name="response">
+    The reason for not reverting is to give opportunity for users to correct any mistake made and also to change the baseURI and mintLimit if needed.
+    These are bounded to contract owner so risk is minimal. </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (Q-13) `CoCreateERC721A::initialize()` No name or symbol check
+
+    NFT contract does not check if the name and symbol actually exist and the lengths are between some reasonable limits.
+    This may lead NFT collections without names and symbols or very long names and symbols.
+
+  </field>
+  <field name="response">
+    We don’t think this is an issue and a requirement to provide flexibility for our users.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimizations</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (G-1) `Treasury::transferERC20BatchWithVesting` can be made more efficient
+
+    An `amount` of an ERC20 is fully vested when `block.timestamp` is greater than or equal to `vestingStartTimestamp` + `vestingDurationSeconds`.
+    Therefore, the current condition for sending immediately is overly strict, resulting in more VestWallet creations than necessary.
+
+    Consider changing `if (vestingStartTimestamps[i] > 0)`
+
+    to `if (vestingStartTimestamps[i] + vestingDurationSeconds[i] > block.timestamp) {`
+
+    This will result in fewer VestingWallet creations, which will save gas.
+  </field>
+  <field name="response">
+    In normal usecase the vestingDuration would be significantly greater and over a period of time since vestingStartTime.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimizations</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (G-2) `CoCreateProject::projectTokenDeployed` is redundant
+
+    Comparing projectToken address to address(0) will be enough to decide if the token is deployed.
+  </field>
+  <field name="response">
+    We would be using this boolean in the future.
+    For example we used it in deploying governor contract and would be used in future upgrades.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimizations</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (G-3) `ProjectToken::initialize()` makes unnecessary external calls
+
+    Saving the treasuries array in memory after one call is more gas efficient than making an external call `_coCreateProject.getTreasuries()` in every iteration.
+  </field>
+  <field name="response">
+    Treasuries are not static and varies with project.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimizations</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (G-4) Inconsistency in using different revert operations
+
+    Contracts use both `revert()` and `require()`. Our recommendation is to use only reverts with custom errors because they are more gas efficient.
+  </field>
+  <field name="response">
+    No response provided.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimizations</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (G-5) Non-upgradeable contracts don’t need an initializer
+
+    Treasury.sol and TokenClaim.sol are not upgradeable, and they can use `constructor()` instead of `initialize()`.
+  </field>
+  <field name="response">
+    Disagree with the suggestions. We use proxies and need initializers.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Informational</field>
+  <field name="impact">high</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (I-1) Token contracts can be upgraded to any implementation
+
+    In ProjectToken.sol, the owner is able to upgrade the implementation of the token contract. Unlike other contracts, the token contract does not check if the new implementation is validated by the UpgradeGate.sol.
+
+    ```solidity
+    // solhint-disable-next-line no-empty-blocks
+    function _authorizeUpgrade(address newImplementation) internal view virtual override onlyOwner {}
+    ```
+
+    A malicious owner can upgrade the token contract to any implementation and bypass all checks in the contract. For example, they can mint an unlimited amount of tokens even though the token is fixed supply.
+
+    Our discussions with the CoCreate team revealed that the ungated upgradability of token contracts is a core use case for CoCreate’s customers. We still think the users of the platform should be aware of this mechanic.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Informational</field>
+  <field name="impact">high</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## (I-2) Component ownership is independent of the project ownership
+
+    Component owners are assigned in the `initialize()` of each corresponding component. However, the owner of the project is supposed to be transferred to another address using `transferContractOwner()`.
+
+    Transferring the ownership of the project does not affect the owners of the components, and the old owner will continue owning all of the existing components, including the treasury and project token. This may cause a malicious owner to sell/transfer a project but keep minting project tokens or drain the project treasury.
+
+    The CoCreate team stated the transfer of contract ownership should only affect the future components and the old owner should keep owning the old components by design. We want to ensure the users of the protocol are aware transferring the contract ownership won’t affect the owner of the components.  </field>
+</item>
