@@ -1,0 +1,65 @@
+<page
+        clientName="Co:Create"
+        reportDate="Feb 2nd, 2023"
+        auditTitle="CoCreate A-2"
+        auditVersion="1.0.0"
+        repoUrl="https://github.com/cocreatelabs/contracts"
+        customRepoInfo
+        layout="/library/audits/_layout.html"
+>
+
+    <content-for name="schedule">
+        The security audit was performed by the Macro security team from January 16, 2023 to January 27, 2023.
+    </content-for>
+
+    <content-for name="spec">
+        <ul>
+            <li>Discussions on Slack with the CoCreate team.</li>
+            <li>A provided audit handoff document provided through Google Docs.</li>
+        </ul>
+    </content-for>
+
+
+    <content-for name="repo-info">
+        <ul>
+            <li>
+                <b>Repository:</b>
+                <a href="{{page.repoUrl}}" target="_blank">
+                    {{page.repoUrl.split('/').slice(-1)[0]}}
+                </a>
+            </li>
+            <li class="break-words break-all">
+                Commit Hash <b>(Majority of contracts):</b>
+                <code>0e7964333b116a1f286ccf96eb372c6c2b102645</code>
+            </li>
+            <li class="break-words break-all">
+                Commit Hash <b>(CoCreateERC721A):</b>
+                <code>0db6545c3e60065cbcedaf349fac3acbbd761176</code>
+            </li>
+        </ul>
+    </content-for>
+
+
+    <content-for name="source-code">
+
+        <p>Specifically, we audited the following contracts as part of the audit:</p>
+
+        <template type="file-hashes">
+            59cab6bfe3413d751abe22120dfcafce9f269acd7e2ecc9176ba43df6038ef60  CoCreateLaunch.sol
+            74c62f559ee32ec574fa78a11070d6c7719f0378a6cceaa615aba4734ae98cea  ICoCreateLaunch.sol
+            cb9aee71b43f2e655f7fb70fc4c76a0f95f9e7124809cdfbb6f0c0402e8c6118  UpgradeGate.sol
+            11c130b3c396dd5514b87d7f0e2ce7d1d1b5637cad288f2976e2f4de364fea7a  CoCreateProject.sol
+            2ad6db4ade6a2e77cbc10972ebf1309475872cc39f9b84699deda8de7cf24e41  CoCreateProjectFactory.sol
+            615e7372fbc76c7910bd00e00d334815e20683ee212f87e63c721fb25c1ee11d  ProjectToken.sol
+            79ced9aa37ec519a96ae5ad9f74080b8b91a714e47cfa515e90738a1d1697624  ITreasury.sol
+            b4ad6a7ec124a92bcb755a7953548ed9aaf3dcbf03838ecd4ae29d8f3c0b07a1  Treasury.sol
+        </template>
+
+
+        <p>We audited the following contracts as part of CoCreateERC721A contract audit:</p>
+
+        <template type="file-hashes">
+            537da59aa452b2b4110c4cf808e1ee6c5c977de4cc711ab8062e8e18218381b7  CoCreateERC721A.sol
+            f9e912ca36e8f6692cda96403b0a6a795e94a0dbb34fbf3c0eb6b211835cbddd  IERC4494.sol
+        </template>
+    </content-for>
