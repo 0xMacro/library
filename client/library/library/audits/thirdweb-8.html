@@ -1,0 +1,77 @@
+<page
+  clientName="thirdweb"
+  reportDate="January 30th, 2023"
+  auditTitle="thirdweb A-8"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from December 26, 2022 to January 10, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>A provided audit handoff document provided through Notion.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank">
+        {{page.repoUrl.split('/').slice(-1)[0]}}
+      </a>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash <b>(Wallet Account):</b>
+      <code>c03ba94894bc5c9e72b5ba1e6210656866951153</code>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash <b>(SignatureDrop1155):</b>
+      <code>016a98fda9a873257aa466019ac02d75858301dd</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts as part of Wallet Account contracts audit:</p>
+
+  <template type="file-hashes">
+    27f178383dce8c174544eab00066ccd29f96098a657b4fd16544a147f76341b3  Account.sol
+    da613cf128749a882649ce81bd8c0316081b68466d7c1c96ee312c9160a59d12  AccountAdmin.sol
+    8b99adba4bd4a963c36573b469c460adcaef2200e0cd1e7c406183a0918833d8  IAccount.sol
+    351531c38f6fe322b42c6fbb314a482ba6edba6d282bff4f3a99d478d3248018  IAccountAdmin.sol
+    3ec9119c7840d29e4c61092bbbf8f63e6c5204139490ed44d81bd348005bead8  extension/Multicall.sol
+    e11e8f40eb775c0ccc34b746b03a08e584f626b94fdde1396f538c3a76c487d4  extension/PermissionsEnumerable.sol
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+  </template>
+
+
+  <p>We audited the following contracts as part of SignatureDrop ERC-1155 contract audit:</p>
+
+  <template type="file-hashes">
+    4ef0ce1601048c10a4b0fdc3247062be8f1a9ca0441c862ddfadc16251a31edb  openzeppelin-presets/metatx/ERC2771ContextUpgradeable.sol
+    ab7e40d1b333d675e23d9d4a4c70836c508b2e8b890cf1c6f3dc554424d1215d  lib/CurrencyTransferLib.sol
+    d1fa327e26529fe1048a230a9fdaa183da21f9418729b665e0d57f68f136de0b  lib/TWStrings.sol
+    e2b7ba9418f86c2049b1ad85faae6d019bcf432307b61f36eeb025d3be77c615  extension/ContractMetadata.sol
+    3d9b5d76e87e5d28f2ddf0ff52f0b2cbbc66a9987badd3ae13b2a9953919e36f  extension/PlatformFee.sol
+    f64dbb92dee9bfbe4ad6315fe9a1e174a9c7bd63fd84d17982b893dc6d5e47c8  extension/Royalty.sol
+    300b058b3d07edd1ec662fae8f2496500392eb2d14c9a9f3709d210f75ab37d6  extension/PrimarySale.sol
+    d28288423c41e9bcc22c4861dc6901087b7a2500a8415c39580de4f803591005  extension/Ownable.sol
+    218107fe08602e304fd149f431978968aa7fdb9e435e09ea46b4b41c9fa7d028  extension/LazyMint.sol
+    e11e8f40eb775c0ccc34b746b03a08e584f626b94fdde1396f538c3a76c487d4  extension/PermissionsEnumerable.sol
+    8e961ee74cc169780902223f15cb2641768d0d23a3290f0af7bf2ff326ad9dd4  extension/Drop1155.sol
+    e694e6c8204c373d6cd69a6eaee8fa5fcac000bd1923de25c202a156ecc6727c  extension/SignatureMintERC1155Upgradeable.sol
+    b446921a0ad9df016d4076d7721fb43ea378e0921d8ce5b818789bd370b00d68  SignatureDrop1155.sol
+    2b2a1a00610c96a38a30cff147e13ca0b35201916310264573b7c5fb0be5f444  SignatureDrop1155OperatorCheck.sol
+  </template>
+</content-for>
+
