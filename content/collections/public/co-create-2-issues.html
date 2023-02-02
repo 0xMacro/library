@@ -464,20 +464,6 @@
 </item>
 
 <item>
-  <field name="topic">Gas Optimizations</field>
-  <field name="impact">low</field>
-  <field name="status">wontdo</field>
-  <field name="content">
-    ## (G-5) Non-upgradeable contracts don’t need an initializer
-
-    Treasury.sol and TokenClaim.sol are not upgradeable, and they can use `constructor()` instead of `initialize()`.
-  </field>
-  <field name="response">
-    Disagree with the suggestions. We use proxies and need initializers.
-  </field>
-</item>
-
-<item>
   <field name="topic">Informational</field>
   <field name="impact">high</field>
   <field name="status">wontdo</field>
