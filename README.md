@@ -22,6 +22,14 @@ npm run dev-evm
 
 This is a Lancer project. Read more at [lancer.studio](https://lancer.studio)
 
+### Preview Images
+
+Note that preview generation is non-deterministic, you may have to try a few times :(
+
+```
+npm run evm:gen-previews intro/about
+```
+
 ## Notes
 
 PUT EVERYTHING UNDER THE `client/library/library/` FOLDER. This is necessary due to our url routing setup.
