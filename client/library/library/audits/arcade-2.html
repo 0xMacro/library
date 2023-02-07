@@ -1,0 +1,101 @@
+<page
+  clientName="Arcade"
+  reportDate="February  6th, 2023"
+  auditTitle="Arcade A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/arcadexyz/v2-contracts"
+  repoCommitHash="96933d4ad1f4c2e58227f4e86faa6c6e013514f6"
+  customRepoInfo
+  customReviewInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from December 19, 2022 to January 18, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    <li>
+      <a href="{{page.repoUrl}}" target="_blank">Relevant documentation</a> for the in-scope contracts.
+    </li>
+
+  </ul>
+</content-for>
+
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash:
+        <code>96933d4ad1f4c2e58227f4e86faa6c6e013514f6</code>
+      </li>
+      <li>
+        <b>Repository:</b>
+        <a href="https://github.com/arcadexyz/market" target="_blank">
+          {{"https://github.com/arcadexyz/market".split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash:
+        <code>298694677783ac6e16cdfbcf4fa4e5ea47e1a350</code>
+      </li>
+    </ul>
+  </content-for>
+
+
+<content-for name="source-code">
+
+  <p>We audited the following contracts within the <b>v2-contracts</b> repository:</p>
+
+  <template type="file-hashes">
+    0654e248d42cbf2068b47c22a111c861ce091098553986089d8160e1efdf4d74  contracts/ERC721Permit.sol
+    c337c89272f9940d7623b028f400461be8dd89979e243e2f6ddbbc5fe7ef190b  contracts/ERC721PermitUpgradeable.sol
+    0ca3972c5932e3646bb9633f1e5a954f3cceca7ae19799d0e62d73bf63da64ae  contracts/InstallmentsCalc.sol
+    88ab978368bc0db7d7283ef9402ecfafd6555696aa333959ed6969b94053923f  contracts/LoanCore.sol
+    443d97e05d489c6ff5701b8a385472a2397792be0218cef21939b9b1498e65a0  contracts/OriginationController.sol
+    ac11f4080a3afd1d8be6da45e4db34762df7af94398b834bd9bfdf8e36e41a37  contracts/PromissoryNote.sol
+    8d61873419ff361ed20e1292dc9ba499266d81d35e0dead469ea2789b700c78a  contracts/RepaymentController.sol
+    6f4f2bcc8b2ca2829d83d3b46a590d53697c2185ff33823c82157573749f5237  contracts/vault/AssetVault.sol
+    7d5ce3a49f120d14e68e4ea5319ea0a092309f7caa1583e203d26b2fe50d9811  contracts/vault/CallWhitelist.sol
+    83c924ad6e8e58351aa5597a9a2329f86c094104f70e39b08e2aad0a2145f2b4  contracts/vault/CallWhitelistApprovals.sol
+    3f8529466b73248e12f09c0052bed60e71f7b7a7155193ec6ad158935d40c158  contracts/vault/OwnableERC721.sol
+    99ab8b6db9f8528f15cad7f4dec35ac9301f6fea40e48a3c60538df983566a7c  contracts/vault/VaultDepositRouter.sol
+    99e762f872bc7931eb2dda19f7735d2e76104e33017a47f6210ef8937d3ac40e  contracts/vault/VaultFactory.sol
+    b55d7e112308074fac57d1f1ab49b64d8293696fa16e3fcb16010b6bbb886241  contracts/vault/VaultInventoryReporter.sol
+    5616339992964af324d51725cec47cb7fc13d4d81e7c130809b54eabe500955f  contracts/vault/VaultOwnershipChecker.sol
+    a1baf6e61d8c66de769c3fe3101f8ed4c820391dd9955192ef63be66035fc39d  contracts/verifiers/ItemsVerifier.sol
+    b3fd90257abd460e4dd6d2184eae61b1cd345c37e086fa28f632e469c5995dda  contracts/verifiers/PunksVerifier.sol
+    64ce829a964d65335618240ab1df24e6d507aa94a0b746a16c2a0a5142233b20  contracts/libraries/LoanLibrary.sol
+  </template>
+
+  <p>We audited the following contracts within the <b>market</b> repository:</p>
+
+  <template type="file-hashes">
+    a9d7b6a97b390b912d81e2a04540cec86ec113c1ec9f0ea2176e07284b11724b  contracts/lending-plus/base/CollateralSale.sol
+    24be13c436d56c591cf3394181824ab8a8ce88fb6d8c809e4f66dce6d3bac4ec  contracts/lending-plus/base/Immutables.sol
+    e3c2ebb4ce649587ae8ddb271c04394ae4b3c102896b86234328933fed496337  contracts/lending-plus/base/PayLater.sol
+    a2c664231ef8307d4d3a1a6ff5ac064516e32b9210a70f235492c0793035e63f  contracts/lending-plus/final/CollateralSaleFinal.sol
+    bc26fa6349a5893b6b50a98774a79335da4a20e9640c7733a05dd855d59810b0  contracts/lending-plus/final/PayLaterFinal.sol
+    2f6d91744f6965a562a1226dee061330ece6b1f233ba7d5b2c52bf5113752591  contracts/lending-plus/order-routing/SeaportBasicRoute.sol
+    f9eb76008d18ef19c51eb8f04379564f324fcf1839f09077e55adad5c7fffca0  contracts/lending-plus/order-routing/TreasureRoute.sol
+    37a8c8ba7584ffb996ce6881812892f609fbd80fe20b0b49dcea69c7d90a3a9f  contracts/lending-plus/seaport-basic/CollateralSaleSeaportBasic.sol
+    e8ab34cd83723a53885943d1fe0cdaa7e4f2b6f33d6ab382ff6723852f7d051a  contracts/lending-plus/seaport-basic/PayLaterSeaportBasic.sol
+    4a847596337bcc7bd759254e9a65a3bf6324f117712cac6e79918dd40a13c567  contracts/flash/FlashConsumerAAVE.sol
+    54651e7eec2dd303cc149aac42c128409229049231dd208ebc8232b59920eb25  contracts/flash/FlashConsumerBalancer.sol
+    984a19712a91b10d318f43385cae230f48af905179e4407152d182e348d3d97e  contracts/flash/FlashConsumerBase.sol
+    df1f58cf5042673c8ba795c315256768d52b75a57a2ef2a85ec72f2ad3d26aba  contracts/libraries/LendingPlusLibrary.sol
+    a6789ada33e81ab8709c9a18dd73c1b8380c846d0b8b09c27b192c46fc55bd46  contracts/libraries/LoanLibrary.sol
+    bc0adf2b64defe9891c678304b485bb50a55c625e4d9a3eeaa03f684da0d04d3  contracts/interfaces/ICollateralSale.sol
+    1ded3abb4f65363dfc42e7f607bf724827284da905f20ea37ce347629271caaa  contracts/interfaces/IPayLater.sol
+  </template>
+
+</content-for>
+
