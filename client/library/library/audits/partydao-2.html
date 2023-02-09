@@ -1,0 +1,68 @@
+<page
+  clientName="PartyDAO"
+  reportDate="Feb 7, 2022"
+  auditTitle="PartyDAO A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PartyDAO/party-protocol"
+  passwordEncrypt="env:PAGE_PASS_PARTYDAO_2"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from January 16, 2023 to January 27, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>Available documentation in the pull request.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Pull Request:</b>
+        <a href="https://github.com/PartyDAO/party-protocol/pull/211" target="_blank">
+          Version 1.1
+        </a>
+      </li>
+      <li class="break-words break-all">
+        <b>Commit Hash:</b>
+        <code>991cf2f4bb9ff785a39a2fb4dd19900beaa2cfbc</code>
+      </li>
+      <li>
+        <b>Details: </b></br>
+        These are new features and modifications implemented in the v1.1.
+        <ul>
+        <li>The new crowdfund type that can buy multiple NFTs and enter the governance stage with them (CollectionBatchBuyCrowdfund)</li>
+        <li>The new crowdfund that can continue bidding on another auction of the same collection if it doesn't win instead of ending (RollingAuctionCrowdfund)</li>
+        <li>Addition of contributeFor() to crowdfunds to allow contributing on other's behalf</li>
+        <li>Addition of ability for crowdfunds to set min/max contributions per address</li>
+        <li>Allowing host to bid custom amounts in case of auction crowdfunds</li>
+        <li>Support for ERC1155 listing on OpenSea</li>
+        <li>Support for dutch auction listings on OpenSea</li>
+        <li>Removal of useless listPrice param from Fractional proposals</li>
+        </ul>
+      </li>
+      <li> <b>Inside ./contracts</b></li>
+    </ul>
+  </content-for>
+
+<content-for name="source-code">  
+  <template type="file-hashes">
+    41028f6f6c1ddf7881dc318cda77d194b38ce56d05d967d30d58987351991a9c  ./crowdfund/AuctionCrowdfundBase.sol
+    911e0d5f062750cb3966a50edc1e330fd2c79d1405ee07086ff55ed8e0399e8f  ./crowdfund/AuctionCrowdfund.sol
+    608343c4164455f252aa844c308bec75f7b8e433398038cde479fdf70342f9d3  ./crowdfund/BuyCrowdfundBase.sol
+    75a6374b214f225011cd32806efba8bde60f84472cea714a23152f14883e89ec  ./crowdfund/BuyCrowdfund.sol
+    b255ad7e844e8a0d40afeb24bafea3ccebcd4a048026290fc55cf0a004a9199b  ./crowdfund/CollectionBatchBuyCrowdfund.sol
+    e10e6f91e4618f1ebf569d0b6754c03f1c073af4e5c54237a7197f408e0329eb  ./crowdfund/CollectionBuyCrowdfund.sol
+    8ca6c193a066205309ba4441393972abd21061bb583bfee3d99891e6b4382e2d  ./crowdfund/CrowdfundFactory.sol
+    97d090dec67daafdc07fde0f9c9461335eaa90a076aceb37d1525f18e4a23e7e  ./crowdfund/Crowdfund.sol
+    4a217ead4206766fb19fe37591f5714c8dc7456a24e4e38e40d7d820b06e6275  ./crowdfund/RollingAuctionCrowdfund.sol
+    44b58fa6efba00a48c7832d035eecc09b649c598118754597d2b137295bebcdb  ./globals/LibGlobals.sol
+    1d629273470328a0475ee3b24094e3cacac705e33af8a86a0572e731d9060c61  ./proposals/FractionalizeProposal.sol
+  </template>
+</content-for>
+
