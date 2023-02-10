@@ -1,0 +1,158 @@
+<item>
+    <field name="topic">Sandwich Attack</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">b1cd3e00968920214f9b908e64f0d7a8f88b9fd3</field>
+    <field name="content">
+      ## [H-1] Slippage calculation is incorrect
+  
+  
+      `amountOutMInium` is calculated incorrectly for uniswap swap inside `_sweep`.
+
+
+      ```solidity
+      uint256 amountInNormalized = normalizeDecimals(IERC20Metadata(fromAsset).decimals(), donationAssetDecimals, amountIn);
+  
+      // Set up uniswap swap params.
+      ISwapRouter.ExactInputSingleParams memory params =
+        ISwapRouter.ExactInputSingleParams({
+            tokenIn: fromAsset,
+            tokenOut: donationAsset,
+            fee: poolFee,
+            recipient: address(this),
+            deadline: block.timestamp,
+            amountIn: amountIn,
+            amountOutMinimum: amountInNormalized * (10_000 - uniswapSlippage) / 10_000, // @audit 
+            sqrtPriceLimitX96: 0
+        });
+      ```
+  
+      It's being derived directly from `amountIn` using decimals and slippage, instead of a current market price from uniswap pool.
+  
+      Hence it would either overvalue the amount expected or undervalue it.
+
+      [https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps](https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps)
+
+        
+      In the case of overvalued, it would revert only, while in the case of undervalued, it would allow a sandwich attack.
+  
+      ### Remediations to consider
+  
+      Consider calculating `amountOutMinium` off-chain using any price oracle or `uniswap` quoter and making `amountOutMinium` a user input.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sandwich Attack</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">4b2e9ffcf562dad54fe0680481850792f97a39ff</field>
+    <field name="content">
+      ## [H-2] Default slippage is set to a high number
+  
+      ```solidity
+      function sweep (
+              address fromAsset,
+              uint24 poolFee,
+              uint256 amountIn
+          ) external payable onlySweeper {
+              _sweep (
+                  fromAsset,
+                  poolFee,
+                  amountIn,
+                  1000, // 1% default max slippage
+                  100 // 1% default max slippage
+              );
+          }
+      ```
+  
+      `sweep()` sets slippage for swap to `1_000`, and the comment states that slippage is intended to be set to 1%.
+  
+      ```tsx
+      amountOutMinimum: amountInNormalized * (10_000 - uniswapSlippage) / 10_000,
+      ```
+  
+      However, the calculation is performed using `10_000` as a precision basis, and this causes slippage to be calculated as 10%, which is a huge slippage and will make swaps vulnerable to sandwich attacks.
+  
+      ### Remediations to consider
+  
+      Use `100` as the default slippage.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] The bridge has unlimited approvals for `donationAsset`
+  
+  
+      The bridge is given unlimited token transfer approvals. Although the bridge is a trusted contract, it is recommended to give only required approvals to external parties since any potential bugs or vulnerabilities in the bridge may cause a loss of assets in the donation contract. 
+  
+      ```tsx
+      if (!approvedDonationAsset) {
+          approvedDonationAsset = true;
+          // use max approval for assset
+          TransferHelper.safeApprove(donationAsset, address(connext), MAX_INT);
+      }
+      ```
+  
+      ### Remediations to consider
+  
+      Remove `MAX_INT` approval and approve only the required amounts.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Comments</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4b2e9ffcf562dad54fe0680481850792f97a39ff</field>
+    <field name="content">
+      ## [Q-1] Incorrect comment giving the wrong impression to the reader
+  
+      ```solidity
+      address public immutable donationAsset; // should be USDC
+      ```
+  
+      The readers of the contracts can assume that donations could be made through USDC only, consider removing this comment.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">dfb0dc88636c531b2ef2f384be5539a6c1263123</field>
+    <field name="content">
+      ## [G-1] Token approval could be moved to the constructor to eliminate redundant `SLOADs`
+  
+      ```solidity
+      // Approve connext to bridge donationAsset.
+      if (!approvedDonationAsset) {
+          approvedDonationAsset = true;
+          // use max approval for assset
+          TransferHelper.safeApprove(donationAsset, address(connext), MAX_INT);
+      }
+      ```
+  
+      Every `_sweep()`  reads the storage variable `approvedDonationAsset` , to verify if there is a need to do a token approval.
+      Instead, approval for `donationAsset` could be moved to the constructor to avoid these redundant reads.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sandwich Attack</field>
+    <field name="content">
+      ## [I-1] `_sweep()` does not check for max slippage
+  
+      `sweep()` is a function that can be called with any slippage, and `_sweep()` only checks for the `MIN_SLIPPAGE`. Since this function expects parameters with a precision basis, it is prone to human errors(see [H-2](#H-2)) and a wrong slippage passed here may lose funds to sandwich attacks. 
+  
+      Adding an upper limit for slippages, similar to `MIN_SLIPPAGE`, would resolve this issue; but that may block the sweeper from swapping tokens with low liquidity and is not recommended if such tokens are expected to be handled. Calling `sweep()` through a client app is recommended to minimize human errors.
+    </field>
+  </item>
+  
