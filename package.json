@@ -10,6 +10,7 @@
     "init": "lancer init",
     "dev": "LANCER_CLIENT_DIR=client/library lancer dev",
     "dev-evm": "LEARN_EVM=1 LANCER_CLIENT_DIR=client/learn_evm LANCER_STATIC_DIR=public/learn_evm lancer dev",
+    "evm:gen-previews": "NODE_ENV=production SESSION_SECRET=null node scripts/learn_evm/preview-images/generate.mjs",
     "postinstall": "patch-package"
   },
   "engines": {
@@ -47,6 +48,8 @@
     "tippy.js": "^6.3.7"
   },
   "devDependencies": {
+    "node-font2base64": "^0.8.1",
+    "node-html-to-image": "^3.3.0",
     "solc": "^0.8.10",
     "typescript": "^4.5.2"
   }
