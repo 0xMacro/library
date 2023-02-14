@@ -1,0 +1,181 @@
+<item>
+  <field name="topic">Error Recovery</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">addressed</field>
+  <field name="statusNote">Only added accounting needed to enable a safe implementaiton in the future. This was done as the likelihood of needing the feature is low.</field>
+  <field name="commit">5e5024ad02efd28c5fdc4584296d6d4b4e9ec8ad</field>
+  <field name="content">
+    ## [M-1] RestrictedNORI cannot be minted for suppliers with non-ERC1155 addresses
+
+    Market.sol currently allows for `RestrictedNORI` to fail to be minted for a supplier if their address is not ERC1155 compatible during the Removal purchasing workflow (see the try catch block in the `fulfillOrderXXX()` functions). Nori’s plan is to allow for suppliers to have the failed-to-be-minted RestrictedNORI minted to a different address for the suppliers.
+
+    This plan isn’t currently achievable with the code as written. RestrictedNORI.sol doesn’t allow for RestrictedNORI to be minted to an arbitrary address as the `mint()` function on line 451 pulls the receiver for the mint from the `removalID`'s encoding:
+
+    ```tsx
+    address supplierAddress = RemovalIdLib.supplierAddress({
+        removalId: removalId
+      });
+    super._mint({to: supplierAddress, id: projectId, amount: amount, data: ""});
+    ```
+
+    **Remediations to Consider:**
+
+    - Adding a function to RestrictedNORI.sol with a parameter for the mint receiver.
+    
+        Note: we’d also like to recommend that this function only be able to mint the amount of RestrictedNORI which corresponds to the amount of RestrictedNORI which failed to be minted in the Market.sol workflow. This could be achieved by recording in RestrictedNORI.sol the amount of RestrictedNORI that should’ve been minted during the catch of the try-catch blocks. This would promote safer accounting and prevent Nori from accidentally minting too-much RestrictedNORI for a supplier.
+    
+    - Ensuring that suppliers are aware that they should use addresses which are able to handle ERC1155 tokens.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">medium</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">Additionally added mentioned replacement logic which 0xMacro audited as a part of this fix. Commit points to this new feature.</field>
+  <field name="commit">075b30a144273d6cdc1a1fc5ba6676b68b66bcb1</field>
+  <field name="content">
+    ## [L-1] `Certificate` is missing accounting to indicate current backing of Removals
+
+    Nori’s Certificate contract is intended to show that the Certificate-NFTs are backed by Removals. Currently, there isn’t a way to easily validate on-chain that the Certificate contract is properly backed.
+
+    For example, after release events occur which release Removals that were backing the Certificates, it’s hard to show that the Certificate contract is no longer properly backed. This will make it harder to show in the future, once replacement logic is written, that the Certificate contract and its Certificate-NFTs are once again properly backed.
+
+    **Remediations to consider:**
+
+    - Adding accounting variables to show how many Removals are missing from the Certificate’s backing.
+  </field>
+</item>
+
+<item>
+  <field name="topic">3rd Party Behavior</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">6a741767130f609b71d801a61474aec03d65d5aa</field>
+  <field name="content">
+    ## [L-2] `purchasingToken.transferFrom()` return value is not checked
+
+    There is no guarantee that the IERC20WithPermit `_purchasingToken` will inherit OZ’s ERC20 which `reverts` on failure to transfer. The transfer could be unsuccessful and return false, and the recipient will still be minted a Certificate token even though the removal was not successfully purchased.
+
+    Checking return values is a good practice to prevent unforeseeable situations, like USDC upgrading their contracts to an implementation which returns false instead of reverting. 
+
+    **Remediations to Consider:**
+
+    - Consider checking the return value of `_purchasingToken.transferFrom()` so that suppliers are guaranteed to receive their earned tokens and the recipient is not minted a Certificate token that is unearned.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Duplication</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">ebec9c62d0285a811e5dc94c4c246dbc12db4f56</field>
+  <field name="content">
+    ## [Q-1] Market.sol’s `_fulfillOrder()` and `_fulfillOrderWithoutFee()` could be combined
+
+    The only difference between the two functions is the following in the without-fee variant on lines 1326-1330:
+
+    ```tsx
+    _purchasingToken.transferFrom({ 
+      from: from, 
+      to: _noriFeeWallet, 
+      amount: this.calculateNoriFee(removalAmounts[i])  
+    });
+    ```
+
+    **Remediations to consider:**
+
+    - Lifting this logic outside of the function to be done once on the total `certificateAmount` instead of on the individual supplier removal amounts. This would allow the `_fulfillOrder()` logic to be re-used.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Upgradeability</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">ebec9c62d0285a811e5dc94c4c246dbc12db4f56</field>
+  <field name="content">
+    ## [Q-2] Market.sol uses the non-upgradeable version of OpenZeppelin’s `Math` library for `uint256` instead of the upgradable version.
+
+    **Remediations to consider:**
+
+    - Using OpenZeppelin’s `MathUpgradeable` library instead.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Documentation</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">ebec9c62d0285a811e5dc94c4c246dbc12db4f56</field>
+  <field name="content">
+    ## [Q-3] Missing comments for `purchasingTokenAddress` and `priceMultiple`
+
+    In Certificate.sol, there are 2 functions that are missing comments regarding `purchasingTokenAddress` and `priceMultiple`:
+
+    1. `_receieveRemovalBatch()` 
+        - This function accepts `recipient`, `certificateAmount`, `removalsIds`, `removalAmounts`, `purchasingTokenAddress`, and `priceMultiple` as parameters. However, there are missing Natspec `@param` tags for `purchasingTokenAddress` and `priceMultiple`.
+    2. `onERC1155BatchReceived()` 
+        - This function accepts `data` as a parameter which encodes `recipient`, `certificateAmount`, `purchasingTokenAddress`, and `priceMultiple`. However, the Natspec comment does not mention the `purchasingTokenAddress` or `priceMultiple`, and instead states: `@param data The bytes that encode the certificate's recipient address and total amount.`
+
+    **Remediations to consider:**
+
+    - Consider expanding the comments to include information on `purchasingTokenAddress` and `priceMultiple`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Documentation</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">ebec9c62d0285a811e5dc94c4c246dbc12db4f56</field>
+  <field name="content">
+    ## [Q-4] RestrictedNORI documentation out of date
+
+    RestrictedNORI.sol’s [documentation](https://github.com/nori-dot-eco/contracts/blob/eadef34ee4f9fc55753559e3d845f4453befe773/docs/README.md#restrictednori) states:
+
+    > *It is possible to create more than one schedule per owner address and also to transfer full or partial restricted balances between addresses.*
+    > 
+
+    However, restricted Nori token transfers are disabled as of this update.
+
+    **Remediation to Consider:**
+
+    - Update the spec to mention that restricted Nori balances cannot be transferred, yet it might be possible in a future release.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="response">
+    We took your advice!
+
+    commits: 0b859b4f5712525a02decb9ee05bdcc6a628f056, a8a17a90801531f64379f56428b08c28adf32a29
+  </field>
+  <field name="content">
+    ## [I-1]  Market.sol’s `_permit()` function can have functionality extended
+
+    Currently, Market.sol’s `_permit()` function requires that the transaction initiator also be the signer of the signed message:
+
+    ```tsx
+    _purchasingToken.permit({
+        owner: _msgSender(),
+        spender: address(this),
+        value: amount,
+        deadline: deadline,
+        v: v,
+        r: r,
+        s: s
+    });
+    ```
+
+    This design is slightly different from the typical use cases of signed messages. Many projects allow signed messages to be submitted by accounts other than the message signer to enable other parties to (1) pay for gas costs and (2) allow for other custom business logic. 
+
+    Nori could use this pattern to enable things like allowing other parties to fund buyers’ gas costs or enabling other accounts besides the `MARKET_ADMIN_ROLE` to fund the no-fee swap endpoints. 
+
+    Note, that if this approach is introduced, it should be communicated to users that if they sign messages with the Market contract as the spender of the purchasing tokens, that the user is giving permission for a purchase to be made with the amount of permitted token in Market.sol.
+  </field>
+</item>
