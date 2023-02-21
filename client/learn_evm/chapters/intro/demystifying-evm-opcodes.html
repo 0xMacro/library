@@ -1,0 +1,21 @@
+<page title="Course Overview" layout="/chapters/_layout.html">
+
+<div class="prose">
+<template type="learn-evm-markdown">
+
+# Demystifying EVM Opcodes
+
+The following talk was given at ETH Global in 2022. It's a great primer for what you will learn in this course.
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/_tcyI_lNvo0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
+The video itself is *almost* timeless 🙂 It has the following errata:
+
+- The memory address increments at 10m 30s should increment by `0x10` instead of `0x20`, i.e. `0x00`, `0x10`, `0x20`, `0x30`, etc.
+- The crossed out `PUSH1 0x01` at 26m 14s should read `PUSH1 0x07`.
+
+The slides have been updated and are accessible [here](https://learnevm.com/assets/demystifying-evm-opcodes.pdf). Note that they aren't quite the same without the animations, so pairing them with the video is still advised.
+
+
+</template>
+</div>

@@ -13,3 +13,7 @@
 #audit-report > section + section {
   @apply mt-1;
 }
+
+.min-h-page {
+  @apply md:min-h-[54rem];
+}
