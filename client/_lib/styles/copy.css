@@ -34,6 +34,7 @@
 }
 
 .Copy p > code,
+.Copy a code,
 .Copy ul code,
 .Copy ol code,
 .Copy h1 code,
@@ -47,6 +48,11 @@
   font-size: 80%;
   border-radius: 6px;
   overflow-wrap: break-word;
+}
+
+.Copy a code {
+  background: none;
+  padding: 0;
 }
 
 .Copy > pre,
