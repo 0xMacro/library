@@ -159,10 +159,22 @@
             {{page.repoUrl.split('/').slice(-1)[0]}}
           </a>
         </li>
-        <li class="break-words break-all">
-          <b>Commit Hash:</b>
-          <code>{{page.repoCommitHash}}</code>
-        </li>
+        <if cond="page.repoCommitHashFinal">
+          <li class="break-words break-all">
+            <b>Commit Hash (initial):</b>
+            <code>{{page.repoCommitHash}}</code>
+          </li>
+          <li class="break-words break-all">
+            <b>Commit Hash (final):</b>
+            <code>{{page.repoCommitHashFinal}}</code>
+          </li>
+        </if>
+        <else>
+          <li class="break-words break-all">
+            <b>Commit Hash:</b>
+            <code>{{page.repoCommitHash}}</code>
+          </li>
+        </else>
       </ul>
     </else>
 
