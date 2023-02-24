@@ -1,0 +1,112 @@
+
+<div class="mt-5 px-4 flex dark:border-gray-600 bg-gray-200/25 dark:bg-gray-700/25 space-x-4 lg:space-x-5 overflow-x-auto nopagebreak">
+  <div class="py-4 flex-1 flex-shrink-0">
+    <div class="uppercase text-xs font-medium font-ui text-gray-400">Topic</div>
+    <div class="whitespace-nowrap">{{issue.topic}}</div>
+  </div>
+
+  <if cond="issue.status !== 'informational'">
+    <div class="py-4 self-stretch {{issue.statusNote ? 'px-4 bg-zinc-100 dark:bg-[#222]' : ''}}">
+      <div class="uppercase text-xs font-medium font-ui print:text-gray-700 {{issue.statusNote ? 'text-zinc-400' : 'text-gray-400'}}">
+        Status
+      </div>
+      <div
+        class="whitespace-nowrap"
+      >
+        <if cond="issue.commit">
+          <a
+            class="inline-flex items-center text-green-500 dark:text-green-400 hover:text-blue-500 hover:underline"
+            href="{{page.repoUrl}}/commit/{{issue.commit}}"
+            title="{{issue.commit}}"
+            target="_blank"
+          >
+            {{Issues.statusNames[issue.status]}}
+            <svg xmlns="http://www.w3.org/2000/svg" class="px-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+<path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+</svg>
+          </a>
+        </if>
+        <else-if cond="issue.commitTree">
+          <a
+            class="inline-flex items-center text-green-500 dark:text-green-400 hover:text-blue-500 hover:underline"
+            href="{{page.repoUrl}}/tree/{{issue.commitTree}}"
+            title="{{issue.commitTree}}"
+            target="_blank"
+          >
+            {{Issues.statusNames[issue.status]}}
+            <svg xmlns="http://www.w3.org/2000/svg" class="px-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+<path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+</svg>
+          </a>
+        </else-if>
+        <else-if cond="issue.repoPath">
+          <a
+            class="inline-flex items-center text-green-500 dark:text-green-400 hover:text-blue-500 hover:underline"
+            href="{{page.repoUrl}}/{{issue.repoPath}}"
+            title="{{issue.commitTree}}"
+            target="_blank"
+          >
+            {{Issues.statusNames[issue.status]}}
+            <svg xmlns="http://www.w3.org/2000/svg" class="px-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+<path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+</svg>
+          </a>
+        </else-if>
+        <else-if cond="issue.customCommits">
+          <for let="customCommit of issue.customCommits.split(',')">
+            <a
+              class="inline-flex items-center text-green-500 dark:text-green-400 hover:text-blue-500 hover:underline"
+              href="{{customCommit}}"
+              title="{{customCommit}}"
+              target="_blank"
+            >
+              {{Issues.statusNames[issue.status]}}
+              <svg xmlns="http://www.w3.org/2000/svg" class="px-1 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+<path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+</svg>
+            </a>
+            <br/>
+          </for>
+        </else-if>
+        <else>
+          {{Issues.statusNames[issue.status]}}
+          <if cond="issue.status === 'fixedprivate'">
+            <span class="text-sm relative top-[-1px]">(closed source)</span>
+          </if>
+        </else>
+      </div>
+    </div>
+  </if>
+  <div class="py-4 {{issue.isVuln ? '' : 'pr-2'}}">
+    <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-800">
+      {{
+        issue.severity === 'Q' ? 'Quality Impact' :
+        issue.severity === 'G' ? 'Gas Savings' :
+        'Impact'
+      }}
+    </div>
+    <div class="whitespace-nowrap">
+      <if cond="issue.severity === 'I'">
+        Informational
+        <span class="text-xs cursor-help" data-tippy-content="Informational issues have no vulnerability in scope, and thus no suggested call-to-action.">✳</span>
+      </if>
+      <else>
+        {{Issues.severityNames[issue.impact]}}
+        <if cond="issue.impactNote">
+          <span class="text-xs cursor-help" data-tippy-content="{{issue.impactNote}}">✳</span>
+        </if>
+      </else>
+    </div>
+  </div>
+  <if cond="issue.isVuln">
+    <div class="py-4">
+      <div class="uppercase text-xs font-medium font-ui text-gray-400 print:text-gray-800">Likelihood</div>
+      <div class="whitespace-nowrap">
+        {{Issues.severityNames[issue.chance]}}
+        <if cond="issue.chanceNote">
+          <span class="text-xs cursor-help" data-tippy-content="{{issue.chanceNote}}">✳</span>
+        </if>
+      </div>
+    </div>
+  </if>
+</div>
