@@ -1,0 +1,228 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">0c8545fc4389d8db65aa5b572152bc538ac62751</field>
+    <field name="content">
+        ## (H-1) Operator filter is never initialized
+
+        `TieredDropLogic` inherits from `DefaultOperatorFiltererUpgradeable` and overrides NFT transfers to ensure the operator is not blacklisted by the filter registry, provided the operator restriction is set.
+
+        However, `__OperatorFilterer_init` is required to be called to register/subscribe the contract to a filter registry, and it is never called. This causes `onlyAllowedOperator` and `onlyAllowedOperatorApproval` modifiers to always return true, no matter the operator. It may also prevent OpenSea from honouring royalties accrued from any collection that implements this, as there is no registration/subscription to their registry.
+
+        **Remediations to Consider**
+
+        Call `__OperatorFilterer_init` in `TieredDrop`'s initializer function, registering the contract to the filter registry. 
+    </field>
+</item>
+<item>
+    <field name="topic">Data Model</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">3c72569e0c467e3184d6f04a85253a4e51d711ea</field>
+    <field name="content">
+        ## (H-2) Not all contracts use the "storage struct" pattern - causing storage collisions
+
+        `TieredDropLogic` inherits from `DelayedReveal`, `LazyMintWithTier`, and `BatchMintMetadata` which don’t follow the storage struct pattern, as it is expected for contracts using the extension pattern. This causes the potential for storage collisions to occur, since the contracts use the proxy pattern and use delegate calls to read and write to storage. Storage collisions can allow data to be set and/or read from that is not intended, causing many potential issues and vulnerabilities.
+
+        **Remediations to Consider**
+
+        Ensure all contracts storage follow the storage struct pattern, to prevent storage collisions. 
+    </field>
+</item>
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">07c791c6494a34def9f15f01a1197d7eab8627a2</field>
+    <field name="content">
+        ## (M-1) Initial permissions are not enumerable
+
+        In TieredDrop.sol’s initializer function, it initializes permissions using the `PermissionsInit`’s `_setupRole()`, which allows `TieredDrop` to set the permission without inheriting from the entire permissions contract.
+
+        However, the extension `TieredDropLogic` inherits from `PermissionsEnumerable`, with is compatible with permissions, but stores extra data on permission update to allow retrieval of all addresses with a given permission. Since TieredDrop initializes using `Permission`’s `_setupRole()`, rather than `PermissionsEnumerable`'s `_setupRole()`, permissions initialized  cannot be retrieved as it is expected to, and the count received by `getRoleMemberCount()` can be off.
+
+        **Remediations to Consider**
+
+        Create a `PermissionsEnumerableInit` contract that uses enumerable permissions to initialize `TieredDrop`, allowing accurate information regarding permissions. 
+    </field>
+</item>
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5da3a9d36e1f86b09303fc6c87f79673d1a0d46d</field>
+    <field name="content">
+        ## (M-2) Meta transactions are not supported for extension management operations
+
+        `TieredDrop.sol::_canSetExtension()` uses `msg.sender` instead of `_msgSender()`:
+
+        ```
+        function _canSetExtension() internal view virtual override returns (bool) {
+                bytes32 defaultAdminRole = 0x00; 
+                return IPermissions(address(this)).hasRole(defaultAdminRole, msg.sender);          // @audit use of _msgSender
+        }
+        ```
+
+        As a consequence, all calls relying on `_canSetExtension()` for authorization don’t work with meta transactions. In particular, the following calls are affected:
+
+        - `BaseRouter.sol::addExtension`
+        - `BaseRouter.sol::updateExtension`
+        - `BaseRouter.sol::removeExtension`
+
+        **Remediations to Consider**
+
+        Consider changing `TieredDrop.sol` to inherit from `ERC2771ContextUpgradeable` and use `_msgSender()` instead of `msg.sender` in `_canSetExtension()`. 
+    </field>
+</item>
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">2dbc98953c7691a404a8f49eb50dd865889bbce5</field>
+    <field name="content">
+        ## (L-1) Unreachable custom error
+
+        In OperatorFiltererUpgradeable.sol’s `onlyAllowedOperator` and `onlyAllowedOperatorApproval` modifiers, a check is made that will revert with `OperatorNotAllowed` if `OPERATOR_FILTER_REGISTRY.isOperatorAllowed()` returns false:
+
+        ```solidity
+        if (!OPERATOR_FILTER_REGISTRY.isOperatorAllowed(address(this), msg.sender)) {
+            revert OperatorNotAllowed(msg.sender);
+        }
+        ```
+
+        However, the operator filter registry’s `isOperatorAllowed` function never returns false, it either returns true, or reverts with its own custom error `AddressFiltered` or `CodeHashFiltered`:
+
+        ```solidity
+        function isOperatorAllowed(address registrant, address operator) external view returns (bool) {
+
+            address registration = _registrations[registrant];
+
+            if (registration != address(0)) {
+
+                EnumerableSet.AddressSet storage filteredOperatorsRef;
+
+                EnumerableSet.Bytes32Set storage filteredCodeHashesRef;
+                
+                filteredOperatorsRef = _filteredOperators[registration];
+                
+                filteredCodeHashesRef = _filteredCodeHashes[registration];
+                
+                if (filteredOperatorsRef.contains(operator)) {
+                
+                    revert AddressFiltered(operator);
+                
+                }
+
+                if (operator.code.length > 0) {
+                
+                    bytes32 codeHash = operator.codehash;
+                    
+                    if (filteredCodeHashesRef.contains(codeHash)) {
+                    
+                        revert CodeHashFiltered(operator, codeHash);
+                    
+                    }
+                
+                }
+
+            }
+
+            return true;
+        }
+        ```
+
+        **Remediations to Consider**
+
+        Remove the check if `isOperatorAllowed` returns false for both `onlyAllowedOperator` and `onlyAllowedOperatorApproval`, and allow it to revert with the relevant error, removing the need for `OperatorNotAllowed`. 
+    </field>
+</item>
+<item>
+    <field name="topic">Quality</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## (Q-1) Ownable is setup but never used
+
+        In TieredDrop.sol `OwnableInit` is used to setup an owner of the contract in `initialize()` and TieredDropLogic.sol inherits `Ownable` and sets up who can change owner.
+
+        However, the `owner` and `onlyOwner` are never used, and is initialized for no apparent reason.
+
+        **Remediations to Consider**
+
+        Remove Ownable from TieredDropLogic.sol, and do not initialize `OwnableInit` in TieredDrop.sol, in order to save gas on deployments, and remove unnecessary functions. 
+    </field>
+    <field name="response">
+        Not fixing. The owner() functionality of Ownable is necessary for updating the NFT collection’s Opensea storefront metadata (banner image, etc.)
+    </field>
+</item>
+<item>
+    <field name="topic">Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## (Q-2) Use custom errors
+
+        For solidity versions 0.8.4+ it is advised to revert with custom errors over using require statements. Using them saves bytecode on deployment, a little gas on execution, and allows for more detailed error messages with the ability to pass in parameters.
+
+        **Remediations to Consider**
+
+        Replace require statements with custom errors to give more context about errors and save a bit of gas. 
+    </field>
+    <field name="response">
+        Not fixing. thirdweb plans to further spec out the introduction of custom errors to its stack.
+    </field>
+</item>
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a3d5b3bf111646a4dd722ee405e10bafa0799d03</field>
+    <field name="content">
+        ## (G-1) Unnecessary external calls for permissions
+
+        In TieredDropLogic.sol, there are multiple external calls to check if an address has a given role. Example:
+
+        ```solidity
+        return Permissions(address(this)).hasRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        ```
+
+        However, external calls cost additional gas, and in this case an external call can be avoided by directly retrieving the data using `PermissionsStorage`:
+
+        ```solidity
+        function _hasRole(bytes32 role, address addr) internal view returns(bool) {
+            PermissionsStorage.Data storage data = PermissionsStorage.permissionsStorage();      
+        return data._hasRole[role][addr];
+        }
+        ```
+
+        **Remediations to Consider**
+
+        Replace external calls to `Permissions` to query permissions by using `PermissionsStorage` in order to save gas.
+    </field>
+</item>
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">High</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## (I-1) Admin can add any extension
+
+        TieredDrop.sol inherits from BaseRouter.sol, and overrides `_canSetExtension()` to allow the `defaultAdminRole`, set in its initializer as the `_defaultAdmin` address, to add any extension to the contract.
+        However, an extension has complete control over writing to storage, since the calls are done via delegateCall. This allows a malicious admin to add an extension that can do anything to the contract, including steal all NFTs, or steal all tokens that the contract has been approved for.
+
+        **Remediations to Consider**
+
+        - Setup an extension registry, a contract where all valid extension are stored, and have it so only the team can set these extensions. Then when adding an extension, it is retrieved from the registry. This ensures extensions are still opt in, but are limited to vetted and safe extensions in order to prevent malicious functions being set.
+        - Create a version of TieredDrop.sol that inherits from RouterImmutable.sol, giving users the option to prevent additional extensions from being added after deployment.
+    </field>
+    <field name="response">
+        Not fixing. This aspect of particularly the TieredDrop contract is intentional. thirdweb will later introduce an extension registry for the rest of its contracts to ensure only vetted extensions can be added/used by thirdweb contracts.
+    </field>
+</item>
+
