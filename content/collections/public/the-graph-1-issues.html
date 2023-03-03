@@ -1,0 +1,308 @@
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">spec</field>
+  <field name="impactNote">`subscribe()` should be callable for other users with expired subscriptions.</field>
+  <field name="chance">na</field>
+  <field name="status">fixed</field>
+  <field name="commit">974c487e395da5d73ecf95051f7fb55dd58a13be</field>
+  <field name="content">
+    ## [H-1] `subscribe()` not callable for other user after their first subscription expires
+
+    The `subscribe()` function mistakenly compares the `user` subscription end date against `block.number` instead of `block.timestamp`. This prevents a user X from calling `subscribe()` for a user Y if user Y has an expired subscription.
+
+    Consider updating `block.number` to `block.timestamp`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Front-Running</field>
+  <field name="impact">critical</field>
+  <field name="impactNote">Funds are stolen.</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">Increases linearly with over-approval amounts.</field>
+  <field name="status">fixed</field>
+  <field name="commit">d4ba8c9b5b54ea7be0716de9ad186a5c0e36fb12</field>
+  <field name="content">
+    ## [H-2] `extendSubscription()` front-run vulnerability
+
+    In `extendSubscription()`, the user’s current subscription is used to calculate how many additional tokens are required to extend the subscription up to the specified `end`.
+
+    However, a user may be able to get the extender to pay more than they intend. For example:
+
+    1. User X has a subscription from time `200` to `500` with rate `7`. Current time is `230`.
+    2. Extender calls `extendSubscription()` with user X’s address and an end time of `800`.
+    3. User X front-runs transaction with:
+        1. `unsubscribe()`, also getting a refund
+        2. `subscribe()` with `start` as now, with `end` as a small amount after (such as `315`), and with `rate` as high as they can afford.
+    4. Extender, intending to pay for `250` seconds of time, is now paying for `435` seconds, and at a much higher rate than intended.
+
+    This issue affects extenders linearly with approval size.
+
+    Consider updating `extendSubscription`’s parameters to include a `intendedRate` so the extender’s paid rate cannot be front-run.
+
+    Also consider replacing `end` with `secondsToExtend` so extenders cannot pay for more time than they intend.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Edge Case</field>
+  <field name="impact">high</field>
+  <field name="impactNote">
+    Common case: Use case is blocked.
+
+    Worst case: User loses funds from their current subscription, by malicious intent or by grief.
+  </field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">User must have an active subscription, but can be griefed into having one.
+Third party will likely not have a subscription, and can be griefed into having one.</field>
+  <field name="status">fixed</field>
+  <field name="commit">4b6363c99d1ce2d3a647c5d99339b010171b7fc5</field>
+  <field name="content">
+    ## [H-3]  `fulfil()` reverts or loses funds when user has an active subscription
+
+    A use case supported by the Subscriptions contract is allowing a third party to call `fulfil()` on a user’s pending subscription, converting the pending into an actual subscription and paying for it.
+
+    If the targeted user already has an existing subscription, `unsubscribe()` is called to refund the user before converting the pending subscription.
+
+    However, the `unsubscribe()` function only refunds `msg.sender`, which is different than the user in this use case. This causes one of the following issues:
+
+    - If the `msg.sender` has an active subscription, the `msg.sender`’s subscription is unsubscribed, and the target user’s subscription is overwritten, losing access to those funds.
+    - If the `msg.sender` does not have an active subscription, the call reverts with `no active subscription`, and the use case is blocked from functioning.
+
+    Note that the subscription status of either party can be freely switched from no-subscription to active-subscription by way of `subscribe()`, allowing a griefer to set up these scenarios at low cost.
+
+    Consider implementing an internal function `_unsubscribe(address)` which accepts an address, and calling it from `unsubscribe()`  with `msg.sender`, and from `_subscribe()` with `user`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="impactNote">`user` loses funds.</field>
+  <field name="chance">low</field>
+  <field name="chanceNote">User would need to call `subscribe()` with `start` and `end` parameters orders of magnitude larger than expected.</field>
+  <field name="status">fixed</field>
+  <field name="commit">850f4e3fe2485de8fc524febd9ed43ecbfaeaf4c</field>
+  <field name="content">
+    ## [M-1] Calling `subscribe()` with incorrect values can lock funds in contract
+
+    The `subscribe()` function allows `start` and `end` values to have a maximum value of `type(uint64).max`, but the `start` value can be truncated during cast to `int64` on lines [361-362](https://github.com/edgeandnode/subscription-payments/blob/81a44aede886fc972b2f2422038a804f00789966/contract/contracts/Subscriptions.sol#L361-L362) of `unlocked()`:
+
+    ```solidity
+    uint256 len = uint256(
+        SignedMath.max(
+            0,
+            **int256(int64(_subEnd)) -
+                int256(Math.max(block.timestamp, _subStart))**
+        )
+    );
+    ```
+
+    As a result, `unsubscribe()` can mis-calculate the refund and leave a portion of funds locked in the contract.
+
+    Consider restricting subscription  `start` and `end` to a maximum value of `type(int64).max`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Open Access</field>
+  <field name="impact">medium</field>
+  <field name="impactNote">Blocks an uncommon use case.</field>
+  <field name="chance">low</field>
+  <field name="chanceNote">No one benefits from the attack.</field>
+  <field name="status">fixed</field>
+  <field name="commit">d4ba8c9b5b54ea7be0716de9ad186a5c0e36fb12</field>
+  <field name="content">
+    ## [L-1] `subscribe()` griefing attack
+
+    When user X calls `subscribe()` to create a subscription for user Y, a malicious user Z can front-run the transaction by calling `subscribe()` themselves with a long `end` and a minimal `rate`.
+
+    This can disrupt the [assumingly less-common] use case of a machine user granting a user a subscription upon some event.
+
+    Consider one or many of:
+
+    1. Extending the pending subscription feature to cover this use case
+    2. Documenting the limits of this approach, particularly not to build a system around it
+    3. Removing this feature
+  </field>
+</item>
+
+<item>
+  <field name="topic">Ecosystem</field>
+  <field name="impact">medium</field>
+  <field name="impactNote">Blocks certain tokens from being used as currency.</field>
+  <field name="chance">low</field>
+  <field name="chanceNote">The number of tokens that fall under this category may be limited.</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## [L-2] Unsafe ERC-20 transfer
+
+    [Not all ERC-20 tokens](https://medium.com/coinmonks/missing-return-value-bug-at-least-130-tokens-affected-d67bf08521ca) return a boolean for their transfer functions. These tokens are not compatible with the Subscriptions contract as currently written, since it requires that they return `true`.
+
+    Consider using Open Zeppelin’s [SafeERC20 helper function](https://docs.openzeppelin.com/contracts/2.x/api/token/erc20#SafeERC20) if support for these tokens is desired.
+  </field>
+  <field name="response">
+    Won’t fix. Only applies to nonconforming ERC-20 implementations that don’t return boolean values from `tranfer()`. We don’t intend to support these implementations.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Re-entrancy</field>
+  <field name="impact">low</field>
+  <field name="impactNote">Locally, exploiter only loses money. Might create issues for future integrations, though unlikely.</field>
+  <field name="chance">low</field>
+  <field name="chanceNote">Only applicable if a future integration somehow introduces a vulnerability.</field>
+  <field name="status">addressed</field>
+  <field name="commit">72ee3ba71ab4e7dec682af29b8bcf5a8f58368ed</field>
+  <field name="content">
+    ## [L-3] Minor Reentrancy
+
+    The `_subscribe` has a minor reentrancy vulnerability:
+
+    - If the user has a sub, then `_unsubscribe` is called
+    - This transfers tokens to the user (for a refund), giving an opportunity for reentrancy
+    - This reentrancy occurs *before* `subscriptions[user]` and the new epoch states get updated.
+
+    However, this causes the attacker to lose money, as their old subscription data is overwritten with the new, with no chance to retrieve the funds for the old.
+
+    This shouldn't cause any problems. However, if extra safety is desired, consider adding OZ's `nonReentrant` modifier to `subscribe`, `unsubscribe`, and  `fulfil`.
+  </field>
+  <field name="response">
+    We've added a comment explaining the potential vulnerability.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Views</field>
+  <field name="impact">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">850f4e3fe2485de8fc524febd9ed43ecbfaeaf4c</field>
+  <field name="content">
+    ## [Q-1] `locked()` may produce inaccurate result due to cast truncation    
+
+    Similar to M-2, `locked()` also may cause cast truncation and yield incorrect values. See line line [332](https://github.com/edgeandnode/subscription-payments/blob/81a44aede886fc972b2f2422038a804f00789966/contract/contracts/Subscriptions.sol#L332): 
+
+    ```solidity
+    uint256 len = uint256(
+        SignedMath.max(
+            0,
+            **int256(Math.min(block.timestamp, _subEnd)) - int64(_subStart)**
+        )
+    );
+    ```
+
+    This function is not utilized internally so no vulnerability is created within this contract.
+
+    Consider restricting subscription  `start` and `end` to a maximum value of `type(int64).max`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">fbfc4825cb2dd97760526a9660eaa9c72058c39d</field>
+  <field name="content">
+    ## [Q-2] Additional arguments for `Init` event
+
+    The values for  `epochSeconds` and `uncollectedEpoch` may be beneficial for off-chain consumers.  Consider adding these to the `Init` event.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Documentation</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">77245bce041cc8c8ac82c046d6a6b8f7c2ff45f8</field>
+  <field name="content">
+    ## [Q-3] Inaccurate comment
+
+    The following comment is inaccurate:
+
+    ```jsx
+    /// @dev Second param required, but currently unused.
+    ```
+
+    Consider updating the comment accordingly.
+  </field>
+</item>
+
+<item>
+  <field name="topic">User Experience</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">77d94dab5bed1c7dd38a46d39afcfb2a85269d30</field>
+  <field name="content">
+    ## [Q-4] Underflow revert
+
+    Calling `fulfil()` is called after the pending subscription’s `end` timestamp causes the transaction to revert. No harm is done in this scenario except perhaps to user/developer experience.
+
+    Consider adding a validation check against the underflow to provide a useful error message. Note that this is likely uncommon case.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Redundant Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">fd6bcb1ee4254cc854d023499f53a0cd8df663bd</field>
+  <field name="content">
+    ## [G-1] Unnecessary `require()`
+
+    `msg.sender` can never be zero [in `unsubscribe()`](https://github.com/edgeandnode/subscription-payments/blob/81a44aede886fc972b2f2422038a804f00789966/contract/contracts/Subscriptions.sol#L119). Consider removing this check.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Redundant Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">a78e4943c3774158669ae52aeb4a286dcdc4b58f</field>
+  <field name="content">
+    ## [G-2] Duplicate computation
+
+    In `unsubscribe()`, [`minAmount`](https://github.com/edgeandnode/subscription-payments/blob/81a44aede886fc972b2f2422038a804f00789966/contract/contracts/Subscriptions.sol#L257) is assigned to the same value as [`amountUsed`](https://github.com/edgeandnode/subscription-payments/blob/81a44aede886fc972b2f2422038a804f00789966/contract/contracts/Subscriptions.sol#L244). Consider consolidating them into one variable.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Storage I/O</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">a78e4943c3774158669ae52aeb4a286dcdc4b58f</field>
+  <field name="content">
+    ## [G-3] Unnecessary repeat storage reads & writes in `collect()`
+
+    Repeated reads and writes to the same storage is discounted, but still expensive. Consider assigning `uncollectedEpoch` to a new local variable for use within [the `collect()` loop](https://github.com/edgeandnode/subscription-payments/blob/81a44aede886fc972b2f2422038a804f00789966/contract/contracts/Subscriptions.sol#L186-L195), and then writing its value back to `uncollectedEpoch` after the loop completes.
+
+    This reduces `n` storage writes to 1 storage write, saving gas.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Redundant Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">77d94dab5bed1c7dd38a46d39afcfb2a85269d30</field>
+  <field name="content">
+    ## [G-4] Duplicate logic in `unsubscribe()`
+
+    In `unsubscribe()`:
+
+    - The subscription is required to be not expired (`sub.end > _now`)
+    - Therefore, the `if` / `else if` can be simplified to an `if` / `else`
+    - Then, the `setEpochs(sub.start, sub.end, -int128(sub.rate));` can be moved out and above the `if` / `else` statements, as it should occur in both cases.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="content">
+    ## (I-1) Mistakes with user-controlled rates
+
+    As described in [TMAAR](#tmaar), the responsibility of setting the correct subscription rate is solely on the user. When working with this smart contract:
+
+    - Users should be wary of mistakes in setting a subscription rate, as an incorrect rate can cause loss of funds to the user.
+    - Gateways should be wary when upgrading their off-chain rate validation, and consider backwards compatibility for existing subscriptions.
+  </field>
+</item>
