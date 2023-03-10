@@ -1,0 +1,88 @@
+<page
+  clientName="thirdweb"
+  reportDate="March 1st, 2023"
+  auditTitle="thirdweb A-10"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  repoCommitHash="391cf6625b813a0e51c02eab61d179c63d96104f"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from Feburary 21, 2022 to Feburary 27, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>A provided audit handoff document provided through Notion.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash:
+        <code>391cf6625b813a0e51c02eab61d179c63d96104f</code>
+      </li>
+      <li>
+        <b>Plugin was renamed to extension:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash:
+        <code>c03069cedbcad9707c921fbea8a702a6c3fa673a</code>
+      </li>
+    </ul>
+  </content-for>
+
+<content-for name="source-code">
+
+  <p>We audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    bdb2c0116b8db66fc5f5dd27c688a352e390653e066663552d4d0fe8fd8ead18  eip/ERC721AUpgradeable.sol
+    a814ab43a9725a15f900a4f395766306acf15b11adaee6e9ffeba22dd9282395  extension/ContractMetadata.sol
+    5dbae66e99833dd12c31cd500a32fe3421d22800b439cd1e1e060d51e0942dd4  extension/ERC2771Context.sol
+    6296294d3c5ab588f222e6b8a813fad390f618e75cfbbc9ea9c3182272672166  extension/ERC2771ContextUpgradeable.sol
+    9db51112d4e6e2bbd174a9014c226c84a93bdb520651b5406158763a8f27d0d8  extension/OperatorFilterToggle.sol
+    ac64ab713fc340391cfddc90655442c7269a8d911fb334b62f5077f4972b73d0  extension/OperatorFilterer.sol
+    2d4c31ec5c4477e24a7e3df27ecc6b285666b48741060e382b3f225eb06e8e40  extension/OperatorFiltererUpgradeable.sol
+    0c92c9a5db8d10dddaa4907e672373e18da9c9fe345da407e6311bc82b7b9d40  extension/Ownable.sol
+    1bb91fdcd9342217aa66a70130a5ad679af3cd674fce41fcc9a524de8bd602a2  extension/Permissions.sol
+    95f5691cc5bf7c97363771f026f46704ee41ae3fbf0c54e76bb31d199f47e754  extension/PermissionsEnumerable.sol
+    89c929fc668c6576063f6291d713a014c67b051268649b7f38973a3c1c620c6f  extension/PrimarySale.sol
+    b93af7a5166167858d6a884cb6b9659072777fc2a84c47445684274f1969b316  extension/Royalty.sol
+    f56741fc6d8907b6fd6a132126c5a6697c7449cfecb384ac4861c4e8430ebabc  extension/SignatureActionUpgradeable.sol
+    439d385d4820540114856ca9297b7c05e1a14025b5622c6dfcc54c8a3670eeb4  extension/init/ContractMetadataInit.sol
+    ac8902008f61436c416a0901127a6ec56d77a3dc168752bdbabb2a058208cabe  extension/init/ERC2771ContextInit.sol
+    046f64b7a91b9b84735ac4b63c4d768ef59d93576d7afd8d0d6f641d3e051cc7  extension/init/ERC721AInit.sol
+    00f42698954f001c4e8174b8cbccbce0e550bb6f904abf94421f818e86f4d719  extension/init/OwnableInit.sol
+    75b6da527e546772665d027c704ecf79bd0d6752cd68aee174f59ade104683a2  extension/init/PermissionsInit.sol
+    5a64382050165a1f59f157e7b60cded0cb6b446de8e8cdd512570781dc53d646  extension/init/PrimarySaleInit.sol
+    20c513099d53c551d711eeded10dbc6f7fa2384d65b47d902ccfa2dcc7767178  extension/init/RoyaltyInit.sol
+    ac5586ab52de3172b761b1e2716cf85aab56b1d6488582bec9f26dd7c1779d53  extension/init/SignatureActionInit.sol
+    65462f90d17fcf1befeccedd6f78a372bd0160de16daf3507ffcd639aac38948  extension/interface/IERC2771Context.sol
+    077140792d5cc238e26dd08c3060ae08a6bc110d86c07b19447ea048e71aa30f  openzeppelin-presets/utils/cryptography/EIP712Upgradeable.sol
+    339ce9415f2bf581f81a8d5e1cd01037d1ffad773178589b7a5a5e5507c225a9  plugin/BaseRouter.sol
+    b38f6724ce79f1dc1a9e263395cdb90e9c299aa4d4998623904944bf3a02d876  plugin/PluginState.sol
+    3bebc90e3cbdcb6a1da513cc60199699c4084256ff92b48954d5544eb37887c3  plugin/Router.sol
+    ca637f57186d3b73a65d8175d4ff2b41bf23b0487d7ac504f8441455d7d100e6  tiered-drop/TieredDrop.sol
+    1805043b20f3dd7cd36057c593d24c34075e41c142ffa970b24299f052c64526  tiered-drop/plugin/TieredDropLogic.sol
+    3a06285322800233833b091280ac543ee1f1e89ee842850be4c688e1c1587a25  tiered-drop/plugin/TieredDropStorage.sol
+    4c290cdff808979789dcfab5117dcceaecf14e7eab13663228b2689bf99dc3da  extension/DelayedReveal.sol
+    bb8bea4780240116750a5e64e03bb00872b67e975a93774cd251f0538578c859  extension/LazyMintWithTier.sol
+    a8894404c22cd603956b7b485b5197ea2e44daa1112186d81c780e4d36c1e2cf  extension/DefaultOperatorFiltererUpgradeable.sol
+    3323f6df6053af4642bb75e33b4b825c098b4893336c896867d974465c82a459  extension/BatchMintMetadata.sol
+  </template>
+</content-for>
+

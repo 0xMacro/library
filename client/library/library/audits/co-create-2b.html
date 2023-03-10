@@ -1,0 +1,49 @@
+<page
+        clientName="Co:Create"
+        reportDate="Feb 2nd, 2023"
+        auditTitle="CoCreate A-2b"
+        auditVersion="1.0.0"
+        repoUrl="https://github.com/cocreatelabs/contracts"
+        customRepoInfo
+        passwordEncrypt="env:PAGE_PASS_COCREATE_2B"
+        layout="/library/audits/_layout.html"
+>
+
+    <content-for name="schedule">
+        The security audit was performed by the Macro security team from January 16, 2023 to January 27, 2023.
+    </content-for>
+
+    <content-for name="spec">
+        <ul>
+            <li>Discussions on Slack with the CoCreate team.</li>
+            <li>A provided audit handoff document provided through Google Docs.</li>
+        </ul>
+    </content-for>
+
+
+    <content-for name="repo-info">
+        <ul>
+            <li>
+                <b>Repository:</b>
+                <a href="{{page.repoUrl}}" target="_blank">
+                    {{page.repoUrl.split('/').slice(-1)[0]}}
+                </a>
+            </li>
+            <li class="break-words break-all">
+                Commit Hash <b>(CoCreateERC721A):</b>
+                <code>0db6545c3e60065cbcedaf349fac3acbbd761176</code>
+            </li>
+        </ul>
+    </content-for>
+
+
+    <content-for name="source-code">
+
+        <p>CoCreate A-2b only involves issues related to CoCreateERC721A contract. Readers are welcome to read the <a href="https://0xmacro.com/library/audits/co-create-2">whole report.</a></p>
+        <p>Specifically, following files are part of the A-2b audit report:</p>
+
+        <template type="file-hashes">
+            537da59aa452b2b4110c4cf808e1ee6c5c977de4cc711ab8062e8e18218381b7  CoCreateERC721A.sol
+            f9e912ca36e8f6692cda96403b0a6a795e94a0dbb34fbf3c0eb6b211835cbddd  IERC4494.sol
+        </template>
+    </content-for>
