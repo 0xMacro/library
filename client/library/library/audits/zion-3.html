@@ -1,0 +1,46 @@
+<page
+  clientName="Towns"
+  reportDate="February 27, 2023"
+  auditTitle="Zion 3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/HereNotThere/harmony"
+  repoCommitHash="466ceffcf97c1b7ffb6c9534aff008b04350eb41"
+  passwordEncrypt="env:PAGE_PASS_ZION_3"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from January 23, 2023 to February 3, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">\
+051636d97d9af5a1aeb10003db13debb8d80733f17a2aea69c39db62e5156bdb  contracts/src/spacesv2/MultiCaller.sol
+87841b38d3d470b86adc24dc8e2e0c300e1c49ca2543d35e936a58cfca911332  contracts/src/spacesv2/Space.sol
+5fcad5cf46944a04eb38ae94869af750df7fe4d6d50b4bd82462ec35eeed2059  contracts/src/spacesv2/SpaceFactory.sol
+7427f88cc9653590d087b9db1f2c1a256949676edd3683cb48e174d286c1bd9d  contracts/src/spacesv2/SpaceOwner.sol
+20055122b7c35a54093cbc5634db82be8b041a123874e71a5b53d7633c39d334  contracts/src/spacesv2/entitlements/TokenEntitlement.sol
+c04519d2ad029f19fc3495073648a8f0fed57e71932e38d81ab25cb4c65eccef  contracts/src/spacesv2/entitlements/UserEntitlement.sol
+314df46402f4ee600cc60e409cab8efbb224068531291df7533535e9810f8560  contracts/src/spacesv2/interfaces/IEntitlement.sol
+a9d591a5f0dc64188c4c0a665953878f38ed40d3b035d9e0946cfb6d88ebdea5  contracts/src/spacesv2/interfaces/ISpace.sol
+a019c72ab523453e588c3efc7f4b665aec014f74bfe7eb90b3ab77acf782528f  contracts/src/spacesv2/interfaces/ISpaceFactory.sol
+1139f2ffa9f18ccd6ca00b80c76298e63bb3499f016fc91838c8b6cab278e336  contracts/src/spacesv2/interfaces/ISpaceOwner.sol
+f1d556bf99b8a58e6a949488be7b21159ac0d2564505ecea1b6c7d97c70b8e4a  contracts/src/spacesv2/libraries/DataTypes.sol
+32ab975445f4dd17a05c903406c1ab7a82e502a1c4db63d2bef77340c4a40e13  contracts/src/spacesv2/libraries/Errors.sol
+fe7dec0926eff8ff7f0da47079b6f923d5eb89b98dd29c6cb3c268ee577fd304  contracts/src/spacesv2/libraries/Events.sol
+f16bfdd4507143e6702e8e5c6f4db6948696b77b8e07eba17b6fc3f08e056688  contracts/src/spacesv2/libraries/Permissions.sol
+6539b910532a972b7f2bd663cff8faa8f113306d59321118a1fa50380b7538b1  contracts/src/spacesv2/libraries/Utils.sol
+  </template>
+</content-for>
