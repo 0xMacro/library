@@ -1,0 +1,87 @@
+<page
+  clientName="thirdweb"
+  reportDate="March 13th, 2023"
+  auditTitle="thirdweb A-9"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_THIRDWEB_9"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from Feburary 6th, 2022 to Feburary 15th, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>A audit handoff document provided through Notion.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash <b>(Airdrop):</b>
+        <code>fc068ba9ed7d034544d76deb07c8296046b2f26d</code>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash <b>(Multichain Registry):</b>
+        <code>8e67c4e3406f1826461c939c2a2f2413e6574860</code>
+      </li>
+    </ul>
+  </content-for>
+
+<content-for name="source-code">
+
+  <p>We audited the following contracts specificially for the Airdrop audit:</p>
+
+  <template type="file-hashes">
+    0f8b24f4fedd9fc3a1d26d9cee3983961d988d5a47fc50fec4e81468745460dd  contracts/airdrop/AirdropERC1155.sol
+    63eb7a2e86d0e542c374f1038e8f28a349264f6b26c72464c36920455b1897e1  contracts/airdrop/AirdropERC20.sol
+    f21672afa3dc281fc2fdeaa1ad8e16f32d6630abbe38916ae1f65a80c7f4d0b2  contracts/airdrop/AirdropERC721.sol
+    2af99a66c3f2ae4c418eb6a674ab06dc4e1ebf580e07ceb4f9cd9e83bc4f9857  contracts/interfaces/airdrop/IAirdropERC1155.sol
+    e513059e7e66056276148af682def4739f8d1b779d54c082cb3b2ea2bf133f8c  contracts/interfaces/airdrop/IAirdropERC20.sol
+    12e8142ab6324916ee6e6c2062d56cf676c004f5513a14841a9494a06fb87ab8  contracts/interfaces/airdrop/IAirdropERC721.sol
+    ab7e40d1b333d675e23d9d4a4c70836c508b2e8b890cf1c6f3dc554424d1215d  contracts/lib/CurrencyTransferLib.sol
+    569cd0b266ff404aeac1a4266a1535121e47907ef1dcea2d55f4c036a11f758e  contracts/openzeppelin-presets/token/ERC20/utils/SafeERC20.sol
+    d28288423c41e9bcc22c4861dc6901087b7a2500a8415c39580de4f803591005  contracts/extension/Ownable.sol
+    e11e8f40eb775c0ccc34b746b03a08e584f626b94fdde1396f538c3a76c487d4  contracts/extension/PermissionsEnumerable.sol
+    b4958ce026d4c0c93dae5e671aabed246531c448e1e081d0ba6dc590c3377393  contracts/extension/interface/IPermissionsEnumerable.sol
+  </template>
+
+  <p>We audited the following contracts specificially for the Multichain Registry audit:</p>
+
+  <template type="file-hashes">
+    7984a45907b466554b736367b7ad476ae3c1512d861563ba6b940491acc52827  contracts/plugin/TWRouter.sol
+    b15da519da306fa111231cff65858cd0b9f1c90398a6e2762731ff4313784478  contracts/plugin/interface/IDefaultPluginSet.sol
+    0eba4e9a2acbd86a29216da2183a911dc876d239c345a4297caae991e4111e75  contracts/plugin/interface/IPlugin.sol
+    851c4009315122f065b73fcdaa27f27ed6e9adcd9be30372230d93c88b0e1251  contracts/plugin/interface/IPluginRegistry.sol
+    b30554e2957c58ead799b31e89e82da2bbc97ba39ec4ecf07288cc35f48f0953  contracts/plugin/interface/ITWRouter.sol
+    cc74a1df7e3e61817d85c80e9db6f7d1580ca86aab83c642de3678873271908f  contracts/registry/TWMultichainRegistry.sol
+    1d352d3edcc93bfd1ce49efa386c1aeaf224309d70a513c6a71dd9f6b52fbb17  contracts/extension/Initializable.sol
+    b4958ce026d4c0c93dae5e671aabed246531c448e1e081d0ba6dc590c3377393  contracts/extension/interface/IPermissionsEnumerable.sol
+    e11e8f40eb775c0ccc34b746b03a08e584f626b94fdde1396f538c3a76c487d4  contracts/extension/PermissionsEnumerable.sol
+    778d5305652c4eb562b12880cb6cf023d67df24844c15783a0b80fac2e715585  contracts/openzeppelin-presets/utils/EnumerableSet.sol
+    bef561777e503ca93c3710cb00c85f0aeb7a1fb7134d8c4078ea668c8b849a92  contracts/lib/TWStringSet.sol
+    e79b52a8ed68d712078780d8acda473e67e2ddd9072a46124b790de0b85ddb68  contracts/extension/interface/IMulticall.sol
+    3ec9119c7840d29e4c61092bbbf8f63e6c5204139490ed44d81bd348005bead8  contracts/extension/Multicall.sol
+    e63c27c95600ee1886258f2e588bc6e00a8b6224bfba341c1b05a78baa3755e1  contracts/lib/TWAddress.sol
+    f58c27091037ef6c814886b28b6dcff1749ad09c038b7c624a4fc302c348bf73  contracts/plugin/DefaultPluginSet.sol
+    47ad900d613c0f168949339bddb19b1691e0641f71097ae4e564d0fc67241335  contracts/plugin/PluginRegistry.sol
+    6a4b8d272e6625d0a3adfb1bdd2dc5663cc0df840c975cdf13b312946bce5c74  contracts/plugin/PluginState.sol
+    5fadc5cc3066582745123007129b568b8fa4427a1187fe4ace9f78ab4a0eec2c  contracts/plugin/Router.sol
+    e3332c614ddad11ce40a8a5aa42c4f0c24283cd476fd7226232bffbf51a0aaa0  contracts/interfaces/ITWMultichainRegistry.sol
+    333d596baf00c08da55bc1671da3f5df65c4a1d9e8d5639e910d1c23ffb7f980  contracts/extension/interface/IPermissions.sol
+    65462f90d17fcf1befeccedd6f78a372bd0160de16daf3507ffcd639aac38948  contracts/extension/interface/IERC2771Context.sol
+    6e3e72c12215c5e5051229528d28216785a715ca5ee34f26dab2f4720f2bfc71  contracts/registry/plugin/MultichainRegistryCore.sol
+  </template>
+</content-for>
+
