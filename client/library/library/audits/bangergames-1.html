@@ -1,0 +1,33 @@
+<page
+  clientName="Banger Games"
+  reportDate="April 7, 2023"
+  auditTitle="BangerGames A-1A"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/bangergames/BangerCoin"
+  repoCommitHash="1f5917ec1196cc158071271e31f29fb05dc8a174"
+  passwordEncrypt="env:PAGE_PASS_BANGER_1"
+
+  issueSummaryFormat="table"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on April
+    4th, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+        <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+        <li>Internal documents shared by {{page.clientName}} team.</li>
+      </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the following contract within this repository:</p>
+
+    <template type="file-hashes">
+        c720c8e2112b92172e51f3d7ec0dd3aad5197a26158c5f369dcec980f8cf5094  contracts/QwanCoin.sol
+    </template>
+  </content-for>
+
+</page>
