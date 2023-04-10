@@ -1,0 +1,63 @@
+<page
+  clientName="Sommelier"
+  reportDate="April 4, 2023"
+  auditTitle="Sommelier A-7"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from March 27,
+    2023 to MArch 31, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>a4275c686a7d7ff502fe6a69589e6f4da17448b0</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository:
+    </p>
+
+    <template type="file-hashes">
+      a29bca2fae4dc622b90346b1f7852453e3503a840701be2a7464e27b2895d385  src/CellarFactory.sol
+      4f8151a90a5755de4be3387b9b0cac669b45f20af92a878116508fcc787c1a22  src/Registry.sol
+      feec55389d0abef454b0133d8f408062da2a460e8a332a8d7c8eefaab94af87b  src/base/Cellar.sol
+      5d3d273c73332d95c1e0df85de127b87928fb28ffca8004506f73b1c58c2d01b  src/base/CellarInitializableV2_2.sol
+      48ff1fa20cd91b33d00c36df6057e4234106897b2e364bb6b55381f92d1d6a8c  src/modules/adaptors/Aave/AaveATokenAdaptor.sol
+      9025a5c56bd5f1aa2d1f8fe5e7249160320a7da8cb5e1a91794ca915698b847a  src/modules/adaptors/Aave/AaveDebtTokenAdaptor.sol
+      3c251926543cc47d525cb24c949282291b1c2361edd6a1e91e35a6c31587a5b3  src/modules/adaptors/Aave/V3/AaveV3ATokenAdaptor.sol
+      96598c35e600aba11fc87013b79287a88ee4d40bda5964275fd8506133d5775c  src/modules/adaptors/Aave/V3/AaveV3DebtTokenAdaptor.sol
+      fc75779c1707d06e238750a164cfee87b0525b5f9ae2472b78d31598cbb011d5  src/modules/adaptors/BaseAdaptor.sol
+      ecdbed924862c1529bc9ffd34cb010b1515c0216b90dc72cf491ab491b909675  src/modules/adaptors/Compound/CTokenAdaptor.sol
+      b9fe6e24df7c28a984c0cb1a665d514d586659d0d084542b06bfd7d6ece8ec42  src/modules/adaptors/ERC20Adaptor.sol
+      2ef04a4c9032c971e071883a193eb6065d8ce4dd912a566cdfbb60f71c04aa4e  src/modules/adaptors/Sommelier/CellarAdaptor.sol
+      b0ddf7eafe59922c8c6fb5d9551fd9cde671e10d1df7fab06d63f0b24e12ae25  src/modules/adaptors/UniSwap/UniswapV3Adaptor.sol
+      bc3d8a1c0dc9c2f5873d09d1eb3a89ebba3b8a631528f41de60b45551b99123f  src/modules/adaptors/UniSwap/UniswapV3PositionTracker.sol
+      903eba19c52da3588ae6cebd78bca1b2da2ec2f8727485be83de3c96aa0d3a0e  src/modules/adaptors/VestingSimpleAdaptor.sol
+      5b8a1daca33ecc81a85dc3830ec55674290ba7126bfc6847ec8d8094efc4a4fa  src/modules/adaptors/ZeroX/ZeroXAdaptor.sol
+      b12fdbb8cd318e9b842d37d6feb1639e631b9abffacc5d886b9b272e35e42495  src/modules/price-router/PriceRouter.sol
+      684893c530d034c4181a03894655577719f6e55ae0589979233e9fe1241bee02  src/modules/swap-router/SwapRouter.sol
+      5268a5174478fd3b205c3ef4e950be7d9ca77e78cee5436ea8d82af027c74efa  src/modules/adaptors/OneInch/OneInchAdaptor.sol
+      3a914f413659a21b6f037f3b3629c7a7b8fad1cbdd9068bc2b0d517dfe088208  src/modules/adaptors/PositionlessAdaptor.sol
+    </template>
+  </content-for>
+</page>

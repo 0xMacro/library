@@ -1,0 +1,45 @@
+<page
+  clientName="Spindl"
+  reportDate="April 5th, 2023"
+  auditTitle="Spindl A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/spindl-xyz/spindl-on-chain"
+  repoCommitHash="5b2cc0b83fa73a18f302e56112e370331db20e6d"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_SPINDL_2"
+
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from January
+    23, 2023 to January 27, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        Spindl’s long-term goal is to be seen as the leader in the attribution space. 
+        However, in order to achieve this goal, they want to start simple. 
+        That is why in this current V1 set of contracts they have opted to limit and centralize most of the functionality to themselves, 
+        in particular to the owner (a multisig wallet) and the worker (an address assigned to the server), both of which Spindl considers to be trustworthy. 
+        It is trusted that the owner or worker will give every referrer their earned amount, and they will set each referrer’s and campaign’s status to their true status. 
+        In addition, the owner will set the advertiser and worker to the proper addresses. In Spindl’s V2 set of contracts, they hope to move their contracts towards decentralization.     
+    </template>
+  </content-for>
+
+
+  <content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    404e3a60a3874d8ed2f7a3701c1ce0a930bb2742e1e053b60f4e0e62e28f5348  contracts/AdvertiserProxy.sol
+    426bd76a2c235d5131dd69bc0194ced15f65dc7e365b73e47c153a693d9876e4  contracts/ProxyFactory.sol
+  </template>
+</content-for>
+
+</page>
