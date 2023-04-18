@@ -1,0 +1,49 @@
+<page
+  clientName="Mimicry"
+  reportDate="April 17th, 2023"
+  auditTitle="Mimicry A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Mimicry-Protocol/repo"
+  repoCommitHash="fea90cda9b9174fec81af7503071b159a7715197"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_MIMICRY_3"
+>
+  <content-for name="schedule">
+    Review of economic system design was outside of the scope of this audit and requires an additional analysis.
+    The security audit was performed by the Macro security team from March 8, 2023 to April 12, 2023. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Discord with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+      <li>A privately accessible Google Doc project whitepaper.</li>
+    </ul>
+
+    <!-- <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+
+    </template> -->
+  </content-for>
+
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+      f09be49b44d9911bd40e0e339332056f4a871e5f4df2ac937e24c58e2017aa01  contracts/Accountant.sol
+      086b1a61287c56c395209fcd4d6998485ef176e20e59ebd55491d2c8ec5f9cd5  contracts/Market.sol
+      65f3378a08c4bb3510141af7411a0b84f667c484fbe6ec2467d5a6a986f48b04  contracts/Mimicry.sol
+      6643cc7634bdfb763fd47998bdba0ebf4abf36323c617314cb289a7aa8416e07  contracts/PositionToken.sol
+      03918be2083f7a347f94b18d3cd0dac5764a74ce2240eee4b7fd22aa6b198440  contracts/currencyProviders/ChainlinkCurrencyProvider.sol
+      0a4bef8dc07a1d4b7f3c15d5708948fea17f67cadd722b30ccc059f470f6d6d6  contracts/interfaces/ICurrencyProvider.sol
+      cc099071cd06783496b3cece837474ef3424339a2a68897c43c3b6aaa1c6a2e5  contracts/interfaces/IMarket.sol
+      3b815a59e4056800672b9734e33e0b31d59e4a4dd72f1b4c23878c8c35a0afe4  contracts/interfaces/IMarketValueProvider.sol
+      0f7a6e30bce5dee5ee7b9d6e4f5182df6c2204431964a1f858fb04028beca757  contracts/interfaces/IMimicry.sol
+      9f3bcd2aa4e20cb1f6621b21c47a616d90db6838b18375ff546ed6977a2bfda6  contracts/interfaces/IValueProvider.sol
+      0ecc2ee89be83d0ec945b4a6669fd9300dfc03285e498de82e89e8bfd180a689  contracts/valueProviders/ChainlinkAggregatorV3ValueProvider.sol
+      c15fef2821779d726e3f944def45d0ec61e2bd358991c67dc953e13c48c2cba5  contracts/valueProviders/TellorMimicryCollectionStat.sol
+    </template>
+  </content-for>
+</page>
