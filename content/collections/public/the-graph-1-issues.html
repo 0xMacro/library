@@ -261,7 +261,7 @@ Third party will likely not have a subscription, and can be griefed into having 
   <field name="content">
     ## [G-2] Duplicate computation
 
-    In `unsubscribe()`, [`minAmount`](https://github.com/edgeandnode/subscription-payments/blob/81a44aede886fc972b2f2422038a804f00789966/contract/contracts/Subscriptions.sol#L257) is assigned to the same value as [`amountUsed`](https://github.com/edgeandnode/subscription-payments/blob/81a44aede886fc972b2f2422038a804f00789966/contract/contracts/Subscriptions.sol#L244). Consider consolidating them into one variable.
+    In `fulfil()`, [`minAmount`](https://github.com/edgeandnode/subscription-payments/blob/81a44aede886fc972b2f2422038a804f00789966/contract/contracts/Subscriptions.sol#L257) is assigned to the same value as [`amountUsed`](https://github.com/edgeandnode/subscription-payments/blob/81a44aede886fc972b2f2422038a804f00789966/contract/contracts/Subscriptions.sol#L244). Consider consolidating them into one variable.
   </field>
 </item>
 

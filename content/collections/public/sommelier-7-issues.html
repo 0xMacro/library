@@ -1,0 +1,166 @@
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">bbcd5f8d4084fa3153e6e747c23a434e174f9441</field>
+    <field name="content">
+        ## (C-1) Cellar can be drained by the multisig using a malicious priceRouter
+    
+        In Registry.sol's `setAddress()`, the owner of the registry can set the address of the `priceRouter`. This `priceRouter` address is queried by each cellar and used to determine the price of each of its positions to determine the total asset value.
+
+        However, if the registry’s multisig is compromised, or the owners collude, they can set the price router address to be a malicious contract that inflates the value of a cellars assets, allowing them to withdraw all the cellars assets with minimal investment and setup.
+    
+        **Remediations to Consider**
+
+        - Each cellar should cache the price router address retrieved from the registry on deployment.
+        - Add a function callable by governance that updates the cached price router address if the registry updates it. This ensures both the multisig and the governance need to be compromised before funds can be drained, offering more protection of cellars funds.
+    </field>
+</item>
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">96f13659978b997247d70a78f7e7d00cbfa2beb9</field>
+    <field name="content">
+        ## [C-2] Approvals are not revoked leading to drained funds
+        
+        In BaseAdaptor.sol's `oracleSwap()`, the cellar gives approval for a set asset to the `swapRouter` address provided by the registry and calls `swap()` on it.
+
+        ```solidity
+        PriceRouter priceRouter = PriceRouter(
+        Cellar(address(this)).registry().getAddress(PRICE_ROUTER_REGISTRY_SLOT()));
+        // Approve swap router to swap assets.
+        assetIn.safeApprove(address(swapRouter), amountIn);
+        // Perform swap.
+        amountOut = swapRouter.swap(exchange, params, address(this), assetIn, assetOut);
+        ```
+
+        As in the prior issue, the multisig can use `setAddress()` on Registry.sol to set the address of the swap router to be a malicious contract. In order to get around a cellar's `callOnAdaptor`'s `allowedRebalanceDeviation` checks, the malicious swapRouter contract can implement the same swap interface, and return the expected values, but approvals to this contract are never revoked so it doesn't have to make any state changes, as it will maintain approvals after the transaction completes. Then in a separate transaction, the malicious contract can use these approvals to transfer the approved assets from the cellar.
+
+        **Remediations to Consider**
+
+        Revoke approvals given to the swapRouter after the swap
+                and either
+
+        - Set the `swapRouter` address as a constant so it cannot be maliciously changed.
+        - Remove the swapping functionality from the `baseRouter` and turn it into a separate adaptor.
+    </field>
+</item>
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">96f13659978b997247d70a78f7e7d00cbfa2beb9</field>
+    <field name="content">
+        ## [H-1] Protocol fees can be stolen by the registry multisig
+        
+        In FeesAndReserves.sol's `sendFees()`, platform fees are sent to the gravity bridge address, retrieved by the registry, and `sendToCosmos()` is called with the `feesDistributor` address, also retrieved by the registry. Both these addresses can be changed in the registry by the multisig wallet, and can be done maliciously to steal all cellars platform fees.
+
+        **Remediations to Consider**
+
+        The `gravityBridge` and `feesDistributor` addresses are unlikely to change, so storing them in the `FeesAndReserves` contract, or as a constant in the `Registry` contract will prevent them from being changed maliciously.
+    </field>
+</item>
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7e1318ec721c346c5bc379344eeff2b5aa134a1c</field>
+    <field name="content">
+        ## [H-2] FeesAndReserves multisig can set arbitrary feeEarned for cellars
+        
+        In FeesAndReserves.sol’s `performUpkeep()` a check is done to see if the caller is the chainlink `automationRegistry` address, if so it will trust that the passed in `performData` is correct.
+
+        ```solidity
+        if (msg.sender != automationRegistry) {
+            // Do not trust callers perform input data.
+            Cellar target = performInput.cellar;
+
+            if (address(metaData[target].reserveAsset) == address(0)) revert FeesAndReserves__CellarNotSetup();
+            performInput = _calculateFees(target);
+        } else {
+            if (address(metaData[performInput.cellar].reserveAsset) == address(0))
+                revert FeesAndReserves__CellarNotSetup();
+            // Make sure performInput is not stale.
+            if (upkeepData.lastUpkeepTime > performInput.timestamp) revert FeesAndReserves__UpkeepTimeCheckFailed();
+        }
+        ```
+
+        However, the owner of the `FeesAndReserves` contract can set the `automationRegistry` address to anything using `setAutomationRegistry()`. This allows arbitrary performance data to be accepted, and allowing the `feeEarned` for a given cellar to be inflated. This can allow a cellar to move the max funds of the `rebalanceDeviation` into the `feesAndReserves` contract, and allow them to withdraw it, with some fees going the the `feesDistribution` address. This can allow a slow rug pull to occur, or all assets held in reserve for a cellar to be pull out.
+
+        **Remediations to Consider**
+
+        - Set `automationRegistry` to be constant.
+        - Or require governance approval as well as multisig approval in order to change the `automationRegistry` address.
+    </field>
+</item>
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [M-1] New cellars can be vulnerable to an inflation attack
+        
+        In cellarFactor.sol's `deploy()`, a `initialDeposit` param is passed in that, if non-zero, will deposit that amount into the newly deployed cellar and lock those shares in the cellarFactory contract.
+
+        ```solidity
+
+        if (initialDeposit > 0) {
+            asset.safeTransferFrom(msg.sender, address(this), initialDeposit);
+            
+            asset.safeApprove(clone, initialDeposit);
+            
+            cellar.deposit(initialDeposit, address(this));
+        }
+        ```
+
+        This is done to ensure there are some shares in the cellar, to help prevent a vault inflation attack on depositors.
+        However, this initial deposit is optional and if not sufficiently large may still leave depositors vulnerable to the attack.
+
+        **Remediations to Consider**
+
+        - Ensure that a suitable amount of funds are initially deposited and locked to minimize the impact of an inflation attack.
+        - Or use a virtual offset to calculate shares minted, as suggested [here](https://gist.github.com/Amxx/ec7992a21499b6587979754206a48632), to minimize the impact of inflation attacks and prevent requiring funds to be locked in the cellar.
+    </field>
+    <field name="response">
+        While Cellar deployment is still handled by the Sommelier team, we will insure that initial deposits into our Cellars are of an appropriate size, to mitigate the attack. 
+
+        Once Cellar deployment is handled by other 3rd parties, a mitigation like the ones listed in the report will be added to the Cellar code, to reduce deployment overhead for 3rd parties.
+    </field>
+</item>
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">96f13659978b997247d70a78f7e7d00cbfa2beb9</field>
+    <field name="content">
+        ## [Q-1] Unused import
+
+        Cellar.sol imports Multicall.sol, but never uses it.
+    </field>
+</item>
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [I-1] Issues found affect current cellars
+
+        Cellars currently in production can be affected by these issues, and the mitigation will differ from what is outlined above.
+
+        **Suggested Steps**
+
+        - Adjust the multisig owner of the registry to require more signatures.
+        - Add the new adaptors to the registry.
+        - Make governance proposals to transition the affected cellars to the new adaptors.
+        - Steward should prevent cellars from adding old positions.
+        - Increase the minimum timelock of the multisig.
+    </field>
+    <field name="response">
+        To start to mitigate this finding, the multi-sig controlling the registry will be changed so it requires 4 of 7 signatures. Then once Real Yield USDs registry contract has been fully updated to use the newly audited adaptors, the Timelock contract will have its minimum delay changed from 3 days to 30 days.
+    </field>
+</item>

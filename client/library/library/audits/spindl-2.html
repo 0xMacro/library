@@ -1,0 +1,47 @@
+<page
+  clientName="Spindl"
+  reportDate="April 5th, 2023"
+  auditTitle="Spindl A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/spindl-xyz/spindl-on-chain"
+  repoCommitHash="5b2cc0b83fa73a18f302e56112e370331db20e6d"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_SPINDL_2"
+
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from January
+    23, 2023 to January 27, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      Spindl’s long-term goal is to build an attribution system native to Web 3 and how Web 3 developers perceive the world. 
+      That means using a mix of off-chain and on-chain data to correctly measure the user’s journey toward a dApp, and their monetization and engagement once there. 
+      Since this is a very nascent industry where business models have not coalesced, 
+      the Spindl referral and rewards system does the bounty/revenue-share calculation off-chain in order to provide the app developer or marketer the maximum flexibility when it comes to incentivizing user growth. 
+      Eventually, the attribution function will very likely live fully (or more fully) on-chain in a more decentralized and trustless manner. 
+      For now, Spindl’s attribution accounting is considered trusted as it decides who referred whom, and who should be paid as a result. 
+      As part of the transparency here, Spindl provides dashboards to customers showing the state of their campaign, referral fees spent, and sets the status of campaigns on-chain such active or paused. 
+      Once this new Web 3 marketing industry is more mature, Spindl will work to make their attribution more decentralized and (importantly) more composable.    
+    </template>
+  </content-for>
+
+
+  <content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    404e3a60a3874d8ed2f7a3701c1ce0a930bb2742e1e053b60f4e0e62e28f5348  contracts/AdvertiserProxy.sol
+    426bd76a2c235d5131dd69bc0194ced15f65dc7e365b73e47c153a693d9876e4  contracts/ProxyFactory.sol
+  </template>
+</content-for>
+
+</page>

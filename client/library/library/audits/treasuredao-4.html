@@ -1,0 +1,53 @@
+<page
+  clientName="Treasure DAO"
+  reportDate="March 27, 2023"
+  auditTitle="TreasureDAO A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/TreasureProject/smols-on-chain"
+  repoCommitHash="1732834cde36f07e5b14228e6ac0524f47efa9d1"
+  passwordEncrypt="env:PAGE_PASS_TREASUREDAO_4"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from February 6, 2022 to February 13, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+    <li>A privately accessible Notion page of documentation.</li>
+  </ul>
+
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    12d7fce405da71f4e00117fa75090e031714f4258eff7af40a0158d2184de860  contracts/OldSmols.sol
+    6724e67e3a066c28879b8bcb95ef2fb067d8afbf557ed7f20a440651c5ce5003  contracts/School.sol
+    c8c7ee378700a6682469aa83ec2ae40beece0f68b11f0b9e845fed4823ba9338  contracts/Smols.sol
+    3cdbc24e91b32434ddf0777bf938b9ead89e28eac5a3833751adfde924f63c4b  contracts/SmolsAddressRegistry.sol
+    adaef03fe1d31028c018acfba3bb3814aa2affda7b2d752464acc1ce3f813d39  contracts/SmolsAddressRegistryConsumer.sol
+    0cdca82d78b5211fc6bd2bfcf6a86573ba3718a023b6cbd8556328c431854edf  contracts/SmolsExchanger.sol
+    5e7b7402855d2702294577203150beac32eaf2d6f736ad7efde0ed8f8e549b9a  contracts/SmolsHeadSizeExchanger.sol
+    1d3289f8b164e207eacdf95f7c8df3a69813eb7936040835ba412f537752d2c9  contracts/SmolsRenderer.sol
+    5f91f7f3bd4bdec05cb555b54b1ddea1e3d32fa4dff0ebb2599d252484cceb96  contracts/SmolsState.sol
+    70563d50ea37eb0d73a10afab88c15d199bee521bc6732466f1c162ce1f40b0c  contracts/SmolsTraitStorage.sol
+    e9dad090753332635497ce1f678ec7404d1fa51784d12c3d4d85e75ca8a7a7e2  contracts/TransferBlocker.sol
+    a26f1ebab77b360a43cd01c45337944a80a7a5101f522c60826c6e72ea0dc26c  contracts/interfaces/ISchool.sol
+    ae9e7c1f223beea6bc9898307a3497c940da6c8f0233ea1d962a62c9b6bcebd9  contracts/interfaces/ISmols.sol
+    e7a8ae033e5caee423d2b3814ebbc98d6d30e38de203317c19c51fda924ccf52  contracts/interfaces/ISmolsAddressRegistry.sol
+    792a773a8ade6a66f65bed9cacb1ce77249c42990643e58b6f67efbef7892b8a  contracts/interfaces/ISmolsRenderer.sol
+    80f18cc046506fe0e3a305662df98be10cf58581555818219d68134f3743e6c2  contracts/interfaces/ISmolsState.sol
+    246a81b401328922779b2fbe7a325054e1aadc8cdd0f212e6fe4b6ed435c8909  contracts/interfaces/ISmolsTraitStorage.sol
+    faf03abf4dd2d4be7ce9d8f2be97bd94311b614f78d5d88b4cc26cb43d738331  contracts/interfaces/ITransferBlocker.sol
+    f2688ad7810d96aecd6527ab7cffe7ae47df5c0ae06207340428439ce27909c8  contracts/libraries/SmolsLibrary.sol
+    38fa3c603341b5ee9659fdcf6b83820bd7e2d4886bf1c07933da10ae5626b299  contracts/utilities/OwnableOrAdminable.sol
+    bf017eb2039ef502b2785caf45a6dfaa61d5a4b2bd1f5f14188dda7e5ff993d5  contracts/utilities/UtilitiesV2Upgradeable.sol    
+  </template>
+</content-for>
