@@ -162,6 +162,62 @@
     <field name="impact">high</field>
     <field name="chance">low</field>
     <field name="status">fixed</field>
+    <field name="statusNote">This issue was found by an external third party and reported to us to verify.</field>
+    <field name="commit">5dd04581b3584c98e8463732228f69f098e984ba</field>
+    <field name="content">
+
+        ## [H-4] `recipient` can claim ETH earlier than intended
+
+        In Milestones.sol and Intervals.sol, the functions `claim()` and `release()` distribute the owed tokens or ETH to the `recipient`.
+
+        However, the state that determines the amount to send to the `recipient` is updated after the internal function `_distribute()` is called, which will send ETH to the recipient if the `token` address is set to `address(0)`.
+
+        ```solidity
+        function claim() external payable whenNotPaused returns (uint256) {
+            uint256 bal = _nextPayment();
+            if (bal == 0) revert NO_FUNDS_TO_DISBURSE();    
+            _distribute(recipient, bal);
+
+            currentMilestone++;
+
+            emit FundsDisbursed(address(this), bal, "Milestones");
+
+            return bal;
+        }
+        ```
+        Reference: [Line 75-86, Milestones.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/milestones/Milestones.sol#L75-L86)
+
+        ```solidity
+        function _distribute(address _to, uint256 _amount) public {
+            if (token != address(0)) {
+                /// ERC20 transfer
+                SafeERC20.safeTransfer(IERC20(token), _to, _amount);
+            } else {
+                /// ETH transfer
+                bool success;
+                assembly {
+                    /// Limit the call to 50,000 gas
+                    success := call(50000, _to, _amount, 0, 0, 0, 0)
+                }
+            }
+        }
+        ```
+        Reference: [Line 77-89, Stream.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/lib/Stream.sol#L77-L89)
+
+        In the case where the `recipient` is a contract that contains a malicious `fallback` or `receive` function that calls either `claim()` or `release()` when receiving ETH, it would allow the recipient to drain the entire contract of its funds after only needing to wait a single `interval`, or complete a single milestone.
+
+        **Remediations to Consider**
+
+        Follow the [Checks, Effects, and Interactions](https://docs.soliditylang.org/en/v0.6.11/security-considerations.html#use-the-checks-effects-interactions-pattern) pattern, and update `currentMilestone` for Milestones.sol and `paid` for Intervals.sol, before making the call to `_distribute()` for both `claim()` and `release()`.
+                
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
     <field name="commit">5e7183603bbe9463feb9bbb8b8d40ee10a4bc823</field>
     <field name="content">
         ## (M-1) receive should revert if token is non-zero
