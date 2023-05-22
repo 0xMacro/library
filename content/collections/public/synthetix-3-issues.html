@@ -1,0 +1,235 @@
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">1b0828f10d63fbd6d8e12925dc9f64fc399a4aa0</field>
+  <field name="content">
+    ## [H-1] `PriceDeviationCircuitBreaker` does not handle negative prices correctly
+
+    `PriceDeviationCircuitBreaker`'s logic currently does not handle negative prices correctly. The logic in the node fails to account for this on line 30:
+
+    ```solidity
+    int256 difference = abs(primaryPrice - fallbackPrice);
+    	// line 30 is line below 
+      if (deviationTolerance.toInt() < ((difference * 100) / primaryPrice)) {
+          if (parentNodeOutputs.length > 2 && parentNodeOutputs[2].price != 0) {
+              return parentNodeOutputs[2];
+          } else {
+              revert DeviationToleranceExceeded(difference / primaryPrice);
+          }
+      }
+    ```
+
+    If the `primaryPrice` is negative, it will make the computed deviation negative and therefore always less than the deviation tolerance, even if the spread is larger. 
+
+    **Remediations to Consider:**
+
+    - Using the absolute value of the `primaryPrice` instead of the raw value.
+  </field>
+</item>
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">6d2c7ab5653fe64a08f53699ca8523cfcbb4a9d7</field>
+  <field name="content">
+    ## [H-2] `ReducerNode`’s `max()` operation incorrect on only negative prices
+
+    `NodeOutput`'s `Data` allows for prices to be negative. Currently the `ReducerNode`'s `max()` will return zero if all of the input parent node’s data is negative instead of the max negative price. This is due to the return variable being initialized to zero.
+
+    **************************************************Remediations to Consider:**************************************************
+
+    - Similarly to the `min()` function, initialize the output variable with data from one of the parent nodes.
+  </field>
+</item>
+<item>
+  <field name="topic">Interoperability</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">bd6c00b3894fada72fd995932b01a012253f0527</field>
+  <field name="content">
+    ## [M-1] `UniswapNode` does not validate that input tokens belong to the `pool`
+
+    In NodeModule.sol, a `UniswapNode` can be registered by supplying the input parameters `pool`, `token0`, and `token1` address. Currently, there is no validation to ensure that `token0` and `token1` are the correct pair of the `pool`.
+
+    Since the [quote amount](https://github.com/Synthetixio/synthetix-v3/blob/550f7dd7c00077b8e831aac7281fda9db8ec7d8c/protocol/oracle-manager/contracts/nodes/UniswapNode.sol#L73-L75) depends on the address ordering of `token0` and `token1`, this can result in an incorrect final price calculation. It can also cause issues with the scaling of prices, as the decimals used for scaling are based from the tokens as well.
+
+    **Remediations to Consider:**
+
+    - Directly validating that `token0` and `token1` are the pairs used in `pool`.
+  </field>
+</item>
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">medium</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">ec86a70a2d6acd7bb91d984fa16c9ef880645165</field>
+  <field name="content">
+    ## [M-2] `PriceDeviationCircuitBreaker` does not scale deviation parameter to 18 decimal places
+
+    The documentation for `PriceDeviationCircuitBreaker` states that the deviation parameter should be scaled to 18 decimal places. Currently the node does no scaling on the parameter. This does not allow for users to specify smaller deviations than 1%, which may not be granular enough for some use cases.
+
+    **Remediations to Consider:**
+
+    - Add scaling to the deviation tolerance check on line 30 of PriceDeviationCircuitBreakerNode.sol
+  </field>
+</item>
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">18623ca2b5f125b4e2e5393c3a8d9951cedd1e35</field>
+  <field name="content">
+    ## [M-3] `IExternalNode` is missing logic to validate parameters
+
+    ExternalNodes.sol and IExternalNode.sol do not enable implementations of `IExternalNode` to validate that a node’s passed in parameters are valid. This is problematic because it raises the likelihood that users will create malformed external `nodeIds` by accident. This is due to a lack of implementation instead of an incorrect implementation.
+
+    **Remediations to Consider:**
+
+    - Adding some sort of `validate()` function to `IExternalNode` and passing parameters to it during ExternalNodes.sol’s `validate()` function.
+  </field>
+</item>
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">low</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">dd9dbec9d5bdc5096c8a12e56c165fe75d32ed39</field>
+  <field name="content">
+    ## [L-1] `ExternalNodes` lack the ability to have additional parameters
+
+    The hardcoded nodes like, `UniswapNode` and `ChainlinkNode`, have parameters that are passed to the nodes which enable more complex behaviors. It is currently not possible to re-implement the same parameterized behavior of the hardcoded nodes through the `ExternalNode` interface, which is not the intended design. This is due to the ExternalNode.sol’s `validate()` function limiting the parameters to only fit the `ExternalNode`’s mandatory contract address.
+
+    **Remediations to Consider:**
+
+    - Enabling `ExternalNode`s to have variable amounts of parameters.
+  </field>
+</item>
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commitTree">eaecf6e6ef1d5e910c67306a3c9d0118e6032f4b</field>
+  <field name="content">
+    ## [L-2] `UniswapNode` cannot handle ERC20s with larger than 18 decimal places
+
+    ERC20s can have decimals in the range 0-255 (`uint8`'s range). Currently, the UniswapNode.sol’s code is unable to process tokens that have decimals larger than 18. Reverts happen in two places:
+
+    - When adjusting for `token1`'s scale with `uint256 factor = (PRECISION - decimals1);`, this logic will underflow with any `token1` that has decimals larger than 18.
+    - When grabbing the price with `getQuoteAtTick()`, all `token0`s with decimals larger than 26 will overflow the `FullMath` calls in this function, and, `token0`s  with decimals larger than 19 will overflow with tick values higher than `443637`. This is due to the line `uint256 baseAmount = 10 ** decimals0;`, this resulting value is too large for the `FullMath` code to handle.
+
+    ERC20s with higher than 18 decimal places are rare, but they do exist. Currently there are [8 on Ethereum](https://dune.com/queries/1976247). Even though there are not current Uniswap Pools operating for these 8 coins, we still recommend fixing this for the sake of future proofing the code.
+
+    ****************************************************Remediations to Consider:****************************************************
+
+    - Fixing the code to accommodate larger decimals in the range of 0-255, or,
+    - Validate that created `UniswapNode`’s used tokens have decimals no larger than 18.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commitTree">eaecf6e6ef1d5e910c67306a3c9d0118e6032f4b</field> 
+  <field name="content">
+    ## [L-3] `PriceDeviationCircuitBreakerNode` does not allow for prices to be zero
+
+    The node `PriceDeviationCircuitBreakerNode` does not allow for prices to be zero, which is problematic as the `Node`'s price variable of `int256` includes zero in its valid range. This isn’t documented. The node currently reverts when the `primaryPrice` is zero or if the third parent’s price is zero.
+
+    The node’s code can be modified to accommodate zero pricing. Some design decisions need to be made and should be well documented, as the size of something compared to zero is not a well-defined concept. Some implementation options are:
+
+    1. Keeping the code as is and warning developers that zero-prices are not accommodated in this node type.
+    2. Replacing the `primaryPrice` with the smallest amount (`1`) for comparison purposes if the `fallbackPrice` is also not zero.
+    3. Always returning the 3rd node parent or reverting if the `primaryPrice` is zero and the `fallbackPrice` is not zero.
+    4. Letting the node user toggle between options 2/3 with a flag set during node creation.
+
+    **************************************************Remediations to Consider:**************************************************
+
+    - Choosing an implementation option and documenting it clearly for developers.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Readability</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">da08fd2742545153cb5fa5d09243c5b1526f4aa5</field>
+  <field name="content">
+    ## [Q-1] `UniswapNode`’s `token0` and `token1` naming is not user friendly
+
+    The names `token0` and `token1` for the `UniswapNode` parameters could be better named to help developers construct nodes properly. `token0` is supposed to be the target token, and `token1` is supposed to be the stable coin (or the denominator). Mixing up these tokens will give incorrect prices as creating nodes with them backwards will not give prices denominated in USD.
+
+    **********************Remediations to Consider:**********************
+
+    - Changing `token0` to `token` or `numerator`
+    - Changing `token1` to `stablecoin` or `denominator`
+  </field>
+</item>
+<item>
+  <field name="topic">Documentation</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">da08fd2742545153cb5fa5d09243c5b1526f4aa5</field>
+  <field name="content">
+    ## [Q-2] ReducerNode.sol doesn’t mention that `Operation.MEDIAN` returns the average when there are an equal amount of Parents
+
+    The `ReducerNode`'s `median()` operation will return the average of the two most middle nodes when the length of the array is even. It would benefit developers to have this documented.
+
+    **************************************************Remediations to Consider:**************************************************
+
+    - Documenting this design choice so developers are aware of it.
+  </field>
+</item>
+<item>
+  <field name="topic">Documentation</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">da08fd2742545153cb5fa5d09243c5b1526f4aa5</field>
+  <field name="content">
+    ## [Q-3] `ReducerNode`’s `div()` function will revert if a price is zero
+
+    In ReducerNode.sol’s `div()`'s logic, the function will revert without a good error message if a returned parent’s node price is zero. 
+
+    **Remediations to Consider:**
+
+    - Reverting with an error message instead of panicking the EVM by trying to divide by zero.
+  </field>
+</item>
+<item>
+  <field name="topic">Readability</field>
+  <field name="impact">low</field>
+  <field name="status">fixed
+  </field>
+  <field name="commit">da08fd2742545153cb5fa5d09243c5b1526f4aa5</field>
+  <field name="content">
+    ## [Q-4] `PriceDeviationCircuitBreakerNode`'s naming of `fallbackPrice` is misleading
+
+    The name of `PriceDeviationCircuitBreakerNode`'s variable `fallbackPrice` is misleading because the referenced price isn’t the fallback price. That variable is the 2nd parent’s price, which is just used to check the 1st parent’s price. The 3rd parent is actually the fallback price.
+
+    ********************************************Remediations to Consider:********************************************
+
+    - Renaming the variable to `comparisonPrice`
+  </field>
+</item>
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="content">
+    ## [I-1] Geometric-Mean or Arithmetic-Mean ChainLink TWAP Options
+
+    In ChainLinkNode.sol, the TWAP is calculated using an Arithmetic-Mean. Using a Geometric-Mean instead is becoming popular in the DeFi space as it responds differently to types of oracle manipulation attacks. UniswapV3 chose to use the Geometric-Mean in their protocol.
+
+    There isn’t a clean winner in terms of which option is better, as they have very similar behavior overall. [See here](https://delphilabs.medium.com/which-one-should-you-use-arithmetic-or-geometric-mean-twap-ded01532bf49) for a good exploration of the differences in behavior. 
+
+    Users could enjoy having the option to use a GM instead of a AM in the `ChainLinkNode`.
+  </field>
+</item>
+
