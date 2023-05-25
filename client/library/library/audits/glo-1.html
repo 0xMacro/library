@@ -5,8 +5,8 @@
   auditVersion="1.0.0"
   repoUrl="https://gitlab.com/global-income-coin/usdglo"
   repoCommitHash="678ee06750bd91939a0bc746641c435307dfc13a"
-  layout="/library/audits/_layout.html"
   customRepoInfo
+  layout="/library/audits/_layout.html"
   passwordEncrypt="env:PAGE_PASS_GLO_1"
 >
   <content-for name="schedule">
@@ -33,15 +33,29 @@
     </template>
   </content-for>
 
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        <b>Commit Hash:</b>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+    </ul>
+  </content-for>
 
-    <content-for name="source-code">
-        <p>Specifically, we audited the following contracts within this repository:</p>
+  <content-for name="source-code">
+    <p>Specifically, we audited the following contracts within this repository:</p>
 
-        <template type="file-hashes">
-            758b04d2e304251b702ba08782d553a53f48a14c9d2402e502ea4a9e054d2229  USDGLO_V3.sol
-            c9476c4c60e8aa2877dd58a4dc6c76f844e72b5c58532fcd8d044f59222160a2  ERC20PermitUpgradeable_V3.sol
-            40c72cb8e00ba58a97a34b4acacfa9fa03a18713c5e39faff492cfe9aa2bdd0e  ERC20Upgradeable_V2.sol
-        </template>
-    </content-for>
+    <template type="file-hashes">
+        758b04d2e304251b702ba08782d553a53f48a14c9d2402e502ea4a9e054d2229  USDGLO_V3.sol
+        c9476c4c60e8aa2877dd58a4dc6c76f844e72b5c58532fcd8d044f59222160a2  ERC20PermitUpgradeable_V3.sol
+        40c72cb8e00ba58a97a34b4acacfa9fa03a18713c5e39faff492cfe9aa2bdd0e  ERC20Upgradeable_V2.sol
+    </template>
+  </content-for>
 
 </page>
