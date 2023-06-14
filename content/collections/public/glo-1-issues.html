@@ -1,0 +1,88 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">8e1e0a027ac3c72e13f8acb74fb7e997bf6f8256</field>
+    <field name="content">
+        ## [L-1] approve/increaseAllowance/decreaseAllowance don’t revert when contract is paused or address is denylisted
+
+        ### **Description**
+        According to the documentation, ```approve```/```increaseAllowance```/```decreaseAllowance``` are supposed to revert when the contract is paused, or a given address is denylisted. 
+        This is currently not the case, and thus any address being denylisted can still call one of those functions.
+
+        This behavior doesn’t impose any security risks, as the required checks to not allow transfers from and to any denylisted address is checked in the _transfer function.
+
+        ### **Remediations to Consider**
+        Consider adding require checks to revert on ```approve```/```increaseAllowance```/```decreaseAllowance``` when contract is paused or address is denylisted. 
+        Alternatively, update documentation accordingly.
+    </field>
+    <field name="response">
+        I'll update the docs. We made the decision not to revert approves on denylists because the transfers check them anyway.    
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+
+    <field name="content">
+        ## [Q-1] Outdated version of OpenZeppelin is used
+
+        The project uses OpenZeppelin version 4.7.2 for `contracts-upgradeable`. There are known vulnerabilities in older version used (see [here](https://security.snyk.io/package/npm/@openzeppelin%2Fcontracts/4.7.0)). 
+        
+        For example ECDSAUpgradeable.sol used in ERC20PermitUpgradable_V3.sol is susceptible to signature malleability. See details [here](https://github.com/OpenZeppelin/openzeppelin-contracts/security/advisories/GHSA-4h98-2769-gh6h). 
+        
+        Contracts that are affected by this vulnerability are those that implement replay protection by marking the signature itself as used instead of any nonce or unique id. 
+        
+        Thus, with current code, there is no immediate security risk imposed as it uses nonces to prevent  replay attacks. However, it is recommended to upgrade to latest stable OpenZeppelin version.
+    </field>
+    <field name="response">
+        Acknowledged - but we prefer to postpone making these changes until our next smart contract upgrade as the issue doesn't introduce any risk, whilst making the changes would require us to rerun checks & delay our preferred timeline.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8e1e0a027ac3c72e13f8acb74fb7e997bf6f8256</field>
+    <field name="content">
+        ## [Q-2] Documentation nitpicks
+
+        1. The [documentation](https://gitlab.com/global-income-coin/usdglo/-/tree/678ee06750bd91939a0bc746641c435307dfc13a/contracts#minting) states the following:
+            
+            > The internal `_mint` method checks `_requireBalanceIsNotDenylisted` on both the minters balance and the `to` address balance.
+            > 
+            
+            The above statement is not entirely correct as the internal `_mint` function only checks on the `to` address. It is the external `mint` function in *USDGLO_V3.sol* that also checks on the minter’s address via `whenNotDenylisted(_msgSender())`.
+            
+        2. The [documentation](https://gitlab.com/global-income-coin/usdglo/-/tree/678ee06750bd91939a0bc746641c435307dfc13a/contracts#roles) mentions the following for the `DEFAULT_ADMIN_ROLE`:
+            
+            > This role will be by default assigned to the contract deployer address.
+            > 
+            
+            However, it is not the deployer’s address that will be assigned to the role but instead the `admin` address being passed in the `initialize` function.
+            
+        
+        Consider updating the documentation to correctly reflect behavior.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [G-1] Remove extra event for `mint` and `burn`
+
+        USDGLO_V2’s `mint` and `burn` functions emit an event `Mint(…)` and `Burn(…)` respectively. In addition, the underlying `_transfer` function also emits an event `Transfer(…)`, resulting in 2 events being emitted for every mint/burn. 
+        
+        In order to reduce gas costs, consider to remove the additional `Mint(…)` and `Burn(…)` events.
+    </field>
+    <field name="response">
+        Acknowledged - but we prefer to postpone making these changes until our next smart contract upgrade as the issue doesn't introduce any risk, whilst making the changes would require us to rerun checks & delay our preferred timeline.
+    </field>
+  </item>
