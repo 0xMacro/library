@@ -1,0 +1,66 @@
+<page
+  clientName="thirdweb"
+  reportDate="June 15th, 2023"
+  auditTitle="thirdweb A-12"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  passwordEncrypt="env:PAGE_PASS_THIRDWEB_12"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from May 2, 2023 to May 15, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>A audit handoff document provided through Notion.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash <b>(Smart Accounts):</b>
+        <code>30adb10f3f2580b15feeb600a287dec10b7dd81c</code>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash <b>(Open Edition ERC-721):</b>
+        <code>92dca09d6e621f74eb2462b8f338a15886875917</code>
+      </li>
+    </ul>
+  </content-for>
+
+<content-for name="source-code">
+
+  <p>We audited the following contracts specificially for the Smart Accounts audit:</p>
+
+  <template type="file-hashes">
+    da316fb1470e63c860c2d16bfac3eb40cbea32185e48452570ec974cddc49d4f  contracts/smart-wallet/non-upgradeable/Account.sol
+    17c47494082a575cb03558c43865109f6e1f60be68426cbbca327e7eaf100676  contracts/smart-wallet/non-upgradeable/AccountFactory.sol
+    171794c06d55dcb93f2fe5823e7919e9e8775a9e5ca3122a798aa47a026e3e11  contracts/smart-wallet/dynamic/DynamicAccount.sol
+    085c4304da3f37680f130fa67dcc5b08466d7179aca9171368f4ec19bae16705  contracts/smart-wallet/dynamic/DynamicAccountFactory.sol
+    6380fd0e2829c9a45c4329406e02bdca64538722c124bbfaee85060510668aa3  contracts/smart-wallet/managed/ManagedAccount.sol
+    67f0ab5628020eb187211f688bfaa5b35670fb982ceec13c63e0f5cfcd3ee76c  contracts/smart-wallet/managed/ManagedAccountFactory.sol
+    c2d02c5f8653736c2c243e5f6545f681822cf3ea576d6915f26b6a7b5e642122  contracts/smart-wallet/utils/AccountCore.sol
+    d6ed33b6e12321ac9d4f1dc2bccdad9cd380a55ea222f75bbfe5347ec89b22a6  contracts/smart-wallet/utils/AccountExtension.sol
+    05841a1d7f05df8113f5e3c2e692121f69c190bdc3c6072c954a9925d44ab6a2  contracts/smart-wallet/utils/BaseAccount.sol
+    3cc12e6a1ac3812fac71665f943f75c06450599d7ef596e7b6e8c5b0bfc6721e  contracts/smart-wallet/utils/BaseAccountFactory.sol
+    6118ab29cd54b45fcb51829a4ab27573ce65207836bd911a987ff8d7fe138eaf  contracts/smart-wallet/utils/BaseRouter.sol
+  </template>
+
+  <p>We audited the following contracts specificially for the Open Edition ERC-721 audit:</p>
+
+  <template type="file-hashes">
+    6aeec2162a830e9e1fef319ca22fae8cb56871960bb4ac051ab4c78e94f10d6c  contracts/OpenEditionERC721.sol
+  </template>
+</content-for>
+
