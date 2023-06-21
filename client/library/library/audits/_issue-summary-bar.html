@@ -29,7 +29,7 @@
         <else-if cond="issue.commitTree">
           <a
             class="inline-flex items-center text-green-500 dark:text-green-400 hover:text-blue-500 hover:underline"
-            href="{{page.repoUrl}}/tree/{{issue.commitTree}}"
+            href="{{ issue.commitTree.startsWith('https://') ? issue.commitTree : `${page.repoUrl}/tree/${issue.commitTree}` }}"
             title="{{issue.commitTree}}"
             target="_blank"
           >
