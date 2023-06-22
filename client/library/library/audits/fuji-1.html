@@ -1,0 +1,45 @@
+<page
+  clientName="Fuji"
+  reportDate="Jun 21, 2023"
+  auditTitle="Fuji A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Fujicracy/fuji-v2"
+  repoCommitHash="50fd0b74ccee1a73a459118e50e044a2bcfacd10"
+  passwordEncrypt="env:PAGE_PASS_FUJI_1"  
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from Feb 13, 2023 to Mar 8, 2023.
+  <p><strong>It is <span style="color:red">important</span> to note that Fuji is comparatively complex since it involves a lot of moving parts (lending, cross-chain, permits), hence we were able to find a significant number of issues.
+  Most of these issues were on the surface level, hence there is the possibility of more issues once you go deep.
+  Fixes resolution is also not ideal for these many issues, since all fixes increase the possibilities and do not allow reviewing them in isolation.
+  Considering all of this, we suggest a reaudit to Fuji team.</strong></p>
+  <p>
+  <strong>Note:</strong> Fuji has chosen to get this audit with another audit provider for a fresh perspective, which we support and consider a sensible decision.
+  This report includes fixes for critical and high issues only.</p>
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    baa296b414300783226365b71e45c63ca14ec1701a23963f6cf4f729bc23e710  BaseRouter.sol
+    a1b926a697a7b5643a6e8a93c10225aa2630c9826bcfe96c8a8aeb33adbc32a2  BaseVault.sol
+    02f7fbd7caea343a7fd1942dc4cae37adae86748b80475b8b3abd7ebceb93583  EIP712.sol
+    4a92ddfc1159c2cd8943a07aa5b7e9a69aefcc962dfa8b34e256cf65ee7d23c8  PausableVault.sol
+    05953cfd4e31ced27fe9a00dca235043055de6a711872e24cb29185ccffcdec1  ConnextRouter.sol
+    8308fb22001ad69573a297b68809a1bd0eb325de157f21a67cbc655f17a9460b  VaultPermissions.sol
+    df8abf2fb3cddada0443638f03cd1e4ffb301208e334a7bc6baa5fc304ad97fc  BorrowingVault.sol
+
+  </template>
+</content-for>
