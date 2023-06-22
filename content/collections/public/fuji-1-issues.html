@@ -1,0 +1,1668 @@
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/368</field>
+    <field name="content">
+      ## [C-1] Incorrect overloading of `_spendAllowance` allows the owner to use their allowance indefinitely.
+
+      `BaseVault.sol` intends to overload `_spendAllowance` so that it takes withdrawal allowance into consideration for `transferFrom` calls.
+  
+      However, defined function signature of `spendAllowance` in `BaseVault` :
+  
+       `_spendAllowance(address, address, address, uint256)` [(link)](https://github.com/Fujicracy/fuji-v2/blob/50fd0b74ccee1a73a459118e50e044a2bcfacd10/packages/protocol/src/abstracts/BaseVault.sol#L197)
+  
+      is different from the function signature ERC20 expects or calls:
+  
+      `_spendAllowance(address, address, uint256)` [(](https://github.com/Fujicracy/fuji-v2/blob/50fd0b74ccee1a73a459118e50e044a2bcfacd10/packages/protocol/src/abstracts/BaseVault.sol#L197)[link)](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/5e76b2622546a2e42e5c19e4ce1a96ee2691c7fe/contracts/token/ERC20/ERC20.sol#L324)
+  
+      Therefore, if someone executes a `transferFrom`, it will call the vanilla ERC20's `spendAllowance`, without taking withdrawal allowances into consideration. This allows owners to transfer shares to a new address using `transferFrom`, while still retaining their withdrawal balance.
+  
+      **POC**
+      
+      ```
+          // VaultPermissions.t.sol
+          function test_spend_allowance_issue() public {
+       
+              do_deposit(1 ether, vault, owner);
+      
+              vm.startPrank(owner);
+              vault.approve(receiver, 1 ether);   
+              uint256 state1 = vault.allowance(owner, receiver);
+              vm.stopPrank();
+          
+              vm.startPrank(receiver);
+              vault.transferFrom(owner, receiver, 1 ether);
+              uint256 state2 = vault.allowance(owner, receiver);
+          
+              assertEq(state1, state2);
+            }
+      ```
+      
+  
+      **Remediation to consider:** 
+  
+      Consider overloading `spendAllowance` with the right function signature.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Theft of User Assets</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/425</field>
+    <field name="content">
+      ## [C-2] Using `SWAP` as an action, anyone can steal user's funds from router
+
+      Fuji allows users to do multiple actions through the router. 
+      There is a beneficiary check defined on multiple actions like withdraw, borrow, to ensure that the actions benefit the actual owner of the bundle.
+  
+      However, no such check is being made for SWAP action, allowing someone to steal those funds.
+  
+      For example.
+  
+      ```
+      The user gives the router an allowance to withdraw, off-chain through signature. 
+      Someone can now use this signature for their benefit using swap. 
+  
+      1. Permit Withdraw
+      Allowance
+      operator = router, owner = user, receiver = router
+  
+      2. Withdraw from the vault to the router.
+      Set the beneficiary to be the owner.
+      
+      3. Call swap from collateral token to different token, 
+      with the receiver being the attacker.
+      
+      Exit
+      ```
+  
+      **Remediation to consider:**
+  
+      Consider adding a beneficiary check for swap action and consider whitelisting swappers.
+  
+      Whitelisting swappers is necessary because the swapper is user input. 
+      Without whitelisting, a user could pass a dummy swapper and trick your contract into thinking that the beneficiary is what the contract expects. However, the user could then do whatever they want inside, allowing them to get away with tokens.
+  
+      In general, it is recommended to whitelist all external addresses that are being called, Vaults, Swappers, and Flashers. Not doing so has created multiple issues, as seen in this report. For example, check C-3.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Theft of User Assets</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/425</field>
+    <field name="content">
+      ## [C-3] Using the user’s router allowance, anyone can steal user’s funds
+    
+      A vault is a user input for all actions of the router bundle.
+  
+      Suppose Alice gives the router an allowance to spend 1000 tokens and intends to deposit these tokens into vault X. An attacker who sees Alice's approval in the mempool can front-run Alice's deposit with their own bundle.
+  
+      To pass the checks of _safePullTokenFrom, they pass sender and receiver both as Alice only. However, please note that the vault is user-input, so anyone can pass anything there and make you believe Alice is the receiver when she is not. This way, anyone can use anyone's allowance and run away with their funds.
+  
+      ```
+      // DEPOSIT
+      // sender = receiver = user
+      (IVault vault, uint256 amount, address receiver, address sender) =
+                abi.decode(args[i], (IVault, uint256, address, address));
+      ----
+      _safePullTokenFrom(token, sender, receiver, amount);
+      ----
+      vault.deposit(amount, receiver);
+  
+      ----------------------------
+      function _safePullTokenFrom(
+          address token,
+          address sender,
+          address owner,
+          uint256 amount
+      )
+      internal
+      {
+          if (sender != address(this) && (sender == owner || sender == msg.sender)) {
+            ERC20(token).safeTransferFrom(sender, address(this), amount);
+          }
+      }
+      ```
+  
+      **Remediation to consider:**
+  
+      Consider whitelisting vaults and verifying that the sender is equal to `msg.sender` inside `_safePullTokenFrom`. 
+      Implementing both changes would reduce the possible exposure to the contract due to user input and ensure that the sender is the actual user performing the transaction
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Theft of User Assets</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/425</field>
+    <field name="content">
+      ## [C-4] Frontrunning `Permit` allows the user to do a different set of actions than the beneficiary intended and, in the worst case run away with funds
+  
+      The router contract tries to make sure that beneficiary should remain the same, but there is no validation to check if the actions being performed are the ones user intended.
+  
+      Consider Alice sets withdraw allowance for router through permit and intends to send it to the vault of Chain B.
+  
+      Anyone can use this Alice permit and do a totally different set of actions.
+      They can `xCall` and bridge this asset to some random chain.
+  
+      ```
+      Alice's Intended Bundle 
+      1. PermitWithdraw(Owner=Alice, Operator= Router, Receiver= Router)
+      2. Withdraw (Beneficiary = Alice)
+      3. xCallWithCalldata(ChainB, Deposit(receiver=alice)) (Beneficiary = Alice)
+  
+      It is possible to create a different bundle using the same permit.
+      1. PermitWithdraw(Owner=Alice, Operator= Router, Receiver= Router)
+      2. Withdraw (Beneficiary = Alice)
+      3. xCall(any random chain, receiver = Alice) (Beneficiary = Alice)
+      ```
+  
+      Fuji Team responded to this lead with following :</br>
+      **Response:**
+  
+      <aside><i>
+      We have referred to these situations as front-running a permit. We believe we have put some measures in place, perhaps not enough.
+      We ensure that the beneficiary remains the same.
+      When calling the withdraw action, the beneficiary is set to the owner. Then when attempting to bridge the _beneficiary will be checked and `_internalBundle` will revert.
+      </i>
+      </aside>
+
+      It is true that the beneficiary, Alice, in this case, remains the same. 
+      However, it is not guaranteed that only Alice's intended actions will be done using her permit. 
+      This significantly impacts user experience, which directly interferes with the core intention of the Fuji protocol: bundling user actions through debt permits to enable cross-chain functionality.
+  
+      Not only is this a user experience issue, but there are also ways attackers can steal from Alice, keeping `Beneficiary=Alice` only
+  
+      1. An attacker can manipulate the swap parameters of a swap action since they are user input. They can either add a swap action on top of Alice's bundle or edit it if it's already there.
+      
+          Currently, there is no check on the beneficiary as explained in [C-2].
+          However, even if you add check, the exposure to this issue remains.
+      
+          ```
+          (
+              ISwapper swapper,
+              address assetIn,
+              address assetOut,
+              uint256 amountIn,
+              uint256 amountOut,
+              address receiver,
+              address sweeper,
+              uint256 minSweepOut
+          ) = abi.decode(
+              args[i],
+              (
+                  ISwapper,
+                  address,
+                  address,
+                  uint256,
+                  uint256,
+                  address,
+                  address,
+                  uint256
+              )
+          ); // @audit one can basically tweak any parameter of this as of now
+          ```
+      
+          a. Sandwich Attack
+          
+          An attacker can allow very high slippage for Alice's action and sandwich their own action in between. They can even change the `assetOut` address to select the pool with the lowest liquidity.
+          
+      
+          b.  Sweeper Attack
+      
+          An attacker can set the `amountOut` to a very low value, set themselves as the sweeper, and run away with leftover `amountIn` (user funds). 
+      
+          There is no check on who the sweeper could be.
+          With the right parameters, attackers can steal nearly everything. 
+      
+          Please note that in both cases, the beneficiary or receiver can remain the same.
+      
+  
+      2. Another way is not as easy as the method described above, but the attacker can basically pass any amount of slippage in `xCalls` and sandwich them on the destination.
+  
+      To sum up, simply checking the beneficiary is not enough. Many other parameters can impact the amount received by the beneficiary and benefit the attacker.
+  
+      **Remediation to consider:**
+      Consider embedding the hash of actions the user intends to perform with their arguments inside the signature. This would resolve many of the issues mentioned in the report.
+  
+      For example, there would no longer be a need to whitelist swapper, flasher, or vault. C-2 & C-3
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Theft of User Assets</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/389</field>
+    <field name="content">
+      ## [C-5] `Reentrancy` allows anyone to modify beneficiary between the bundle and steal assets
+  
+      Currently, all the external calls from the router are unprotected. This means that the executor can pass `swapper`, `flasher`, and `vault` as anything they like and re-enter.
+  
+      Even if Fuji whitelist `swapper`, `vault`, and `flasher` as solution to other critical issues of this report, 
+      there are two legitimate ways users can still re-enter: the flasher callback and withdrawing ETH.
+  
+      While the flasher reentrancy is intended, the contract currently doesn’t handle it correctly.
+      It allows the executor to change beneficiary once it's set between the bundle.
+  
+      For example:
+  
+      ```
+      beneficiary and tokensToCheck are state variables
+  
+      bundle #PARENT
+      some action: beneficiary: X
+      flasher:
+          reenter with child bundle  #CHILD
+          need to do some action for beneficiary X only,
+          since checkBeneficiary would only allow for X
+          this child bundle is done with execution
+          so it would set beneficiary ,tokenToCheck to 0 in the end
+          https://github.com/Fujicracy/fuji-v2/blob/50fd0b74ccee1a73a459118e50e044a2bcfacd10/packages/protocol/src/abstracts/BaseRouter.sol#L285
+  
+      #PARENT
+      return to the parent bundle
+      and there you go; 
+      since beneficiary is set to address(0).
+      one can can set beneficiary to any address
+      ```
+  
+      The cause of the issue is that beneficiary and "tokensToCheck" are state variables. Since they are state variables, the state cleared in the child is also considered cleared for the parent. 
+  
+      **Remediation to consider:**
+      To resolve this, consider making `beneficiary` and `tokensToCheck` memory variables instead.
+  
+      Memory for each call is different, unlike storage. Hence, both the parent and child will have their own isolated `beneficiary` and `tokensToCheck`. This not only solves the problem but also significantly reduces the gas costs involved due to the use of memory instead of storage.
+  
+      If you decide to go this route, please add a check inside the "flashloan" action that confirms the first action in  `requestorCalldata`  is the same as the one in the parent bundle, similar to how it's done in `_crossTransferWithCalldata`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">3rd Party Behavior</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/376</field>
+    <field name="content">
+      ## [H-1] Someone can execute a Denial of Service on Fuji’s Borrowing vault.
+  
+      Multiple lending providers offer the option to repay a loan on someone else's behalf. 
+      For example, [Aave V2](https://github.com/aave/protocol-v2/blob/ce53c4a8c8620125063168620eba0a8a92854eb8/contracts/protocol/lendingpool/LendingPool.sol#L236) allows this feature.
+  
+      ```
+      contracts/protocol/lendingpool/LendingPool.sol#L236
+  
+      function repay(
+          address asset,
+          uint256 amount,
+          uint256 rateMode,
+          address onBehalfOf
+        ) external override whenNotPaused returns (uint256) {
+          DataTypes.ReserveData storage reserve = _reserves[asset];
+      ```
+  
+      It's possible for someone to leverage this feature and pay off vault debts. 
+      The Fuji vault currently does not handle this case, halting both borrowing and payback, locking collateral for borrowers.
+  
+      The reason is `convertDebtToShares` would revert due to division by 0
+  
+      ```
+      function _convertDebtToShares(
+          uint256 debt,
+          Math.Rounding rounding
+        )
+          internal
+          view
+          returns (uint256 shares)
+        {
+          uint256 supply = debtSharesSupply;
+          return (debt == 0 || supply == 0) ? debt : debt.mulDiv(supply, totalDebt(), rounding);
+        }
+  
+      ```
+  
+      While paying a vault's debt is theoretically possible, one may question why someone would do so.
+  
+      We acknowledge that it is less probable for individuals to pay off significant debts, but in the early stages of the vault, when the debt is minimal or even worth 1 wei, one can pay it on the vault's behalf and execute a denial of service on further debt actions on the vault for a lifetime.
+  
+      The only option for Fuji in this scenario would be to redeploy the vault and hope that attackers do not grief it again.
+  
+      **Remediation to consider:**
+  
+      We couldn't come up with an ideal isolated solution to this problem. 
+      Please let us know if you have any ideas.
+  
+      There are some possible ways, like considering shares to mint equal to debt only in `_convertDebtToShares`, like it's done if the supply of shares is zero. 
+      However, this approach would distribute the new debt position over all previous borrowers, which is not ideal and could create additional complexity and attack vectors.
+  
+      Instead, as mitigation after deployment, consider borrowing a significant amount yourself to reduce the likelihood of someone repaying the vault's debt on their own. 
+      Even in the extreme case where someone pays off the entire vault's debt, users should still be able to withdraw their funds.
+      Consider adding a test for same.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Accounting</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/398</field>
+    <field name="content">
+      ## [H-2] Partial Liquidations won't be possible for vaults with the collateral asset of decimals < 18
+  
+      The `liquidate` function of Fuji's borrowing vault has the following code:
+  
+      ```
+      uint256 price = oracle.getPriceOf(debtAsset(), asset(), _debtDecimals);
+      uint256 discountedPrice = Math.mulDiv(price, LIQUIDATION_PENALTY, 1e18);
+      gainedShares = convertToShares(Math.mulDiv(debt, liquidationFactor, discountedPrice));
+      ```
+  
+      The purpose of `gainedShares` is to calculate the number of shares a liquidator should receive for paying an owner's debt. 
+      Ideally, it should be done like this:
+  
+      ```jsx
+      debtToCover = debt * liquidationFactor / 1e18
+  
+      If 1 * 10 ** assetDecimals is worth this much price,
+      then how many assets are equivalent to debtToCover?
+  
+      1 * 10 ** assetDecimals = price
+      ? = debtToCover
+  
+      gainedAssets = debtToCover * 10 ** assetDecimals / price
+                               = debt * liquidationFactor * 10 ** assetDecimals / price * 1e18
+  
+      ```
+  
+      However, Fuji's current implementation needs to be corrected since it ignores both offsets.
+      `Math.mulDiv(debt, liquidationFactor, discountedPrice);`
+  
+      ```jsx
+      gainedAssets = debt * liquidationFactor / price
+      ```
+  
+      Nearly all widely used ERC20s have decimals ≤ 18. 
+      There won't be any issue for tokens with decimals = 18 since the numerator and denominator would cancel each other out. 
+      However, for all tokens with decimals < 18, Fuji would overestimate the gained shares and hence would assign `gainedShares` equal to the total balance of the owner due to the following check:
+  
+      ```
+      if (gainedShares > existingShares) {
+            gainedShares = existingShares;
+      }
+      ```
+  
+      If the concerned liquidation is whole, liquidation will go untroubled. 
+  
+      However, if the liquidation is partial, then it would revert while burning owner shares since you cannot burn all owner shares until all the owner's debt is paid.
+  
+      **Remediations to consider:**
+  
+      Consider applying proper offsets `10 ** 18 / 10 ** assetDecimals` for gained asset calculation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Design</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/397</field>
+    <field name="content">
+      ## [H-3] Setting fixed values for `maxLTV` and `liqRatio` initially exposes the vault to liquidation.
+
+      Fuji aims to support a diverse range of pairs for its borrowing vaults. Ideally, Fuji intends to be more conservative than its providers by setting `maxLTV` and `liqRatio` to comparatively lower values to avoid liquidations.
+  
+      However, in the current implementation of the borrowing vault, both `maxLTV` and `liqRatio` are defined to a fixed value with the option of changing them later through timelock. 
+  
+      ```
+      constructor(
+          address asset_,
+          address debtAsset_,
+          address oracle_,
+          address chief_,
+          string memory name_,
+          string memory symbol_,
+          ILendingProvider[] memory providers_
+        )
+          BaseVault(asset_, chief_, name_, symbol_)
+        {
+         ----
+          maxLtv = 75 * 1e16; // @audit 
+          liqRatio = 80 * 1e16; // @audit 
+       -------
+        }
+      ```
+  
+      There are two cases to consider:
+  
+      1. **If the initial fixed ratios (Fuji) are less than the planned and provider ratios:**
+      This won't create any issues and will only limit borrowers until timelock acts.
+      2. **If the initial fixed ratios (Fuji) are greater than the planned and provider ratios:** 
+      Since the provider sees only one debt position from their point of view, borrowers can borrow more than what the provider would itself have allowed for their collateral. This is because they can use someone else's collateral, potentially exceeding the planned limit.
+      
+          At least one or both of the following would happen
+      
+          - The market moves, and the vault gets liquidated.
+          The current implementation does not have a way to penalize borrowers if the vault is liquidated. The loss is borne by all holders, including users who did not borrow anything. This makes the situation worse.
+          - Once the timelock is activated, the borrower would be liquidated. Some may argue that this is unfair.
+  
+      **Remediation to consider:**
+  
+      Consider defining both `maxLTV` and `liqRatio` during construction depending on the token pair.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Design</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/402</field>
+    <field name="content">
+      ## [H-4] Partial Liquidations may not be possible in some cases due to check in `beforeTokenTransfer`
+
+      In certain cases, partial liquidations may not be possible, and the vault will remain vulnerable until the health factor drops below `FULL_LIQUIDATION_THRESHOLD`.
+  
+      For example, consider the following scenario:
+  
+      ```
+      1. 
+      Alice's collateral is worth $4000, and she has borrowed 2 assets of $1500 each,
+      With a maximum loan-to-value ratio of 75% and liquidation ratio of 80%.
+  
+      Collateral: $4000
+      Debt: 2 * ($1500)  
+  
+      2. 
+      Debt asset's price increases to $1650
+      Collateral: $4000
+      Debt: 2 ($1650)
+      The health factor: 4000 * 0.80/ 3300 = 0.96969697 > 0.95
+      Vault intends to liquidate half of the debt position.
+  
+      The assets liquidator would get
+      1 (half debt) * 1650 / 0.9 (liq discount) = 1833.333333333
+      Alice still has a debt of 1 * 1650, 
+      Which by 0.75 LTV, utilizes 2200 of Alice's collateral.
+  
+      maxRedeem for Alice = 4000 - 2200 = 1800
+      What Alice need to pay to the liquidator = 1833.33
+  
+      1833 > 1800
+      Code Reverts !! On this [line](https://github.com/Fujicracy/fuji-v2/blob/1b939ec84af137db430fc2aa1b4c6f15e5254003/packages/protocol/src/abstracts/BaseVault.sol#L594)
+  
+      **BaseVault.sol#L594**
+      function _beforeTokenTransfer(address from, address to, uint256 amount) internal view override {
+          to; 
+          if (from != address(0)) {
+          #L594 require(amount <= maxRedeem(from), "Transfer more than max");
+          }
+      }
+      ```
+  
+      **Remediation to consider:** 
+  
+      Consider adding a pass for this case inside `_beforeTokenTransfer`.
+      Please note that it cannot be skipped for all burns, as the withdraw relies on the burning of tokens to determine the amount of collateral a user can withdraw.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unrestricted Access</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/419</field>
+    <field name="content">
+      ## [H-5] Anyone can override the handler records using the same `trasnferId` and failing bundle
+
+      If `try this.xBundle(actions, args)` fails inside `xReceive` of the router, and the contract has dormant funds; a record is made inside the handler in the name of `transferId`, and funds are transferred there.
+  
+      However, since anyone can call `xReceive`, one can call it with the same `transferId` later, make the bundle fail on purpose, and override the content inside the handler.
+  
+      **Remediation to consider:** 
+  
+      Consider quering `connext` to check if the `transferId` passed is already processed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">MEV</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/484</field>
+    <field name="content">
+      ## [H-6] Executor of a bundle containing `_crossTransfer` can  execute a sandwich attack on the destination
+  
+      The `_crossTransfer` and `_crossTransferWithCalldata` functions pass `msg.sender` as `delegate` in `xCall`. 
+  
+      This means that `msg.sender` would have complete control over slippage on the destination; they can increase or decrease it to any number they like. 
+      For more information, see: https://docs.connext.network/developers/reference/contracts/calls#xcall
+  
+      ```
+      function _crossTransfer(bytes memory params) internal override {
+        ----
+          ----
+          bytes32 transferId = connext.xcall(
+            // _destination: Domain ID of the destination chain
+            uint32(destDomain),
+            // _to: address of the target contract
+            receiver,
+            // _asset: address of the token contract
+            asset,
+            // _delegate: address that has rights to update the original slippage tolerance
+            // by calling Connext's forceUpdateSlippage function
+            **msg.sender,** 
+            // _amount: amount of tokens to transfer
+            amount,
+            // _slippage: can be anything between 0-10000 becaus
+            // the maximum amount of slippage the user will accept in BPS, 30 == 0.3%
+            slippage,
+            // _callData: empty because we're only sending funds
+            ""
+          );
+          emit XCalled(transferId, msg.sender, receiver, destDomain, asset, amount, "");
+        }
+      ```
+  
+      This is okay in the case of `_crossTransferWithCalldata` since it has its own slippage protections in calldata.
+  
+      However, for `_crossTransfer`, this allows executor of the bundle to set slippage to the maximum and sandwich the call.
+  
+      ```
+      function forceUpdateSlippage(TransferInfo calldata _params, uint256 _slippage) 
+      external onlyDelegate(_params) {
+  
+      https://github.com/connext/monorepo/blob/1f1aa5f845581d5b1050a0f693f19b45d69c7056/packages/deployments/contracts/contracts/core/connext/facets/BridgeFacet.sol#L423
+      ```
+  
+      **Remediations to consider:**
+      Consider passing a delegate as the beneficiary instead of `msg.sender`. 
+      However, please note that if the beneficiary is a contract, it may not have the ability to update this slippage when necessary.
+  
+      If liquidity conditions do not improve, the funds may remain stuck in the Connext bridge.
+  
+      If your use case involves contract addresses as beneficiaries in `_crossTransfer`, consider passing `tx.origin` as a delegate if the beneficiary is contract.
+  
+      Or
+  
+      Consider passing Fuji’s timelock address as a delegate.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec Break</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Fujicracy/fuji-v2/pull/410</field>
+    <field name="content">
+      ## [H-7] Incorrect handling of `requesterCallData` for Flashloan action inside `_getBeneficiaryFromCalldataof` the router
+  
+      When a Flashloan action is executed, the `requesterCallData` parameter is extracted from the calldata and passed to the `_getBeneficiaryFromCalldata` function again. 
+      (Decode B in the following code)
+  
+      ```
+      function _getBeneficiaryFromCalldata(bytes memory callData)
+          internal
+          pure
+          returns (address beneficiary)
+      {
+          **// Decode A**
+        (Action[] memory actions, bytes[] memory args,) =
+            abi.decode(callData, (Action[], bytes[], uint256));
+        ------
+          } else if (actions[0] == Action.Flashloan) {
+                  **// Decode B**
+            (,,,, bytes memory requestorCalldata) =
+              abi.decode(args[0], (IFlasher, address, uint256, address, bytes));
+            beneficiary = _getBeneficiaryFromCalldata(requestorCalldata);
+          } 
+        --------
+      }
+      ```
+  
+      To decode the `requesterCallData` into actions and arguments inside this second `_getBeneficiaryFromCalldata` call, the following encoding would be used at Decoding A. 
+  
+      ```
+      (Action[] memory actions, bytes[] memory args,) = 
+      abi.decode(callData, (Action[], bytes[], uint256));
+      ```
+  
+      However, the `requesterCallData` of the Flasher has a different format than 
+      `(Action[], bytes[], uint256)` , it is:
+  
+      ```
+      **(BaseRouter.xBundle.selector, Actions[], bytes[])**
+      ```
+  
+      This means that the decoding process would fail at point A, and the router would not be able to bridge calldata with Flashloan as its first position.
+  
+      This is problematic because having Flashloan as the first action is necessary for some of Fuji's use cases, such as closing a position with Flashloan.
+  
+      **Remediation to consider:** 
+  
+      Consider refactoring `_getBeneficiaryFromCalldata` to accommodate the Flashloan action.
+  
+      One way of doing so is 
+  
+      ```
+  
+      **_crossTransferWithCalldata**
+               decode calldata into actions and args 
+               _getBeneficiaryFromActionsAndArgs
+  
+      **_getBeneficiaryFromActionsAndArgs**
+      (Action[] memory actions, bytes[] memory args)
+      {
+          -- FlashloanCase
+            (,,,, bytes memory requestorCalldata) =
+              abi.decode(args[0], (IFlasher, address, uint256, address, bytes));
+              
+                  (, Action[] memory actions, bytes[] memory args) =
+            abi.decode(requestorCalldata, (BaseRouter.xBundle.selector, Actions[], bytes[]));
+            beneficiary = _getBeneficiaryFromCalldata(actions, args);
+          } 
+       --------
+      }
+  
+      ```
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Share Value Manipulation</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-1] Fuji’s vault would remain vulnerable to an inflation attack despite the explicit measures taken
+  
+      There is one widely known issue regarding the front-running of the first deposit.
+      Fuji team is already aware of this and mentions the same on [L85](https://github.com/Fujicracy/fuji-v2/blob/1b939ec84af137db430fc2aa1b4c6f15e5254003/packages/protocol/src/abstracts/BaseVault.sol#L85) of the base vault, and has added a `minAmount` protection against it. 
+      However, it's not enough since one can deposit `minAmount`, withdraw it such that only 1 wei of assets remain in the contract, and then sandwich the first deposit.
+  
+      **Remediation to consider:**
+      Contract Changes:
+  
+      1. Consider defining state variables to track balances instead of `.balanceOf`
+      2. Represent shares with more precision/decimals than assets ([refer openzeppelin’s discussion](https://ethereum-magicians.org/t/address-eip-4626-inflation-attacks-with-virtual-shares-and-assets/12677#proposed-mitigation-3))
+  
+      Or
+      Consider depositing some amount into the vaults on your own when they are deployed and leave it there. 
+      This will ensure that the total supply of shares will always remain at a certain level.
+  
+      Other solutions, like minting dead shares to zero address, are suboptimal, as explained in this [MixBytes](https://mixbytes.io/blog/overview-of-the-inflation-attack) Blog Post. 
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Accounting</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-2] Incorrect Rounding for Shares/Assets/Debt Calculation
+  
+      All rounding should be done considering the best result for the vault and the worst result for users so that someone cannot take advantage of the vault with consecutive actions without losing any value. However, Fuji vaults perform incorrect rounding in multiple instances (all instances listed [here](https://www.notion.so/Issues-46dde2fad9c7487b9888b3838b02153c?pvs=21)), allowing users to extract more than their contribution.
+  
+      For example, consider Fuji's `previewWithdraw` function, which rounds down instead of rounding up:
+  
+      ```jsx
+      Shares (Alice) = 50
+      TotalSupplyShares = 100
+      TotalAssets = 200
+      ```
+  
+      Alice calls withdraw for one asset,
+  
+      `previewWithdraw` (round down): the number of shares to be burned is `(1 * 100) / 200 = 0`.
+  
+      Hence, Alice can theoretically keep withdrawing one worth of assets without burning any shares. Although the associated gas costs won't make this trade feasible, it breaks the invariant. Hence we classified this issue as a medium rather than high.
+  
+      **Remediation to consider:**
+  
+      Consider reversing rounding in the following cases:
+  
+      1. `previewWithdraw`: Round up. You want to burn the maximum number of shares for given assets.
+      2. `previewMint`: Round up. You want to pull the maximum number of assets for given shares.
+      3. `borrow`:
+  
+      [fuji-v2/BorrowingVault.sol at main · Fujicracy/fuji-v2](https://github.com/Fujicracy/fuji-v2/blob/main/packages/protocol/src/vaults/borrowing/BorrowingVault.sol#L235)
+  
+      `uint256 shares = convertDebtToShares(debt);`
+  
+      Round up. You don't want users to add debt to the vault without getting shares for it.
+  
+      1. `_computeMaxBorrow` :
+  
+      [fuji-v2/BorrowingVault.sol at 6231dd1161602cc4b081fd2bab621fa6a3cb9394 · Fujicracy/fuji-v2](https://github.com/Fujicracy/fuji-v2/blob/6231dd1161602cc4b081fd2bab621fa6a3cb9394/packages/protocol/src/vaults/borrowing/BorrowingVault.sol#L351)
+  
+      `uint256 debt = convertToDebt(debtShares);`
+  
+      Round up. You want the user to borrow the least possible.
+  
+      1. `_computeFreeAssets`:
+  
+      [fuji-v2/BorrowingVault.sol at main · Fujicracy/fuji-v2](https://github.com/Fujicracy/fuji-v2/blob/main/packages/protocol/src/vaults/borrowing/BorrowingVault.sol#L365)
+  
+      `uint256 debt = convertToDebt(debtShares);`
+  
+      Round up. You want the user to be responsible for the maximum debt.
+  
+      1. `getHealthFactor` :
+  
+      [fuji-v2/BorrowingVault.sol at main · Fujicracy/fuji-v2](https://github.com/Fujicracy/fuji-v2/blob/main/packages/protocol/src/vaults/borrowing/BorrowingVault.sol#L557)
+  
+      `uint256 debt = convertToDebt(debtShares)`
+  
+      Round up. You want to factor in the maximum possible debt.
+  
+      1. `liquidate` :
+  
+      [fuji-v2/BorrowingVault.sol at main · Fujicracy/fuji-v2](https://github.com/Fujicracy/fuji-v2/blob/main/packages/protocol/src/vaults/borrowing/BorrowingVault.sol#L604)
+  
+      `uint256 debt = convertToDebt(_debtShares[owner]);`
+  
+      Round up. You want the liquidator to cover the maximum possible debt for given shares.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec Break</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-3] Vaults Cannot Reach Their Deposit Cap
+  
+      Both methods of depositing assets into the vault (deposit and mint) have the following check to revert if the deposit exceeds the deposit cap:
+  
+      ```
+      if (shares + totalSupply() > maxMint(receiver)) { // @audit issue
+            revert BaseVault__deposit_moreThanMax();
+      }
+      ```
+  
+      However, due to double accounting of `totalSupply`, the vault can never reach its deposit cap.
+  
+      `maxMint` is derived from `maxDeposit`, and `maxDeposit` is calculated as `depositCap - totalAssets`.
+  
+      Therefore, `maxMint` calculates the number of shares the vault can mint from that point onwards, not the maximum number of shares it can mint during its lifetime. Hence, the addition of total supply in the following line is redundant and problematic: `shares + totalSupply() > maxMint(receiver)`.
+  
+      Consider a deposit cap of 100 tokens. Someone makes the first deposit of 10 tokens, resulting in a total supply of 10 tokens. Now, if someone wants to deposit 89 tokens, it should ideally be allowed, but it cannot be done due to this issue.
+  
+      ```
+      Second deposit: 89
+      To mint: 89
+      Shares + totalSupply() > maxMint(receiver)
+      89 + 10 > 100 - 10
+      99 > 90
+      And it reverts!
+      ```
+  
+      **This makes the resultant deposit cap half of the defined one.** To mitigate this issue, one can still increase the deposit cap. Therefore, we classify it as a medium severity rather than high.
+  
+      **Remediation to consider:**
+  
+      Consider removing `totalSupply` from `shares + totalSupply() > maxMint(receiver)`
+      check.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec Break</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-4] Vaults max__ functions fail to comply with EIP-4626
+  
+      ### Case 1:
+  
+      According to [EIP-4626](https://eips.ethereum.org/EIPS/eip-4626), the `maxDeposit`, `maxWithdraw`, `maxMint`, `maxRedeem` functions must return 0 even when the corresponding actions are temporarily disabled.
+  
+      However, in Fuji vaults, this is not considered and all functions would still return actual value even if vaults are paused.
+  
+      Although this is not an issue for Fuji vaults, since the pause is later enforced in the code, developers building on top of Fuji vaults may expect the EIP behavior and not handle it explicitly, leading their code down an unexpected path.
+  
+      **Remediation to consider:**
+  
+      Consider returning 0 if vaults are paused for `maxDeposit`, `maxWithdraw`, `maxMint`, and `maxRedeem`. Please note that `maxBorrow` is not part of EIP-4626, but as it takes inspiration from EIP, consider returning 0 for it as well.
+  
+      ### **Case 2:**
+  
+      According to [EIP-4626](https://eips.ethereum.org/EIPS/eip-4626#maxdeposit) , the `maxDeposit` must not revert. However, it will eventually revert in the case of Fuji Vaults.
+  
+      ```
+      function maxDeposit(address) public view virtual override returns (uint256) {
+          return depositCap - totalAssets(); 
+      }
+      ```
+  
+      Total assets in vaults can increase through two means: deposits and yield. Therefore, once yield begins to accumulate, total assets could exceed the deposit cap, even if no new deposits are made.
+  
+      This presents a problem for `maxDeposit` as it would underflow and revert. This could have an impact on protocols built on top of Fuji vaults, as their code assumes that `maxDeposit` will never revert.
+  
+      **Remediation to consider:**
+  
+      Consider adding this check before performing the subtraction.
+  
+      `if (totalAssets >= depositCap) return 0 ;`
+  
+    
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Lack of Checks</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-5] `Rebalance` allows breaking defined conservative `maxLTV` and liquidation ratio
+  
+      Fuji aims to maintain a conservative `maxLTV` and liquidation ratio compared to other lending providers to avoid liquidation of the vault's debt position. However, the current `Rebalance` function allows for rebalancing with any number of collateral and debt, which breaks this invariant.
+  
+      Currently, the `RebalancerManager` performs checks for assets and debts on `L57` and `L62`. Both checks verify that the vault holds the number of assets and debts being moved, but there is no check on the ratio of assets and debts being moved. 
+  
+      For example, suppose the vault intends to maintain `maxLTV` at 50%. In one provider, the vault's debt position is 100 worth of assets as collateral and 50 worth of assets as debt. During rebalancing, the rebalancer role holder can move 30 value of collateral assets to another provider and keep the previous provider at a ratio of `70(collateral):50(debt)`, breaking the assumption of Fuji that they will always have conservative ratios compared to actual providers.
+  
+      This increases the likelihood of vault liquidation.
+  
+      Currently, using rebalance, one can move the debt positions in any way until actual providers allow. 
+  
+      **Remediation to consider:**
+  
+      Consider adding a check to ensure that the ratio of assets to debt remains the same during rebalance.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">ERC20 Variations</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-6] For some assets, `_setProviders` will revert if new providers overlap with previous ones.
+  
+      The `_setProviders` function has two purposes: setting the providers array with a new set of providers and giving maximum approval for vault assets to all of the new providers.
+  
+      ```
+      function _setProviders(ILendingProvider[] memory providers) internal override {
+          uint256 len = providers.length;
+          for (uint256 i = 0; i < len;) {
+           ----
+            IERC20(asset()).approve(
+              providers[i].approvedOperator(asset(), asset(), debtAsset()), type(uint256).max
+            );
+            IERC20(debtAsset()).approve(
+              providers[i].approvedOperator(debtAsset(), asset(), debtAsset()), type(uint256).max
+            );
+          ----  
+          }
+          _providers = providers;
+              -------
+      }
+      ```
+  
+      This code works for normal tokens, but for tokens that revert on `approve` if they already have an allowance, it will revert.
+  
+      For example, `USDT`.
+      If a new set of providers have even one provider from the previous, it will revert.
+  
+      **Remediation to consider:**
+  
+      Consider resetting `allowance` to 0 before setting it to the max. 
+      or
+      Consider using `[forceApprove](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/4fb6833e325658946c2185862b8e57e32f3683bc/contracts/token/ERC20/utils/SafeERC20.sol#L82)` from the OZ [SafeERC20 library](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/4fb6833e325658946c2185862b8e57e32f3683bc/contracts/token/ERC20/utils/SafeERC20.sol#L82).
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-7] The slippage check on the destination is only done if the first action is deposit/withdrawal
+  
+      The slippage check is only performed if the first action is a deposit or withdrawal, not for all actions.
+  
+      ```
+      ConnextRouter.sol
+      _accountForSlippage()
+      if (action == Action.Deposit || action == Action.Payback)
+      ```
+  
+      This covers all cases where a user bridges an asset, except in cases where the received funds are used in a nested action. 
+      For example:
+      1. `xReceive` with X amount of funds. 
+      2 .Bundle :
+      `1. permitWithdraw() 2. withdraw(Y) 3. xCallWithCallData(Deposit (X + Y))`
+  
+      Fuji Team responded to this lead with following :
+      **Response:**
+  
+      In this case after the 3rd action xCallwithCallData, on the destination chain the slippage will be checked on a deposit. 
+  
+      While it is true that slippage would be checked at the final destination, that check would occur for X+ Y in terms of nested `xCall` slippage parameters, not on X in terms of the initial `xCAll`. Therefore, the contract would accept any X slippage and execute an `xCall` to the final destination, missing a required check on the first level.
+  
+      If X + Y does not fall within the slippage range, the call would revert at the final destination. However, the user's position on the middle chain would already be withdrawn, and they would be unable to take any action to rectify the situation.
+  
+      **Remediation to consider:**
+      Consider checking for slippage in `xReceive` whenever the contract receives any funds.
+  
+      To avoid looping through all actions to get the amount, consider sending `AmountMinOut` instead of `slippage` in calldata.
+  
+      Please note if you decide to solve
+       [[M-8] If liquidity conditions don't improve on the destination, the hardcoded slippage protections of `_crossTransferWithCalldata` won’t allow adapting. 
+      ](https://www.notion.so/M-8-If-liquidity-conditions-don-t-improve-on-the-destination-the-hardcoded-slippage-protections-of-7ab7f6faba6f4f6d803926a5af501849?pvs=21)by removing the explicit slippage protection, this issue won't be applicable anymore.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-8] If liquidity conditions don't improve on the destination, the hardcoded slippage protections of `_crossTransferWithCalldata` won’t allow adapting.
+  
+      If the liquidity currently available on the destination is causing slippage more than what the user specified while doing `xCall`, the call will revert.
+  
+      Connext currently exposes two options for users to mitigate it :
+      https://docs.connext.network/developers/guides/handling-failures#high-slippage
+  
+      - Wait it out until slippage conditions improve (relayers will continuously re-attempt the transfer execution).
+      - Increase the slippage tolerance.
+  
+      The first option is still possible in the case of `_crossTransferWithCalldata` of Fuji’s router.
+  
+      However, **the second is not,**  since slippage is hardcoded inside the calldata, and checked using `_accountForSlippage`.
+  
+      Hence in the worst case, if slippage conditions don't improve or if the user bundles action with very low slippage, the `xCall` would keep failing.
+  
+      **Remediations to consider:**
+  
+      Please check with the Connext team to see if any attack vectors require you to have your own slippage protection. If none exist, consider relying on Connext's slippage protection instead of doing your calculations.
+  
+      If explicit slippage protection for `_crossTransferWithCalldata` is removed, apply M-7 to `_crossTransferWithCalldata` as well.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec Break</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] Initializing the deposit cap to `type(uint128).max` with the option of changing it later through timelock defies its purpose.
+  
+      The deposit cap is intended to cap the exposure initially. 
+      However, Fuji vaults define the deposit cap as `type(uint128).max` during construction with the option of reducing it through the timelock. 
+  
+      ```
+      BaseVault.sol
+  
+      constructor(
+          address asset_,
+          address chief_,
+          string memory name_,
+          string memory symbol_
+        )
+          ERC20(name_, symbol_)
+          SystemAccessControl(chief_)
+          VaultPermissions(name_)
+        {
+               -----
+          depositCap = type(uint128).max; 
+          ----
+        }
+      ```
+  
+      This defeats the purpose of the deposit cap, since it allows exceeding the planned deposit cap before the timelock takes effect. Therefore, we classify this issue as medium severity.
+  
+      **Remediation to consider:**
+      Consider making a deposit cap a user input during construction.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-2] Lack of validation regarding the previous active `providers` inside `setProviders`
+  
+      There is no validation inside `setProviders` to check if the new `providers` array contains all of the current active debt positions of the vault.
+  
+      If any active debt positions are missed, the vault will underestimate the total assets exposing the vault until it is corrected.
+  
+      **Remediation to consider:**
+  
+      Since access to this function is limited to admins through timelock, we can expect them to behave always in protocol interest; however, consider adding a check to ensure none of the current active debt position providers are missed on the smart contract level to remove this exposure completely.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Asset Transfers</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-3] Unnecessary `receive()` declaration for `BorrowingVault.sol`
+
+      ```
+      L147 receive() external payable {}
+      ```
+  
+      Fuji vaults don't have any use case for accepting native assets directly to the vault. 
+  
+      **Remediation to consider:**
+
+      Consider removing this entry point for native assets from the vault so someone doesn't send native assets incorrectly.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec Break</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-4] No check to ensure `maxLTV < liqRatio` inside `setMaxLtv()`
+  
+      The `setLiqRatio` function checks that the passed `liqRatio` is greater than or equal to `maxLTV`, but no such check is performed inside the `setMaxLTV` function. Hence admins can unintentionally break this invariant.
+  
+      **Remediation to consider:**
+      Consider adding an explicit check to ensure that `maxLTV` is less than `liqRatio`. 
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec Break</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-5] Incomplete check inside `setLiqRatio()` allows defining `liqRatio` = `maxLTV`
+  
+      The comment on `L122` of the borrowing vault mentions  
+  
+      ```
+      * - Must check `maxLTV` Must < `liqRatio`.
+      ```
+  
+      However, one can set `liqRatio = maxLTV` using `setLiqRatio`
+  
+      ```
+      function setLiqRatio(uint256 liqRatio_) external onlyTimelock {
+          if (liqRatio_ < maxLtv || liqRatio_ == 0) {
+            revert BaseVault__setter_invalidInput();
+          }
+          liqRatio = liqRatio_;
+          emit LiqRatioChanged(liqRatio);
+      }
+      ```
+  
+      **Remediation to consider:**
+      Consider adding equality to the concerned check.  
+  
+      From `if (liqRatio_ < maxLtv || liqRatio_ == 0)`
+  
+      To `if (liqRatio_ <= maxLtv || liqRatio_ == 0)`
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">User Experience</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-6] Lack of option for borrowers to `payback` their complete loan
+
+      Fuji's Borrowing Vault accepts absolute debt amount only in `payback`.
+  
+      Lending providers charge interest per block, so between the time you submit a transaction and the time it gets processed, the debt will have increased by some small margin, especially on L2s. On L1s, it is also not guaranteed that you will land in the same block; there is always some latency. This prevents someone from paying off their total debt, and there will always be some leftover dust.
+  
+      **Remediation to Consider:**
+  
+      1. Ask users to pass the unit max as the amount in `payback` if they want to repay their total debt, then define the amount as the user's current debt inside `payback`. AAVE does the [same](https://github.com/aave/protocol-v2/blob/master/contracts/protocol/lendingpool/LendingPool.sol#L22).
+      2. Define a different `payback` in terms of shares.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">User Experience</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-7] None of vault actions from the router use slippage protections provided by the vault
+  
+      Fuji's vault provides various slippage protections for users, but none of them are being used inside the router, for instance, the `minShares` of deposit.
+  
+      **Remediation to Consider:**
+  
+      Consider using provided slippage protections 
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Edge Case</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-8] `_getBeneficiaryFromCalldata` of ConnextRouter doesn't consider nested `XTransfer`, `XTransferWithCall` and `DepositETH`
+  
+      When checking beneficiary for `_crossTransferWithCalldata` using `_getBeneficiaryFromCalldata`, there is no consideration if the first action is  `XTransfer` or `XTransferWithCall` or `DepositETH`.
+  
+      ```
+      function _getBeneficiaryFromCalldata(bytes memory callData) // @audit come back to this again 
+          internal
+          pure
+          returns (address beneficiary)
+        {
+          (Action[] memory actions, bytes[] memory args,) =
+            abi.decode(callData, (Action[], bytes[], uint256));
+          if (actions[0] == Action.Deposit || actions[0] == Action.Payback) {
+             --
+          } else if (actions[0] == Action.Withdraw || actions[0] == Action.Borrow) {
+           --
+          } else if (actions[0] == Action.WithdrawETH) {
+             ---
+          } else if (actions[0] == Action.PermitBorrow || actions[0] == Action.PermitWithdraw) {
+           --
+          } else if (actions[0] == Action.Flashloan) {
+           --
+          } else if (actions[0] == Action.Swap) {
+            revert BaseRouter__bundleInternal_swapNotFirstAction(); // @audit issue of xCall
+          }
+        }
+      ```
+  
+      One cannot misuse it since `_getBeneficiaryFromCalldata` returns `address(0)` as the beneficiary, which won't match the actual beneficiary inside `_checkBeneficiary`.
+  
+      However, it is still possible to sweep the assets using this method, although there are many other ways of doing so, as explained in the following section [[I-5] Anyone can sweep the unused funds from the router.](https://www.notion.so/I-5-Anyone-can-sweep-the-unused-funds-from-the-router-b3eb3428a0274e1d81422c2c623cc71a?pvs=21) 
+  
+      **Remediations to consider:**
+      Although we couldn't think of a way to exploit this, it doesn't mean that none will exist. 
+      The best practice is to reduce exposure at the source. 
+      Consider adding a revert inside `_getBeneficiaryFromCalldata` if the first action is `XTransfer`, `XTransferWithCall`, or `DepositETH`, similar to swap.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-9] `_addTokenToList` is missing for `XTransfer` and `XTransferWithCall` actions
+
+      Currently, `_addTokenToList` is not done for both `XTransfer` and `XTransferWithCall` actions. This can result in dormant contract funds being used or unintentionally leaving funds in the contract.
+  
+      **Remediations to consider:**
+  
+      While this issue is not considered severe since there are other ways of sweeping the contract, 
+      [[I-5] Anyone can sweep the unused funds from the router.](https://www.notion.so/I-5-Anyone-can-sweep-the-unused-funds-from-the-router-b3eb3428a0274e1d81422c2c623cc71a?pvs=21) 
+  
+      consider adding tokens to the `tokensToCheck` list as is done for all other actions to remove this exposure completely.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Design</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] Different versioning systems inside Fuji Vault
+  
+      Currently, two versioning systems are being used: "1,2,3..n" for the `EIP712` domain separator and "0.0.1, x.y.z" for the immutable `VERSION`. This can lead to confusion for users and requires a conscious effort from Fuji developers to update both version numbers instead of just one.
+  
+      To simplify this process, consider combining both version systems into one and using a single versioning system across the board.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundancy</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-2] Unnecessary use of `_msgSender()`
+  
+      ```
+      For example :
+  
+      BaseVault.sol
+      function approve(address receiver, uint256 shares) public override(ERC20, IERC20) returns (bool) {
+          address owner = _msgSender();
+              .....
+      }
+  
+      BorrowingVault.sol
+      function borrow(uint256 debt, address receiver, address owner) public override returns (uint256) {
+          address caller = _msgSender();
+      ```
+  
+      Currently, Fuji's code uses both `_msgSender()` from the OZ context library and standard `msg.sender`. However, since Fuji has no intention of enabling meta transactions, using standard `msg.sender` should work everywhere. 
+      Consider using `msg.sender` in all places to remove this confusion and save a small amount of gas.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Precision Loss</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-3] Double conversion of **`Shares <> Assets`** in withdraw
+  
+      ```
+  
+      Withdraw
+      address caller = _msgSender();
+      if (caller != owner) {
+            _spendAllowance(owner, caller, receiver, **convertToShares(assets)**); // @audit twice conversion
+      }
+  
+      function _spendAllowance(
+          address owner,
+          address operator,
+          address receiver,
+          uint256 shares // @audit inherited incorrectly 
+      ) internal
+      {
+          _spendWithdrawAllowance(owner, operator, receiver, **convertToAssets(shares)**);
+      }
+      ```
+  
+      In the `Withdraw` function of `BaseVault` on line 420, assets are converted into shares and passed to `spendAllowance()`. However, `spendAllowance()` again converts these shares into assets.
+  
+      This double conversion is redundant and causes a slight loss of precision.
+  
+      Consider defining a different internal method to spend allowance in terms of assets.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundancy</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-4] Redundant code on `L597` of `BaseVault.sol`
+  
+      ```
+      BaseVault.sol
+      L596: function _beforeTokenTransfer(address from, address to, uint256 amount) internal view override {
+      L597: to; 
+          ....
+      ```
+  
+      Consider removing this `to;` since it doesn't do anything.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundancy</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-5] Unnecessary use of counters library for `nonces`
+  
+      ```
+      VaultPermissions.sol
+      L372
+      function _useNonce(address owner) internal returns (uint256 current) {
+          Counters.Counter storage nonce = _nonces[owner];
+          current = nonce.current(); 
+          nonce.increment();
+      }
+      ```
+  
+      Consider defaulting back to standard variable increment and a read instead of depending on the counters library.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundancy</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-6] Unused Import inside `BorrowingVault.sol`
+  
+      ```
+      BorrowingVault.sol
+      import {IFlasher} from "../../interfaces/IFlasher.sol";
+      ```
+  
+      Consider removing this unused import.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundancy</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-7] Unused mapping in `BorrowingVault.sol`: `_borrowAllowances`
+  
+      ```
+      BorrowingVault.sol
+      L93 mapping(address => mapping(address => uint256)) private _borrowAllowances;
+      ```
+  
+      Consider removing this unused state variable.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-8] Unnecessary state variable and logic in `BaseRouter.sol`: `isAllowedCaller`
+  
+      `BaseRouter` defines the `isAllowedCaller` mapping on `L61`. It allows timelock to mutate it using `allowCaller()`. However, `isAllowedCaller` is not used anywhere inside routers. Instead, it is used in `ConnextHandler`.
+  
+      To avoid unnecessary external calls and improve code readability, consider moving this mapping and its features to `ConnextHandler` only.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">ERC20 Variations</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-9] Unsafe Transfer of ERC20 
+      ```
+      function sweepToken(ERC20 token, address receiver) external onlyHouseKeeper {
+          uint256 balance = token.balanceOf(address(this));
+          token.transfer(receiver, balance); 
+      }
+      ```
+  
+      Inside `sweepToken` of `BaseRouter.sol`, the safe transfer is not added as it's done elsewhere.
+  
+      There is no security exposure since there is no state update based on token transfers. 
+      However, consider adding this feature to prevent housekeepers from assuming failed transfers as successful.
+  
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Naming</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-10] Incorrect naming for beneficiary inside payback action of the router.
+
+      ```
+      BaseRouter.sol
+      L168
+  
+      (IVault vault, uint256 amount, **address receiver**, address sender) =
+                abi.decode(args[i], (IVault, uint256, address, address)); 
+      --------
+      vault.payback(amount, receiver);
+      ```
+  
+      Since its owner whose debt position is being paid, consider renaming `receiver` to the `owner`.
+  
+    </field>
+  </item>
+   
+  <item>
+    <field name="topic">SSTORE/SLOAD</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-1] Consider defining `_asset` as immutable inside `BaseVault.sol`
+  
+      ```
+      BaseVault.sol
+  
+      L65: IERC20Metadata internal _asset;
+  
+      ```
+  
+      Since there is no option to change the collateral asset of the vault once it is defined, consider defining `_asset` as immutable. This will save gas since gas-intensive `SLOADs` will no longer be required.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">SSTORE/SLOAD</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-2] Consider defining `_debtAsset` as immutable inside `**BorrowingVault.sol**`
+
+      ```
+      BorrowingVault.sol
+  
+      L87: IERC20Metadata internal _debtAsset;
+      ```
+  
+      Since there is no option to change the debt asset of the vault once it is defined, consider defining `_debtAsset` as immutable. This will save gas since gas-intensive `SLOADs` will no longer be required.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Loop Break</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-3] Consider adding a break in the loop once the validity of the provider is proved inside `_isValidProvider`
+  
+      ```
+      function _isValidProvider(address provider) internal view returns (bool check) {
+          uint256 len = _providers.length;
+          for (uint256 i = 0; i < len;) {
+              if (provider == address(_providers[i])) {
+                  check = true;
+                              <<break here>>
+              }
+              unchecked {
+                  ++i;
+              }
+          }
+      }
+      ```
+  
+      Once the match is found inside the `providers` array, you can break the loop and return. Doing so would save significant gas costs since no further `SLOAD` operations would be performed for the remaining `providers`.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Loop Break</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-4] Consider adding a break in the loop of `_isInTokenList`
+  
+      ```
+      function _isInTokenList(address token) private view returns (bool value) {
+          uint256 len = _tokensToCheck.length;
+          for (uint256 i = 0; i < len;) {
+            if (token == _tokensToCheck[i].token) {
+              value = true; 
+                      <<break here>>
+            }
+            unchecked {
+              ++i;
+            }
+          }
+        }
+      ```
+  
+      Once the token is found inside the `_tokensToCheck` array, there is no need to continue iterating; consider adding a `break` statement as shown in the code above to save gas costs of further interactions in the loop.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Insolvency</field>
+    <field name="content">
+      ## [I-1] Implicit Limit on User Withdrawal Amounts
+  
+      While the Vault allows the distribution of its debt position to multiple providers, withdrawals can only be made from the active provider. If the current active provider cannot fulfill the order, there is no way to withdraw from other providers. This results in a limit on the amount that users can withdraw.
+  
+      **Response From Fuji Team:** 
+      We acknowledge the problem, and in fact distributing funds across providers of a vault is intentional. The reason for this is if the vault have enough pooled assets, they will be incurring interest rate slippage when rebalancing funds. To avoid the situation you are highlighting, we were thinking on handling this aspect offchain. That means, that we only rebalance at least the position size (collateral+debt) of the major depositor. Let me know if that clarifies. Though a more robust solution will be handling rebalancing restrictions to that of the "major-position" size. That will avoid the situation your described at smart contract level.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">ERC20 Variations</field>
+    <field name="content">
+      ## [I-2] Lack of Support for Certain ERC20 Token Types
+  
+      The following ERC20 token types are not supported by fuji vaults and routers:
+      
+        
+      | Token Type | Description |
+      | --- | --- |
+      | Reentrant | ERC777 Tokens |
+      | Fee on Transfer  | Some tokens have a transfer fee (e.g. STA, PAXG), while others may introduce one in the future (e.g. USDT, USDC). |
+      | Rebasing  | Some tokens may modify balances arbitrarily outside of transfers (e.g. Ampleforth-style rebasing tokens, Compound-style airdrops of governance tokens, mintable/burnable tokens). |
+      | Multiple Addresses | Some proxied tokens have multiple addresses. |
+      | Low Decimals | Some tokens, like [GUSD](https://etherscan.io/token/0x056Fd409E1d7A124BD7017459dFEa2F387b6d5Cd?a=0x5f65f7b609678448494De4C87521CdF6cEf1e932), only have 2 decimals. |
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Delegate Call</field>
+    <field name="content">
+      ## [I-3] Providers should not have a state of their own, and any storage writes.
+  
+      Fuji does delegates call to their provider contracts so that `BaseVault` could act as a counterparty to actual lending providers like Aave.
+  
+      Delegate calls should be handled carefully. Please ensure that:
+  
+      1. Providers do not have any state of their own.
+      2. They do not write any state of vaults.
+  
+      They should purely act as logical contracts and nothing else.
+  
+      Please note that having immutable variables inside providers should remain safe since they are directly embedded in bytecode.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Insolvency</field>
+    <field name="content">
+      ## [I-4] Fuji borrowing vault doesn't handle the case of liquidation of its debt position on actual lending providers.
+  
+      If any actual lending provider liquidates Fuji's borrowing vault's debt position, the penalty is applied to all shareholders and not only the borrowers, which is unfair.
+  
+      Fuji's counter is they will always have more conservative ratios than the actual providers. Therefore, users’ positions would be liquidated on their platform first. 
+      However, this assumption may not hold true during flash crashes.
+      With conservative debt ratios 
+  
+      - The liquidator role holders of Fuji need to be very vigilant to handle liquidations before actual ones in the event of flash crashes.
+      - The asset/debt asset pair need to be relatively prone to flash crashes.
+  
+      Please consider this moving forward.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Theft of Assets</field>
+    <field name="content">
+      ## [I-5] Anyone can sweep the unused funds from the router.
+  
+      There are sweep methods explicitly defined with access to only timelock. 
+      However, there are several ways to anyone can execute a sweep. 
+      One way is through `xReceiver`,
+  
+      Please check the following code snippet from `xRecieve` of the router.
+  
+      ```
+              
+      function xReceive(
+          bytes32 transferId,
+          uint256 amount,
+          address asset,
+          address originSender,
+          uint32 originDomain,
+          bytes memory callData
+        )
+      -----
+                  balance = asset_.balanceOf(address(this)); 
+              if (balance < amount) {
+              revert ConnextRouter__xReceive_notReceivedAssetBalance();
+            } else {
+              _tokensToCheck.push(Snapshot(asset, balance - amount));
+            }
+      ```
+  
+      It is possible to call `xReceive` with `amount` equal to the balance of the contract without sending any tokens. The above code snippet treats those funds as incoming and allows the sender to spend them as they please.
+  
+      Another way is through `_crossTransfer`. Since there are no checks regarding the token list there, one can easily bridge any dormant assets of the contract to any receiver.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec Break</field>
+    <field name="content">
+      ## [I-6] Beneficiaries could be changed in one bundle by initially passing `address(0)` as beneficiary.
+  
+      By continuously passing `address(0)` as the beneficiary, it is theoretically possible to have `address(0)` as the beneficiary for multiple actions and change it later, as shown in the code below.
+  
+      ```
+      function _checkBeneficiary(address user) internal {
+          if (_beneficiary == address(0)) { 
+            _beneficiary = user;
+          } else {
+            if (_beneficiary != user) {
+              revert BaseRouter__bundleInternal_notBeneficiary();
+            }
+          }
+        }
+      ```
+  
+      We couldn't find any incentive for someone to do this, but we wanted to make you aware of this case in case you can think of any ways one can exploit this.
+    </field>
+  </item>
+  
