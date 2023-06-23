@@ -218,6 +218,34 @@
     <field name="impact">high</field>
     <field name="chance">low</field>
     <field name="status">fixed</field>
+    <field name="statusNote">TODO</field>
+    <field name="commit"></field>
+    <field name="content">
+
+        ## [H-5] Funds sent to a precomputed Stream contract can be locked
+
+        In Manager.sol, either a Milestone or Intervals Stream contract address can be pre-computed by calling either `getMSSStreamAddress()` or `getIntvStreamAddress()`. The address is pre-computed and deployed using the create2 opcode, which uses the bytecode of the deploying contract as well as a supplied salt.
+
+        However, the implementation addresses of either the Interval or Milestone stream can be changed if the owner upgrades the Manager.sol contract. Since the contract deployed is a minimal proxy that includes the implementation address in its bytecode, the deployed contract address returned for a given salt would also change. 
+
+        In the case where funds are sent to a pre-computed contract address before it is deployed, with the assumption that they can deploy this contract at a later date. If before this contract is deployed, the owner of the Manager contract changes the implementation address by upgrading it. The result would be that there would no longer be a way to deploy a contract with the address the funds were sent to, causing them to be locked.
+
+        **Remediations to Consider**
+
+        - Instead of having an immutable address for each Stream implementation, have an array that stores all implementation addresses that have been set for a Stream type.
+        - Then the index of the implementation array can be used to specify which implementation address to use for either pre-computing the address or deploying the contract.
+        - Add owner functions to push new implementation addresses to the proper array.
+
+        Doing this would allow a user to deploy a contract with an older implementation address that  they may have used to precompute the address of and sent funds to.
+
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
     <field name="commit">5e7183603bbe9463feb9bbb8b8d40ee10a4bc823</field>
     <field name="content">
         ## (M-1) receive should revert if token is non-zero
@@ -229,6 +257,30 @@
 
         `receive()` should revert if the set `token` value is non-zero in order to prevent ETH from being accidentally locked in the contact.
         
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">TODO</field>
+    <field name="commit"></field>
+    <field name="content">
+
+        ## [M-2] Payment info is not used in salt generation
+
+        In Manager.sol, either a Milestone or Intervals Stream contract address can be pre-computed by calling either `getMSSStreamAddress()` or `getIntvStreamAddress()`.
+
+        However, Milestone.sol’s `msPayments` parameter is not used in the salt to generate the contract address, and for Intervals.sol, `owed` is not used in the salt either.
+
+        In the case where either a Milestones or Intervals contract address is precomputed, and is interacted with prior to deployment, potentially by sending funds into it. There may be assumptions made about the payment parameters it will have once deployed, and since these payment parameters are not used to generate the salt, the contract can be deployed with anything. This could cause funds sent into a Stream before deployment to be withdrawn by the recipient much quicker than intended, if it is deployed with payment parameters that take all the funds after the first milestone or interval.
+
+        **Remediations to Consider**
+
+        - Add `msPayments` to the salt generation for Milestones contracts, and `owed` for the salt of Intervals contracts.
+        - Use `abi.encode` instead of `abi.encodePacked` to prevent salt collisions with differing inputs.
     </field>
 </item>
 
