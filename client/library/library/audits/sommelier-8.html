@@ -1,0 +1,72 @@
+<page
+  clientName="Sommelier"
+  reportDate="June 28, 2023"
+  auditTitle="Sommelier A-8"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+  passwordEncrypt="env:PAGE_PASS_SOMMELIER_8"
+
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from June 5,
+    2023 to June 23, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>569d676eb6becd3245c0a2afe89ee34a3158790f</code>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(Marketplace):</b>
+        <code>fb9694aa79e222af4ede3631de79c97fa5d19819</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository for the initial part of the audit:
+    </p>
+
+    <template type="file-hashes">
+      5b08e2710e4bddc89395b419211816996f6c68c1925e15179da1ea53c128a4bd  src/AxelarProxy.sol
+      5bba14f3d4d46656a98160dc9e481170172f2cd8269e2f69cc4daf7291898972  src/modules/adaptors/Aave/AaveATokenAdaptor.sol
+      7e94a1d5901343bffba944c2f1576a07211d4bb39d7669e3c358392bcf887198  src/modules/adaptors/Compound/CTokenAdaptor.sol
+      a0035d5f8d636ca32b05d8fcc42659d351b34f2b0dd46ef2c755df2be0f3ec49  src/modules/adaptors/Frax/FTokenAdaptor.sol
+      ee8ccb8874001059295fd95a5d5943f0a0bfab2518335fbe5154b4cf39280c49  src/modules/adaptors/Frax/FTokenAdaptorV1.sol
+      ed6ff6f79d6bf3fe014a01f60c62e6c8eaa7d6cbb527cfe4c6e1dbfc886ce516  src/modules/adaptors/Morpho/MorphoAaveV2ATokenAdaptor.sol
+      76896a9f0352edf8b25a6287a15f7039caddb519d4eb9640aaa53e47640944ab  src/modules/adaptors/Morpho/MorphoAaveV2DebtTokenAdaptor.sol
+      29f437c5fecafa4e24ff37b029dfff639496bb31d199ffde20489f4e2e89b2e4  src/modules/adaptors/Morpho/MorphoAaveV3ATokenCollateralAdaptor.sol
+      2314003f887e0c70456b7240858de90dc403b03d688f950c63741c5ce6981e27  src/modules/adaptors/Morpho/MorphoAaveV3ATokenP2PAdaptor.sol
+      1e20d24666d6ae80d3c9d55e7cd2b4b6e9ab677f75eda540ae402612253a96d5  src/modules/adaptors/Morpho/MorphoAaveV3DebtTokenAdaptor.sol
+      2d727f2aab4b42aff42020a79da48dc483b0156eb4831b2808372fc50bb34603  src/modules/adaptors/Morpho/MorphoRewardHandler.sol
+      bc338f5a88de65c91e211fb214b35b7fb25cdcd6918e0eaeea07e8ef65a6e6a9  src/modules/price-router/Extensions/Balancer/BalancerPoolExtension.sol
+      780fdb18c9b0166fd933338655492e9ea23283f8a0ffd7bc0619945b49c6b423  src/modules/price-router/Extensions/Balancer/BalancerStablePoolExtension.sol
+      6d88140a08f55b9d94a4dc86083565450a1ca06441c0cd284adf6a7b55fae140  src/modules/price-router/Extensions/Lido/WstEthExtension.sol
+      4170fe390f8a9bee1640331fd1ad32d8912cc0cd4a1c7834f5fd7081c8153658  src/modules/price-router/PriceRouter.sol
+    </template>
+
+    <p>We audited the following contracts as part of the second part of the audit:</p>
+
+  <template type="file-hashes">
+    c17ce6d5cb3832a7e9fdc75166e30fae7e0e902691f1530b1b2917bec7086193  src/modules/adaptors/Balancer/BalancerPoolAdaptor.sol
+    97bb6b75a90c297f134c0fd33f065d3c2f441fcf71ca1de90eb69ddbb499ee64  src/modules/adaptors/Sommelier/CellarAdaptor.sol
+    d3233c38925e9a414bc3377a992663669974d124d09efe6824835175c14b6406  src/modules/price-router/Extensions/Redstone/RedstonePriceFeedExtension.sol
+  </template>
+  </content-for>
+</page>
