@@ -1,0 +1,450 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [H-1] Hero owner may reset Hero properties
+
+      In the `EllerianHeroUpgradeable` contract, `SynchronizeHero()` function may be invoked multiple times with the same signature to reset `Hero` related attributes to previously valid but currently obsolete data.
+  
+      `VerifySignature` contract documentation indicates that its verification functions, such as `bigVerify()` on which `SynchronizeHero()` relies, do not have replay attack protection and that any logic reliant must also have logic guarding against replay attacks.
+  
+      However, `SynchronizeHero()` does not follow this guideline and therefore is vulnerable to replay attack.
+  
+      **Remediations to Consider:**
+  
+      - Implement replay attack protection similar to how it is implemented in `ElleriaElmBridge:RetrieveElleriumFromGame()` using a nonce as part of the signed message.
+    </field>
+    <field name="response">
+        This will be deprecated, and the source of truth is now our backend servers instead to support custom in-game functionality.
+
+        The backend servers will be integrated with Chainlink’s VRF to proof state changes to ensure reliability and integrity.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [M-1] Incorrect output of checkTotalRewards() function
+  
+      In the `ElleriumLPStakingPool` contract, `rewardRate` value is denominated in Gwei. In addition, `setRewardRate()`, the function for updating `rewardRate` expects input denominated in Gwei `_emissionRateInGWEI`. Also, in `getReward()` function `totalRewards[msg.sender]` is multiplied by `1e9` to get the actual reward amount in Wei.
+  
+      ```solidity
+      function getReward() public nonReentrant updateReward(msg.sender) {
+          uint256 reward = totalRewards[msg.sender] * 1e9;
+          if (reward > 0) {
+              totalRewards[msg.sender] = 0;
+  
+              rewardsToken.mint(msg.sender, reward);
+              emit ClaimedReward(msg.sender, reward);
+          }
+      }
+      ```
+  
+      However, the implementation of the `checkTotalRewards()` function does not have corresponding multiplication by the `1e9` factor, even though the natspec comment indicates that the return value is denominated in Wei.
+  
+      ```solidity
+      /// @notice Exposes sender's claimable rewardToken balance.
+      /// @return Sender's Claimable rewardToken balance in WEI.
+      function checkTotalRewards() external view returns (uint256) {
+          return totalRewards[msg.sender];
+      }
+      ```
+  
+      **Remediations to Consider:**
+  
+      - Update `checkTotalRewards()` so it returns the `totalRewards` amount for a particular user denominated in Wei instead of Gwei, or
+      - Change `rewardRate` to be expressed in Wei instead of Gwei. Correspondingly, update `setRewardRate()` and `getReward()` function implementations to work with Wei denomination to prevent accidental issuance of enormous rewards which could happen at the moment if `setRewardRate()` is called with an emission rate incorrectly provided in Wei.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">50bdf09d1779fd76caeaaaf6d7dbd4fce5320f9b</field>
+    <field name="content">
+      ## [M-2] Contract dependencies are not immutable
+  
+      In the `ElleriumLPStakingPool` and `ElleriaElmBridge` contracts, `setAddresses()` and `SetReferences()` functions can be called only by the contract owner. These two functions are responsible for initializing and updating important external contract dependencies, which include staking token, rewards token, staking fee, and signature verification contract.
+  
+      If these contract dependencies are not properly set or they get accidentally misconfigured, overall system operation will be affected. In addition, the two previously mentioned contracts cannot be properly used after deployment without a call to these functions.
+  
+      To increase user trust in the overall system, it is important to provide means for users to verify important state changes and to react in case they disagree with the same. Also, it is best practice to minimize important system configuration updates, such as updates to external dependencies, unless they are necessary.
+  
+      **Remediations to consider:**
+  
+      - Set contract dependencies in the contract constructor during contract deploy, and
+      - In case contract dependencies updates are required, add a timelock mechanism with appropriate delay when contract dependency updates are performed in an existing system.
+    </field>
+    <field name="response">
+        Contracts within scope have been modified to only set dependencies in the constructor. Subsequent contracts that are single-utility will also be switched to follow the same pattern.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [M-3] Contract owner has excessive privileges for managing token assets
+  
+      In the `ElleriumLPStakingPool` and `ElleriaElmBridge` contracts, the `withdrawToken()` function, which is callable only by the owner, enables the caller to withdraw all ERC20 assets from the contract.
+  
+      ```solidity
+      function withdrawToken(address _tokenContract, uint256 _amount) external onlyOwner {
+        IERC20 tokenContract = IERC20(_tokenContract);
+        tokenContract.transfer(msg.sender, _amount);
+      }
+      ```
+  
+      While this functionality may serve a purpose in an emergency situation, its presence in its current form may affect users’ trust in the overall system.
+  
+      **Remediations to Consider:**
+  
+      - Consider removing `withdrawToken()` from the `ElleriaElmBridge` since `ElleriaElmBridge` does not store ELM assets but burns them during `BridgeElleriumIntoGame()` operation.
+      - Consider replacing `withdrawToken()` in `ElleriumLPStakingPool` with functionality for individual users to perform an emergency withdrawal in case an emergency state is enabled.
+    </field>
+    <field name="response">
+        Resolutiom: withdrawToken() removed from both contracts.
+
+        The contract ElleriaElmBridge does not manage ERC20 tokens, hence there was no risk of funds within the contract being mismanaged.
+
+        ElleriumLPStakingPool, the intent was to withdraw stuck tokens, though makes sense it can cause trust issues.
+
+        The "emergency state" is essentially RewardRate set to 0 and feesTaken set to false. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Coding standards</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [L-1] Unsafe usage of ERC20 transfer functions
+  
+      In the following instances, return values of `transfer` are ignored:
+  
+      - `ElleriumLPStakingPool:stake()`
+      - `ElleriumLPStakingPool:unstake()`
+      - `ElleriumLPStakingPool:withdrawToken()`
+      - `ElleriaElmBridge:withdrawToken()`
+      - `ElleriaElmBridge:BridgeElleriumIntoGame()`
+  
+      For handling non-standard ERC20 token implementations which do not revert, but return false on transfer failure, consider using OZ’s SafeERC20 variants of token handling functions `safeTransfer()` / `safeTransferFrom()`.
+  
+      **Remediations to Consider:**
+  
+      - Instead of IERC20’s `transfer()` and `transferFrom()`, consider using OZ’s SafeERC20 variants `safeTransfer()` / `safeTransferFrom()`.
+    </field>
+    <field name="response">
+        Additional updates in commit 50bdf09d1779fd76caeaaaf6d7dbd4fce5320f9b.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Coding standards</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [L-2] Incorrect EIP-712 implementation
+  
+      The `VerifySignature` contract implements signature verification based on the EIP-712 standard.
+  
+      However, the current implementation does not include `DOMAIN_SEPARATOR` as part of the signature. As a result, signatures generated on one chain may be reused on other chains.
+  
+      **Remediations to Consider:**
+  
+      - Implement the EIP-712 standard with corresponding `DOMAIN_SEPARATOR` verification functionality.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [L-3] Missing argument in ERC20Withdraw event
+  
+      In the `ElleriaElmBridge` when `RetrieveElleriumFromGame()` is executed corresponding `ERC20Withdraw` event is emitted. This event contains info about the caller, ELM token contract, the amount withdrawn, and the current number of withdrawals.
+  
+      However, the `ERC20Withdraw` event does not contain `_txnCount` information, which is practically the `id` of the withdrawal transaction. As a result, it is harder to determine which previously signed transactions by the internal server have already been processed on-chain.
+  
+      **Remediations to consider:**
+  
+      - Add `_txnCount` information to the `ERC20Withdraw` event.
+    </field>
+    <field name="response">
+        Additional updates in commit 50bdf09d1779fd76caeaaaf6d7dbd4fce5320f9b.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Signature</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [L-4] Signature replay using hash collision
+  
+      In the `EllerianHeroUpgradeable` contract, `SynchronizeHero()` function implementation relies on a fixed set of elements (11) from provided `_data` array argument. This `_data` argument is also forwarded to `VerifySignature:bigVerify()` function which iterates through `_data` elements and calculates message hash for signature verification.
+  
+      However, since the `_data` array can be of a length that is greater than the necessary set of elements, the malicious caller of `SynchronizeHero()` can add extra elements to the `_data` array to generate a hash collision.
+  
+      **Remediations to consider:**
+  
+      - Add guard condition to prevent `SynchronizeHero()` calls with `_data` array length greater than required.
+    </field>
+    <field name="response">
+        Function to be deprecated.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">50bdf09d1779fd76caeaaaf6d7dbd4fce5320f9b</field>
+    <field name="content">
+      ## [L-5] Missing events for important state updates
+  
+      In the `ElleriumLPStakingPool` and `ElleriaElmBridge` contracts, several important state-changing functions miss corresponding event emissions. These are:
+  
+      - `ElleriaElmBridge:SetReferences()`
+      - `ElleriaElmBridge:withdrawToken()`
+      - `ElleriumLPStakingPool:setAddresses()`
+      - `ElleriumLPStakingPool:setRewardRate()`
+      - `ElleriumLPStakingPool:withdrawToken()`
+  
+      However, without appropriate events, it is difficult for off-chain tools to track and monitor on-chain system behavior.
+  
+      **Remediations to consider:**
+  
+      - To facilitate off-chain tracking and monitoring, introduce appropriate events for important system state changes.
+    </field>
+    <field name="response">
+        Changed variables for the dependencies to be public.
+        
+        Contract dependencies set only within the constructor.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Coding standards</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [L-6] Non-standard ERC20 burn implementation
+  
+      In the `ElleriumTokenERC20v2` contract, the internal `_transfer()` function is meant to handle the transfer to 0 address as a burn operation. When recipient is address(0), `totalSupply` is reduced by the provided amount of token.
+  
+      ```solidity
+      // Demint for burn transactions.
+      if (recipient == address(0)) {
+          _totalSupply = _totalSupply - amount;    
+      }
+  
+      _balances[actualRecipient] = _balances[actualRecipient] + amount;
+      ```
+  
+      However, what differs from expected behavior is that `_balance` of address(0) will still get increased by the provided amount. This not be the case since it invalidates the invariant that the sum of individual account balances should be equal to the `totalSupply`.
+  
+      **Remediations to Consider:**
+  
+      - Update implementation so that the balance update above is placed in the else block.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Coding standards</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [L-7] Incorrect Transfer event data
+    
+      In the `ElleriumTokenERC20v2` contract, the internal `_transfer()` function performs token transfer with additional logic to prevent transfers before the system is completely configured. One aspect of this mechanism is that those who attempt transfers beforehand will get blacklisted. A consequence of getting blacklisted is that transfers from the blacklisted address will be rerouted to the owner-controlled address.
+  
+      When a transfer from the blacklisted address is processed, corresponding balances are updated. However, Transfer event emission references the initial `recipient` instead of `actualRecipient` which in this edge case is incorrect.
+  
+      ```solidity
+      ...
+      _balances[actualRecipient] = _balances[actualRecipient] + amount;
+      emit Transfer(sender, recipient, amount);
+      ```
+  
+      **Remediations to Consider:**
+  
+      - Update Transfer event emission to reference `actualRecipient` instead of the `recipient`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [G-1] Avoid taxFee transfer calls when there is no taxFee
+  
+      In the `ElleriumLPStakingPool:unstake()` implementation, the `taxFee` transfer call always happens.
+  
+      ```solidity
+      stakingToken.transfer(stakingLPFeesAddress, taxFee);
+      ```
+  
+      However, this call is unnecessary in the following situations:
+  
+      - `applyFees` is false
+      - `taxFee` is 0
+      - `stakingLPFeesAddress` is address(0)
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [G-2] Prefer `+=` instead of `+` since it costs less gas
+  
+      When updating a value in an array with arithmetic, using `array[index] += amount` is cheaper than `array[index] = array[index] + amount`. This is because you avoid an additional `mload` when the array is stored in memory and a `sload` when the array is stored in storage.
+  
+      This can be applied for any arithmetic operation including `+=`, `-=`,`/=`,`*=`,`^=`,`&=`, `%=`, `<<=`,`>>=`, and `>>>=`. This optimization can be particularly significant if the pattern occurs during a loop.
+  
+      *Saves 28 gas for a storage array, 38 for a memory array*
+  
+      *Instances (4)*:
+  
+      ```solidity
+      File: ETH_ElleriumTokenERC20.sol
+  
+      229:         _balances[actualRecipient] = _balances[actualRecipient] + amount;
+  
+      242:         _balances[account] = _balances[account] + amount;
+  
+      ```
+  
+      ```solidity
+      File: ElleriumLPStakingPool.sol
+  
+      129:         balances[msg.sender] = balances[msg.sender] + _amount;
+  
+      144:         balances[msg.sender] = balances[msg.sender] - _amount;
+  
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Errors</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [Q-1] Use Solidity’s custom errors
+  
+      Consider using [Solidity’s 0.8.4 feature - custom errors](https://blog.soliditylang.org/2021/04/21/custom-errors/) to reduce contract size, increase code readability, and have more gas-efficient operations.
+    </field>
+    <field name="response">
+        Implemented for contracts under scope.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [Q-2] `require()` / `revert()` statements should have descriptive reason strings
+  
+      *Instances (3)*:
+  
+      ```solidity
+      File: ETH_ElleriumTokenERC20.sol
+  
+      61:         require (msg.sender == owner() || _approvedAddresses[msg.sender]);
+  
+      ```
+  
+      ```solidity
+      File: ElleriumLPStakingPool.sol
+  
+      122:         require(_amount > 9999);
+  
+      140:         require(_amount <= balances[msg.sender]);
+  
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [Q-3] Consider following standard function naming conventions
+  
+      In some contracts, function names are capitalized, while in others, they follow the standard `camelCase` naming convention. Consider using the `camelCase` convention consistently throughout the whole codebase.
+    </field>
+    <field name="response">
+        Implemented for contracts under scope, to maintain the standard across all other contracts as well.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [Q-4] Remove redundant code for calculating and applying staking taxFee
+  
+      In the `ElleriumLPStakingPool` same logic for calculating staking taxFee is implemented in two different ways in the following two functions:
+  
+      - `getWithdrawalFees()`
+      - `unstake()`
+  
+      Consider reusing `getWithdrawalFees()` in `unstake()` instead of reimplementing it.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5ef970c93b7aab58d1500011815f45d1a3e71bb7</field>
+    <field name="content">
+      ## [Q-5] Consider improving the Natspec documentation
+  
+      - Add natspec comments for contract variables
+      - Add natspec for missing function arguments and return variables
+      - Add natspec comments for event declarations and their arguments
+      - (If custom errors are implemented) Add natspec comments for custom errors
+    </field>
+    <field name="response">
+        Changed for contracts under scope.
+    </field>
+  </item>
+  
