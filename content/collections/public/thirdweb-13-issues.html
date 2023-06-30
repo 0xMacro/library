@@ -1,0 +1,174 @@
+<item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">43ebc9a209fe49d8f71fb2f42a6b2e4a56fe62e9</field>
+    <field name="content">
+        ## [H-1] Mint price is determined by quantity
+
+        `LoyaltyCard.mintWithSignature` always only mints 1 NFT to the user as stated in the comments:
+        ```solidity
+        /// @dev Mints an NFT according to the provided mint request. Always mints 1 NFT.
+        ```
+
+        and defined by the line [LoyaltyCard#L276](https://github.com/thirdweb-dev/contracts/blob/ef8f6da0f3bed3c4be267a3052e21b711a74212d/contracts/LoyaltyCard.sol#L276):
+
+        ```solidity
+        _safeMint(_to, 1);
+        ```
+
+        However, in `_collectPrice`, the total price the user has to pay is calculated as follows:
+
+        ```solidity
+        uint256 totalPrice = _quantityToClaim * _pricePerToken;
+        ```
+
+        Thus, for quantity > 1, the user has to pay the total price determined by the quantity, despite only getting 1 NFT minted. 
+
+        **Remediations to Consider**
+
+        Consider only allowing mint request with quantity = 1 and otherwise revert.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d3b50d0a838f0a434be93219915da802f3083a50</field>
+    <field name="content">
+        ## [M-1] Native token can get locked in drop contracts
+
+        **Reference:** [DropERC20Logic.sol#L124](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/extension/DropERC20Logic.sol#L124), [DropERC721Logic.sol#L199](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/extension/DropERC721Logic.sol#L199), [DropERC1155Logic.sol#L206](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/extension/DropERC1155Logic.sol#L206)
+
+        ### Description
+
+        `DropERC20Logic` inherits from `Drop` contract which implements the `payable` `claim(…)` function that calls `_collectPriceOnClaim` to transfer payment to `feeRecipient` and `saleRecipient`. 
+
+        The issue of locking native tokens in the contract occurs under the following circumstances:
+
+        1. Payment currency in `claimConditions` is set to ERC20.
+        2. A user calls `claim` with appropriate amount of ERC20 tokens approved and accidentally also passes native tokens along. 
+
+        As a result, the `claim` call succeeds but the native tokens passed along will be locked within the DropERC20 contract.
+
+        Note that this issue also applies to `DropERC721Logic` and `DropERC1155Logic`. 
+
+        An admin could rescue the tokens by adding a new extension that provides appropriate function to transfer tokens back to original owners. However, it is recommended to avoid such situations in the first place. 
+
+        ### **Remediations to Consider**
+
+        Consider checking that no native tokens are transferred (`msg.value == 0`) when payment currency is set to ERC20.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">93319e133f8bb309b986738a9fc0ef22396c56ce</field>
+    <field name="content">
+        ## [Q-1] `ReentrancyGuardUpgradeable` not initialized
+
+        `LoyaltyCard` inherits from `ReentrancyGuardUpgradeable` but is not being initialized in the `initialize` function. 
+
+        Note that due to the logic in `ReentrancyGuardUpgradeable`, this doesn’t impose any security risk, but it is considered as best practice to properly initialize all parent contracts. 
+        
+        **Remediations to Consider**
+        
+        Consider initializing `ReentrancyGuardUpgradeable` properly by adding `__ReentrancyGuard_init` to the `initialize` function.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Clean Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">44e0639b026d29a239009aacda47d04ecb27131c</field>
+    <field name="content">
+        ## [Q-2] Unused role `OPERATOR_ROLE`
+
+        `OPERATOR_ROLE` is declared in the following contracts:
+
+        - [DropERC721.sol#L83](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/DropERC721.sol#L83)
+        - [DropERC1155.sol#L88](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/DropERC1155.sol#L88)
+        - [DropERC721Logic.sol#L66](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/extension/DropERC721Logic.sol#L66)
+        - [DropERC1155Logic.sol#L64](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/extension/DropERC1155Logic.sol#L64)
+
+        However, this role is not used anywhere else in the code
+
+        **Remediations to Consider**
+
+        Consider removing `OPERATOR_ROLE` declarations from above contracts.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Clean Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b7885770ed44c970c12850fd1d507540e5d43416</field>
+    <field name="content">
+        ## [Q-3] Unused Import
+
+        The following imports of `ReentrancyGuardInit` are not required and can be removed:
+
+        - [DropERC20.sol#L27](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/DropERC20.sol#L27)
+        - [DropERC721.sol#L31](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/DropERC721.sol#L31)
+        - [DropERC1155.sol#L32](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/DropERC1155.sol#L32)
+
+        The following import of `ERC20VotesStorage` is not required and can be removed:
+
+        - [DropERC20Logic.sol#L21](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/drop/extension/DropERC20Logic.sol#L21)
+    </field>
+</item>
+
+<item>
+    <field name="topic">Clean Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a8f776b91b417969678a97e8e6780b12ed4a503d</field>
+    <field name="content">
+        ## [Q-4] Storage gap variable not needed
+
+        Due to the use of dynamic contract pattern and its use of unstructured storage, `__gap` variables declared in some of the upgradable contracts are not needed. Consider removing the `__gap` variable from the following files:
+
+        - [ERC2771ContextUpgradeable.sol#L66](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/dynamic-contracts/extension/ERC2771ContextUpgradeable.sol#L66)
+        - [ERC20BurnableUpgradeable.sol#L50](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/dynamic-contracts/eip/ERC20BurnableUpgradeable.sol#L50)
+        - [ERC20Upgradeable.sol#L393](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/dynamic-contracts/eip/ERC20Upgradeable.sol#L393)
+        - [ERC20VotesUpgradeable.sol#L276](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/dynamic-contracts/eip/ERC20VotesUpgradeable.sol#L276)
+        - [draft-EIP712Upgradeable.sol#L122](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/dynamic-contracts/eip/draft-EIP712Upgradeable.sol#L122)
+        - [draft-ERC20PermitUpgradeable.sol#L107](https://github.com/thirdweb-dev/contracts/blob/3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c/contracts/dynamic-contracts/eip/draft-ERC20PermitUpgradeable.sol#L107)
+    </field>
+</item>
+
+<item>
+    <field name="topic">Use Case</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">44e0639b026d29a239009aacda47d04ecb27131c</field>
+    <field name="content">
+        ## [I-1] Transfers are enabled by default
+
+        `LoyaltyCard` allows the transfers of NFTs by default; enabled by the following line in `initialize`:
+
+        ```solidity
+        _setupRole(TRANSFER_ROLE, address(0));
+        ```
+
+        Due to the use case of `LoyaltyCard` - namely issuing NFTs to loyal customers - consider restricting transfers by default for normal users and only allow transfers for admins having the `TRANSFER_ROLE` assigned.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Use Case</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">44e0639b026d29a239009aacda47d04ecb27131c</field>
+    <field name="content">
+        ## [I-2] No support for flat platform fee
+
+        `OpenEditionERC721` has been recently updated to support a new fee mechanism called “flat fee” besides “percentage fee”. However, all three drop contracts only support “percentage fee”. Consider updating drop contracts to support “flat fee” in addition to “percentage fee”.   </field>
+</item>
