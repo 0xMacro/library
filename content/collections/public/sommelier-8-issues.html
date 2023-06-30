@@ -1,0 +1,627 @@
+<item>
+    <field name="topic">Trust Assumption</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">ac9547fbf271b033168dbe8df4aaa9d34eaa78f8</field>
+    <field name="content">
+        ## (M-1) Strategist can lower Morpho health factors to the liquidation threshold
+    
+        In `MorphoAaveV2ATokenAdaptor` and `MorphoAaveV3ATokenCollateralAdaptor`, each allows the strategist to withdraw assets from Morpho via `withdrawFromAaveV2Morpho()`,  and `withdrawFromAaveV3Morpho()` respectively.
+
+        ```solidity
+        function withdrawFromAaveV2Morpho(IAaveToken aToken, uint256 amountToWithdraw) public {
+            morpho().withdraw(address(aToken), amountToWithdraw, address(this));
+        }
+        ```
+        Reference: [MorphoAaveV2ATokenAdaptor.sol#L157-L158](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV2ATokenAdaptor.sol#L157-L159)
+        
+        ```solidity
+        function withdrawFromAaveV3Morpho(ERC20 tokenToWithdraw, uint256 amountToWithdraw) public {
+            morpho().withdrawCollateral(address(tokenToWithdraw), amountToWithdraw, address(this), address(this));
+        }
+        ```
+        Reference: [MorphoAaveV3ATokenCollateralAdaptor.sol#L138-L140](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV3ATokenCollateralAdaptor.sol#L138-L140)
+
+        The `MorphoAaveV2DebtTokenAdaptor` also allows the strategist to borrow assets from Morpho with `borrowFromAaveV2Morpho()`.
+
+        ```solidity
+        function borrowFromAaveV2Morpho(address aToken, uint256 amountToBorrow) public {
+        // Check that debt position is properly set up to be tracked in the Cellar.
+        bytes32 positionHash = keccak256(abi.encode(identifier(), true, abi.encode(aToken)));
+        uint32 positionId = Cellar(address(this)).registry().getPositionHashToPositionId(positionHash);
+        if (!Cellar(address(this)).isPositionUsed(positionId))
+            revert MorphoAaveV2DebtTokenAdaptor__DebtPositionsMustBeTracked(aToken);
+
+        // Borrow from morpho.
+        morpho().borrow(aToken, amountToBorrow);
+        }
+        ```
+        Reference: [MorphoAaveV2DebtTokenAdaptor#L104-L114](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV2DebtTokenAdaptor.sol#L104-L113)
+
+        However, each of these functions can decrease the health factor of the cellars Morpho position and there are no checks to ensure the health factor is maintained above a minimum safe value. This can allow a strategist to bring the health factor of the cellars position down to the liquidation threshold of Aave, causing the cellar’s Morpho positions to be at risk of liquidation.
+
+        **Remediations to Consider**
+
+        Check the health factor of the cellar after a strategist withdraws funds, to ensure the positions do not become too close to being liquidated.
+   </field>
+</item>
+<item>
+    <field name="topic">Trust Assumption</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">ac9547fbf271b033168dbe8df4aaa9d34eaa78f8</field>
+    <field name="content">
+        ## (M-2) MorphoV2 adaptor can be liquidated by users if set up improperly
+    
+        In `MorphoAaveV2ATokenAdaptor.sol` a `isLiquid`  is set in the positions `configurationData` value that will determine if the position is allowed to be withdrawn by users using `withdraw()`, this is to prevent users from withdrawing assets from a position that is used as collateral to support a debt position:
+
+        ```solidity
+        function withdraw(
+            uint256 assets,
+            address receiver,
+            bytes memory adaptorData,
+            bytes memory configData
+        ) public override {
+            // Run external receiver check.
+            _externalReceiverCheck(receiver);
+
+            // Make sure position is setup to be liquid.
+            bool isLiquid = abi.decode(configData, (bool));
+            if (!isLiquid) revert BaseAdaptor__UserWithdrawsNotAllowed();
+
+            IAaveToken aToken = abi.decode(adaptorData, (IAaveToken));
+
+            // Withdraw assets from Morpho.
+            morpho().withdraw(address(aToken), assets, receiver);
+        }
+        ```
+        Reference: [MorphoAaveV2TokenAdaptor#L78-L95](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV2ATokenAdaptor.sol#L78-L95)
+
+        However there is the possibility for a `MorphoAaveV2ATokenAdaptor` position to be set as `isLiquid` but then have the cellar later take on debt from Morpho via a `MorphoAaveV2DebtTokenAdaptor` position, or for a position to be setup incorrectly by the strategist. In this case, any withdraws from the liquid Morpho lending position would effect the health factor of the debt position, potentially allowing the health factor to be manipulated by cellar share holders to allow the cellars Morpho positions to be liquidated maliciously.
+
+        **Remediations to Consider**
+
+        Either
+
+        - Check if the cellar has any borrows on Morpho before allowing withdraws.
+        - Check if withdrawing lowers the cellars health factor below a minimum.
+        - Keep track of debt with an external contract to easily check if there is debt in the cellar before withdrawing.
+
+        Doing either of these will prevent the possibility of users maliciously effecting the health of a misconfigured cellars debt position.
+   </field>
+</item>
+
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">14bd3cf95ea2500f9e81b19239020895286caf08</field>
+    <field name="content">
+        ## (M-3) Arbitrary calls made for `relayerJoinPool()` and `relayerExitPool()`
+
+        In `BalancerPoolAdaptor.sol`'s `relayerJoinPool` and `relayerExitPool`, it takes a `bytes` array of `calldata` that is directly used to make a call on the relayer.
+
+        ```solidity
+        function relayerJoinPool(
+            ERC20[] memory tokensIn,
+            uint256[] memory amountsIn,
+            ERC20 bptOut,
+            bytes[] memory callData
+        ) public {
+            for (uint256 i; i < tokensIn.length; ++i) {
+                tokensIn[i].approve(address(vault), amountsIn[i]);
+            }
+            uint256 startingBpt = bptOut.balanceOf(address(this));
+            relayer.multicall(callData);
+
+            uint256 endingBpt = bptOut.balanceOf(address(this));
+            uint256 amountBptOut = endingBpt - startingBpt;
+            PriceRouter priceRouter = Cellar(address(this)).priceRouter();
+            uint256 amountBptIn = priceRouter.getValues(tokensIn, amountsIn, bptOut);
+
+            if (amountBptOut < amountBptIn.mulDivDown(slippage(), 1e4)) revert BalancerPoolAdaptor___Slippage();
+
+            // revoke token in approval
+            for (uint256 i; i < tokensIn.length; ++i) {
+                _revokeExternalApproval(tokensIn[i], address(vault));
+            }
+        }
+        ```
+        Reference: [BalancerPoolAdaptor#L208-L231](https://github.com/PeggyJV/cellar-contracts/blob/bcd9a69bcadff58e247d293f85b45587f2bba62c/src/modules/adaptors/Balancer/BalancerPoolAdaptor.sol#L208-L231)
+
+        ```solidity
+        function relayerExitPool(ERC20 bptIn, uint256 amountIn, ERC20[] memory tokensOut, bytes[] memory callData) public {
+        PriceRouter priceRouter = Cellar(address(this)).priceRouter();
+        uint256[] memory tokenAmount = new uint256[](tokensOut.length);
+
+        for (uint256 i; i < tokensOut.length; ++i) {
+            tokenAmount[i] = tokensOut[i].balanceOf(address(this));
+        }
+
+        relayer.multicall(callData);
+
+        for (uint256 i; i < tokensOut.length; ++i) {
+            tokenAmount[i] = tokensOut[i].balanceOf(address(this)) - tokenAmount[i];
+        }
+        uint256 bptEquivalent = priceRouter.getValues(tokensOut, tokenAmount, bptIn);
+        if (bptEquivalent < amountIn.mulDivDown(slippage(), 1e4)) revert BalancerPoolAdaptor___Slippage();
+        }
+        ```
+        Reference: [BalancerPoolAdaptor.sol#L243-L256](https://github.com/PeggyJV/cellar-contracts/blob/bcd9a69bcadff58e247d293f85b45587f2bba62c/src/modules/adaptors/Balancer/BalancerPoolAdaptor.sol#L243-L258)
+
+        This can allow a strategist to make multiple arbitrary calls to balancer relayer and is not limited to exiting or joining a pool as intended. This opens the strategist to potentially make swaps or interact with balancer in unintended ways, like setting internal balancer balances that are not tracked by the cellar.
+
+        **Remediations to Consider**
+
+        Explicitly call `joinPool()` or `exitPool()` on the `vault` contract, or with the relayer to ensure the function executes as expected.
+   </field>
+</item>
+
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">14bd3cf95ea2500f9e81b19239020895286caf08</field>
+    <field name="content">
+        ## (M-4) Slippage checks can be skipped in `relayerExitPool()`
+        
+        In BalancerPoolAdaptor.sol’s `relayerExitPool()`, there are input parameters passed in to determine if tokens received from exiting the pool is within an accepted slippage range.
+
+        ```solidity
+        function relayerExitPool(ERC20 bptIn, uint256 amountIn, ERC20[] memory tokensOut, bytes[] memory callData) public {
+        PriceRouter priceRouter = Cellar(address(this)).priceRouter();
+        uint256[] memory tokenAmount = new uint256[](tokensOut.length);
+
+        for (uint256 i; i < tokensOut.length; ++i) {
+            tokenAmount[i] = tokensOut[i].balanceOf(address(this));
+        }
+
+        relayer.multicall(callData);
+
+        for (uint256 i; i < tokensOut.length; ++i) {
+            tokenAmount[i] = tokensOut[i].balanceOf(address(this)) - tokenAmount[i];
+        }
+        uint256 bptEquivalent = priceRouter.getValues(tokensOut, tokenAmount, bptIn);
+        if (bptEquivalent < amountIn.mulDivDown(slippage(), 1e4)) revert BalancerPoolAdaptor___Slippage();
+        }
+        ```
+        Reference: [BalancerPoolAdaptor.sol#L243-L256](https://github.com/PeggyJV/cellar-contracts/blob/bcd9a69bcadff58e247d293f85b45587f2bba62c/src/modules/adaptors/Balancer/BalancerPoolAdaptor.sol#L243-L258)
+
+        However, since only the `calldata` is used to make the call with the relayer, these other input parameters can be unrelated to the call itself. This allows a strategist to add empty values to `amountIn` and `tokensOut`, which allows the strategist to ignore the slippage check.
+
+        **Remediations to Consider**
+
+        Explicitly call exitPool with set input parameters on the `vault` contract or ensure the `calldata` sent to the relayer matches the values entered in order to properly make slippage checks.
+                
+   </field>
+</item>
+
+<item>
+    <field name="topic">Trust Assumption</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">addressed</field>
+    <field name="content">
+        ## (L-1) Chainlink prices can be incorrect
+
+        The PriceRouter.sol’s `_getPriceInUSD()` takes the price of assets and converts them to their price in USD with 8 decimals.
+
+        ```solidity
+        /**
+        * @notice Helper function to get an assets price in USD.
+        * @dev Returns price in USD with 8 decimals.
+        */
+        function _getPriceInUSD(ERC20 asset, AssetSettings memory settings) internal view returns (uint256) {
+            // Call get price function using appropriate derivative.
+            uint256 price;
+            if (settings.derivative == 1) {
+                price = _getPriceForChainlinkDerivative(asset, settings.source);
+            } else if (settings.derivative == 2) {
+                price = _getPriceForTwapDerivative(asset, settings.source);
+            } else if (settings.derivative == 3) {
+                price = Extension(settings.source).getPriceInUSD(asset);
+            } else revert PriceRouter__UnknownDerivative(settings.derivative);
+
+            return price;
+        }
+        ```
+        Reference: [PriceRouter.sol#L515-L531](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/price-router/PriceRouter.sol#L515-L531)
+
+        However, there are some assets supported by chainlink that their price in USD is not 8 decimals. In the case of [AMPL/USD](https://data.chain.link/ethereum/mainnet/crypto-usd/ampl-usd) the price returned is 18 decimals. This can disrupt with the valuation of assets by either inflating or deflating the price from the actual value of the asset.
+
+        **Remediations to Consider**
+
+        Either
+
+        - Ensure any asset using chainlink as a data feed uses 8 decimals before adding.
+        - Consider the decimals of the price returned by the feed into the price calculations.
+   </field>
+   <field name="response">
+    Will not support assets via chainlink if they do not have 8 decimals
+    </field>
+</item>
+
+<item>
+    <field name="topic">Gas</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">b42f57a15f584e91d13ab995f1f5ce13e4ca3f5a</field>
+    <field name="content">
+        ## (G-1) Costly Balancer read-only reentrancy check
+
+        In `BalancerPoolExtension.sol`, there is a check to ensure the vault has not in the middle of execution, which could lead to a [known read-only reentrancy issue](https://forum.balancer.fi/t/reentrancy-vulnerability-scope-expanded/4345).
+
+        ```solidity
+        function _ensureNotInVaultContext(IVault vault) internal view {
+        // Perform the following operation to trigger the Vault's reentrancy guard.
+        // Use a static call so that it can be a view function (even though the
+        // function is non-view).
+        //
+        // IVault.UserBalanceOp[] memory noop = new IVault.UserBalanceOp[](0);
+        // _vault.manageUserBalance(noop);
+
+        // solhint-disable-next-line var-name-mixedcase
+        bytes32 REENTRANCY_ERROR_HASH = keccak256(abi.encodeWithSignature("Error(string)", "BAL#400"));
+
+        // read-only re-entrancy protection - this call is always unsuccessful but we need to make sure
+        // it didn't fail due to a re-entrancy attack
+        // This might just look like an issue in foundry. Running a testnet test does not use an insane amount of gas.
+        (, bytes memory revertData) = address(vault).staticcall(
+            abi.encodeWithSelector(vault.manageUserBalance.selector, new address[](0))
+        );
+
+        if (keccak256(revertData) == REENTRANCY_ERROR_HASH) revert BalancerPoolExtension__Reentrancy();
+        }
+        ```
+        Reference: [BalancerPoolExtension.sol#L43-L62](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/price-router/Extensions/Balancer/BalancerPoolExtension.sol#L43-L62)
+
+        However, as [suggested](https://github.com/balancer/balancer-v2-monorepo/blob/9c1574b7d8c4f5040a016cdf79b9d2cc47364fd9/pkg/pool-utils/contracts/lib/VaultReentrancyLib.sol) by Balancer, static calls will consume all gas forwarded to them if they revert due to a storage modification, which is the goal of this check. Forwarding most of the available gas towards this static call, as is done here, would cause a lot additional gas to be consumed.
+
+        Additionally, it is more gas efficient to check if the reverting data’s length is greater than zero, than it is to check the returned error, as any error when static calling this function would be the reentrancy error.
+
+        **Remediations to Consider**
+
+        Use the code suggested by balancer to prevent excess gas consumption when making this check.
+    
+        
+   </field>
+</item>
+
+<item>
+    <field name="topic">Gas</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b42f57a15f584e91d13ab995f1f5ce13e4ca3f5a</field>
+    <field name="content">
+        ## (G-2) Loop index unnecessarily cast as uint8
+
+        In `PriceRouter.sol`’s `_getValues()`, it loops though all an array of assets and amounts to determine the value of all assets.
+
+        ```solidity
+        for (uint8 i = 0; i < baseAssets.length; i++) {
+            // Skip zero amount values.
+            if (amounts[i] == 0) continue;
+            ERC20 baseAsset = baseAssets[i];
+            if (baseAsset == quoteAsset) valueInQuote += amounts[i];
+            else {
+                uint256 basePrice;
+                {
+                    AssetSettings memory baseSettings = getAssetSettings[baseAsset];
+                    if (baseSettings.derivative == 0) revert PriceRouter__UnsupportedAsset(address(baseAsset));
+                    basePrice = _getPriceInUSD(baseAsset, baseSettings);
+                }
+                valueInQuote += _getValueInQuote(
+                    basePrice,
+                    quotePrice,
+                    baseAsset.decimals(),
+                    quoteDecimals,
+                    amounts[i]
+                );
+            }
+        }
+        ```
+        Reference: [PriceRouter.sol#L585-L605](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/price-router/PriceRouter.sol#L585-L605)
+
+        However, the index `i` used in the loop is a `uint8` which gets cast as a `uint256` each time it is used to index from the `amounts` or `baseAssets` array. Each casting consumes additional gas.
+
+        **Remediations to Consider**
+
+        Set `i` as a `uint256` instead of a `uint8` to prevent unnecessary casting and gas consumption.   
+   </field>
+</item>
+
+<item>
+    <field name="topic">Gas</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b42f57a15f584e91d13ab995f1f5ce13e4ca3f5a</field>
+    <field name="content">
+        ## (G-3) Use ++i instead of i++
+
+        In `PriceRouter.sol`, the functions `_getValues()` and `getExchangeRates()` use for loops when executing. 
+
+        ```solidity
+        for (uint8 i = 0; i < baseAssets.length; i++) {
+        ```
+        Reference: [PriceRouter.sol#L585](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/price-router/PriceRouter.sol#L585)
+
+        ```solidity
+        for (uint256 i; i < numOfAssets; i++) {
+        ```
+        Reference: [Pricerouter.sol#L474](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/price-router/PriceRouter.sol#L474)
+
+        However, it is 5 gas cheaper to increment these indexes using `++i` than it is to use `i++`.
+
+        Although 5 gas is not much savings, over many loops it can add up, especially when these functions are called as frequently as they are.
+
+        **Remediations to Consider**
+
+        Replace instances of `i++` with `++i`.
+    
+        
+   </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6333f91e603e22b22efd0e4df50c9e269d6e2842</field>
+    <field name="content">
+        ## (Q-1) Inaccurate natSpec comment
+
+        In `MorphoAaveV3ATokenCollateralAdaptor.sol`'s `withdrawableFrom()` the natSpec comment states that it “Checks that cellar has no active borrows, and if so reverts.”
+        However, if there are active borrows, `withdrawableFrom()` returns `0` rather than reverting.
+
+        ```solidity
+        /**
+        * @notice Checks that cellar has no active borrows, and if so reverts.
+        */
+        function withdrawableFrom(bytes memory adaptorData, bytes memory) public view override returns (uint256) {
+            address[] memory borrows = morpho().userBorrows(msg.sender);
+            if (borrows.length > 0) return 0;
+            else {
+                ERC20 underlying = abi.decode(adaptorData, (ERC20));
+                return morpho().collateralBalance(address(underlying), msg.sender);
+            }
+        }
+        ```
+        Reference: [MorphoAaveV3ATokenCollateralAdaptor.sol#L82-L92](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV3ATokenCollateralAdaptor.sol#L82-L92)
+
+        **Remediations to Consider**
+
+        Alter the comment to clarify that it will return `0` rather than revert.
+    
+        
+   </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6333f91e603e22b22efd0e4df50c9e269d6e2842</field>
+    <field name="content">
+        ## (Q-2) Unused import
+
+        In `Lido/WstEthExtension.sol`, the `IChainlinkAggregator` import is unused.
+
+        ```solidity
+        import { IChainlinkAggregator } from "src/interfaces/external/IChainlinkAggregator.sol";
+        ```
+        Reference: [WstEthExtension.sol#L5](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/price-router/Extensions/Lido/WstEthExtension.sol#L5)
+
+        **Remediations to Consider**
+
+        Remove the `IChainlinkAggregator` import.
+    
+        
+   </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6333f91e603e22b22efd0e4df50c9e269d6e2842</field>
+    <field name="content">
+        ## (Q-3) Unnecessary type casting
+
+        In `MorphoAaveV2ATokenAdaptor.sol`, `MorphoAaveV3ATokenCollateralAdaptor.sol`, and `MorphoAaveV3ATokenP2PAdaptor.sol`, there are functions where `adaptorData` is decoded into either an `IAaveToken` or `ERC20`, but only the address is used.
+
+        ```solidity
+        IAaveToken aToken = abi.decode(adaptorData, (IAaveToken));
+
+        // Withdraw assets from Morpho.
+        morpho().withdraw(address(aToken), assets, receiver);
+        ```
+        Reference: [MorphoAaveV2ATokenAdaptor.sol#L91-L94](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV2ATokenAdaptor.sol#L91-L94)
+
+        ```solidity
+        ERC20 underlying = abi.decode(adaptorData, (ERC20));
+
+        // Withdraw assets from Morpho.
+        morpho().withdrawCollateral(address(underlying), assets, address(this), receiver);
+        ```
+        Reference: [MorphoAaveV3ATokenCollateralAdaptor.sol#L76-L79](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV3ATokenCollateralAdaptor.sol#L76-L79)
+
+        ```solidity
+        ERC20 underlying = abi.decode(adaptorData, (ERC20));
+        return morpho().collateralBalance(address(underlying), msg.sender);
+        ```
+        Reference: [MorphoAaveV3ATokenCollateralAdaptor.sol#L89-L90](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV3ATokenCollateralAdaptor.sol#L89-L90) and [MorphoAaveV3ATokenCollateralAdaptor.sol#L98-L99](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV3ATokenCollateralAdaptor.sol#L98-L99)
+
+        ```solidity
+        ERC20 underlying = abi.decode(adaptorData, (ERC20));
+        uint256 iterations = abi.decode(configurationData, (uint256));
+
+        // Withdraw assets from Morpho.
+        morpho().withdraw(address(underlying), assets, address(this), receiver, iterations);
+        ```
+        Reference: [MorphoAaveV3ATokenP2PAdaptor.sol#L85-L89](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV3ATokenP2PAdaptor.sol#L85-L89)
+
+        ```solidity
+        ERC20 underlying = abi.decode(adaptorData, (ERC20));
+        return morpho().supplyBalance(address(underlying), msg.sender);
+        ```
+        Reference: [MorphoAaveV3ATokenP2PAdaptor.sol#L96-L97](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV3ATokenP2PAdaptor.sol#L96-L97) and [MorphoAaveV3ATokenP2PAdaptor.sol#L104-L105](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Morpho/MorphoAaveV3ATokenP2PAdaptor.sol#L104-L105)
+
+        **Remediations to Consider**
+
+        Cast the decoded `adaptorData` as an `address` where specified to prevent additional type casting.
+   </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6333f91e603e22b22efd0e4df50c9e269d6e2842</field>
+    <field name="content">
+        ## (Q-4) Misspelling
+
+        In `FTokenAdaptor.sol` there is a misspelling of override.
+
+        ```
+        *      and overrid the interface helper functions.
+        ```
+        Reference: [FTokenAdaptor.sol#L11](https://github.com/PeggyJV/cellar-contracts/blob/569d676eb6becd3245c0a2afe89ee34a3158790f/src/modules/adaptors/Frax/FTokenAdaptor.sol#L11)
+
+        **Remediations to Consider**
+
+        Fix this spelling error.
+    
+        
+   </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">66e77629680d6e1cea74ae829edfc126dd237bed</field>
+    <field name="content">
+        ## (Q-5) Unnecessary casting of `liquidityGauge`
+
+        In `BalancerPoolAdaptor.sol`’s `stakeBPT()` and `unstakeBPT()` , there is an unnecessarily cast of `liquidityGauge` to `address` when `_liquidityGauge` is already an address representing the same thing.
+
+        ```solidity
+        function stakeBPT(ERC20 _bpt, address _liquidityGauge, uint256 _amountIn) external {
+        _validateBptAndGauge(address(_bpt), _liquidityGauge);
+        uint256 amountIn = _maxAvailable(_bpt, _amountIn);
+        ILiquidityGaugev3Custom liquidityGauge = ILiquidityGaugev3Custom(_liquidityGauge);
+        _bpt.approve(address(liquidityGauge), amountIn);
+        liquidityGauge.deposit(amountIn, address(this));
+        _revokeExternalApproval(_bpt, address(liquidityGauge));
+        }
+        ```
+        Reference: [BalancerPoolAdaptor.sol#L266-L273](https://github.com/PeggyJV/cellar-contracts/blob/bcd9a69bcadff58e247d293f85b45587f2bba62c/src/modules/adaptors/Balancer/BalancerPoolAdaptor.sol#L266-L273)
+
+        ```solidity
+        function unstakeBPT(ERC20 _bpt, address _liquidityGauge, uint256 _amountOut) public {
+        _validateBptAndGauge(address(_bpt), _liquidityGauge);
+        ILiquidityGaugev3Custom liquidityGauge = ILiquidityGaugev3Custom(_liquidityGauge);
+        _amountOut = _maxAvailable(ERC20(address(liquidityGauge)), _amountOut);
+        liquidityGauge.withdraw(_amountOut);
+        }
+        ```
+        Reference: [BalancerPoolAdaptor.sol#L281-L286](https://github.com/PeggyJV/cellar-contracts/blob/bcd9a69bcadff58e247d293f85b45587f2bba62c/src/modules/adaptors/Balancer/BalancerPoolAdaptor.sol#L281-L286)
+
+        There is also an unnecessary casting in `balanceOf()` where `liquidityGauge` is already and address that is cast again to an address.
+
+        ```solidity
+        function balanceOf(bytes memory _adaptorData) public view override returns (uint256) {
+            (ERC20 bpt, address liquidityGauge) = abi.decode(_adaptorData, (ERC20, address));
+            if (liquidityGauge == address(0)) return ERC20(bpt).balanceOf(msg.sender);
+            ERC20 liquidityGaugeToken = ERC20(address(liquidityGauge));
+            uint256 stakedBPT = liquidityGaugeToken.balanceOf(msg.sender);
+            return ERC20(bpt).balanceOf(msg.sender) + stakedBPT;
+        }
+        ```
+        Reference: [BalancerPoolAdaptor.sol#L152-L158](https://github.com/PeggyJV/cellar-contracts/blob/bcd9a69bcadff58e247d293f85b45587f2bba62c/src/modules/adaptors/Balancer/BalancerPoolAdaptor.sol#L152-L158)
+
+        **Remediations to Consider**
+
+        Use `_liquidityGauge` instead of `liquidityGauge` where an address is needed.
+            
+        
+   </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">9218c3438faa54a68600addbc05e1f4738b9fc2d</field>
+    <field name="content">
+        ## (Q-6) Additional comments
+    
+        Each adaptor has comments that describe the adaptors specification. However in `BalancerPoolAdaptor.sol` there are additional unnecessary Adaptor Data and Configuration Data comments.
+
+        ```solidity
+        //==================== Adaptor Data Specification ====================
+        // See Related Open Issues on this for BalancerPoolAdaptor.sol
+        //================= Configuration Data Specification =================
+        // NOT USED
+        ```
+        Reference: [BalancerPoolAdaptor.sol#L36-L39](https://github.com/PeggyJV/cellar-contracts/blob/fb9694aa79e222af4ede3631de79c97fa5d19819/src/modules/adaptors/Balancer/BalancerPoolAdaptor.sol#L36-L39)
+
+        **Remediations to Consider**
+
+        Remove these additional comments.
+        
+   </field>
+</item>
+
+<item>
+    <field name="topic">Informational</field>
+    <field name="impact">medium</field>
+    <field name="status">addressed</field>
+    <field name="content">
+        ## (I-1) Asset price oracles can be edited
+
+        A assets price oracle is set by the `PriceRegistry.sol` contract which it’s multisig owner can call `startEditAsset()` to edit where after a 7 day delay, the new asset’s pricing will take effect.
+
+        This can allow the multisig to potentially rug cellars if the asset’s new oracle info is malicious, such as setting it to an `Extension` contract oracle that could be written to return favourable pricing in specific situations.
+
+        Editing the asset can be stopped by sommelier governance, by calling `transitionOwner()` to transition the owner over the course of 7 days, while preventing any owner functions from being called, preventing an asset from completing it pending change. Doing so requires governance and the community to watch for any calls to `startEditAsset()` and flag anything that seems malicious. Third party bots should be setup that notify the community of calls to `startEditAsset()`.   </field>
+    <field name="response">
+        Sommelier will create guides to teach the community how they can set up OpenZeppelin Sentinel bots to watch important contracts such as the PriceRouter and Registry, and notify them of certain actions taken.
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Informational</field>
+    <field name="impact">medium</field>
+    <field name="status">addressed</field>
+    <field name="content">
+        ## (I-2) Governance can transfer ownership of the price router
+
+        As mentioned in I-1, governance can call transitionOwner() of the PriceRouter to change the owner. This occurs over the course of 7 days, during which no owner functions can be called. In the case that governance transitions the price router’s owner to a new malicious owner, the community should be aware and respond accordingly. Third party bots should be setup that notify the community of calls to transitionOwner().    
+    </field>
+    <field name="response">
+        Sommelier will create guides to teach the community how they can set up OpenZeppelin Sentinel bots to watch important contracts such as the PriceRouter and Registry, and notify them of certain actions taken.
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Informational</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## (I-3) Cellar shares can be set to be illiquid
+
+        Cellars can hold positions in another cellar’s shares using the `CellarAdaptor`. This can be beneficial when cellars have correlated assets and withdrawing shares from a cellar would result in receiving correlated assets to what is held in the parent cellar. There is the possibility, however, where a strategist may want to hold shares in a cellar that holds unrelated assets. Doing so could cause user withdrawals to receive multiple assets that are unrelated to the parent cellar’s positions, and users may want to sell these. To prevent this, a strategist can set a cellar position to be illiquid, preventing user withdrawals of those cellar shares, and ensuring the assets received from a user withdrawal are more in line with what is expected.
+
+        It is important to note that illiquid cellar positions will remain until a strategist withdraws them, leaving shares in the cellar unable to be withdrawn if the only remaining positions are illiquid cellar shares.   </field>
+    <field name="response">
+        Accepted
+    </field>
+
+</item>
