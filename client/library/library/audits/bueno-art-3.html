@@ -1,0 +1,39 @@
+<page
+  clientName="Bueno.art"
+  reportDate="July 3rd, 2023"
+  auditTitle="Bueno.art A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/codeblush/solidity-audit"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_BUENO_ART_3"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from June 26th, 2023 to June 27th, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    8b1b12243eb31d8b8b0e2a80acebd074822eca5ce169e2dc26a89f8ea868c517  contracts/Bueno1155Drop.sol
+    2e082d4d9ff4149382f2f031de3ff9a91310683f98608169b702d2f15630bcb5  contracts/Bueno721Drop.sol
+    46b543bb2f3c8dc594b36b6138ee562ba4b9ba86eba3a198884746d92b60800b  contracts/BuenoFactory.sol
+    c751010efe8f5605c0b9968c34522f95429f4fb1fc5e358459a5bd999e63ca60  contracts/ICommon.sol
+  </template>
+
+  <p>
+    <b>Note:</b> This document contains an audit of the differences between Solidity contracts listed above and previous version from <a href="https://0xmacro.com/library/audits/bueno-art-2">Bueno-Art-2</a> audit. Specifically, the audit pertains only to the contracts themselves, and does not pertain to any other programs or scripts, including deployment scripts.
+  </p>
+</content-for>
+
+</page>
