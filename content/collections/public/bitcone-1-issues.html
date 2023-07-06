@@ -1,0 +1,35 @@
+<item>
+    <field name="topic">Documentation</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [I-1] Ownable implementation without admin functions
+
+        Although the contract inherits and implements `Ownable.sol` from OpenZeppelin, no functions are gated through the `onlyModifier`. 
+        As a result, the `owner` address is unable to modify any particular setting or take privileged actions inside the contract. 
+
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [I-2] Additional view functions
+
+        Since the code was generated using a token generator tool, the contract implements additional view functions, `generator()` and `version()` that do not
+        serve any specific use case or purpose within the ERC20 token standard or the Bitcone community.  
+
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [I-2] Max supply is fixed
+
+        The maximum and current supply of the Bitcone token cannot be altered in any way. 
+        This value was set during the contract deployment construction and there are no public or external functions that allow for its modification.
+
+    </field>
+</item>
