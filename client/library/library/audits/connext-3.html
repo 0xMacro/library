@@ -1,0 +1,35 @@
+<page
+  clientName="Connext"
+  reportDate="July 6th, 2023"
+  auditTitle="Connext A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/connext/monorepo/"
+  repoCommitHash="ea8deeb188acf4ef5482dc4cdea6ce9d42db1184"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_CONNEXT_1"
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on
+    July 3rd, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Specification documentation provided by {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository, in the `packages/deployments/contracts/contracts/messaging/` directory:</p>
+
+    <template type="file-hashes">
+      b46fc1ba449ce82df3ed16ed64a0d9df0192b1047c9d8f10a18877e7a593cd7a  ./interfaces/ambs/wormhole/IWormholeReceiver.sol
+      2d2a1bba751758c724fde75f356ea18795a09879bd810c21c50874347af59833  ./interfaces/ambs/wormhole/IWormholeRelayer.sol
+      ab01fd275f9adfa5e2c0477dc64fa85fd8e47517828137da34067cfab26e08b2  ./connectors/wormhole/BaseWormhole.sol
+      cca14ad0afde9d75809e7766516fc59ea41716f7119353b9837e5b91f3c9bd7c  ./connectors/wormhole/WormholeHubConnector.sol
+      a606c027bef403ba81a13bce1adf36f24ab0e9108cbfd0bc70a002c6f672b0da  ./connectors/wormhole/WormholeSpokeConnector.sol
+    </template>
+</content-for>
