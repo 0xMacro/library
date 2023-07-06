@@ -1,0 +1,357 @@
+<item>
+    <field name="topic">Griefing</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">943ca404defaf8d19ffb26dce80f7da0173b29f1</field>
+    <field name="content">
+        ## (M-1) Delegate can send an account’s funds to the treasury
+        
+        In Account.sol, a set delegate is able to execute multiple commands using `execute()` and `_dispatch()`. In these calls, parameters are passed in to make the proper execution.
+
+        However, the `market` contract address that the call is made on is also passed in as a parameter, and no checks are made to ensure this is a trusted contract.
+
+        Although there is not much a malicious contract can do to directly affect the account, it can be setup to return an assetPrice that sets the execution fee to be the amount of sUSD held in the account, draining it and sending to the set treasury address.
+
+        In most cases, this would be a griefing attack as they don’t have control over the treasury wallet, but anyone that does could steal all funds held in accounts that have been delegated to them.
+
+        **Remediations To Consider**
+
+        Instead of having the `market` address as a parameter, use a marketKey, and query the address from the addressResolver using `_getPerpsV2Market()`. This will ensure calls are made to an actual market contract preventing malicious contract calls.
+    </field>
+    <field name="response">
+        Regarding the suggestion to use a market key instead of the market address, it was decided to leave it as is.
+    </field>
+</item>
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## (M-2) Delegates not reset when Account ownership is transferred
+
+        In Account.sol, an owner can add one or more delegates who are authorized to perform sensitive operations related to that account.
+
+        When Account ownership is transferred to a new owner, the new owner may not be aware that previously configured delegates are still set and can execute actions for the account.
+
+        This may lead to situations where the previous account owner has backdoor access to the new owner’s account.
+
+        **Remediations To Consider**
+
+        - Remove all configured delegates when Account ownership is transferred, and
+        - Provide additional functionality for enumerating configured delegates.
+    </field>
+    <field name="response">
+        If ownership is canceled, the user should remove delegates if necessary. in most cases, I’d imagine ownership transfer is to another controlled EOA that would want the same functionality the delegates are already providing.
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## (M-3) Account may get locked due to error-prone ownership transfer
+
+        In Account.sol, the account owner may transfer ownership to the new address by calling the `transferOwnership()`. However, there is no validation that the new address provided is valid or that it can be used to interact with the account. In case it is invalid, privileged actions accessible only by the account owner will not be executable. In addition, all MARGIN_ASSET withdrawals will be directed toward an invalid owner address.
+
+        **Remediations To Consider**
+
+        - Implement 2 step ownership transfer process, where the new owner needs to claim the account for it to be considered transferred.
+
+    </field>
+    <field name="response">
+        This is an acceptable risk, and not one contracts should safeguard against.
+    </field>
+
+
+</item>
+
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">943ca404defaf8d19ffb26dce80f7da0173b29f1</field>
+    <field name="content">
+        ## (L-1) Fees can be changed and exceed 100% of a trades value
+        In Settings.sol, the fees that an account pays for making a transaction can be set by the owner of the contract by calling `setTradeFee()`, `setLimitOrderFee()`, and `setStopOrderFee()`. The only restriction is that the new doesn’t exceed the `MAX_BPS`, which caps the fee at 100% of the `sizeDelta` of an account transaction. When a conditional trade is made in Account.sol, the `tradeFee` and either the `stopOrderFee` or `limitOrderFee` add together to determine the total fee for the transaction, allowing a max fee of 200% of a trades value.
+
+        Since these trade values can be set at any time, the owner could increase the trade fee to be 100% and users funds would either be locked or taken by the set `treasury` address.
+
+        **Remediations To Consider**
+
+        Either
+
+        - Set a max trade fee that is more reasonable.
+        - Ensure the owner of the settings contract is a multisig with a sufficient timelock to allow users time to exit their position if malicious fees are set.
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">e82cd3e425968f3374467b6ae57d1bc9c5860d39</field>
+    <field name="content">
+        ## (L-2) Ensure market is active for conditional trades
+
+        In Account.sol’s `_validConditionalOrder()` is called by Gelato to check if a set conditional trade has met the conditions to trigger its execution. The execution occurs when Gelato calls `executeConditionalOrder()`, and is not supposed to revert.
+
+        However, there is the possibility for a market to be inactive or paused for multiple reasons, and the status of the market isn’t validated in `_validConditionalOrder()`, potentially causing the execution to revert if interacting with an inactive market.
+
+        **Remediations To Consider**
+
+        In `_validConditionalOrder()` check to ensure the market is active to prevent conditional trades from failing to execute.
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Upgradability</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">bb6120420ec3850e2fcf757043fcd752569a04ca</field>
+    <field name="content">
+        ## (L-3) Account is not upgrade safe
+
+        Account.sol is intended to be deployed as an implementation contract, with proxies delegating to the current implementation which is retrieved from Factory.sol. Account inherits from multiple contracts which don’t have a storage gap set. If Account needs an upgrade, this can potentially limit the options of what can be upgraded, as there is a potential for storage collisions to occur if not handled properly.
+
+        **Remediations To Consider**
+
+        Add storage gaps to Account.sol’s inherited contracts to allow more freedom for future upgrades.
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">909637262350746301309ca109eda6d10d1f26fc</field>
+    <field name="content">
+        ## (G-1) Shifting arrays is expensive
+
+        In Factory.sol, when the ownership of an account gets updated, the account calls `updateAccountOwnership()`, which updates an array of accounts owned by an owner, removing the account from the old owner account’s array and adding it to the new owner’s account array.
+
+        However, when removing the account from the old owner, it loops through the array until the address is found, then calls `_shiftArrayLeftFrom()`, which removes the account address at the passed-in index, then shifts every address after the removed one each a space to the left. If an address owns many accounts, this can be expensive, as each address shifted is a storage write.
+
+        **Remediations To Consider**
+
+        Instead of shifting the addresses, retrieve the address at the end of the array and set it to the index that is being removed, then `pop()` the array. This ensures there is only a single storage write, no matter the size of the address array.
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">0d5d1e4a921b71156ffc1eac7c1f037e35f0be17</field>
+    <field name="content">
+        ## (G-2) Unnecessary repeated calls to _getPerpsV2Market()
+
+        In Account.sol’s `executeConditionalOrder()`, there are multiple calls to `_getPerpsV2Market()`, which is an external function call to retrieve the `market` contract from a `marketKey`, each call costs unnecessary additional gas.
+
+        **Remediations To Consider**
+
+        Call `_getPerpsV2Market()` and store the resulting address in memory, and reuse it where necessary.
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">943ca404defaf8d19ffb26dce80f7da0173b29f1</field>
+    <field name="content">
+        ## (G-3) `futuresMarketManager` can be immutable
+
+        In Account.sol, `futuresMarketManager` is set in the initializer by querying the ADDRESS_RESOLVER for its contract address.
+
+        However, the futuresMarketManager is unlikely to change, and can be set in the constructor using the same method.
+
+        **Remediations To Consider**
+
+        Set the futuresMarketManager in the constructor rather than on each initialization. This will reduce gas costs of deployment and operation.
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">be18adbf4a433e78c4fee4e00e3735bf504b22df</field>
+    <field name="content">
+        ## (Q-1) Unnecessary account parameter in events
+
+        In Events.sol, each function ensures the caller is an account contract by querying the Factory.sol contract. It then emits the relevant events, taking in an `account` address as a parameter.
+
+        However, each call to these functions by the Account.sol contract passes in its own address as the `account` parameter, meaning `account` will always equal `msg.sender`.
+        
+        **Remediations To Consider**
+        
+        Remove the account parameter from each function in Event.sol, and replace with msg.sender.
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7b13aee67abc4635e7c7dcf1bbbfdddf8140b55e</field>
+    <field name="content">
+        ## (Q-2) Unnecessary parameter and check
+        In Factory.sol’s `updateAccountOwnership()`, an `_account` address is passed in and checked to see if it’s a valid address, and if msg.sender equals _account:
+
+        ```solidity
+        // ensure account is registered by factory
+        if (!accounts[_account]) revert AccountDoesNotExist();
+
+        // ensure function caller is the account
+        if (msg.sender != _account) revert OnlyAccount();
+        ```
+
+        However, the same thing can be accomplished by checking `msg.sender` on the `accounts` mapping, removing the need for an `_account` parameter and the second check that throws `OnlyAccount`
+
+        **Remediations To Consider**
+
+        Remove the `_account` parameter and replace all instances of it with msg.sender. Also remove the check if `msg.sender` ≠ `_account`.
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">00d3d645016d6a9e120ada82738ee002440b02ea</field>
+    <field name="content">
+       
+        ## (Q-3) FreeMargin check can be made into internal function
+
+        In Account.sol, there are multiple checks to ensure that if there is sufficient `freeMargin()` to allow a trade to occur. These checks are found in functions, `_modifyAccountMargin`, `_perpsV2ModifyMargin`, `_placeConditionalOrder`, and `_imposeFee`, each are very similar or identical to each other and can be replaced with an internal function.
+
+        **Remediations To Consider**
+
+        Replace freeMargin checks with an internal function to prevent duplicate code, and clean up the codebase.
+
+    </field>
+
+</item>
+       
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">00d3d645016d6a9e120ada82738ee002440b02ea</field>
+    <field name="content">
+        ## (Q-4) Duplicate calls to `transferMargin()`
+
+        In Account.sol’s `_perpsV2ModifyMargin()` there is a branch if `_amount` is greater than zero:
+
+        ```solidity
+        if (_amount > 0) {
+            if (uint256(_amount) > freeMargin()) {
+                revert InsufficientFreeMargin(freeMargin(), uint256(_amount));
+            } else {
+                IPerpsV2MarketConsolidated(_market).transferMargin(_amount);
+            }
+        } else {
+            IPerpsV2MarketConsolidated(_market).transferMargin(_amount);
+        }
+        ```
+
+        Each branch calls the same function `transferMargin()` on the market with the same `_amount` parameter. 
+
+        **Remediations To Consider**
+
+        Remove the else branch, and check if there is enough free margin, then make the call to `transferMargin()`like this:
+
+        ```solidity
+        if (_amount > 0 && uint256(_amount) > freeMargin()) {
+            revert InsufficientFreeMargin(freeMargin(), uint256(_amount));
+        }
+        IPerpsV2MarketConsolidated(_market).transferMargin(_amount);
+        ```
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2f6ca224d6dde0e0a132a9ac835224cd15012d55</field>
+    <field name="content">
+        ## (Q-5) `MIN_ETH` never used
+        In Account.sol, the constant MIN_ETH is initialized but never used.
+
+        **Remediations To Consider**
+
+        Remove `MIN_ETH` as it is never used.
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## (Q-6) Missing event information for filled conditional order
+
+        In Account.sol, when `executeConditionalOrder()` is performed, the amount of `sizeDelta` filled for a particular conditional order may differ from the `sizeDelta` defined initially for that order. This edge case can happen when the `sizeDelta` of conditional order is larger than the position’s `currentSize`.
+
+        Consider adding an attribute to the `emitConditionalOrderFilled` for `sizeDelta` processed.
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">519c19bb441ccd28e2a29d4bd9a9d0806de7fbf9</field>
+    <field name="content">
+        ## (Q-7) Missing indexed attribute for conditional order events
+
+        For events, ConditionalOrderPlaced, ConditionalOrderCancelled, and ConditionalOrderFilled consider making the conditionalOrderId parameter indexed to facilitate off-chain monitoring and tracking.
+
+    </field>
+
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">981ec3569e9da29614418add3aeb8f134cfa77f0</field>
+    <field name="content">
+        ## (Q-8) Documentation improvements
+
+        - In IFactory.sol, natspec is missing for the version param of the `NewAccount` event.
+        - In Account.sol, natspec for the return value of `_getPerpsV2Market()` indicates IPerpsV2Market type. However, the return value is of type `IPerpsV2MarketConsolidated`.
+    </field>
+
+</item>
