@@ -1,0 +1,83 @@
+<page
+  clientName="Grateful"
+  reportDate="July 4th, 2023"
+  auditTitle="Grateful A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Grateful-protocol/grateful-contracts"
+  repoCommitHash="87b9b31b1d5e7a3315d1b70ea22b409427bfed79"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from June 4, 2023 to June 9, 2023.
+    <p>
+    <strong>Note:</strong> Grateful contracts are based on the Synthetix’s Router Proxy Architecture 
+    using the unstructured storage pattern. The audit was focused around the actual protocol logic, meaning that code 
+    related to the Proxy Architecture including the actual deployment of the contracts 
+    were outside of the scope of this audit. 
+    </p>
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+      <li>Available documentation: https://grateful.gitbook.io/docs/</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        Grateful contracts use an [upgradable proxy architecture](https://sips.synthetix.io/sips/sip-307/), 
+        allowing the owner to upgrade to a new implementation. In addition, the owner has the following privileges:
+        <ul>
+            <li><b>Configuration:</b> Change solvency and liquidation time.</li>
+            <li><b>Fee:</b> Set protocol fee. 
+                <br/>
+                <i>Note:</i> Protocol fees are taken from the Giver who creates the subscription and are handled
+                through subscriptions to the <i>Grateful Treasury</i>. According to Grateful team, there will be no fees 
+                charged at the beginning, but users need to be aware that fees can be increased anytime.
+            </li>
+            <li><b>Vault management:</b> Add vaults, change min and max rate, deactivate/pause vaults. 
+                <i>Note:</i> Users can't withdraw their funds on pauses vaults.</li>
+        </ul>
+
+    </template>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+        0971a6aa93ed9794bba40fecc018c6e769a4f80a7e662ea83fe9e6d10a27ac4f  contracts/modules/BalancesModule.sol
+        0eb2425c87c63cc7b816b3bdc7f3734e49b97f7bc255fd4ee43a46624d25784b  contracts/modules/ConfigModule.sol
+        3ab86d52ac1dcfc9c38a2a15407a094d9a232365e3a39c281687fedf225a2e5f  contracts/modules/CoreModule.sol
+        943fbed60efc0fbeb688ec87152ffff31fea3e2cc1e4216af9a45c470b6eeb4a  contracts/modules/FeesModule.sol
+        59f9097b841d5acc3e80180fbacf69b7aa86819e0e8392662debec776bd1f4ac  contracts/modules/FundsModule.sol
+        f27dec7c9c6254dc040211d02441da359936e161c0d9c6cd8490b6be9f5e6e5d  contracts/modules/LiquidationsModule.sol
+        797b3e38cdcf77c5f852fe547dea309cd386d34a4829354b3c8094e38f6c3397  contracts/modules/MulticallModule.sol
+        bb258f1519b5fa8bc690a4e6bc0916c52e27596101aafb1a229fa837af44bef6  contracts/modules/ProfilesModule.sol
+        4219752d73fe1a90554ec94c1625c4105e363258b73d691b03afb1846b0fd918  contracts/modules/SubscriptionsModule.sol
+        a839706de5a4533fce703be0a135e6ae6ec91899b0908816aeb706170f64f6f5  contracts/modules/VaultsModule.sol
+        7888ca6b2210684499a37649e4d73c9127053a931523f6416c3087c69577f8fa  contracts/errors/BalanceErrors.sol
+        88bcedbf34825368bda4afda02418702c9a0dcbaac659c3c21576c70370087f8  contracts/errors/InputErrors.sol
+        08b9d1a15e1ffe9d91add316e2dc665469e6103f99b3fdc2f83f2133317ade86  contracts/errors/ProfileErrors.sol
+        f4cf09a5ebb8777ad3698f43589237a90e415ebaad756589f924fe41d135feab  contracts/errors/SubscriptionErrors.sol
+        ca15fe502ae648629314feb677ab497997895f34c5574010ff161b46158b5c59  contracts/errors/VaultErrors.sol
+        356a0cbd572a74ea55beb722e00b8aa5897bb318c480c7764b2576ad67482072  contracts/storage/Balance.sol
+        726b1323d6ff5385bb2b85ea67f61ee85ee35dc3e8c07fe73d721cca6e9a5a3c  contracts/storage/Config.sol
+        5813735dfb27ce8fea2f1adacd3fac9b9da32f5276b6cd35c00e8d3cb1750f05  contracts/storage/Fee.sol
+        b9de91d57cd5b5ec4951b371764e799ed41288b6e38ad7c9cb9f1d8ff99ee3f3  contracts/storage/Profile.sol
+        7097f33d16ad550470e11c43c855c1540c0aaf60eff2edc162c9217884097aba  contracts/storage/ProfileNft.sol
+        585a581c0f3ccaaf888d17e8b93a0aa82126e9b0d2c8f1cc126543b204471917  contracts/storage/ProfileRBAC.sol
+        839c0585a3e073de6f5f788fec00d358dcf07bd71475563d603958598958136e  contracts/storage/Subscription.sol
+        7e89d835e3f5219dfa8f7cea0beac244dacf711f5c159e6d7f9ed73ff395d593  contracts/storage/SubscriptionNft.sol
+        d03be4bbbce80ee0b83ffb53ad618c81be7743093f2e701b2b608a9901bbaa79  contracts/storage/SubscriptionRegistry.sol
+        62cfb785203af65bc681d5d3ce3d5330fa79af700a3c7ea01d53d0c2cd8ac88a  contracts/storage/Vault.sol
+        5d7f0650c563bcb685354c5f1333797dc2ea0a36c21e855acdddde8c3a0104c7  contracts/utils/ProfileRenderer.sol
+        8a030c4a20b31d754d4de9878d2d0e1d83af86d73356cd449a06cb595c16ee52  contracts/utils/RendererUtils.sol
+        269e40f208b35b677b3225488ff50ca3ef997f5138177c5fd68369e1adf3ff44  contracts/utils/SubscriptionRenderer.sol
+        ca952837e4e6afcb93cbe7afd1ffe50aba3361f4daf3b37a5a97434187ebbc30  contracts/utils/SubscriptionUtil.sol
+        c98e00d7efe7212fea19b7911acf4b6445888105beb3d05340b16640e0ba2e17  contracts/utils/VaultUtil.sol
+    </template>
+  </content-for>
+
+</page>
