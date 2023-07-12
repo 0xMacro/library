@@ -1,0 +1,148 @@
+<page
+  clientName="Connext"
+  reportDate="July 12, 2023"
+  auditTitle="Connext A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/connext/monorepo"
+  repoUrl2="https://github.com/connext/chain-abstraction-integration"
+  customRepoInfo
+  customReviewInfo
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_CONNEXT_2"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from April 24, 2023 to May 26, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>Connext documentation.</li>
+    <li>Connext provided audit handoff document.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank">
+        {{page.repoUrl.split('/').slice(-1)[0]}}
+      </a>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash:
+      <code>96d5d965081d8391466b9d0ff4b9a8bebcf131b0</code>
+    </li>
+
+    <li>
+      <b>Snapshot Library Improvement (PR4060):</b>
+      <a href="https://github.com/connext/monorepo/pull/4060/" target="_blank">
+        monorepo/pull/4060
+      </a>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash:
+      <code>0152ca9966abc3f183404ba78ae84fb480cbb9fa</code>
+    </li>
+
+    <li>
+      <b>Relayer Proxy (PR4061):</b>
+      <a href="https://github.com/connext/monorepo/pull/4061/" target="_blank">
+        monorepo/pull/4061
+      </a>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash:
+      <code>12def02d68c4f6779e2c209549245607bef2e40b</code>
+    </li>
+
+    <li>
+      <b>Repository:</b>
+      <a href="{{page.repoUrl2}}" target="_blank">
+        {{page.repoUrl2.split('/').slice(-1)[0]}}
+      </a>
+    </li>
+    <li class="break-words break-all">
+      Commit Hash:
+      <code>ac7932652d506615a58a9f21e2819117ecd4428d</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within the `monorepo` repository:</p>
+  <p><i>./packages/deployments/contracts/contracts/messaging/</i></p>
+  <template type="file-hashes">
+    55f1767dd806c2ee2767e093ba8a02f011d7f1bcb1d9750ecf4a8e4756d3e76a  ./Conductor.sol
+    b1dc10d58c5da9720418633a8b71454d3c938fd006c05eeb0d4d0084fb600f40  ./MerkleTreeManager.sol
+    fce2ea45afbf33b2b4937344269b1364184f0e4a7d46a987fa24b6d2061397a7  ./RootManager.sol
+    eccf9a33b5d0f170003c0a343e68693c16eb4d499654b5ed177fe787a224d923  ./connectors/Connector.sol
+    78a29659b3f55e4ac2f5b6a0f489048ea552c77b8371530a21bc255c6c5515f5  ./connectors/ConnectorManager.sol
+    b27b0e5f079af9c5f1539d1ba2d2984cad515192a0fc9a02095a1b979612e7b5  ./connectors/GasCap.sol
+    0d138e14b7b8c80b54463580155c834af445580a838c70cb86a13a20ff1ef226  ./connectors/HubConnector.sol
+    d3fc564c6a3d71ebb5a110d55f19779212dd43b7bd11deeafeba02af04162c33  ./connectors/SpokeConnector.sol
+    6ec3570640c1d2d92b0861ba795133d47ea761af72e39ddd324ce43603c1b5c0  ./connectors/mainnet/MainnetSpokeConnector.sol
+    8ba3dc99a2bb0fa668fdec812a3c35115c21ae78207c1e0056b7b72e9507960e  ./connectors/optimism/BaseOptimism.sol
+    87e76de475254cc776735d75e0f6e5ffa9bec0ecb414f5d7f360ffa6a36f9ea8  ./connectors/optimism/OptimismHubConnector.sol
+    68f46da81aafe83fa8ac40468a5dfab6f186e608592824d162f0f65c51a5c734  ./connectors/optimism/OptimismSpokeConnector.sol
+    adb10e8b8a71ddb405b378943f0ca19511a2c510ad6a1ff5bd61e6c16f80ddd1  ./connectors/optimism/lib/Types.sol
+    0de1ee567a7f6e3e27e6d1cc09e6dfb3e335c8f1336507b4d3f605b46229f2a6  ./connectors/polygonzk/BasePolygonZk.sol
+    c12fec532345fb4a431cd6777e40b8c66489140368c8169a845cdb855e1b116d  ./connectors/polygonzk/PolygonZkHubConnector.sol
+    ce3bffbdc6484edfde1d0942686b9b63a23c82a8772f64b7a5c266127827aaea  ./connectors/polygonzk/PolygonZkSpokeConnector.sol
+    71d172e0f55002e86483ec25a6f185b08d979ba993dc8ae02daa4a0c58698550  ./connectors/zksync/ZkSyncHubConnector.sol
+    a267b84fb21d40a969d358a26e2fa792f40514abe79f0ffbc48f312566f26f33  ./connectors/zksync/ZkSyncSpokeConnector.sol
+    18e69eed4b7226e8650fa078fab7cc47600f4bdd24652ffb2e38d23c3e7fc5a6  ./interfaces/IConnector.sol
+    34583a69beb6430e1d3a563e2672bbb64e7316d8eb25ca2bbd62868b8cd77303  ./interfaces/IConnectorManager.sol
+    2bf30b5788b487ddaa1e44333f999aa16ba71e7ab5ef4c476e3905bd3f00a53a  ./interfaces/IHubConnector.sol
+    cd9c247436a3baeca59201b1cab92367da901b383b7fbeacb48fb6f9acb8b421  ./interfaces/IMessageRecipient.sol
+    2e06d4c06aee3e8208780812acb796a1e1745e5fc0cdd9dfc98f69b91a80ca07  ./interfaces/IOutbox.sol
+    d1dcb24dae1549066036e00c9eac5293411dd899177295f6f401031e624af3be  ./interfaces/IRootManager.sol
+    41cff48edb04834553bec3921283b5dccaa7e76a8249b462e88f5186875bc751  ./interfaces/ambs/optimism/IOptimismPortal.sol
+    1ef13616e80e6337a0dc0c72be02e9ae47f5b39b451ccfc36b4b2f04a1d3cdf1  ./interfaces/ambs/optimism/OptimismAmb.sol
+    a8eb4926df3031341dcd299a0e974b61ba60d9564e982e27b58c47a17f3e46fd  ./interfaces/ambs/polygonzk/IBridgeMessageReceiver.sol
+    29f13a887856de236c8b20ab84ec0f36afdb3827e2d097c179db91a46d9ee475  ./interfaces/ambs/polygonzk/IPolygonZkEVMBridge.sol
+    d4f97d76ce1e8ec0eeedf67c4c85f0d14310b5da026e606d49c8a975a294c896  ./interfaces/ambs/zksync/IL1Messenger.sol
+    ecd5f295053f40ebc1c3db09005735098fb492ab756cc228fb822de31136f1e6  ./interfaces/ambs/zksync/IZkSync.sol
+    19fca7174da361d51a0343ac8a2931db0aacdf8f268a30334d4709cbdee4e73a  ./libraries/DomainIndexer.sol
+    93c200bbbe70554ca25da16e42f008273ecc85a27cf1b033d902dd50b93b84a9  ./libraries/SnapshotId.sol
+  </template>
+
+  <p>Snapshot Library Improvement (PR4060)</p>
+  <p><i>./packages/deployments/contracts/contracts/core/connext/helpers/</i></p>
+  <template type="file-hashes">
+    94bc1020cca4f13b5d94594561052614dac2f011c1083f18235762d0e0d05560  ./RootManager.sol
+    1a44e10256c8f0dc4a78d077b2f432100ff5a9843c3c79b02aa7102ef9487be6  ./connectors/SpokeConnector.sol
+    e661b537559a3c3a24ad4d47616677ed4d1b3002ef412d9da5e02b05b3c44e08  ./libraries/SnapshotId.sol
+  </template>
+
+  <p>Specific changes (PR4061) for the Relayer Proxy contracts</p>
+  <p><i>./packages/deployments/contracts/contracts/core/connext/helpers/</i></p>
+  <template type="file-hashes">
+    28036f04d0f3596e3611900e9b87e74f506ef391f64e003c16a45f29864445d3  ./RelayerProxy.sol
+    f503fedd08b41aff76d2ca534f1e5a7944ea111d7c7bce8ffa0511bad76fcc51  ./RelayerProxyHub.sol
+  </template>
+
+  <p>And, specifically, we audited the following contracts within the `chain-abstraction-integration` repository:</p>
+  <p><i>./contracts/</i></p>
+  <template type="file-hashes">
+    b9885798adf17358867522790b9310c3229e24e6b836b105440e620666a7bd75  ./destination/xreceivers/AuthForwarderXReceiver.sol
+    b847b153ba7ab456a5a7aa6a7d9679ecfda6ca63cff284d1b7746231b385034e  ./destination/xreceivers/ForwarderXReceiver.sol
+    71d08a6f9dacde6cad8f71082ea8bb7e32d6548c98754642cc7f27b3c5093ffe  ./destination/xreceivers/Swap/SwapForwarderXReceiver.sol
+    6807a4f014d9bf7f5577580d12dc2fae30335d10448797ed03f0254415cfd064  ./origin/Swap/SwapAndXCall.sol
+    34b1adcd7bfa2c54ef58fe93799ee97d166a02169377ef9edd84c9d7dee44d86  ./shared/Swap/OneInch/OneInchUniswapV3.sol
+    94fed22e19824f9af01b7f0a63550629298e24047b5afc9233fcff082d6b4ddb  ./shared/Swap/Pancakeswap/PancakeV3Swapper.sol
+    74d10828789e61b84573729dbdac6ccb16877e140ceeeed3f41d11e5fad2ac4b  ./shared/Swap/SwapAdapter.sol
+    34e33e21ed36fd2c6e420eef1b21f41c012aca983add519fccddd8845f877269  ./shared/Swap/Uniswap/UniV2Swapper.sol
+    888581b0e5260e71d535b6afa502926ad7d5883319fc140ffa8355a64310c02a  ./shared/Swap/Uniswap/UniV3Swapper.sol
+    b232a10c70916913d8763c7c096d6e02d72789f5d2946bb06afc0244a1872210  ./shared/Swap/interfaces/IPancakeSmartRouter.sol
+    cce7f213b6c7e44eef721560bfbd1ef99501b7fb7655fb090794119400aa6b54  ./shared/Swap/interfaces/ISmartRouter.sol
+    d7066a42cd77c48b2ee6e96d7dfd8115d8b6df3c65e9eab5744d41830f82bccc  ./shared/Swap/interfaces/ISwapper.sol
+    b991bc8a69dd21e4eb5e7599457972f17abf0bdca8f4357bca059f7620393099  ./shared/Swap/interfaces/IWETH9.sol
+    5656aba4deaa3d2e68d27b62f8bdc437e8026fa44f2ec502097185a2ed8b6571  ./shared/Swap/libraries/BytesLib.sol
+  </template>
+</content-for>
+
