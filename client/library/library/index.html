@@ -15,28 +15,9 @@
     <p class="mt-4">Check them out below.</p>
   </div>
 
-  <section class="mt-12 max-w-lg">
-    <h2 class="text-2xl font-bold">Cool Stuff</h2>
-    <p class="mt-2">Useful resources for developing on Solidity, Ethereum, and the EVM.</p>
-    <ul class="mt-4 text-xl space-y-2 font-medium">
-      <li>
-        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/gas-nums">⛽️&nbsp;&nbsp;Gas Numbers Every Solidity Dev Should Know</a>
-      </li>
-      <li>
-        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/trim/repl">✂️&nbsp;&nbsp;Trim REPL</a>
-      </li>
-      <li>
-        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/evm/explorer">🗺&nbsp;&nbsp;EVM Bytecode Explorer</a>
-      </li>
-      <li>
-        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/evm/solidity-repl">🪚&nbsp;&nbsp;Quick & Crude Solidity REPL</a>
-      </li>
-    </ul>
-  </section>
-
   <section class="mt-12 max-w-2xl">
-    <h2 class="text-2xl font-bold">Audit Works</h2>
-    <p class="mt-2">A curated list of audits and clients we have worked with in the past.</p>
+    <h2 class="text-2xl font-bold">Public Audits</h2>
+    <p class="mt-2">A curated list of audits  we have worked with in the past, available to the community.</p>
 
     <div class="mt-4 space-y-8">
 
@@ -54,21 +35,9 @@
           <div class="border-t dark:bg-gray-900 border-gray-200 dark:border-gray-800 px-4 py-5 sm:p-0">
             <dl class="sm:divide-y sm:divide-gray-200 dark:sm:divide-gray-800">
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">Scope</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
-                  {{audit.scope}}
-                </dd>
-              </div>
-              <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
                 <dt class="text-sm font-medium text-gray-500">Dates Performed</dt>
                 <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
-                  {{audit.dates}}
-                </dd>
-              </div>
-              <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">Team Size</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
-                  {{audit.teamSize}}
+                  {{audit.date}}
                 </dd>
               </div>
               <if cond="audit.about">
@@ -82,6 +51,12 @@
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
                 <dt class="text-sm font-medium text-gray-500">Links</dt>
                 <dd class="Copy --sm mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
+                  {{AuditMarkdown.renderIssueContent(audit.report)}}
+                </dd>
+              </div>
+              <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Links</dt>
+                <dd class="Copy --sm mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
                   {{AuditMarkdown.renderIssueContent(audit.attachments)}}
                 </dd>
               </div>
@@ -92,6 +67,25 @@
       </for>
 
     </div>
+  </section>
+
+  <section class="mt-12 max-w-lg">
+    <h2 class="text-2xl font-bold">Cool Stuff</h2>
+    <p class="mt-2">Useful resources for developing on Solidity, Ethereum, and the EVM.</p>
+    <ul class="mt-4 text-xl space-y-2 font-medium">
+      <li>
+        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/gas-nums">⛽️&nbsp;&nbsp;Gas Numbers Every Solidity Dev Should Know</a>
+      </li>
+      <li>
+        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/trim/repl">✂️&nbsp;&nbsp;Trim REPL</a>
+      </li>
+      <li>
+        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/evm/explorer">🗺&nbsp;&nbsp;EVM Bytecode Explorer</a>
+      </li>
+      <li>
+        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/evm/solidity-repl">🪚&nbsp;&nbsp;Quick & Crude Solidity REPL</a>
+      </li>
+    </ul>
   </section>
 
 </div>
