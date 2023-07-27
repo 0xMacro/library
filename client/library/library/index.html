@@ -35,7 +35,7 @@
           <div class="border-t dark:bg-gray-900 border-gray-200 dark:border-gray-800 px-4 py-5 sm:p-0">
             <dl class="sm:divide-y sm:divide-gray-200 dark:sm:divide-gray-800">
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">Dates Performed</dt>
+                <dt class="text-sm font-medium text-gray-500">Audit Report Release Date</dt>
                 <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
                   {{audit.date}}
                 </dd>
@@ -49,13 +49,13 @@
                 </div>
               </if>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">Links</dt>
+                <dt class="text-sm font-medium text-gray-500">Report Link</dt>
                 <dd class="Copy --sm mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
                   {{AuditMarkdown.renderIssueContent(audit.report)}}
                 </dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">Links</dt>
+                <dt class="text-sm font-medium text-gray-500">References</dt>
                 <dd class="Copy --sm mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
                   {{AuditMarkdown.renderIssueContent(audit.attachments)}}
                 </dd>
