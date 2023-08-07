@@ -1,0 +1,59 @@
+<page
+  clientName="Sommelier"
+  reportDate="Aug 4, 2023"
+  auditTitle="Sommelier A-9"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+  passwordEncrypt="env:PAGE_PASS_SOMMELIER_9"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from July 31,
+    2023 to August 4, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>e10e66952ba637c432f2aa681b8d2a86d05239ff</code>
+      </li>
+     
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository for the initial part of the audit:
+    </p>
+
+    <template type="file-hashes">
+        8de003d3f99f5ee9ec9af9878f60e7f951ef81ee024c74d24e4b7c1586239fd2  src/Deployer.sol
+        3f2260cefb52d14a46b1c58f388c29003fd936e0378ec6100e340e7cbe91b898  src/Registry.sol
+        da45d0063828460c28f1b7bf61aea41dbf8b55c068d0e176e1a77b05a7885cfb  src/base/Cellar.sol
+        8fb479f2a5e5923277f2c1c24071ae8202442d05e6d7b17189948183e9dff6cf  src/base/ERC4626SharePriceOracle.sol
+        84ccc31b14adb1630540117df3a171e023c30bda8eb6d80947de2eb8d814dbe9  src/base/permutations/CellarWithAaveFlashLoans.sol
+        abc25211a31b23c18ef38412e9ab572d39cb417e58a7342ce56d07a3f73e857d  src/base/permutations/CellarWithBalancerFlashLoans.sol
+        54a2d06a27398d807443f5d10e3c67ca380ed9aa0aac138ef5931576e9d846ca  src/base/permutations/CellarWithOracle.sol
+        9ab08dcb8beb3756b26bf1a6084a3d47403c4c2e8da89e26ce5479519e644121  src/base/permutations/CellarWithOracleWithAaveFlashLoans.sol
+        a22e32be23195483227b51326396aec6c3a3f21468cc5c2ead9be949d23dea23  src/base/permutations/CellarWithOracleWithBalancerFlashLoans.sol
+        73bb18be6bac1dd3af305099e15e6306e0fef214fef370d7757d22bb9d948e2a  src/base/permutations/CellarWithShareLockPeriod.sol
+        ce73ac1e92105ad85c707a9b4946d836f782eba469c161d5a33c429f7cca65ec  src/modules/adaptors/Balancer/BalancerPoolAdaptor.sol
+        a2162b8f914b0a68d4bc51aa4623e6ec585acca7136b7561c27934cf588fed38  src/modules/adaptors/Sommelier/LegacyCellarAdaptor.sol
+        8201d6303d412a5d0fd3a2a6065d07a42f4654be9fda199a331ef1453727768f  src/modules/price-router/Extensions/Lido/StEthExtension.sol
+    </template>
+
+  </content-for>
+</page>
