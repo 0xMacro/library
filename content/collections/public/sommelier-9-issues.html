@@ -124,6 +124,23 @@
       Add an event to indicate what the `automationActions` address is set to.
     </field>
   </item>
+
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+     <field name="status">fixed</field>
+    <field name="commit">a33838df36f45ad711a194dcc60be24cef934ce6</field>
+    <field name="content">
+      ## [L-2] `distrustPosition` missing event
+  
+      In `Registry.sol`’s `distrustPosition()` does not emit an event. It would be beneficial to emit an event here so that call to this function can be more easily watched and reacted to in case a position is unexpectedly distrusted by the registry’s owner as well as to more easily determine which positions are trusted by the registry.
+  
+      **Remediations to Consider**
+  
+      Add an event that emits the information of the position when it is distrusted.
+    </field>
+  </item>
   
   <item>
     <field name="topic">Code Quality</field>
@@ -180,6 +197,31 @@
       **Remediations to Consider**
   
       Replace `haas` with `has`
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a33838df36f45ad711a194dcc60be24cef934ce6</field>
+    <field name="content">
+      ## [Q-4] `positionCount` no longer used
+  
+      In `Registry.sol` the public variable `positionCount` is not longer used or referenced by anything and displays an inaccurate position count.
+  
+      ```solidity
+      /**
+       * @notice Stores the number of positions that have been added to the registry.
+       *         Starts at 101.
+       */
+      uint32 public positionCount = 100;
+      ```
+      Reference: [Registry.sol#L387-L391](https://github.com/PeggyJV/cellar-contracts/blob/e10e66952ba637c432f2aa681b8d2a86d05239ff/src/Registry.sol#L387-L391)
+  
+      **Remediations to Consider**
+  
+      Remove this variable as it is no longer used and displays inaccurate information about the registry.
     </field>
   </item>
   
