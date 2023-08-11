@@ -1,0 +1,314 @@
+<item>
+    <field name="topic">Front-runing</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">9b32434a5ae8c8fae7caab9b8176b487289f90b5</field>
+    <field name="content">
+      ## (H-1) Unsafe hard-coding of Uniswap min values causes LP token loss
+  
+      In UniswapV2Vault, a liquidity provider can provide capital by calling `addLiquidity`. In essence, the LP borrows an amount from the asset vault and adds both tokens into Uniswap. 
+  
+      The deposit into Uniswap is done by calling this line: 
+  
+      ```solidity
+      IUniswapV2Router02(_router).addLiquidity(
+          capital, asset, amount, assetToBorrow, 0, 0, address(this), block.timestamp // solhint-disable-line
+      ); 
+      ```
+  
+      However, the parameters `amountAMin` and `amountBMin` for  `IUniswapV2Router02(_router).addLiquidity()` are hard-coded to `0`. This opens any LP deposits to front-running attacks by sandwiching 2 swap transactions before and after. This results in most LP deposits being stolen.
+  
+      As an illustration, consider a pool with 100 DAI and 100 DBL, and an LP attempting to deposit 100 DAI. The attacker will sandwich the LP’s `addLiquidity` call by using the following transactions:
+  
+      1. Front-run a swap transaction of 1000 DAI for 90.90 DBL
+      2. Back-run a swap transaction of 90.90 DBL back to DAI
+  
+      The result is the attacker will receive their original deposited amount (1000) and most (~81) of the DAI that the LP deposited. 
+  
+      **Remediation To Consider**
+
+      Remove and parameterize the hard-coded `amountAMin` and `amountBMin`values in `addLiquidity`.
+    </field>
+    </field>
+    <field name="response">
+        <p>
+            Currently, there is really no solution to eliminate this type of attack for AMM. Uniswap does not solve this. And Double can't solve this either. This is an active research area in AMM and MEV to find the optimum price range check. Users should be comfortable with the risk and proceed with caution to use Double and AMM in general.
+        </p>
+        <p>
+            Double has optioned to add a price range check, for example 0.5%, can limit the method to pump the token price used by attackers. However, if the liquidity supply is still large enough, the transaction could still be sandwich attacked. In addition, an attacker can mount a DoS attack to pump the token price by 0.5% which will cause the transaction to revert, a bad UX for the product. When the liquidity provider tries to add liquidity again after the revert at a higher price, the attacker can mount a DoS attack again and pump the token price by another 0.5%. The attacker can repeat the DoS attacks a few times and then allow the liquidity provider to add liquidity at a much higher token price. Then the attacker dumps which cause the same type of loss for the liquidity provider.
+        </p>
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Data Model</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">2e6338864d32dbe52366b8ddd56c78f97ed424b3</field>
+    <field name="content">
+      ## (H-2) LP withdrawals with non-base USD capital can be blocked
+  
+      When whitelisted, liquidity providers can provide liquidity non-base USD capital tokens. However, when the LP try to remove their liquidity, they will encounter a capital amount mismatch and revert. This is due to conversion to base USD amount relying on the pool ratio, which can change over time.
+  
+      When an LP adds liquidity, the `capitalSupplied` amount is stored using `ClubManager.addCapital(msg.sender, usd)` in the following lines of code:
+  
+      ```solidity
+      function addLiquidity(address capital, uint256 amount, address asset) external override nonReentrant {
+          ...
+          if (_policy.getClubManager() != address(0)) {
+            uint256 usd = convertCapitalToUSD(capital, amount);
+            IClubManager(_policy.getClubManager()).addCapital(msg.sender, usd);
+        }
+          ...
+      }
+      ```
+  
+      However, before the capital amount is stored, it is converted to the base USD amount using the Uniswap pool’s ratio using `_getQuote`:
+  
+      ```solidity
+      function _convertCapitalToBaseUSD(address capital, uint256 amount) internal view returns (uint256) {
+          ...
+          //case#2: there is a trading pair between the capita type and base USD
+        address lp = IUniswapV2Factory(_factory).getPair(capital, _policy.getUsdBase());
+        if (lp != address(0)) {
+                  // Gets base USD using the pool ratio
+            return _getQuote(amount, capital, _policy.getUsdBase());
+        }
+          ...
+      }
+      ```
+  
+      When the LP attempts to withdraw, they call `removeLiquidity`. This time, the amount calculated using the pool ratio is checked against the stored capital amount, which may be greater due to trading activity.
+  
+      ```solidity
+      function removeLiquidity(address capital, address asset, uint256 bundleID, uint256 amountAssetIn) external override nonReentrant {
+          if (_policy.getClubManager() != address(0)) {
+            //convert capitalAmount to whole USD first
+            uint256 usd = convertCapitalToUSD(capital, bundle.capitalAmount);
+                  // removeCapital will check against
+            IClubManager(_policy.getClubManager()).removeCapital(msg.sender, usd);
+        }
+      }
+      ```
+  
+      A reversion will occur when `removeCapital` is called:
+  
+      ```solidity
+      function removeCapital(address supplier, uint256 amount) external override onlyRole(AMMVAULT_ROLE) {
+          // The input amount may be greater than the stored capital suppplied amount from addLiquidity
+          require(amount <= capitalSupplied[supplier], "ClubManager: need more capital");
+          ...
+      }
+      ```
+  
+      **Remediation To Consider**
+
+      Remove the capital conversion logic and rely on `bundle.capitalAmount` when removing liquidity.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2e6338864d32dbe52366b8ddd56c78f97ed424b3</field>
+    <field name="content">
+      ## (M-1) Differentiated logic for ClubManager can offset capital accounting
+  
+      The ClubManager contract allows Double to control the LP positions users can add and remove by capping them depending on their holdings of DoubleDownClub tokens.
+  
+      If the ClubManager address is set in the policy contract, every call to `addLiquidity()` and `removeLiquidity()` in UniswapV2Vault.sol contract will call ClubManager’s `addCapital()` and `removeCapital()` correspondingly. These functions keep track of the capital used (added or removed) inside the `capitalSupplied` mapping.
+  
+      ```solidity
+      function addLiquidity(address capital, uint256 amount, address asset) external override nonReentrant {
+              ...
+              if (_policy.getClubManager() != address(0)) {
+                  //convert amount to whole USD first.
+                  uint256 usd = convertCapitalToUSD(capital, amount);
+                  **IClubManager(_policy.getClubManager()).addCapital(msg.sender, usd);**
+              }
+              ...
+      }
+  
+      function removeLiquidity(address capital, address asset, uint256 bundleID, uint256 amountAssetIn) external override nonReentrant {
+              ...
+              if (_policy.getClubManager() != address(0)) {
+              //convert capitalAmount to whole USD first
+              uint256 usd = convertCapitalToUSD(capital, bundle.capitalAmount);
+              **IClubManager(_policy.getClubManager()).removeCapital(msg.sender, usd);**
+          }
+              ...
+      }
+      ```
+  
+      Otherwise, if the ClubManager address is set to `address(0)`, the logic will continue without making these external calls and without accounting for any capital.
+  
+      This can cause users who add positions while club manager is disabled not to be able to remove them if the club manager module is enabled afterward. 
+  
+      **Remediation To Consider:**
+  
+      Consider flagging liquidity positions that have been added without the club manager module, and bypass the `removeCapital()` call if so.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">spec</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2aa5d5ed41b3eef50efe5eed254b6b74381e4536</field>
+    <field name="content">
+      ## (L-1) LP can deposit above capital supply cap
+  
+      The ClubManager keeps track of the capital supplied and prevents a user from supplying more than their capital cap. However, a user can surpass this cap. The reason is due to the use of `convertCapitalToUSD` to calculate the equivalent base USD amount, and also Solidity’s rounding logic. The calculation depends on the ratio of the Uniswap Pool and the base USD decimal:
+  
+      ```solidity
+      function convertCapitalToUSD(address capital, uint256 amount) public view returns (uint256) {
+          return (_convertCapitalToBaseUSD(capital, amount) / (10 ** IERC20Metadata(_policy.getUsdBase()).decimals()));
+      }
+      ```
+  
+      The resulting amount of `_convertCapitalToBaseUSD` is subject to fluctuations due to trading activity. If the asset-to-capital ratio is less than 1, a user can deposit `10 ** IERC20Metadata(_policy.getUsdBase()).decimals()` amount of capital to get a rounded down value of `0` and not impact the depositor’s cap.
+  
+      **Remediation To Consider:**
+  
+      Implementing logic to round up to 1 if the calculated amount is less than 1 but greater than 0.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="status">addressed</field>
+    <field name="commit">54a59c5f91cfb9bdc9452df83edfd90648ef592d</field>
+    <field name="content">
+      ## (I-1) Fee-on-transfer tokens can get stuck
+  
+      Double protocol does not plan to support fee-on-transfer tokens. However, in UniswapV2LPMigrations.sol, users could mistakenly import existing Uniswap LP positions whose tokens have fee on-transfer.  By doing it, every attempt to migrate LP tokens through `migrateLPTokens()` will revert, since the logic the logic assumes the amounts of tokens returned from Uniswap’s `removeLiquidity()`,  resulting in the LP tokens being stuck.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## (I-2) Invalid addresses configuration can block LP withdrawals
+  
+      In UniswapV2Vault.sol, `removeLiquidity()` function makes multiple external calls to addresses fetched from the AMMVaultPolicy.sol contract:
+  
+      - `_policy.getClubManager()`
+      - `_policy.getDoubleDip()`
+      - `_policy.getUsdBase()`
+  
+      These three addresses can be configured to new values by administrators. By setting invalid targets in any of these, the `removeLiquidity()` call would revert, indirectly blocking LP withdrawals.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="status">fixed</field>
+    <field name="commit">5e179939cd6d5d4ec37653375a62c53a405ef7ae</field>
+    <field name="content">
+      ## (I-3) Unbounded fee ratio can block LP withdrawals
+
+      In UniswapV2Vault.sol, at the end of `removeLiquidity`, DoubleDip token rewards are calculated using the following logic:
+  
+      ```solidity
+      if (_policy.getDoubleDip() != address(0)) {
+          uint256 feeInUSD = _convertCapitalToBaseUSD(capital, fee);
+          feeInUSD = feeInUSD * (10**36) / (10 ** IERC20Metadata(_policy.getUsdBase()).decimals()); //convert from base USD to 36 decimals
+          IDoubleDip(_policy.getDoubleDip()).**earnRewards**(feeInUSD, msg.sender, asset);
+      } 
+      ```
+  
+      Rewards are accumulated using `earnRewards(feeInUSD, msg.sender, asset)`. An admin can intentionally or unintentionally block withdrawals by setting the `rewardToFeeRatio` to a sufficiently high number (e.g., `type(uint256).max`). The result is LP providers will be blocked from withdrawing their positions, since the result of `earnRewards()` will overflow.
+  
+      **Remediation To Consider:**
+  
+      For `rewardToFeeRatio`, consider capping the `rewardToFeeRatio` to a maximum equivalent to 100% (`DECIMALBASE`) or higher if the ratio is intended to overcome this percentage.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## (I-4) Dangerous logic migration
+  
+      In the AMMVaultPolicy.sol contract, the `owner` has permission to set the addresses of the `_clubManager` and `_doubleDip` contracts.
+  
+      By changing the address of the logic implementation of ClubManager or DoubleDip, the storage values of all variables would be fragmented. In some cases, stored values may be cleared. Not having the stored values in the ClubManager.sol contract can cause:
+  
+      1. `capitalSupplied` mapping values: investors will not be able to properly call `removeCapital` due to their `capitalSupply` being `0`. 
+      2. `ddcIdToOwner` mapping values: Investors won’t be able to withdraw their DDC tokens if they have used them as an allowance to add liquidity. Otherwise, they will need to withdraw their tokens and send them to the new contract to add liquidity. 
+      3. `delegationCount`, `ddcPowerCount`, and `ddcOwnedCount`: all the delegate counts would be reset.
+      4. For DoubleDip.sol, the impact is low since the only storage here is rewards statistics, and the contract already has a RewardStorage.sol contract to store unclaimed rewards per user.
+  
+    </field>
+    <field name="response">
+        Double does not intend to migrate ClubManager after launch.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## (Q-1) Variables can be marked as immutable
+  
+      Multiple variables are only assigned in the constructor and can be marked as immutable:
+  
+      In AMMVault.sol:
+  
+      - `_assetVault`
+      - `_policy`
+  
+      In ClubManager.sol:
+  
+      - `_ddc`
+  
+      In DoubleDip.sol:
+  
+      - `_rewardStorage`
+      - `_assetVault`
+  
+      In RewardStorage.sol:
+  
+      - `_rewardToken`
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## (Q-2) AssetVault.sol: DoubleDip address could be fetched from policy contract
+  
+      For AssetVault.sol, consider fetching the DoubleDip address from the AMMVaultPolicy contract to keep a unique point of access. This way, by updating the address in a single contract, it will persist on all the other contracts.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## (Q-3) No events in global config contract
+  
+      For AMMVaultPolicy.sol contract, consider adding events to keep track of important global changes.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## (G-1) Unnecessary check of asset reserve
+  
+      In <a href="https://github.com/double2win/v1/blob/be522ba55229c70e6e5085507d5b3cedd4adf4c4/contracts/UniswapV2Vault.sol#L37">line 37</a> of UniswapV2Vault.sol, the amount of asset to borrow is checked against the AssetVault reserves. It is, again, checked when calling `_assetVault.borrow(asset, assetToBorrow);`. Consider removing this duplicate check.
+    </field>
+  </item>
+  
+  
