@@ -1,0 +1,158 @@
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">medium</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">8fede787e8fcaafc96aa64e0fdeb191957f56821</field>
+  <field name="content">
+## (H-1) Any account holder can withdraw their committed `sUSD` margin using `rescueERC20()`
+
+Kwenta is planning to use `sUSD` as a margin asset.
+
+`sUSD` is a token that could be accessed by two different addresses, an implementation address, and a target address.
+
+Both of these addresses share the same state as per as the token state is concerned.
+
+Ideally, you are supposed to interact with the implementation address. However, there is a way someone can exploit the present Kwenta contract by using the target address.
+
+Kwenta’s `MarginBase.sol` has a feature that allows account owners to withdraw redundant assets from the contract. i.e. all ERC20s except the margin asset. 
+
+However, as someone can access the same `tokenState`of implementation address (`sUSD`) via target address, they can rescue `sUSD`, and hence the committed margin.
+
+```solidity
+    /// @notice added to support recovering trapped erc20 tokens
+    /// @param tokenAddress: address of token to be recovered
+    /// @param tokenAmount: amount of token to be recovered
+    function rescueERC20(address tokenAddress, uint256 tokenAmount)
+        external
+        onlyOwner
+    {
+        if (tokenAddress == address(marginAsset)) { //@audit high severity 
+            revert CannotRescueMarginAsset();
+        }
+        IERC20(tokenAddress).transfer(owner(), tokenAmount);
+        emit Rescued(tokenAddress, tokenAmount);
+    }
+```
+
+Consider restricting rescuing the target address as well. One can fetch this target address on-chain from the implementation contract address.
+  </field>
+  <field name="response">
+After careful consideration, we determined that the functionality provided via rescueERC20() was unnecessary. This conclusion was not a result of the audit's finding, but because it's function is solely unrelated to the system and not required for it to work properly.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">841836484ee176f0c018de6a0047e61f6c4f7d69</field>
+  <field name="content">
+## (M-1) Order cannot be executed if the fee is equal to the maximum amount that the owner of the margin account is willing to pay for that order
+
+If the owner of the margin account places an order with a fee cap, the order is not considered valid and cannot be executed if the cap they specified is equal to the fee. 
+
+`if (tooVolatile || dynamicFee >= order.maxDynamicFee) {
+    return (false, 0);
+}`
+
+This means the owner of the margin account can lose out on an order that they wanted to place. 
+
+Consider updating `>=` to `>` to make the fee cap inclusive.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">5f4210b79ae86f3ab87631e4ddc6e7bc760fe695</field>
+  <field name="content">
+## (L-1) `tradeFee`, `limitOrderFee`, and `stopOrderFee` cannot be set to `MAX_BPS`
+
+The maximum fee is a constant 10,000 bps. However, `tradeFee`, `limitOrderFee`, and `stopOrderFee` can never be set to 10,000. 
+
+Consider updating `>=` to `>`.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">8fede787e8fcaafc96aa64e0fdeb191957f56821</field>
+  <field name="content">
+## (L-2) `IERC20.transfer` return value is not checked
+
+There is no guarantee that the ERC20 token being rescued will inherit OZ’s ERC20 which `reverts` on all bad inputs. The transfer could be unsuccessful and return false, and the `Rescued` event will still be emitted. This could cause confusion for the owner of the margin account. 
+
+Consider checking the return value of `IERC20.transfer` and only emitting the `Rescued` event if the return value is true.
+  </field>
+    <field name="response">
+After careful consideration, we determined that the functionality provided via rescueERC20() was unnecessary. This conclusion was not a result of the audit's finding, but because it's function is solely unrelated to the system and not required for it to work properly.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">483ce2d6503ef0624e04f1dd53911ce668499274</field>
+  <field name="content">
+## (L-3) `TreasuryAddressChanged`, `TradeFeeChanged`, `LimitOrderFeeChanged`, and `StopOrderFeeChanged` emit even if the new value is the same as the old one
+
+MarginBaseSettings’s `setTreasury()`, `setTradeFee()` , `setLimitOrderFee()` , and `setStopOrderFee()` do not check if the new value is different from the old one when emitting their respective events. This creates the potential for duplicate events to be emitted, which may cause confusion to users on the client app, such as displaying a more recent “updated” trade fee when no data has actually changed.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">3e21cf0cd822fb0bf8a8e3521884d41a4fb791fb</field>
+  <field name="content">
+## (Q-1) `marginAsset` is set twice in the `initialize()` function
+
+In `MarginBase.sol` , the state variable `marginAsset` is unnecessarily set two times in the `initialize()` function on lines 203 and 211. 
+
+Consider only setting `marginAsset` one time.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">8efd9b8b4bb90909bfbbd7552d50bcb2bdbd1d4a</field>
+  <field name="content">
+## (Q-2) `marginBaseSettings` address can be immutable
+
+In `MarginAccountFactory.sol`, `marginBaseSettings` address is only being assigned inside the constructor but it is not declared as immutable. 
+
+Consider changing the variable declaration of `marginBaseSettings` to immutable.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">03821bed05d0166e9e716d42385098ede91f1ae8</field>
+  <field name="content">
+## (G-1) `onlyOwner` modifier not needed on `depositAndDistribute()` function
+
+The `onlyOwner` modifier is not needed on the `depositAndDistribute()` function since the function calls `deposit()` which has its own `onlyOwner` modifier. This means the `onlyOwner` modifier would be called 2 times unnecessarily.
+
+  </field>
+</item>

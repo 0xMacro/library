@@ -1,0 +1,105 @@
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">01aa8ba4cfc65681f07acbebb48a42dbc0017654</field>
+    <field name="content">
+      ## [G-1] Swap approvals can be removed
+  
+      In Account.sol when the owner swaps tokens using the `UNISWAP_V3_SWAP` command, in `_uniswapV3Swap()` the account contract approves the `PERMIT2` address for the `tokenIn`  and also calls approves the `UNISWAP_UNIVERSAL_ROUTER` address on `PERMIT2` on the same `tokenIn`.
+  
+      ```solidity
+      // approve Permit2 to spend _amountIn of this contract's tokenIn
+      IERC20(tokenIn).approve(address(PERMIT2), _amountIn);
+  
+      // approve tokens to be swapped via Universal Router
+      PERMIT2.approve({
+          token: tokenIn,
+          spender: address(UNISWAP_UNIVERSAL_ROUTER),
+          amount: _amountIn.toUint160(),
+          /// @dev timstamp will never overflow (i.e. maximum value of uint48 is year 8 million 921 thousand 556)
+          expiration: uint48(block.timestamp)
+      });
+      ```
+      Reference: [Account.sol#L1045-L1055](https://github.com/Kwenta/smart-margin/blob/5cc3ccc3817d41ad28e2b777450b308f460c9d4c/src/Account.sol#L1045-L1055)
+  
+      However, if the desired tokens to swap are directly sent to the `UNISWAP_UNIVERSAL_ROUTER` address before calling `_universalRouterExecute()` and the `payerIsUser` value set as data for the `UNISWAP_UNIVERSAL_ROUTER`'s `execute()` `input` is set to false, then these approvals can be removed.
+  
+      **Remediations to Consider**
+  
+      Remove the approvals and transfer the `tokenIn` to the `UNISWAP_UNIVERSAL_ROUTER` instead of the contract in the case where `MarginAsset == tokenIn`, otherwise transfer `assetIn` from the contract directly. Also set `payerIsUser` to be false. Doing so can reduce gas costs of executing swaps.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5103f83ada8d03272cb6ade3068b3416a698eef9</field>
+    <field name="content">
+      ## [G-2] `nonReentrant` called excess times
+  
+      In `Account.sol`’s `dispatch()` function has a `nonReentrant` modifier that prevents reentrancy. However, `dispatch()` is internal and only called by `execute()` for each command. This means that the `locked` value will be read and set twice per call to dispatch for each command execute, but it only needs to be set once in `execute()`
+  
+      **Remediations to Consider**
+  
+      Move the `nonReentrant` modifier from `dispatch()` to the `execute()` function to prevent unnecessary calls to the `nonReentrant` modifier.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c609655ced2ff6be25f7875f557f06d245328924</field>
+    <field name="content">
+      ## [Q-1] Unused event
+  
+      In Events.sol, the function `emitExecutorFeeSet()` is never called. It implies that an account can set their own executor fee, but that is currently not the case.
+  
+      **Remediations to Consider**
+  
+      Remove `emitExecutorFeeSet()` and its associated `ExecutorFeeSet` event as they are not used.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8671a8337ff24042d3efd378bcb141aca9edae09</field>
+    <field name="content">
+      ## [Q-2] Unnecessary `payable` casting
+  
+      In `Account.sol`’s `_payExecutorFee(`), when the executor is not Gelato, the ETH fee is sent to the executor via a low level call.
+  
+      ```solidity
+      fee = SETTINGS.executorFee();
+      (bool success,) = payable(msg.sender).call{value: fee}("");
+      if (!success) revert CannotPayExecutorFee(fee, msg.sender);
+      ```
+      Reference: (Account.sol#L911-L913)[https://github.com/Kwenta/smart-margin/blob/5cc3ccc3817d41ad28e2b777450b308f460c9d4c/src/Account.sol#L911-L913]
+
+      However, low level calls to transfer ETH do not require the address to be set to `payable`.
+  
+      **Remediations to Consider**
+  
+      Remove the casting of `msg.sender` to `payable`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Informational</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [I-1] Accounts cannot set `executorFee`
+  
+      The `executorFee` used to pay for the execution of conditional orders, in the case where the executor is not gelato, is set by the owner of the `Settings.sol` contract, and cannot be adjusted by account owners. In times where gas prices cause conditional order execution to be more expensive than the currently set fee, then gelato will most likely be the only executor of the conditional order. Conversely, if the currently set fee is much lower than the gas cost to execute, it will most likely occur quickly but will may be executed for a larger fee than what Gelato would have charged if they executed the order.
+    </field>
+    <field name="response">
+        Can be remedied via robust chain monitoring and quick calibration response
+    </field>
+</item>
+  
+  
+  

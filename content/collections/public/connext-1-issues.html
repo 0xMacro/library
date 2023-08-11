@@ -1,0 +1,717 @@
+<item>
+    <field name="topic">Access Control</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">9e880f942a60ae3c384b04bdcfdb5db881621615</field>
+    <field name="content">
+      ## [C-1] Lack of access control on `RelayerProxyHub.propagate()` would allow anyone to drain the `RelayerProxyHub` contract.
+  
+      In `RelayerProxyHub` contract, `propagate()` is an external function without any access control.
+      Hence, anyone can call it with an arbitrary relayer fee and valid root as input and withdraw all assets from the contract via `transferRelayerFee()`.
+  
+      **Remediations to Consider:**
+  
+      Consider restricting access to the relayers only.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Denial of Service</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">addressed</field>
+    <field name="commitTree">2684-h1</field>
+    <field name="response">We implemented an alternative fix to track the lastPropagatedRoot by domain, that way you could call the same function multiple times if a single domain failed. The spoke connectors will also revert if a duplicate aggregate root is received, so this seems a cleaner fix</field>
+    <field name="content">
+      ## [H-1] RootManager.propagate susceptible to DoS
+  
+      In the RootManager contract, `propagate()` function is responsible for distributing aggregate roots to all connectors for corresponding domains. Implementation of this function does not revert if during interaction with a specific connector error is raised. This prevents a single inaccessible chain from causing a complete bridge halt. Particular functionality was introduced to fix a previously reported issue in [Spearbit audit](https://github.com/spearbit-audits/connext-nxtp/issues/34).
+  
+      When `propagate()` is called a set of initial validation checks is performed. If these checks are successful `lastPropagatedRoot` value will be set. In the rest of `propagate()` function even if interaction with all connectors fails `propagate()` function will not revert and the `lastPropagatedRoot` value will remain set. This means that follow-up invocations of `propagate()` function will not be possible until `_aggregateRoot` is updated. This is indeed the original intention of this code.
+  
+      ```jsx
+      validateConnectors(_connectors);
+  
+      uint256 _numDomains = _connectors.length;
+      // Sanity check: fees and encodedData lengths matches connectors length.
+      require(_fees.length == _numDomains && _encodedData.length == _numDomains, "invalid lengths");
+  
+      // Dequeue verified roots from the queue and insert into the tree.
+      (bytes32 _aggregateRoot, uint256 _count) = dequeue();
+  
+      // Sanity check: make sure we are not propagating a redundant aggregate root.    
+      require(_aggregateRoot != lastPropagatedRoot, "redundant root");
+      lastPropagatedRoot = _aggregateRoot;
+      ```
+  
+      However, since `propagate()` function can be invoked by anyone, as it doesn’t have any access control limits, a malicious actor can invoke this function with inappropriate arguments. For example, by providing encoding data of unexpected length. This will cause most if not all connectors to revert when invoked. For example, processing will fail for:
+  
+      - PolygonHubConnector in `_sendMessage()` function when `encodedData.length` is not 0
+      - ZKSyncHubConnector when `encodedData.length` is not 32
+      - BaseMultichain in `_sendMessage()` when `encodedData.length` is not 0
+      - GnosisBase in `_getGasFromEncoded()` when `encodedData.length` is not 32
+      - ArbitrumHubConnector in `_sendMessage()` when `encodedData.length` is not 96
+  
+      As a result of malicious actor actions, aggregate roots won’t be propagated to destination domains. The system may recover if a new root is added and `propagate()` is called with proper inputs. However, an attacker can front-run these calls with their own invocation with adverse inputs.
+  
+      **Remediations to Consider:**
+  
+      1. Remove the sanity check present at L201 of RootManager. This would keep `propagate()` permission-less, but there could be duplicate RootPropagated events.
+      
+          ```jsx
+          require(_aggregateRoot != lastPropagatedRoot, "redundant root");
+          ```
+      
+      2. Restrict access to `propagate()` function to relayers only.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">18fa5e4cd4d38d144482bc7cd910d5adf1319a48</field>
+   
+    <field name="content">
+      ## [H-2] Watcher may halt root propagation due to incorrect `removeDomain` implementation
+  
+      `RootManager` inherits from `DomainIndexer`, which allows watchers to remove connectors through `RootManager.removeConnector`> `DomainIndexer.removeDomain`. There are three data structures associated with this method: `domains[]`, `connectors[]`, and `domainToIndexPlusOne`. `domainToIndexPlusOne` maps the domain to its index in the array. These three data structures need to be updated correctly and always in sync for domain management functionality to work properly.
+  
+      However, the current `removeDomain()` function implementation is incorrect when the domain to be removed is not the last. The `removeDomain` function swaps the last element from the `domains[]` and `connectors[]` array with the to-be-removed element and pops the last element. Also, the `domainToIndexPlusOne` mapping is cleared for the to-be-removed element. But the update to `domainToIndexPlusOne` for the swapped last connector is missing. As a result, the swapped domain will have an incorrect index which will cause incorrect system behavior.
+  
+      Due to the incorrect index for the swapped domain, it will not be possible for the corresponding connector to invoke `RootManager.aggregate()` function. When invoked, `aggregate()` function will fail in `onlyConnector(_domain)` modifier as `getConnectorForDomain()` will revert due to an unexpected connector address or due to an index array out-of-bounds error. Therefore message propagation originating from this particular domain will be halted.
+  
+      To recover from the data corruption contract upgrade is necessary. Current contract functionality does not provide means to reset data structures to a valid state. For example, a subsequent call to `removeConnector()` for the now corrupted domain may have an unexpected effect in removing a connector for a totally different domain due to an incorrect `domainToIndexPlusOne` record, further exacerbating data corruption. Also, a subsequent call to `addConnector()` will fail since the domain already exists.
+  
+      In summary, *watchers* accidentally or intentionally may halt root propagation for one or more domains due to incorrect `removeDomain()` function implementation, and the current system does not provide means to the *owner* to recover from this issue without RootManager contract redeployment.
+  
+      **Remediations to Consider:**
+  
+      Consider updating `domainToIndexPlusOne` mapping to reflect the new position of swapped last element.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Denial of Service</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">228bc106d97fe0177a47c296eb2d52785b471a55</field>
+    <field name="content">
+      ## [H-3] Messages with insufficient gas can halt processing on Gnosis Bridge
+  
+      To propagate a root from Mainnet to the Gnosis chain, *anyone* can invoke `propagate()` function on the RootManager with the appropriate value in `encodedData`. This variable encodes the maximum gas to be used to process this message at the destination (Gnosis chain). `propagate()` triggers `HubConnector.sendMessage()` which itself relies on `GnosisHubConnector._sendMessage()` to deliver a message to the Gnosis AMB by calling `requireToPassMessage()`.
+  
+      ```jsx
+      GnosisAmb(AMB).requireToPassMessage(
+        mirrorConnector,
+        abi.encodeWithSelector(Connector.processMessage.selector, _data),
+        _getGasFromEncoded(_encodedData)
+      );  
+      ```
+  
+      On the other hand, to send a new origin root from the Gnosis chain to Mainnet, *anyone* can invoke `send()` function on the corresponding GnosisSpokeConnector with the appropriate value in `_encodedData`. As in the previous case, this variable is used to define the maximum gas to be used to process this message at the destination (Mainnet). `send()` function relies on `GnosisSpokeConnector._sendMessage()` to deliver a message to the GnosisAmb by calling `requireToPassMessage()`.
+  
+      The only validation in Connext contracts mentioned above and related to encodedData is to verify that `encodedData.length` is 32 bytes long so that it can be decoded as uint256 which Gnosis AMB expects. Also, it validates that provided gas is less than the gasCap. However, within Gnosis AMB itself - more precisely `MessageDelivery._sendMessage()`, there is additional validation that this value should be bigger than the constant `MIN_GAS_PER_CALL` which is 100.
+  
+      ```css
+      function requireToPassMessage(address _contract, bytes memory _data, uint256 _gas) public returns (bytes32) {
+        return _sendMessage(_contract, _data, _gas, SEND_TO_ORACLE_DRIVEN_LANE);
+      }
+  
+      function _sendMessage(address _contract, bytes memory _data, uint256 _gas, uint256 _dataType)
+        internal
+        returns (bytes32)
+      {
+        // it is not allowed to pass messages while other messages are processed
+        // if other is not explicitly configured
+        require(messageId() == bytes32(0) || allowReentrantRequests());
+        require(_gas >= MIN_GAS_PER_CALL && _gas <= maxGasPerTx());
+      ...
+      ```
+  
+      If a message that is successfully posted from either side to the Gnosis AMB bridge has a gas set to value which is insufficient to guarantee proper processing, that message won’t be properly processed on the destination.
+  
+      Due to the above, an attacker may invoke `RootManager.propagate()` on Mainnet or `GnosisSpokeConnector.send()` on the Gnosis chain, and provide intentionally insufficient max gas in `encodedData`, e.g. value of 100. This amount of gas is not enough for roots to be processed at the destination, but it is enough to pass validation at Gnosis AMB. As a result, the attacker may halt processing on one or both sides of the chain. On the origin, the state will be updated correctly, but on the destination, there will be no updates.
+  
+      **Remediations to Consider**
+  
+      - Adding corresponding min gas limit on GnosisHubConnector and GnosisSpokeConnector that will guarantee successful processing on destination
+    </field>
+  </item>
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">macro-h4</field>
+    <field name="response">acknowledged — currently when the liquidity layer is the only whitelisted sender, and there is protection against replays at that level, this attack should not be possible. however, this is a requirement to fix as more consumers use the messaging layer.</field>
+    <field name="content">
+      ## [H-4] `SpokeConnector` swap allows replay of messages
+  
+      `Connext` enables replacing connectors without dropping the messages by maintaining the Merkle tree in a separate contract from actual connectors.
+  
+      However, if it's done to any spoke connector in the current code’s state, one can replay the already executed message on swapped spoke connector.  
+  
+      Spoke connectors record if the message is processed inside `messages` mapping, and doesn't allow to replay it through `calculateMessageRoot`.
+  
+      ```solidity
+      function process(bytes memory _message) internal returns (bool _success) {
+        ...
+        messages[_messageHash] = MessageStatus.Processed;
+        ...
+      }
+  
+      function calculateMessageRoot(
+        bytes32 _messageHash,
+        bytes32[32] calldata _messagePath,
+        uint256 _messageIndex
+      ) internal view returns (bytes32) {
+        // Ensure that the given message has not already been proven and processed.
+        require(messages[_messageHash] == MessageStatus.None, "!MessageStatus.None");
+          ...
+      }
+      ```
+  
+      However, since this `messages` mapping resides in the spoke connector contract only, if it is swapped with a new one, the new one won't have the old state, allowing one to process an already executed message again.
+  
+      **Remediation to Consider**
+  
+      - Maintain `messages` mapping in a separate contract
+    </field>
+  </item>
+  <item>
+    <field name="topic">Asset Recovery</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">bb90fdcbefe4730cb3efcc670d2ba0f030676366</field>
+    <field name="content">
+      ## [M-1] Unspent assets can get stuck in the RootManager contract
+  
+      In the RootManager contract, callers of `propagate()` function submit assets necessary to cover fees for processing of `aggregateRoot` propagation on destination chains.
+  
+      However, if interaction with a particular connector fails for any reason, `propagate()` function will still succeed, and sent assets will remain in the RootManager contract.
+  
+      Currently, there is no mechanism in the RootManager contract to withdraw these unspent assets, and therefore they will remain stuck.
+  
+      **Remediations to Consider**
+  
+      Consider:
+  
+      - refunding unspent assets to the caller
+      - introducing admin-controlled `withdrawFunds()` function
+    </field>
+  </item>
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">f8ea1e579db7c9167aa26b1e6b0a7b2c8e95088a</field>
+    <field name="response">acknowledged — currently when the liquidity layer is the only whitelisted sender, and there is protection against duplicate hashes because of unique transfer ids (passed in message body) at the liquidity layer.
+        unique ids generated [here:](https://github.com/connext/nxtp/blob/10e5df93b125b508bb53cb6393d6a836d5824391/packages/deployments/contracts/contracts/core/connext/facets/BridgeFacet.sol#L580-L581)</field>
+    <field name="content">
+      ## [M-2] `SpokeConnector` swap can result in duplicate messages
+  
+      `Connext` upgradeability approach relies on swapping contracts, such as SpokeConnector instances, in order to update code logic without dropping the messages. Most of the state is maintained in the Merkle tree in a separate contract from actual connectors, which facilitates upgrades using this approach.
+  
+      However, one important part of the state is handled by the SpokeConnector contract itself. That is `nonces` mapping which ensures that messages originating from that particular domain and directed towards a concrete destination chain are unique. `nonces` variable is used in SpokeConnector in the `dispatch()` function as part of the message wrapper. A message with a wrapper is then formatted and hashed. The hash of the message is then used as an identifier within the system.
+  
+      ```jsx
+      // Get the next nonce for the destination domain, then increment it.
+      uint32 _nonce = nonces[_destinationDomain]++;
+  
+      // Format the message into packed bytes.
+      bytes memory _message = Message.formatMessage(
+        DOMAIN,
+        TypeCasts.addressToBytes32(msg.sender),
+        _nonce,
+        _destinationDomain,
+        _recipientAddress,
+        _messageBody
+      );
+  
+      // Insert the hashed message into the Merkle tree.
+      bytes32 _messageHash = keccak256(_message);
+  
+      // Returns the root calculated after insertion of message, needed for events for
+      // watchers
+      (bytes32 _root, uint256 _count) = MERKLE.insert(_messageHash);
+      ```
+  
+      When `SpokeConnector` is swapped, the state is reset which includes `nonces` mapping. As a result, it is possible that the same combination of parameters ends up in `Message.formatMessage()`. In this case, a new message with the same identifier will be inserted in the Merkle tree on the origin and propagated to the destination. However, on the destination, it won’t be possible to process it as it would be considered a duplicate message.
+      This would be most problematic in cases where the external protocol is using the `connext` as messaging bridge to do various defined actions on cross-chain destinations.
+  
+      **Remediation to Consider:**
+  
+      - Maintain `nonces` mapping outside of the SpokeConnector contract.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">addressed</field>
+    <field name="commit">f60ec71828c8b80757a0b541cf93ac2352e28f4c</field>
+    <field name="response">Fixed this in a different way then suggested — made Connector.processMessage(...) (which holds the onlyAMB modifier) a virtual function, which is overridden in the ZKSyncSpokeConnector without the modifier. This means the _processMessage msg.sender check in the spoke connector is preserved, while the check that the AMB is the sender.
+        Making Connector.processMessage virtual was done to fix arbitrum aliasing</field>
+    <field name="content">
+      ## [M-3] Missing functionality in ZkSyncSpokeConnector
+  
+      ZkSync 2.0 peculiarity of preserving `msg.sender` for L1 to L2 calls introduces a need for additional functionality in ZkSyncSpokeConnector. When ZkSyncHubConnector initiates a call to the `processMessage()` function of ZkSyncSpokeConnector, the caller (`msg.sender`) on L2 will have the address of `mirrorConnector`.
+  
+      Currently, the `processMessage()` function is protected by the `onlyAMB` modifier which performs a check that `msg.sender == AMB`. This check will be satisfied only when `AMB == mirrorConnector`.
+  
+      In case, when the mirror connector contract address changes on L1, the contract owner of ZkSyncSpokeConnector, has the capability to update the `mirrorConnector` variable on L2 by calling `setMirrorConnector()`.
+  
+      However, there is no corresponding functionality for the owner to update the value of the `AMB` variable. Therefore, in the case of the mirror connector contract address change on L1, it will not be possible to update and have a properly operating ZkSyncSpokeConnector.
+  
+      **Remediations to Consider:**
+  
+      - Add capability to update AMB variable on Connector
+      - Add capability to update AMB variable only on ZkSyncSpokeConnector
+      - Override `processMessage()` in ZkSyncSpokeConnector and change access control guard to compare `msg.sender` with `mirrorConnector` instead of `AMB`
+    </field>
+  </item>
+  <item>
+    <field name="topic">Denial of Service</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="response">acknowledged, but likely will not fix. fixing this issue requires offchain logic (which will not be enforceable as this is open to any relayer network), or instituting a relayer whitelist at the messaging layer. 
+        the worst case is the optimization of batch processing falls back to the simple case of processing a single message</field>>
+    <field name="content">
+      ## [M-4] SpokeConnector’s `proveAndProcess()` is susceptible to griefing
+  
+      In the SpokeConnector contract, the `proveAndProcess()` function, which is responsible for executing messages associated with propagated roots, can be called by anyone. This function is expected to be called by relayer infrastructure in normal circumstances, but it also allows permissionless access in order to reduce centralization risk. This function also supports handling a batch of messages for execution as a performance optimization.
+  
+      However, when the relayer submits a batch to `proveAndProcess()`, an attacker or interested 3rd party may front-run that transaction with a call to `proveAndProcess()` with the message that is the last message in the batch. That last message from the attacker’s transaction will be successfully processed, but the batch transactions submitted by the relayer will fail at the end of message array processing. 
+  
+      Based on the provided information, there is no complex logic on retry logic on the relayer execution side for failed `proveAndProcess()` call. Therefore, an attacker may cause disruption in the processing of messages on the destination chain, unnecessary gas expenses related to the relayer infrastructure, and reduce or practically remove performance optimization benefits of processing a batch of messages in a single call.
+  
+      **Remediations to Consider:**
+  
+      - Verify that messages provided to `proveAndProcess()` are in an adequate state before processing any of them, or
+      - Limit access to `proveAndProcess()`
+    </field>
+  </item>
+  <item>
+    <field name="topic">Asset Recovery</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="response">acknowledged — this would require bad inputs to the fees argument in the propagate function. will fallback to the maxim of “dont send stupid things” instead of explicitly reverting here!</field>
+    <field name="content">
+      ## [L-1] Incorrectly sent assets to GnosisHubConnector will be stuck
+  
+      GnosisHubConnector contract inherits functionality from HubConnector. This inherited functionality includes the `sendMessage()` function which is `payable`.
+  
+      ```jsx
+      function sendMessage(bytes memory _data, bytes memory _encodedData) external payable onlyRootManager {
+        _sendMessage(_data, _encodedData);
+        emit MessageSent(_data, _encodedData, msg.sender);
+      }
+      ```
+  
+      However, GnosisHubConnector doesn’t have any use for assets sent to it, nor any means to withdraw these assets in case they are incorrectly sent to it from the RootManager contract.
+  
+      **Remediations to Consider:**
+  
+      - Override `sendMessage()` in GnosisHubConnector and remove `payable`, or
+      - Add means to rescue/withdraw assets from the GnosisHubConnector
+    </field>
+  </item>
+  <item>
+    <field name="topic">Asset Recovery</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">addressed</field>
+    <field name="commitTree">macro-l2</field>
+    <field name="response">ended up going with a simpler solution — allowing admin withdrawals on the  connector directly. there is no incentive to use funds above the cap, and they are retrievable by the owner where implemented. this also mirrors existing spoke connector functionality</field>
+    <field name="content">
+      ## [L-2] Assets sent to ZkSyncHubConnector and MultichainHubConnector may get stuck
+  
+      In the ZkSyncHubConnector contract, the `_sendMessage()` function forwards the `fee` amount of assets to ZkSync AMB. `fee` amount of assets is determined based on `msg.value` and value of configured `gasCap` on the ZkSyncHubConnector contract.
+  
+      ```jsx
+      // In ZkSyncHubConnector
+      uint256 fee = _getGas(msg.value);
+  
+      // In GasCap contract
+      function _getGas(uint256 _gas) internal view returns (uint256) {
+        if (_gas > gasCap) {
+          _gas = gasCap;
+        }
+        return _gas;
+      }
+      ```
+  
+      When `msg.value` is less or equal to configured `gasCap` all assets will be forwarded to the ZkSync AMB. However, when `msg.value` is greater, then only the `gasCap` of assets will be forwarded while `msg.value - gasCap` of assets will remain stored in ZkSyncHubConnector. Since currently there is no mechanism to withdraw this remaining amount of assets they will remain stuck in the contract.
+  
+      The same issue is present MultichainHubConnector, more precisely in the BaseMultichain contract `_sendMessage()` function.
+  
+      ```jsx
+      // Get the max fee supplied
+      uint256 supplied = _getGas(msg.value); // fee paid on origin chain, up to cap
+      ```
+  
+      [Previous related issue](https://github.com/spearbit-audits/connext-nxtp/issues/20).
+  
+      **Remediations to Consider:**
+  
+      - Add means to rescue/withdraw assets from the ZkSyncHubConnector, and
+      - Add means to rescue/withdraw assets from the MultichainHubConnector
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="response">yeah i think we are okay with this! we use the more specific function, and processing message where they are functionally “processed” seems logically consistent</field>
+    <field name="content">
+      ## [L-3] Missing event emission in MainnetSpokeConnector and Multichain Connectors
+  
+      ### MainnetSpokeConnector
+  
+      The MainnetSpokeConnector contract differs from other SpokeConnectors since it integrates both Hub and Spoke functionality within a single contract. As a result, some functions such as the `processMessage()` function, are not needed, and even though they are present, they are not called since there is no AMB.
+  
+      However, this means that corresponding event emissions are not happening. For example, the `MessageProcessed` event in `Connector.processMessage` will never be emitted in the case of MainnectSpokeConnector. This inconsistent behavior with how other Connectors function may impact off-chain tools and systems relying on these events. [Related issue](https://github.com/spearbit-audits/connext-nxtp/issues/171).
+  
+      **Remediations to Consider:**
+  
+      - Add `MessageProcessed` event to the `_sendMessage()` function, and
+      - Move `MessageSent` event emission in `sendMessage()` top-level function to come before `_sendMessage()` call which will generate the corresponding `MessageProcessed` event.
+  
+      ### MultichainHubConnector and MultichainSpokeConnector
+  
+      Multichain connectors use `anyExecute` instead of `Connector.processMessage` for processing messages on both the hub and spoke side.
+  
+      ```
+      function anyExecute(bytes memory _data) external returns (bool success, bytes memory result) { // @audit what its calling 
+        _processMessage(_data);
+      }
+      ```
+  
+      However since the `MessageProcessed` event is not emitted here, it creates an inconsistency with respect to other connectors.
+  
+      **Remediations to Consider:**
+  
+      - Add `MessageProcessed` event to the `anyExecute()` function
+    </field>
+  </item>
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="response">agree with acknowledge, the goal for connectors here is to keep operational costs as cheap as possible, meaning max immutables over mutables</field>
+    <field name="content">
+      ## [L-4] Hardcoded gas values in SpokeConnector are potentially problematic
+  
+      **Issue** 
+  
+      SpokeConnector, while doing an external call on the destination, forwards only `PROCESS_GAS` for message execution on the destination, and keeps `RESERVE_GAS` to be able to complete the execution.
+  
+      The issue with `PROCESS_GAS` and `RESERVE_GAS` is that they are immutable. Hence, if there is a change in gas cost for some opcode, the message processing that was working initially may fail. And since these two configuration values are immutable, it won't be possible to update these values.
+  
+      Dependence on hardcoded gas costs isn’t a good practice, they have changed in the past, and there is no guarantee they won't change in the future.
+  
+      **Informational** 
+  
+      In the SpokeConnector constructor, provided `_processGas` and `_reserveGas` values need to be larger than 850_000 and 15_000 correspondingly. These hardcoded values may not be appropriate for chains with different opcode gas prices, such as ZkSync 2.0 (for which gas price tables are not yet available).
+  
+      **Remediations to Consider:**
+  
+      - Consider making both `PROCESS_GAS` and `RESERVE_GAS` mutable variables.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="response">The require is in the process function, which is called within a for loop in the top-level proveAndProcess. If there is insufficient gas for one of the messages, the whole call should revert. But yes, this does contradict the comment and safeguards in case the entire tx doesn't revert.</field>
+    <field name="content">
+      ## [L-5] `PROCESS_GAS` guard insufficient for a batch of messages
+  
+      In the SpokeConnector contract, when the relayer submits a batch to `proveAndProcess()`, each message in the batch is processed individually in the underlying `process()` function. In this function, an external call is made with `PROCESS_GAS` forwarded to the callee. Before this call is performed there is a guard which checks the current gas left. This guard is effective when the `proveAndProcess()` executes a batch of size 1 and guarantees successful transaction completion independent of the status of the external call.
+  
+      ```jsx
+      // A call running out of gas TYPICALLY errors the whole tx. We want to
+      // a) ensure the call has a sufficient amount of gas to make a
+      //    meaningful state change.
+      // b) ensure that if the subcall runs out of gas, that the tx as a whole
+      //    does not revert (i.e. we still mark the message processed)
+      // To do this, we require that we have enough gas to process
+      // and still return. We then delegate only the minimum processing gas.
+      require(gasleft() > PROCESS_GAS + RESERVE_GAS - 1, "!gas");
+      ```
+  
+      However, in the case when the batch size is bigger than 1, to guarantee the execution of `proveAndProcess()` for all messages without reverts, the caller needs to provide at least a `number of messages * (PROCESS_GAS + RESERVE_GAS - 1)`. 
+  
+      Otherwise, a first message in the batch can consume all of the `PROCESS_GAS` provided and cause the processing of messages that follow in the batch to fail due to not enough gas left to satisfy the guard condition listed above. In that case, a revert will be raised in the process function where this condition is checked and will cause the whole `proveAndProcess()` transaction to fail.
+  
+      **Remediations to Consider:**
+  
+      - Consider checking in the `proveAndProcess()` function that the amount of provided gas for processing a whole batch of messages is appropriate
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">642f9261eb7fce80caf299f664edec8178f62ac6</field>
+    <field name="content">
+      ## [Q-1] Make gasCap variable public
+  
+      In the GasCap contract, `gasCap` variable misses the visibility specifier. When visibility is not defined, it is `internal` by default, making it inaccessible to query it externally. Other connectors have similar variables with public visibility so to be consistent make gasCap public also.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="response">acknowledge — the consistent naming may not be suitable for all the ways its used but the mechanism can be shared (as it all provides some degree of protection from overpaying). would rather keep the logic in a single contract / place</field>
+    <field name="content">
+      ## [Q-2] Confusing usage of gasCap mechanism
+  
+      In the ZkSyncHubConnector contract, `_gasCap()` function and underlying `gasCap` variable represent submission cost capacity, while in the case of GnosisHubConnector, `gasCap` variable represents only one factor of submission cost, more precisely the maximum amount of gas to be used. Consider introducing a new variable/function to indicate different cap mechanics.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-3] ZkSync AMB integration will require changes
+  
+      The Mailbox contract in Zk Sync AMB is incomplete, and additional changes are to be expected. For example, the implementation of the [l2TransactionBaseCost()](https://github.com/matter-labs/v2-testnet-contracts/blob/0908581bd4db37d0d90c4c95b62bfc0a5cb3746b/l1/contracts/zksync/facets/Mailbox.sol#L78..L85) function is marked as TODO, while comments in [requestL2Transaction()](https://github.com/matter-labs/v2-testnet-contracts/blob/0908581bd4db37d0d90c4c95b62bfc0a5cb3746b/l1/contracts/zksync/facets/Mailbox.sol#L116..L118) seem to indicate that additional functionality will be added in the near future. Thus, when this happens, code on the Connext side which interacts with the ZkSync AMB will need to be reviewed and potentially updated.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a6eb3a9bfa4c234c8253157a17d7849484151707</field>
+    <field name="content">
+      ## [Q-4] SenderAdded and SenderRemoved events emitted when not needed
+  
+      In the SpokeConnector contract, in `addSender()` and `removeSender()` functions, there is no check if the operation to be performed will result in state changes. Therefore, events like SenderAdded and SenderRemoved will be emitted even if no state change happened, which may confuse off-chain monitoring tools and services.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">ae7bd524959db61d1d4e2f22d75956dbc0a6e5e6</field>
+    <field name="content">
+      ## [Q-5] Update _processMessage in MainnetSpokeConnector to revert since it is not used
+  
+      In MainnetSpokeConnector, `processMessage()` on Connector is not used but the underlying implementation in MainnetSpokeConnector `_processMessage()` does not revert.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">960599567012ea04918ee95a3e27946a6d9754c0</field>
+    <field name="content">
+      ## [Q-6] Override processMessage in Multichain Connectors to revert since it is not used
+  
+      In MultichainHubConnector and MultichainSpokeConnector, `processMessage()` is not used. However, the underlying implementation `_processMessage()` is used by the `anyExecute()` function in the BaseMultichain contract. Consider overriding `processMessage()` in MultichainHubConnector and MultichainSpokeConnector with the implementation that reverts if invoked.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">4510b1fc972150c2c1d081a7de7a99f7802262bb</field>
+    <field name="content">
+      ## [Q-7] Document removePendingAggregateRoot use
+  
+      In SpokeConnector, `removePendingAggregateRoot()` represents a safety mechanism that can be used to protect from issues in the transport layer. However, it cannot be used as a fallback safety mechanism in the case when fraud detection has already failed on the mainnet. Therefore, document the capabilities and limitations of removePendingAggregateRoot so it is not possible to misunderstand the safety properties which it provides.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">2e9b230050d28c3176c1c53831e82011d5968502</field>
+    <field name="content">
+      ## [Q-8] Documentation improvements
+  
+      - SpokeConnector
+          - The top “@notice” comment refers to extending HubConnector which is incorrect as it inherits from Connector
+          - Missing natspec for events. Only FundsWithdrawn event declaration has proper natspec
+          - Missing indexed attributes for corresponding events (e.g. on Dispatch and Process for leaf)
+          - Struct Proof declaration has incorrect natspec comment for the 2nd field - natspec refers to it as **proof** while the field name is a **path**
+          - `allowlistedSenders` public variable doesn’t have a corresponding “@notice” natspec comment
+          - inconsistent natspec comments for functions. Some are missing param definitions (e.g. `send()`) while others are missing return values descriptions (e.g. `dispatch()`)
+          - incorrect natspec comment for `send()` function which is a copy of a natspec comment for a different function `outboundRoot()`
+          - The “@notice” comment for `receiveAggregateRoot()` is confusing since we are not able to distinguish between these two invocation paths mentioned in the comment
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">b7c052eec076a5f167e94ff14231a4972bc44885</field>
+    <field name="content">
+      ## [Q-9] `Check Effect Interaction` not followed for `send()` of spoke connector
+  
+      ```solidity
+      function send(bytes memory _encodedData) external payable whenNotPaused rateLimited {
+      
+              // check
+              require(sentMessageRoots[root] == false, "root already sent");
+              ......
+              // interaction
+          **_sendMessage(_data, _encodedData); 
+                                              external call to AMB**
+  
+              // effect
+          **sentMessageRoots[root] = true;
+              .........**
+        }
+      ```
+  
+      Since check effect interaction is not followed, one can reenter and send messages again; however, we couldn't find an incentive for one to do so and a AMB which would allow one to reenter, marking this as code quality. 
+  
+      Consider moving effect before an interaction to not have any exposure moving forward.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimisation</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-1] Duplicate sender verification in ZkSyncSpokeConnector
+  
+      ZkSync 2.0 preserves `msg.sender` value for L1 to L2 calls. This applies to the ZkSyncHubConnector’s call to `processMessage()` on ZkSyncSpokeConnector. As a result, the `mirrorConnector` and `AMB` variables must be set to the same value in ZkSyncSpokeConnector. Also due to this peculiarity, the `onlyAMB` modifier defined on `processMessage()` function and guard `_verifySender(mirrorConnector)` in `_processMessage()` function perform the same check. Consider removing `_verifySender(mirrorConnector)` in `ZkSyncSpokeConnector._processMessage()` as it is not needed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimisation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">fcec844337620240ac0f23f785a14e1e9debe0a5</field>
+    <field name="content">
+      ## [G-2] Duplicate require condition in MainnetSpokeConnector
+  
+      In the MainnetSpokeConnector contract, in the `sendMessage()` function there is a check that `_encodedData.length` is 0. This same check is present in the internal `_sendMessage()` function which is called immediately after and does most of the processing. Consider removing the check in the top-level `sendMessage()` function.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimisation</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="response">acknowledged — generally, this will not be reliable once we move the tracking of roots sent to within the merkle tree manager</field>
+    <field name="content">
+      ## [G-3] Replace sentMessageRoots mapping with the uint256 variable
+  
+      Merkle tree count represents a continuously increasing counter. A new uint256 storage variable on SpokeConnector that relies on Merkle tree count can remove the need for `sentMessageRoots` mapping that is used in SpokeConnector `send()` function. Consider replacing it to reduce contract storage needs and corresponding gas usage.
+  
+      ```jsx
+      // instead of following
+      bytes32 root = MERKLE.root();
+      require(sentMessageRoots[root] == false, "root already sent");
+      bytes memory _data = abi.encodePacked(root);
+      _sendMessage(_data, _encodedData);
+      sentMessageRoots[root] = true;
+      emit MessageSent(_data, _encodedData, msg.sender);
+  
+      // consider following
+      (bytes32 root, uint256 count) = MERKLE.rootAndCount();
+      require(count > lastSent, "root already sent");
+      bytes memory _data = abi.encodePacked(root);
+      _sendMessage(_data, _encodedData);
+      lastSent = count;
+      emit MessageSent(_data, _encodedData, msg.sender);
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimisation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5f5b2f024b3b01face8982572eb11ea3f3e1fece</field>
+    <field name="content">
+      ## [G-4] Redundant increments for `removedCount` in `dequeueVerified`
+  
+      `removedCount` is only used to identify if there are any removed items in the queue; hence instead of incrementing it for each removed item, consider using a boolean identifier.
+  
+      ```solidity
+      function dequeueVerified()
+      -------	
+      while (!(first > last)) {
+            bytes32 item = queue.data[first];
+            if (!queue.removed[item]) {
+              -------
+            } else {
+              // The item was removed. We do NOT increment the index (we will re-use this position).
+              unchecked {
+                ++removedCount; // @audit you just need identifier
+              }
+            }
+                      ------
+          }
+  
+          // Update the value for `first` in our queue object since we've dequeued a number of elements.
+          queue.first = first;
+  
+          if (removedCount == 0) {
+            return items;
+          } else {
+            -------
+          }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimisation</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-5] Redundant copying of the arrays in `dequeueVerified`
+  
+      Inside `dequeueVerified`, `items` is defined to be of the length of the queue. If some positions of items remained unfilled due to removed items, the `items` array is currently copied into a new array called `amendedItems` upto `index`.
+  
+      ```solidity
+      if (removedCount == 0) {
+            return items;
+          } else {
+            // If some items were removed, there will be a number of trailing 0 values we need to truncate
+            // from the array. Create a new array with all of the items up until these empty values.
+            bytes32[] memory amendedItems = new bytes32[](index); // The last `index` is the new length.
+            for (uint256 i; i < index; ) {
+              amendedItems[i] = items[i];
+              unchecked {
+                ++i;
+              }
+            }
+            return amendedItems;
+      }
+      ```
+  
+      This is an anti-pattern; even if the removed item is one, the whole array is copied.
+      Instead, consider changing the length of the items array through the assembly. `mstore(items, length)`
+    </field>
+  </item>
+  

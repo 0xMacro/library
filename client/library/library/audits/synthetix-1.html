@@ -1,0 +1,113 @@
+<page
+  clientName="Synthetix"
+  reportDate="March 2, 2023"
+  auditTitle="Synthetix 1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Synthetixio/synthetix-v3"
+  customRepoInfo
+  customReviewInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from December 12, 2022 to December 23, 2022.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Discord with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(hardhat-router):</b>
+        <code>c59d36a7f8d507fef12a6eeb1cf32b7633bb50d9</code>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(core-contracts):</b>
+        <code>c59d36a7f8d507fef12a6eeb1cf32b7633bb50d9</code>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(hardhat-storage):</b>
+        <code>d35c52a86214b1f89b0e65db3237e2148100d6d9</code>
+      </li>
+    </ul>
+  </content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts as part of the core-contracts audit</p>
+
+  <template type="file-hashes">
+    3fbc321cf8fc6fd657013c57b3e4a9bc4eb57903d63f9425b3519b1ef80c021f  utils/core-contracts/contracts/token/ERC20.sol
+    ee4d5889b54f47d36c40e6497a8d1fcd7bc4fdb9c1382ef04007a54a21ae92b1  utils/core-contracts/contracts/token/ERC20Helper.sol
+    92bdd5b7dae758caa8e75ff7dd91c1a4b5e48dd70b056903c8c7eca93cece226  utils/core-contracts/contracts/token/ERC20Storage.sol
+    0a92f19fbad3c98f52112486f42f4d9e1b60c42412e236891b1b1008d5f6ae47  utils/core-contracts/contracts/token/ERC721.sol
+    b144a09b3e68cfa9df8da4054fcb6cb19b36501582134af542a45aab1530afbf  utils/core-contracts/contracts/token/ERC721Enumerable.sol
+    d480d61f2c463c83e6cbcd88751a8ea9f3c58a5d36573dc24be14d57b7a187ba  utils/core-contracts/contracts/token/ERC721EnumerableStorage.sol
+    fe0f0f12437fb96a9c72e79756a0a0fc03aa0d9fc02568db4d19750b4b0dacf9  utils/core-contracts/contracts/token/ERC721Owned.sol
+    65346abe209fca65043a98ac02a3c689232d0615ed0def9c12b40cba4602a5cc  utils/core-contracts/contracts/token/ERC721Storage.sol
+  </template>
+
+
+  <p>We audited following files as part of the hardhat-router audit</p>
+
+  <template type="file-hashes">
+    912c6682eaadfe5e8f43957217578c4c64556ad6c738c0c8691069b37d9e513e  utils/hardhat-router/src/extensions/timers.ts
+    d1c7460c3a397a9800d12f48e6694f1903b41488b6b8eca5791371602c006ba9  utils/hardhat-router/src/index.ts
+    836b0c3dd16a0bbc2bfd897b8299ad88ed0d9b2af5c68b7699ce940ca32c082b  utils/hardhat-router/src/internal/contract-helper.ts
+    c31d7a7e5a67085ede323d7198f010c7a9cbd09e3780e0c56bb33fe9423b80cb  utils/hardhat-router/src/internal/deploy-contract.ts
+    fbe554992b38fb59a52965172549ec7908d66e43aec97136f9bb2b6774e512df  utils/hardhat-router/src/internal/errors.ts
+    36b1b849551160c7a4f65baaf9ca9a2225cc978500a67de15136a3d135fb01da  utils/hardhat-router/src/internal/fourbytes.ts
+    635cfc8530a5c99d35a5faf6b8c26d45b19b73e139e1f75dd3599fc2fd1d34a1  utils/hardhat-router/src/internal/quiet-compile.ts
+    70fe04a4fe742734b19cfc01bbf87d361e857a5d7591753051615258cf6948e8  utils/hardhat-router/src/internal/render-router.ts
+    5bd60064fb98c967c709915ee1bbec1d86c53d58bd361f956b713b59c5b0b2e1  utils/hardhat-router/src/internal/render-template.ts
+    02fbd8cd188fd4e1eac53b711b4b31e8d5ac3f12fe8410e1f22999c4f8115f7a  utils/hardhat-router/src/internal/render-testable-storage.ts
+    a266c468d8ec269d5c07a60cf33c2590c747e8604053e0e4c8ee26a9542af309  utils/hardhat-router/src/internal/router-function-filter.ts
+    d58d0384d0d3f82a63a54ca12801e46997889aa0058bca6a3f32cac73d6c596e  utils/hardhat-router/src/internal/router-helper.ts
+    b0cd60033efcfac3d248fd375be4b3d94ba205ffa9f8a9e8f631c2e27bc85b98  utils/hardhat-router/src/internal/timed.ts
+    d4f8b815a235422b4c921edf9c7d9f0007c5dec98dd69ee7a01e23a275faef28  utils/hardhat-router/src/internal/validate-interfaces.ts
+    4640d77649e0a252c4f45431a69db94baedf084465565bf074c00526b723af50  utils/hardhat-router/src/subtasks/generate-router.ts
+    fd85b3e628c0bab9be40e74d632c721184414302ebae8ae5928bd36db90ac801  utils/hardhat-router/src/subtasks/generate-testable-storage.ts
+    d0ebe9ca4c195e78574a736fed76e66ee0bab67487743a139ce82cf6ea2100e5  utils/hardhat-router/src/subtasks/index.ts
+    0b6a23fd7f043f1133fd42e23fa3ddf927d358ad9930f0bafad0917685489f1a  utils/hardhat-router/src/subtasks/validate-interfaces.ts
+    6bb32480394be1cc35178f06bbc144c016caf5affe8e2251b2d90c5659d14a69  utils/hardhat-router/src/subtasks/validate-selectors.ts
+    8891baf24b09432da5e406a8e72c6b3535f6031a4314d838378cf7b9f20bec5e  utils/hardhat-router/src/task-names.ts
+    8327273cbd950968f84702aa78e7ee6db9a29ab0f241cd95fa7b7968010d1832  utils/hardhat-router/src/tasks/deploy.ts
+    701772f552cf13d270c962e50abea28afb499466a96b5e780c693eeb75fa455b  utils/hardhat-router/src/tasks/generate-testable.ts
+    39d566a6e98735b80d349b3b84bfbe70918ef9a5d8b172a8ca4209097166e935  utils/hardhat-router/src/tasks/index.ts
+    ca9746ebb004f76d9d62e7002024051da94d101bffe519a83ca6617e92028e97  utils/hardhat-router/src/tasks/upload-selectors.ts
+    5eb134c62dca0a9c191f26e02e7d66233059007e766b881e0713e59a48f629ae  utils/hardhat-router/src/types.ts
+  </template>
+
+  <p>We also reviewed following files as part of the hardhat-storage audit</p>
+
+  <template type="file-hashes">
+
+    95c1e92a5a0adeba3b1d2facd47cd89f609682dc3a51ed46e79ac48cf99b8fb9  utils/hardhat-storage/src/index.ts
+    8e5e2003dcc1bb13ab243fdcc1a776efc163865bf2522936861663ebc717524a  utils/hardhat-storage/src/internal/dump.ts
+    e412d6e3f811d745b1ffb03af8a9d627322348738a04836ffec741ccd3fd2238  utils/hardhat-storage/src/internal/error.ts
+    2585cd0e4caf3e521bd6d5f51a3b9f8e2df012a6f616a42b7941e70aa7497e67  utils/hardhat-storage/src/internal/iterators.ts
+    30b6cef2beb24d12d802663fca1595ea54c023abbea1184e9591b2f225ca773f  utils/hardhat-storage/src/internal/misc.ts
+    b0b5ed7fe2a529535d7d60839edcad4f8a02da32752f22a032e014cffcf4843d  utils/hardhat-storage/src/internal/render.ts
+    1545c0fbe76ce0b8c0a7293d785b2636a8b8cc69b7bd513dbf1cf78ed08a966e  utils/hardhat-storage/src/internal/validate-namespace.ts
+    374357e2880a062a5e672566e4efe5716324e5b7d4f3235ddf13d088df2c135c  utils/hardhat-storage/src/internal/validate-variables.ts
+    ba3556335eb37b282d499cae9e1e7d13b834abc4f92c9004eededd5db6f050bd  utils/hardhat-storage/src/internal/validate.ts
+    27399f7250c4318270b45ad21f236de676e3d0ac2c4c77a2e44a920b158d41bb  utils/hardhat-storage/src/subtasks/get-source-units.ts
+    0e4ba9573bf6dedf624eb1c96354ae2e474b85e4e76af8e71b20d7d1f677ae98  utils/hardhat-storage/src/subtasks/parse-contents.ts
+    7202e5f1da39067fa5fe9544c2d74498108f3e66c49b53b28458308002879b1b  utils/hardhat-storage/src/subtasks/parse-dump.ts
+    c34af95023b238869acef6be33998a145d7496a784ffad7e4d876807532de603  utils/hardhat-storage/src/task-names.ts
+    b98cd1eddab401ca31d225505bb9727f7725d37e976b036d0674e3af9d965ebf  utils/hardhat-storage/src/tasks/verify.ts
+
+  </template>
+</content-for>

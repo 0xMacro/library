@@ -1,0 +1,40 @@
+<page
+  clientName="Kwenta"
+  reportDate="May 4, 2023"
+  auditTitle="Kwenta A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kwenta/smart-margin"
+  repoCommitHash="bb6f99632ef8eda46f1eae4e67819b854955c13a"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from April 4, 2023 to April 21, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Discord with the {{page.clientName}} team.</li>
+      <li><a href="https://kips-git-feat-cross-margin-and-advanced-orders-kwenta.vercel.app/kips/kip-18/">KIP-18</a></li>
+      <li><a href="https://kips-git-feat-cross-margin-and-advanced-orders-kwenta.vercel.app/kips/kip-19/">KIP-19</a></li>
+      <li><a href="//kips.kwenta.io/kips/kip-55">KIP-55</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    e71ccaa1d4a1feebd135103921449b69fe12b305ccac21482d73077d5e7558f4  src/Account.sol
+    bca54d6d95501325240281b19e47094a83ab3fa9505796f220bd83eb2aae9174  src/AccountProxy.sol
+    baac416359900d7c9233ecb6214236d70c013cfcf0f2a05f82d0efe913eb9737  src/Events.sol
+    f9473f9beecc69681a021be796f95d2e8c726688a6bd0744164eb8fbbb33c30f  src/Factory.sol
+    1cd03cf82dd372c992cff4e84719fedded6576a21534803130e7c43b6d45068d  src/Settings.sol
+    616a63517dbc3254825d4565e08a0068cd73b56ebcea75bff4022e9b695eabd6  src/utils/Auth.sol
+    8addf1216923862b85039a194540ee68b5f9c660120711f2f90147af14636df6  src/utils/OpsReady.sol
+  </template>
+</content-for>
+
+</page>

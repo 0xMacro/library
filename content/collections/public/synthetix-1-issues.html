@@ -1,0 +1,301 @@
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">3fa6c0c4886a6f7e3f0f7a6e727fa95adc68fe7b</field>
+    <field name="content">
+      ## (H-1) Router’s `receive()` function is not useable
+  
+      In the generated Router.sol, the `receive()` function attempts to forward calls to the `_forward()` function:
+  
+      ```solidity
+      receive() external payable {
+          _forward();
+      }
+      ```
+  
+      This is problematic because the `_forward()` function itself does not have the capability to forward to underlying module’s `receive()` functions. This is because the picked-up function selectors from modules do not include the standard `receive()` function. This causes the invocation of the `receive()` function to always revert, breaking the idea that the contracts built with Router.sol have the full capabilities of normal contracts.
+  
+      Currently, the `hardhat-router` plugin implementation filters out the `receive()` function by using the `getSelectors()` function defined in `core-utils/src/utils/ethers/contracts.ts`. This function filters by fragments with the type “`function`" while the `recieve()` ABI entry is of type “`receive`”. 
+      
+  
+      **Remediations to consider:**
+  
+      - The `receive()` function can be treated like the other module contract’s publicly accessible functions. It appears in a contract’s ABI, can be assured to be singular, and can be forwarded to in the same way. This would enable behavior uniformity with vanilla EVM contracts.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">88036dabd03cac64300218af13d7f585af7dd9ee</field>
+    <field name="content">
+      ## (H-2) ERC721 functions do not comply with EIP-721 standard
+  
+      In ERC721 from utils/core-contracts/contracts/token/ERC721.sol, all the functions should adhere to the [EIP-721](https://eips.ethereum.org/EIPS/eip-721) spec:
+  
+     
+      > NFTs assigned to zero address are considered invalid, 
+      and queries about them do throw.
+      > 
+
+
+  
+      In Synthetix implementation in, these functions do not throw but return the following values:
+  
+      - `balanceOf`
+          - Returns `0`
+      - `ownerOf`
+          - Returns `0`
+      - `tokenURI`
+          - Returns `“”`
+  
+      Since the goal of specifications is to allow interoperability, external projects that rely on Synthetix’s ERC721 implementation will receive unexpected results. This can cause problems for the projects building on Synthetix’s core-contracts. 
+  
+  
+      **Remediations to Consider**
+  
+        - Adhering to the EIP-721 standard and revert when queried IDs are invalid i.e. non-existent.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">88036dabd03cac64300218af13d7f585af7dd9ee</field>
+    <field name="content">
+      ## (H-3) ERC721Enumerable functions do not comply with EIP-721 standard
+  
+      In ERC721Enumerable from utils/core-contracts/contracts/token/ERC721Enumerable.sol, some of the functions do not adhere to the [EIP-721](https://eips.ethereum.org/EIPS/eip-721) spec. 
+  
+      The function `tokenOfOwnerByIndex` accepts an owner and index of the owner’s token list. Currently, it returns  `0` if the index to be queried is greater than or equal to the owner’s balance. Instead, it should revert. Also, it should throw when checking the token balance of an non-existent owner (this can be addressed in issue H-2).
+  
+      Another function, `tokenByIndex` also does not follow the spec. Currently, it returns `0` if the index is greater than or equal to the total supply, while instead it should also revert.
+  
+      Since the goal of specifications is to allow interoperability, external projects that rely on Synthetix’s ERC721Enumerable implementation will receive unexpected results. This can cause problems for the projects building on Synthetix’s core-contracts. 
+  
+      **Remediations to Consider**
+  
+      - Adhering to the EIP-721 standard.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b63954cdf50a92ca077f0179af79404c2fe83a3b</field>
+    <field name="content">
+      ## (H-4) ERC20 implementation does not provide a safe alternative to unsafe `approval()`
+  
+      According to [EIP-20](https://eips.ethereum.org/EIPS/eip-20), the `approve()` method of ERC20 in utils/core-contracts/contracts/token/ERC20.sol has an attack vector related to directly setting the approval amount. This opens up a user to a front-running attack when used multiple times on the same spender. 
+  
+      To illustrate, consider:
+  
+      1. `approve()` is called by Bob to allow Alice to spend 200 tokens.
+      2. Before Alice spends the tokens, `approve()` is called again by Bob to allow Alice to spend 100 tokens instead of 200 tokens.
+  
+      After the 2nd approval, Bob expects that Alice is able to only spend a total of 100 tokens. However, Alice is able to front-run the second `approve()` by transferring 200 tokens that was approved in the first `approve()`. Afterwards, Alice is able to spend another 100 tokens. The result is Alice is able to transfer 300 tokens instead of the 100 or 200 that Bob expected.
+  
+      An alternative to using `approve` directly is to call a function that increases the approval amount instead of directly changing it. This is currently done in some implementations such as [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol#L181). 
+    
+      **Remediations to Consider**
+  
+      - Implement `increaseAllowance` and `decreaseAllowance`, similar to [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol#L201), such that the allowance is increased and decreased respectively.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Storage Collision</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">7930cf0b6081f4a834ebd7f89645935c5d72b2aa</field>
+    <field name="content">
+      ## (H-5) Slots are compared by variable names which may fail to prevent storage collisions
+  
+      `validateSlotNamespaceCollisions()` in validate-namespace.ts checks the contracts for yul code that assigns storage slots and if the same slot is assigned in two different places it throws an error and blocks the deployment. However, this check is based on the variable name that is used to hold the bytes that correspond to the slot number and not the value of the variable. This means if two variables with different names hold the same value they will pass the collision check, and if two different slot variables share a name but not value, they will wrongly throw an error.
+  
+      **Remediations to Consider**
+  
+      - Instead of comparing storage slot variable names, the tool should ensure there are no duplicate storage slot values assigned twice. This can be achieved by comparing the `initialValue` parameters of `functionNode` fetched from `iterateSlotAssignments()` after being sure `.slots` are assigned to literal values.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Selector Collision</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">addressed</field>
+    <field name="commit">066e86c60dc3cae27cb030713a861b97b8e80f05</field>
+    <field name="content">
+      ## (M-1) `VALIDATE_SELECTORS` subtask does not check for duplicate selectors in the Proxy contract
+  
+      The `hardhat-router-validate-selectors` subtask is used to check if there are any duplicate function selectors to prevent selector clashes between modules. Checking only the modules folder may fail preventing all selector clashes, as there is nothing that prevents users from having functions in their Proxy contracts.
+  
+      Which Proxy contract to use is determined by the dev by passing the path of the Proxy to the tool (with the default of 'contracts/Proxy.sol:Proxy’). The dev, maliciously or by chance, may include a function in the Proxy contract that clashes with one of the functions in the modules, or, a newly added module may introduce a clash with an existing Proxy function. 
+  
+      As discussed with the Synthetix team, the Router is intended to be 100% explicit about all system functionality. Having such a clash will cause unexpected results for users who think the system behaves as it is represented in the Router. The issue might be exploitable in permissionless protocols where anyone can introduce a new module.
+  
+      **Remediations to Consider**
+  
+      - Include Proxy contract’s functions to the list for function selector clash check in `validate-selectors` subtask.
+      - Or, validate there are not any functions in the Proxy contract.
+  
+      #
+    </field>
+  </item>
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## (M-2) Router’s module contracts cannot specify a `fallback()` function
+  
+      Currently the generated Router.sol has no functionality to allow for its underlying module contracts to specify a `fallback()` function for their own use cases. This creates a difference between the capabilities of Router-based and vanilla contract implementations. The cause of this is similar to that of [H-1], as the `fallback()` function is of type “`fallback`" and not type “`function`" in the ABI and is not under consideration of the Router to be routed to. 
+  
+      **Remediations to consider:**
+  
+      - The `fallback()` function can be treated like the other module contract’s publicly accessible functions. It appears in a contract’s ABI, can be assured to be singular, and can be forwarded to in the same way. This would enable behavior uniformity with vanilla EVM contracts.
+    </field>
+    <field name="response">
+        We’re fine with not allowing modules to have a fallback function.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">88036dabd03cac64300218af13d7f585af7dd9ee</field>
+    <field name="content">
+      ## (M-3) ERC721Enumerable does not extend `supportsInterface()`
+  
+      In ERC721Enumerable, the `supportsInterface()` function has not been properly extended. Instead it uses the ERC721 base implementation. According to [EIP-721](https://eips.ethereum.org/EIPS/eip-721), in the `interface ERC721Enumerable` section, the comment states :
+
+      > Note: the ERC-165 identifier for this interface is 0x780e9d63.
+      > 
+
+  
+      Currently, if a user wants to check if the contract supports ERC721Enumerable and calls `ERC721Enumerable.supportsInterface(0x780e9d63)`, they would receive `false` instead of the spec-required `true`.   
+  
+      **Remediations to Consider**
+  
+      - Implement the `supportsInterface` according to EIP-721.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Storage Collision</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a456af7fb71b967f15098f7708931beefb81c8df</field>
+    <field name="content">
+      ## (M-4) `deploy` task only sends `modules` folder for storage collision check
+  
+      Similar to issue M-1, the TASK_STORAGE_VERIFY is run with only the modules folder. This will cause missing possible storage collisions in the Proxy contract. 
+  
+      ```solidity
+      await hre.run(TASK_STORAGE_VERIFY, { contracts: modules });
+      ```
+  
+      **Remediations to Consider**
+  
+      - Include Proxy contract in the list of to-be-verified contracts in the storage verify task.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Quality</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## (Q-1) Inconsistent use of subtraction in `core-contracts` storage hashing
+  
+      In Synthetix.io’s v3 repo, the `core-contracts` folder and other folders sometimes suggests adherence to the pattern of subtracting one from hashes when creating storage slots as in ProxyStorage.sol:
+  
+      ```solidity
+      function _proxyStore() internal pure returns (ProxyStore storage store) {
+          assembly {
+              // bytes32(uint(keccak256("io.synthetix.v3.proxy")) - 1)
+              store.slot := 0x32402780481dd8149e50baad867f01da72e2f7d02639a6fe378dbd80b6bb446e
+          }
+      }
+      ```
+  
+      This pattern is not followed in all files. For uniformity of the code base, consider choosing whether to subtract 1 or not and use the same pattern everywhere. The subtraction is done [typically](https://forum.openzeppelin.com/t/calculation-of-proxy-contract-storage-slot/30745/2) to ensure that the pre-image of the used hash is unknown. This is not necessarily needed for this use case.
+  
+      #
+    </field>
+    <field name="response">
+        Good point about consistency and that we really don’t need to subtract in this use case. We decided to go without subtraction, and has been implemented in a previous PR that moves all hashes that don’t move into constant variables.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">669adde554f38f86c28757d67947cfb9ba3d62be</field>
+    <field name="content">
+      ## (Q-2) Use of custom errors in generated router file is invalid for some compiler versions
+  
+      In all contracts, `pragma solidity ^0.8.0;` is used while the custom errors feature was released in [version 0.8.4](https://github.com/ethereum/solidity/releases/tag/v0.8.4). This will cause any version before 0.8.04 to fail to compile. Consider changing the pragma to a higher version.
+  
+      #
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">669adde554f38f86c28757d67947cfb9ba3d62be</field>
+    <field name="content">
+      ## (Q-3) Use of `abi.encodeCall` is invalid for some compiler versions
+  
+      In the UUPSImplementation, `abi.encodeCall` is used to encode the function calldata. This built-in function was released in [version 0.8.11](https://github.com/ethereum/solidity/releases/tag/v0.8.11). 
+  
+      In all contracts, `pragma solidity ^0.8.0;` is used. This will allow any version above 0.8.0 to attempt to compile, but will fail if the compiler version is below 0.8.11. Consider changing the pragma to a higher version.
+  
+    </field>
+  </item>
+  <item>
+    <field name="topic">Gas</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c2a60a029226bb327d2b2548eda42dce1dadfacd</field>
+    <field name="content">
+      ## (G-1) `core-contracts` folder rehashes some static storage slots
+  
+      In Synthetix.io’s v3 repo, the `core-contracts` folder rehashes static storage slots in some places. For example, this is the of the OwnableStorage.sol’s storage implementation:
+  
+      The rehashing is unnecessary and can be replaced with a static storage slot as is done in the repo’s `sample-projects` folder:
+  
+      ```solidity
+      function load() internal pure returns (Data storage store) {
+          bytes32 s = keccak256(abi.encode("Ownable"));
+          assembly {
+              store.slot := s
+          }
+      }
+      ```
+  
+      ```solidity
+      function load() internal pure returns (Data storage store) {
+          assembly {
+              // bytes32 s = keccak256(abi.encode("Ownable"));
+              store.slot := 0xe1550b5a17836cfadda6044cd412df004a72cf007361a046298ac83a7992948c
+          }
+      }
+      ```
+  
+      **Remediations to consider**:
+  
+      - Using hardcoded hash outputs instead of rehashing.
+    </field>
+  </item>
+  

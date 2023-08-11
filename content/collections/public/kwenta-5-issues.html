@@ -1,0 +1,63 @@
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">cf80db766a73eabcfbd6ea636a64026dd835bb21</field>
+    <field name="content">
+        ## (Q-1) Inaccurate Comment
+
+        In Account.sol, there is a comment above its constructor that mentions disabling initializers.
+
+        ```solidity
+        /// @notice disable initializers on initial contract deployment
+        ```
+        Reference: [Account.sol#L102](https://github.com/Kwenta/smart-margin/blob/pyth-oracle/src/Account.sol#L102)
+
+        However, there are no initializers in this contract to disable, and this comment was left over from when Account.sol had been initialized prior.
+
+        **Remediations to Consider**
+
+        Remove this comment, as it is no longer accurate.
+    </field>
+</item>
+<item>
+    <field name="topic">Informational</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## (I-1) Conditional orders can be executed without set conditions met
+      The `checker()` function called by Gelato executors to determine if a conditional order should be executed is never verified on-chain and these conditional orders can be called by any executor. This allows a rogue executor to execute conditional orders set by users without the set condition being true. This is unlikely to occur, as the executor will have their GEL token stake slashed, but is something to be aware of if setting large conditional orders.
+    </field>
+    <field name="response">
+        No change in v2.0.2 but expected mechanism rework in v2.0.3/v2.0.4
+    </field>
+
+</item>
+<item>
+    <field name="topic">Informational</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## (I-2) Conditional order execution may be delayed
+  
+      There is no guarantee that a conditional order will execute as soon as its condition is met, an executor may not execute the order while assigned to the task, or it may be executed with a delay. Executors are disincentivized to not execute valid orders, but if an executor doesn’t, then execution may be delayed until a new executor is assigned to the task. It is suggested that conditional orders used to prevent liquidation should assume that the order could be delayed, and set a generous buffer to the targetPrice to reduce the likelihood of liquidation if there is a delay in execution.
+    </field>
+    <field name="response">
+        No change in v2.0.2 but expected mechanism rework in v2.0.3/v2.0.4
+    </field>
+
+</item>
+<item>
+    <field name="topic">Informational</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## (I-3) ETH in an account can be griefed by an executor
+  
+      The fee paid to a Gelato executor for executing a conditional order is set by the executor themselves. If ETH is stored in an account, typically to pay for Gelato conditional orders, and there is an active conditional order, there is a chance for a malicious Gelato executor to set the fee to execute the order to be an amount equal to the ETH in the account. This allows all ETH in the account to be sent to the Gelato contract, and would require trust that the Gelato DAO would distribute this ETH back to the account at a later time. This is unlikely to occur as the executor would be disincentivized to do so as their stake would be slashed. It is recommended that users be aware of this possibility and not overly fund their accounts with ETH.
+    </field>
+    <field name="response">
+        No change in v2.0.2 but expected mechanism rework in v2.0.3/v2.0.4
+    </field>
+
+</item>

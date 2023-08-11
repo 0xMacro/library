@@ -1,0 +1,358 @@
+<item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1630ebc30a76ec3f1ee1222fe4e2224738588dfe</field>
+    <field name="content">
+        ## [H-1] Any signer can withdraw the smart wallet’s deposit amount
+        ### Description
+
+        The spec states the following for the `DEFAULT_ADMIN_ROLE`:
+
+        > Only a holder of the role can withdraw the smart wallet’s gas deposit from the AA Entrypoint contract.
+        > 
+
+        However, it is possible for every legit signer to withdraw the smart wallet’s deposit amount from the `Entrypoint` contract by submitting a user operation that calls `Entrypoint.withdrawTo` directly from the smart wallet.
+
+        The behavior applies to all three wallet setups: `Account`, `ManagedAccount`, and `DynamicAccount`.
+
+        ### **Remediations to Consider**
+
+        Consider adding logic to the `execute` and `executeBatch` function that prevents certain calls from executing. This could be achieved by implementing a blockList containing certain function selectors that are not allowed to be called via `execute` and `executeBatch` functions.
+ </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1630ebc30a76ec3f1ee1222fe4e2224738588dfe</field>
+    <field name="content">
+        ## [M-1] Any signer can corrupt the `AccountFactory`’s signers registry
+        ### Description
+
+        `BaseAccountFactory` implements `addSigner` and `removeSigner` functions to track the registered signers of an account. However, any signer can add and remove signers as they wish by submitting a user operation that calls `AccountFactory.addSigner` or `AccountFactory.removeSigner` directly from the smart wallet. This can lead to various issues such as:
+
+        - Admin can’t grant a new signer the `SIGNER_ROLE`, as the signer has been already added by another signer to the factory’s signer registry.
+        - `AccountFactory` wrongly reports registered signers via `getSignersOfAccount`. Off-chain components and other protocols may rely on this information which can lead to various issues when returning data is not accurate.
+
+        The behavior applies to all three wallet setups: `Account`, `ManagedAccount`, and `DynamicAccount`.
+
+        ### **Remediations to Consider**
+
+        Consider a solution similar to the suggested remediation in [H-1], so that `addSigner` and `removeSigner` functions can’t be called via a user operation transaction.
+
+    </field>
+</item>
+
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">1630ebc30a76ec3f1ee1222fe4e2224738588dfe</field>
+    <field name="content">
+        ## [M-2] Initial permissions are not enumerable
+
+        ### Description
+        
+        `AccountCore._setupRole` is called within the `initialize` functions of DynamicAccount and ManagedAccount. `_setupRole` uses `permissions.storage` location for storing the new role:
+        
+        ```solidity
+        PermissionsStorage.Data storage data = PermissionsStorage.permissionsStorage();
+        data._hasRole[role][account] = true;
+        ```
+        
+        In contrast, the AccountExtension.sol inherits from `PermissionsEnumerable` using `permissions.enumerable.storage`. As a result, roles added in the initialize function of DynamicAccount and ManagedAccount will not show up in the respective `PermissionsEnumerable` functions like `getRoleMember` and `getRoleMemberCount`.
+        
+        ### **Remediations to Consider**
+        
+        Use `PermissionsEnumerable` storage location in `AccountCore._setupRole` function.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">e2c6eadf139cfd567a43c7a918af4d0de95792e6</field>
+    <field name="content">
+        ## [M-3] Native tokens can get locked in `ManagedAccountFactory`
+
+        ### Description
+        
+        `ManagedAccountFactory` inherits from `BaseRouter` which implements the `fallback()` and `receive()` functions allowing the contract to receive native tokens. This allows to send native tokens directly to the factory contract. However, there is no possibility to transfer out those tokens, keeping them locked in the contract forever. 
+        
+        ### **Remediations to Consider**
+        
+        Consider overriding `fallback()` and `receive()` functions in `ManagedAccountFactory` so that the transaction reverts when native tokens are accidentally transferred to the contract.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Upgradability</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1630ebc30a76ec3f1ee1222fe4e2224738588dfe</field>
+    <field name="content">
+        ## [M-4] Potential for storage collision in `ManagedAccount`
+
+        ### Description
+        
+        In ManagedAccount, the state variable `factory` doesn’t use the “storage struct” pattern.
+        
+        This causes the potential for storage collisions to occur, since the contract use the proxy pattern and use delegate calls to read and write to storage. Storage collisions can allow data to be set and/or read from that is not intended, causing many potential issues and vulnerabilities.
+        
+        Note that for a storage collisions to occur, it is required that an extension is added that also doesn’t use the “storage struct” pattern.
+        
+        ### **Remediations to Consider**
+        
+        Consider using the “storage struct” patterns for setting the `factory` variable.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2a239e4785260735205592c8175e2ccadd69311d</field>
+    <field name="content">
+        ## [M-5] Native token can get locked in `OpenEditionERC721`
+
+        ### Description
+
+        `OpenEditionERC721` implements the `payble` `claim(…)` function (via parent contract Drop.sol) that calls `_collecPriceOnClaim` to transfer payment to `feeRecipient` and `saleRecipient`. 
+
+        The issue of locking native tokens in the contract occurs under the following circumstances:
+
+        1. Payment currency in `claimConditions` is set to ERC20.
+        2. A user calls `claim` with appropriate amount of ERC20 tokens approved and accidentally also passes native tokens along. 
+
+        As a result, the `claim` call succeeds but the native tokens passed along will be locked within the `OpenEditionERC721` contract.
+
+        Note that this issue also applies to other Thirdweb contracts that inherit from the `Drop` contract and implement the `_collectPriceOnClaim` function (such as `ERC20Drop`, `ERC721Drop`, …)
+
+        ### **Remediations to Consider**
+
+        Consider checking that no native tokens are transferred (`msg.value == 0`) when payment currency is set to ERC20.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">30689d5bcf41a0ab365e77d69e3ad1b3be67129d</field>
+    <field name="content">
+        ## [L-1] BaseRouter’s getter functions don’t include default extension
+
+        ### Description
+
+        The BaseRouter implementation used by DynamicAccount and ManagedAccount don’t consider the default extensions in its getter functions:
+
+        - `getAllExtensions`
+        - `getExtension`
+        - `getExtensionImplementation`
+        - `getAllFunctionsOfExtension`
+
+        This differs from the behavior of dynamic contracts that use the BaseRouter implementation from the *preset* folder (*see [here](https://github.com/thirdweb-dev/dynamic-contracts/blob/main/src/presets/BaseRouter.sol#L85-L155))* where default extensions will be returned in all BaseRouter’s getter functions.
+    
+        ### **Remediations to Consider**
+
+        Consider including the default extension in the BaseRouter’s getter function to have consistent behavior among different implementations of BaseRouter.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">30689d5bcf41a0ab365e77d69e3ad1b3be67129d</field>
+    <field name="content">
+        ## [L-2] Incorrect `supportsInterface` implementation
+
+        ### Description
+
+        In BaseRouter.sol, the `supportsInterface` function is implemented as follows:
+
+        ```solidity
+        function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {
+            return interfaceId == type(IBaseRouter).interfaceId;
+        }
+        ```
+
+        Whereas the default extension AccountExtension.sol implements its own `supportsInterface` function to signal that `IERC1155Receiver` and `IERC721Receiver` are implemented:
+
+        ```solidity
+        function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155Receiver) returns (bool) {
+            return
+                interfaceId == type(IERC1155Receiver).interfaceId ||
+                interfaceId == type(IERC721Receiver).interfaceId ||
+                super.supportsInterface(interfaceId);
+        }
+        ```
+
+        However, the `supportsInterface` implementation in `AccountExtension` will never be hit as it is already implemented in `BaseRouter`. As a consequence, when `supportsInterface` is called for ManagedAccount and DynamicAccount, it wrongly returns `false` when called with `IERC1155Receiver` and `IERC721Receiver` interface ids.
+
+        ### **Remediations to Consider**
+
+        Consider changing `BaseRouter.supportsInterface` to return true for `IERC1155Receiver` and `IERC721Receiver` interface ids.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c8d0b4ab2a02ebbedd790e528cc93e0a0c0c988d</field>
+    <field name="content">
+        ## [Q-1] Potentially susceptible to signature malleability
+
+        A vulnerable version of ECDSA.sol is used that is susceptible to signature malleability. See details [here](https://github.com/OpenZeppelin/openzeppelin-contracts/security/advisories/GHSA-4h98-2769-gh6h). The current version of ECDSA.sol being used is identical to Openzeppelin’s version 7.0 whereas the vulnerability has been patched in 7.3. 
+
+        Contracts that are affected by this vulnerability are those that implement replay protection by marking the signature itself as used instead of any nonce or unique id. 
+
+        Throughout the Thirdweb code base - whenever ECDSA.sol is used - replay protection happens either via checking the nonce or a unique id. Thus, with current usage of ECDSA.sol, there is no immediate security risk imposed. 
+
+        Consider updating ECDSA.sol to reflect changes in patched Openzeppelin’s version 7.3. This ensures that no vulnerabilities will be introduced by using ECDSA.sol, regardless of the replay protection being used.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1ed7b8dcc2c9a7e84ff1fb561ea29ccab872c929</field>
+    <field name="content">
+        ## [Q-2] Unused imports
+
+        The following imports are not required and can be removed:
+        
+        - In DynamicAccount.sol:
+            
+            ```solidity
+            import "../non-upgradeable/Account.sol";
+            ```
+            
+        - in DynamicAccountFactory.sol:
+            
+            ```solidity
+            import "../utils/BaseAccount.sol";
+            import "../../openzeppelin-presets/proxy/Clones.sol";
+            ```
+            
+        - in ManagedAccountFactory.sol:
+            
+            ```solidity
+            import "../utils/BaseAccount.sol"; 
+            import "../../openzeppelin-presets/proxy/Clones.sol";
+            ```
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1ed7b8dcc2c9a7e84ff1fb561ea29ccab872c929</field>
+    <field name="content">
+        ## [Q-3] Cleanup import
+
+        EntryPoint.sol contains the following import:
+        
+        ```solidity
+        import ".//Exec.sol";
+        ```
+        
+        Consider removing one `/` from the above import line.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Naming</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1ed7b8dcc2c9a7e84ff1fb561ea29ccab872c929</field>
+    <field name="content">
+        ## [Q-4] Misleading variable names
+
+        `BaseAccountFactory.addSigner` contains the following lines:
+        
+        ```solidity
+        bool isAlreadyAccount = accountsOfSigner[_signer].add(account);
+        bool isAlreadySigner = signersOfAccount[account].add(_signer);
+        ```
+        
+        The variable names `isAlreadyAccount` and `isAlreadySigner` are misleading, as `EnumberableSet.add` function returns `true` when a new address is added; and `false` when the address is already in the mapping.
+        
+        Consider renaming above variables to something more appropriate such as:
+        
+        - `isNewAccount`
+        - `isNewSigner`
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d2795622e611c492bce840531e27ab619cca29c4</field>
+    <field name="content">
+        ## [Q-5] Unused import
+
+        The following import is not required and can be removed:
+        
+        - In OpenEditionERC721.sol:
+            
+            ```solidity
+            import "./extension/DelayedReveal.sol"
+            ```
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">d2795622e611c492bce840531e27ab619cca29c4</field>
+    <field name="content">
+        ## [Q-6] Inaccurate comment
+
+        The following comments in `OpenEditionERC721` are incorrect:
+        
+        1. For `minterRole` variable declaration:
+        
+        ```solidity
+        /// @dev Only MINTER_ROLE holders can sign off on `MintRequest`s and lazy mint tokens.
+        ```
+        
+        1. For `_canSetSharedMetadata` function:
+        
+        ```solidity
+        /// @dev Returns whether lazy minting can be done in the given execution context.
+        ```
+        
+        Lazy mints are mentioned on both of the above comments which are not supported in `OpenEditionERC721`. Consider changing the comments appropriately.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1ed7b8dcc2c9a7e84ff1fb561ea29ccab872c929</field>
+    <field name="content">
+        ## [G-1] Use optimized `Clones` version
+
+        The OpenZeppelin’s [Clones.sol](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/proxy/Clones.sol) contract has been updated to save gas on clone creation (see [here](https://github.com/OpenZeppelin/openzeppelin-contracts/commit/6b9bda872d01f8d7e8532ca2002c9a7c8b5ba24d)). The version referenced by Thirdweb is still using the unoptimized version.
+
+        Consider updating Clones.sol to latest version to save gas costs.
+    </field>
+</item>

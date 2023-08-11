@@ -1,0 +1,356 @@
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixedprivate</field>
+    <field name="content">
+        ## [C-1] Next token id can be minted for free before the actual token has been created
+
+        ### Description
+        
+        Tokens can be minted via `mintToken`, `mintTokenTo`, or `mintTokenAllowlist` functions. All of those functions call `_mintAfterChecks` to verify certain conditions before minting. The `_mintAfterChecks` function verifies the specified token id as follows:
+        
+        ```solidity
+        if (id > _currentTokenId) {
+            revert InvalidToken();
+        }
+        ```
+        
+        According to the check above, `_currentTokenId` can be minted because it only reverts for `id` greater than `_currentTokenId`. This is problematic because `_currentTokenId` refers to the next token ID that will be created (rather than the last token ID that has been created).
+        
+        This allows for the minting of the next token ID before the actual token has been created through the `createDropToken` or `createDropTokens` functions.
+        
+        Consider the following scenario: a creator calls `createDropToken` to create a token with an amount of 100 and a price of 10 ether. A malicious user could front-run the transaction and pre-mint all 100 tokens by specifying the `_currentTokenId` when calling `mintToken`. Since token settings are not yet set for the token with ID `_currentTokenId`, the user can mint all 100 tokens for free.
+        
+        ### **Remediations to Consider**
+        
+        Only allow minting of tokens for ids smaller than `_currentTokenId`.   
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixedprivate</field>
+    <field name="content">
+        ## [H-1] Airdrops don’t work when `maxSupply` is not capped
+
+        ### Description
+        
+        According to specification, `maxSupply` should behave as follows:
+        
+        > A token with 0 supply is considered to have infinite possible supply (though it can still be bounded by mintEnd)
+        > 
+        
+        However, the `airdropToken`function contains the following logic:
+        
+        ```solidity
+        if (updatedAmountMinted > token.maxSupply) {
+            revert SoldOut();
+        }
+        ```
+        
+        As per the above logic, airdrops using tokens with `maxSupply == 0` will revert with error `SoldOut()`. 
+        In addition, once a token has been minted, `maxSupply` can’t be changed anymore via `updateTokenSettingsByIndex` function - giving the issue a high severity impact.
+        
+        ### **Remediations to Consider**
+        
+        Only apply above revert logic when `maxSupply > 0`.
+    </field>
+    </item>
+
+    <item>
+        <field name="topic">Incentive Design</field>
+        <field name="impact">high</field>
+        <field name="chance">medium</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [H-2] Tokens can be created with shares > 100, resulting in unfair distribution of revenue
+
+            ### Description
+
+            As stated in the readme and checked in the `_verifyPaymentSplitterSettings` function, the sum of all payees shares must be 100:
+
+            ```solidity
+            if (shareTotal != 100) {
+            revert InvalidPaymentSplitterSettings();
+            }
+            ```
+
+            This is correctly checked when adding payment settings via the `initialize`, `updatePaymentSplitterSettingsByIndex`, and `updateFallbackPaymentSplitterSettings`. However, the call to `_verifyPaymentSplitterSettings` is missing when creating tokens via `createDropToken` and `createDropTokens`. This allows creating payment settings that don’t comply to the contract’s invariant of `shareTotal == 100`.
+
+            This can have the following consequences:
+
+            1. Payees can be specified with `shares == 0`: Once a token with price > 0 gets minted, the paid ether is not added to the payee’s revenue - resulting in the paid amount being locked in the contract
+            2. Payees can be specified with `shareTotal > 100`: In this case, payees will receive revenue that exceeds the allocated amount for the associated token id. As a result, other payees will fail to release their entitled revenue as there is not sufficient ether amount left in the contract.  
+
+            Note that specifying invalid payment settings can be set unintentionally by the owner, but can also happen due to a logic bug on the frontend (which is not uncommon).
+
+            ### **Remediations to Consider**
+
+            Verify payment settings in `createDropToken` and `createDropTokens` by adding `_verifyPaymentSplitterSettings` to these functions.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Spec</field>
+        <field name="impact">low</field>
+        <field name="chance">high</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [M-1] Tokens with no `mintEnd` can’t be minted
+            
+            ### **Description**
+            
+            In `_mintAfterCheck`, the following code validates the start/end time of minting:
+            
+            ```solidity
+            if (
+                (token.mintStart > 0 || token.mintEnd > 0) &&
+                (block.timestamp < token.mintStart ||
+                    block.timestamp > token.mintEnd)
+            ) {
+                revert MintNotActive();
+            }
+            ```
+            
+            The specification defines tokens with `mintEnd == 0` as follows:
+            
+            > *A token with no mintEnd is assumed to be mintable forever*
+            > 
+            
+            However, the above code breaks the specification as the line `block.timestamp > token.mintEnd` always evaluates to true when `mintEnd` is not specified, resulting in the transaction to revert. As a consequence, tokens with no `mintEnd` specified can’t be minted. 
+            
+            Note that the impact of this issue is considered low severity, as it can be remedied by updating token settings via `updateTokenSettingsByIndex`.
+            
+            ### **Remediations to Consider**
+            
+            Change above logic so that tokens with `startEnd > 0` and `mintEnd == 0` are not being reverted.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Incentive Design</field>
+        <field name="impact">medium</field>
+        <field name="chance">medium</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [M-2] A malicious user can take advantage of possible overflow in `amountMinted`
+            
+            ### **Description**
+            
+            An overflow can happen in `_mintAfterChecks` on the following lines:
+            
+            ```solidity
+            unchecked {
+                token.amountMinted += quantity;
+                _mintBalanceByTokenId[id][account] += quantity; 
+            }
+            ```
+            
+            A malicious user can cause an overflow on `amountMinted` by minting more than `max(uint32)-1` tokens. This results in incorrect accounting of `amountMinted`, which can have various consequences, such as:
+            
+            1. The number of minted tokens can exceed `maxSupply`, which breaks the protocol's invariant of `amountMinted ≤ maxSupply`.
+            2. An attacker can trick the creator into assuming that no tokens have been minted. Consider the following scenario:
+                1. The creator creates a token with an infinite supply (`maxSupply` = 0).
+                2. A malicious user takes advantage of overflow and mints `max(uint32)` tokens, thereby setting `amountMinted` back to `0`.
+                3. As `amountMinted` is now equal to 0, the creator wrongly assumes that no tokens have been minted so far and may change the max supply or set the price > 0.
+                4. The creator holds a number of tokens equal to `max(uint32)`, which suddenly become worth a fortune.
+            
+            ### **Remediations to Consider**
+            
+            Don’t use unchecked arithmetic in above code logic.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Griefing</field>
+        <field name="impact">low</field>
+        <field name="chance">low</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [L-1] Airdropping can be griefed
+
+            ### **Description**
+            
+            The `airdropToken` function iterates over an array of provided recipients and mints the respective tokens to each recipient. During mint, if the recipient is a contract, [ERC1155Upgradeable.sol](https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/master/contracts/token/ERC1155/ERC1155Upgradeable.sol#L461) calls `onERC1155Received` and gives execution control to the recipient contract. This means that the recipient contract can execute malicious code, such as consuming all the provided gas. If this occurs, calls to `airdropToken` could cost substantially more than expected or exceed the block gas limit, preventing calls from executing.
+            
+            The impact of this vulnerability is considered low severity, as `airdropToken` can be called again by omitting the griefer contract.
+            
+            ### **Remediations to Consider**
+            
+            - Switch from a push method of transferring tokens, to a pull method. This makes users claim their airdrop and prevents malicious users from preventing others from receiving theirs.
+            - Or explicitly pass in the amount of gas for the transfer, ensuring there is enough gas to allow the contract to execute normal operations, but not provide the entire gas of the transaction that can be used maliciously.
+        </field>
+        <field name="response">
+            We will ensure a reasonable gas limit is provided on the front end, which won’t require any contract mitigations.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Use Cases</field>
+        <field name="impact">low</field>
+        <field name="chance">low</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [L-2] `releaseBatch` fails if one of the payees has already released
+            
+            ### **Description**
+            
+            The `releaseBatch` function iterates over the provided payees array and calls `release` for each payee. However, if a payee has already released the funds, a call to `release` will revert and cause the entire `releaseBatch` function to fail.
+            
+            ```solidity
+            uint256 amount = releasable(payee); 
+            
+            if (amount == 0) {
+                revert NoFundsToRelease();
+            }
+            ```
+            
+            ### **Remediations to Consider**
+            
+            Don’t revert for `amount == 0` in `release` function.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Protocol Design</field>
+        <field name="impact">low</field>
+        <field name="chance">low</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [L-3] Settings for not next token id can be updated
+            
+            ### **Description**
+            
+            In `updateTokenSettingsByIndex`and `updatePaymentSplitterSettingsByIndex`, the following check should prevent non-existing token ids from being updated:
+            
+            ```solidity
+            if (id > _currentTokenId) {
+                revert InvalidToken();
+            }
+            ```
+            
+            According to the check above, updates to `_currentTokenId` are allowed. However, `_currentTokenId` has not yet been created and refers to the next token that will be created. Therefore, a subsequent call to `createDropToken` or `createDropTokens` would overwrite the previously defined settings.
+            
+            ### **Remediations to Consider**
+            
+            Only allow updates for token ids smaller than `_currentTokenId`.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Input Validation</field>
+        <field name="impact">low</field>
+        <field name="chance">low</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [L-4] Missing validation of token settings
+            
+            ### **Description**
+            
+            Token settings can be specified by calling `initialize`, `createDropToken`, and `createDropTokens`. However, these functions do not check whether the settings passed are valid. For instance, if a token is created with `mintEnd < block.timestamp`, no tokens can ever be minted. Similarly, if `amountMinted > 0` on token creation, `amountMinted` would be wrongly tracked.
+            
+            ### **Remediations to Consider**
+            
+            Add validation checks to only allow meaningful token settings.
+        </field>
+        <field name="response">
+            The following fields/cases are intentionally left invalidated
+            <ul>
+                <li>mintStart in the past</li>
+                <li>uuid</li>
+            </ul>
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Naming</field>
+        <field name="impact">low</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [Q-1] Rename `index` param of `airdropToken` function
+
+            Consider renaming the `index` parameter to `id` in the `airdropToken` function to match the naming convention used in all the other functions parameter.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Documentation</field>
+        <field name="impact">low</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [Q-2] Inaccurate comment
+
+            In `calculateRevenueSplit` function, there is the following comment:
+            
+            ```
+            // each token can have different payment splitter settings, and those settings can change while mint is occurring
+            // therefore we need to do some revenue accounting at the time of mint based on the price paid
+            ```
+            
+            However, this comment is incorrect, since payment splitter settings cannot be modified after a token has been minted. 
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Best Practices</field>
+        <field name="impact">low</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [Q-3] Missing event for `updateFallbackPaymentSplitterSettings`
+
+            Generally it is considered a good practice to emit an event on state changes. Consider emitting an event when fallBackPaymentSplitterSettings are being changed.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Best Practices</field>
+        <field name="impact">low</field>
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [G-1] `totalReleased()` can be set to `external`
+
+            `totalReleased()` is defined as `public` but not used anywhere else in code. Consider saving gas costs by using `external` keyword instead of `public`.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Variable Usage</field>
+        <field name="impact">low</field>å
+        <field name="status">fixedprivate</field>
+        <field name="content">
+            ## [G-2] No need to store `uuid` in separate memory var
+
+            In `createDropTokens`, `uuid` is stored in memory variable and only used once when emitting the event. Consider saving gas costs by using `settings.uuid` instead.
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Variable Usage</field>
+        <field name="impact">low</field>
+        <field name="status">wontdo</field>
+        <field name="content">
+            ## [G-3] Remove `amountMinted` setting param
+
+            On every mint, `amountMinted` is increased by the number of minted tokens, thus increasing gas costs as a storage variable needs to be updated. At the same time, `ERC1155SupplyUpgradeable` tracks the `totalSupply` per token id. Consider removing `amountMinted` and use `totalSupply(uint256 id)` instead to save gas costs.
+        </field>
+        <field name="response">
+            This would violate the desired spec in the scenario where burning is enabled and a token is created with supply, as if a token sold out, users who burn their tokens would make it possible to mint more tokens. This could put the minting experience indefinitely in limbo, where most artists would like minting to end once a number is reached. 
+        </field>
+    </item>
+
+    <item>
+        <field name="topic">Protocol Design</field>
+        <field name="impact">medium</field>
+        <field name="status">wontdo</field>
+        <field name="content">
+            ## [I-1] `UUID` uniqueness relies on off-chain components
+
+            Each token created via the `Bueno1155Drop` contract is assigned a unique `UUID` to identify it within the Bueno ecosystem. It is important to note that the uniqueness of the UUID is not checked on-chain and relies on properly functioning off-chain components.   </field>
+
+            <field name="response">
+                We acknowledge this is off-chain data, and this is to support the fact that metadata is technically stored off-chain as well. As an invalid UUID/duplicate won’t affect anything pertaining to the minting or contract functions themselves, and considering the gas impact of including the mapping, we’ve opted to accept this trade-off.
+            </field>
+    </item>

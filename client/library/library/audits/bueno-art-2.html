@@ -1,0 +1,73 @@
+<page
+  clientName="Bueno.art"
+  reportDate="March 31st, 2023"
+  auditTitle="Bueno.art A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://etherscan.io/address/0x41De0a913e8A10E0415B70810FEbCaF8a86Ea9BE"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from March
+    16, 2023 to March 22, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        A clone factory is used to deploy `Bueno1155Drop.sol` contract. The address that is used to deploy the contract becomes the owner, and will have the following privileges:
+            <ul>
+                <li>createDropToken, createDropTokens</li>
+                <li>updateTokenSettingsByIndex</li>
+                <li>updatePaymentSplitterSettingsByIndex, updateFallbackPaymentSplitterSettings</li>
+                <li>airdropToken</li>
+                <li>setRoyaltyInfo, setTokenRoyaltyInfo</li>
+                <li>toggleBurning</li>
+                <li>setUri</li>
+            </ul>    
+        Specifically, we'd like to point out that the `uri` of an NFT can be changed by the owner at any time using the `setUri` function. 
+        While this is a common practice among NFT projects that handle metadata off-chain, minters have to trust the owner to not change the `uri` to something malicious or inappropriate.
+    </template>
+  </content-for>
+
+
+  <content-for name="repo-info">
+    <ul>
+        <li>
+            <b>Deployed Address (Bueno1155Drop.sol):</b>
+            <a href="{{page.repoUrl}}" target="_blank">
+                {{page.repoUrl.split('/').slice(-1)[0]}}
+            </a>
+        </li>
+
+        <li>
+            <b>Deployed Address (BuenoFactory.sol):</b>
+            <a href="https://etherscan.io/address/0x19478179Ef8Bb7c4792a4041903080e097D137dD" target="_blank">
+                0x19478179Ef8Bb7c4792a4041903080e097D137dD
+            </a>
+        </li>
+
+        <li>
+            Commit Hash:
+            <code>1a7d19ccd80547daa4fb1940f968c37aca0a7a93</code>
+        </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    74944a81649225fc31a7911147f4cb6bcb3139942f31b71375e829691592a918  contracts/Bueno1155Drop.sol
+    d4d2263d5ff04e4a4126f9e7b4c9c983757bccae173c47e755e314e3e8afbb1a  contracts/BuenoFactory.sol
+  </template>
+</content-for>
+
+</page>

@@ -1,0 +1,82 @@
+<page
+  clientName="IDEX"
+  reportDate="July 21st, 2023"
+  auditTitle="IDEX A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/idexio/idex-contracts-ikon"
+  repoCommitHash="94726de9d487e1e34fff62c2436bf23ebc9fbad8"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from March 28, 2023 to April 26, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram/Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        IDEX’s v4 protocol is built upon a hybrid architecture, where the trading engine operates off-chain for allowing low-latency trades while providing on-chain order settlement and custody.
+        Due to this hybrid design choice, a lot of functions are restricted and can only be accessed by privileged roles:
+
+        - **owner**: The owner can change the admin without any delay.
+        - **admin:** The admin can change various exchange settings with immediate effect while other more sensitive ones are subject to governance delay. A detailed description about admin’s privileges can be found in the [Governance doc](https://github.com/idexio/idex-contracts-ikon/blob/94726de9d487e1e34fff62c2436bf23ebc9fbad8/GOVERNANCE.md).
+        - **dispatcher:** Trade settlements as well as liquidating and deleveraging operations can only be initiated from an authorized dispatcher wallet. The admin can change the dispatcher wallet with no delay.
+
+        While the high number of restricted functions impose a high-level of centralization, users need to sign trades, transfers, and withdrawals so that no funds can be moved without the users permission (except for liquidating and depositing operations).
+        In addition, users can always claim there funds in a permission-less way via the [“wallet exit” mechanism](https://github.com/idexio/idex-contracts-ikon/tree/94726de9d487e1e34fff62c2436bf23ebc9fbad8#wallet-exits). Note that users will usually receive less funds when closing the wallet via “wallet exit” as opposed to closing open positions via normal trades and then withdrawing the funds via IDEX’s exchange. This is needed to ensure the solvency of the protocol.
+    </template>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+        789716647791632c8b8faa55813320ae58dbd322a15d49d8b08f8d6a00168051  contracts/Custodian.sol
+        646a2d95a074eccfa0b88ff1388c4b9c520fcdba447b2622f1643ba673568b69  contracts/Exchange.sol
+        2ed058275ab1df04d1dafcbf76a5f2f88bd0f5e33486e29c6788c165786f35a7  contracts/Governance.sol
+        4e4fb4ab981d4c8571fb8843c4fd098f8b464bef9a4dc24438490fb8855e204c  contracts/Owned.sol
+        fcd0417d6b4c3df05633231659c44f0b5e797d02b5574e6daff457a14ddef1ba  contracts/libraries/AssetUnitConversions.sol
+        90da9148a327d4f72edaaca09435c1587659dcd63caf848c6ed400aa9abc8d3b  contracts/libraries/BalanceTracking.sol
+        f6584ec655f35e1fa666a4e4647782c381731548e549adc05c9ffaadd16a6b30  contracts/libraries/ClosureDeleveraging.sol
+        b852eb25205374d81f98ac5c8cc57e31209e89baff27269925df447014ffdfe9  contracts/libraries/Constants.sol
+        854c3004ca434c21566f4ffb0bbd8292a495e801289cbdf39b095355f6a65037  contracts/libraries/Depositing.sol
+        cae7cb57aab1169cc6247560776f2b0e91f6cdcbcb26d5cbb19a48b0b62fb8f7  contracts/libraries/Enums.sol
+        be00b433309b838f55e131cbf37f71135a9cf94ed190ec8da39979a97611608a  contracts/libraries/ExitFund.sol
+        429a917d3919f5d5bcb32c7b633fdd6b8c654efacde2b3f050242964c3268c06  contracts/libraries/Funding.sol
+        4d6a3933fef07b7fb8307688530b1da0a4f333b30c070ab13ab98aa61ddddaf4  contracts/libraries/FundingMultiplierQuartetHelper.sol
+        0a5184390f9fa6677303d4df1c4c1485a48b49eba3a7e0b3ed113ba469a857c7  contracts/libraries/Hashing.sol
+        3b1a3b97d325120b8201c2dd3e9e71496d5461f0a014e01846b836cae2cd433d  contracts/libraries/IndexPriceMargin.sol
+        bff1692b2c72cf6ce937d5ae2acdd8fdd174264b88c284b8f329ff3f03de6b68  contracts/libraries/Interfaces.sol
+        c4d774aaddcca4107330f49b41d1f77481835c57bcd8386278e06c6ccc9d8aa8  contracts/libraries/LiquidationValidations.sol
+        2c72bcbaa7dec14f3a723c3a774586038a82ad4236716feb4218c210faff6c73  contracts/libraries/MarketAdmin.sol
+        68a09f8d5a0b5e0ed4529b3b0219aa6678a162fb08c67fbdd35467ed33eab93b  contracts/libraries/MarketHelper.sol
+        41348de8c5f43536c5ff18921ffa691348763f87b65176c128ff6b8a8755e21b  contracts/libraries/Math.sol
+        c191ac34cda19f3407a659ad89002e1cf75adce47ce8b77203b698fcb5217e89  contracts/libraries/NonceInvalidations.sol
+        81243e5d058fa6a850228d6493376c49a80e1fad5d418f8b31aeb6254b1745dc  contracts/libraries/OraclePriceMargin.sol
+        3437792652eb508ac3bf27bfc53be51ba2a6ac7a649d5776ad2c399013fd5b8e  contracts/libraries/PositionBelowMinimumLiquidation.sol
+        72174221abf251e20187bec0af859483e23fcbbe75595e083c689f70546d5671  contracts/libraries/PositionInDeactivatedMarketLiquidation.sol
+        f7215fb5d542142a853bb60566474e348fd79575a5bc410bb6800bfb1ab62c91  contracts/libraries/SortedStringSet.sol
+        b4d9d0589df933d3b60652e2911e39c5caef981437f1686c58b4c9ba8ce91fa4  contracts/libraries/String.sol
+        29b86950c0d9a7240b4372320082362ec1a8aa97b9ca9cfc5fe3e7e9874366c5  contracts/libraries/Structs.sol
+        aa67ad4149430e42f61ab59139621d24c17e8a205e58cdddb724a756cd4e893d  contracts/libraries/Time.sol
+        d43d50ac738401a2ca301e44d1614168a23b34485f246aee2dfd3ae07e2a9d36  contracts/libraries/TradeValidations.sol
+        fb36be336126ed7f836e128058258538db8351d9d4bab1d1fe7ad2d5c3901ba8  contracts/libraries/Trading.sol
+        a9dea4472d05bba812b686e7e773d41bbc8de8b6f843b53c83b9aef0b937dd48  contracts/libraries/Transferring.sol
+        4a4cd7d0c15b380be066f520f75f57c49a2b4d8094466dc6e407609dede0d999  contracts/libraries/UUID.sol
+        03b6e3d290cecdc50860d3dc7e8b88a91ba332d5648fdc0a093ee2e88986fd29  contracts/libraries/Validations.sol
+        e48e47a773089f04ab256e228c8c9f472823a3f1c88d5472df4875364004dd56  contracts/libraries/WalletExitAcquisitionDeleveraging.sol
+        afda31e46fc89374ad0f91111ee8732c00877c80c5f0a60dd813df2a07cb9b35  contracts/libraries/WalletExitLiquidation.sol
+        d87c3059e2cf144411da55fd52b28d0d1408fd08d36fd9fb385f94777d8ba32a  contracts/libraries/WalletExits.sol
+        666eb21534b5d8c9df5d1c0bd32e1d9c9123164f799737033301a1f127a4dd1b  contracts/libraries/WalletInMaintenanceAcquisitionDeleveraging.sol
+        061e524d17fd2b2a1024be458ab08fe277bb6796cbc28b3c9a35c81b067eeae2  contracts/libraries/WalletInMaintenanceLiquidation.sol
+        4c7f74828681d53f67a1585a53221a3465ae4f386e0fffc7d45b1f559e2d2814  contracts/libraries/Withdrawing.sol
+        cd254a80b33acca329f676a873171df6db3abcb674e7e466171116695deb5048  contracts/bridge-adapters/ExchangeStargateAdapter.sol
+    </template>
+  </content-for>
+
+</page>

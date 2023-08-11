@@ -237,20 +237,27 @@ const exportedColorsLearnEVM = [
   }
 ]
 
+function expandJsExtensions(path) {
+  return [
+    `${path}.js`,
+    `${path}.jsx`,
+    `${path}.ts`,
+    `${path}.tsx`,
+    `${path}.mjs`,
+    `${path}.cjs`,
+  ]
+}
 
 module.exports = {
   mode: 'jit',
   darkMode: 'media',
   purge: [
     './client/**/*.html',
-    './client/**/*.js',
-    './client/**/*.jsx',
-    './client/**/*.ts',
-    './client/**/*.tsx',
-    './lib/**/*.js',
-    './lib/**/*.jsx',
-    './lib/**/*.ts',
-    './lib/**/*.tsx',
+    ...expandJsExtensions('./client/_lib/**/*'),
+    ...expandJsExtensions('./client/learn_evm/**/*'),
+    ...expandJsExtensions('./client/library/**/*'),
+    ...expandJsExtensions('./lib/**/*'),
+    ...expandJsExtensions('./scripts/**/*'),
   ],
   theme: {
     screens: {

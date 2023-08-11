@@ -1,0 +1,221 @@
+<page title="Working with Memory" layout="/chapters/_layout.html">
+
+<div class="prose">
+<template type="learn-evm-markdown">
+
+# Working with Memory
+
+When working with the EVM, your bytecode has read/write access to a fresh, isolated, and arbitrary string of **memory**.
+
+In this chapter we cover:
+
+1. <toc>How Memory Works</toc>
+2. <toc>Memory Use Cases</toc>
+3. <toc>Memory Expansion</toc>
+4. <toc>Opcodes that use Memory</toc>
+
+## How Memory Works
+
+When working with assembly-level code, in most machine environments you would need to *allocate memory* before using it. In other words, you would need to *ask* the environment for *permission* to have *more* memory. If granted, your program continues. Otherwise, it errors out.
+
+However, the EVM is different in that you **don’t need to manually allocate memory**. Instead of *asking* the environment for more memory, you simply *directly use* the memory locations you need.
+
+As you use more memory, you automatically pay for the additional memory allocation. Read on for more details.
+
+### Basic Opcodes
+
+The basic opcodes that interact with memory are:
+
+- `MSTORE` - Writes 32 bytes into memory at a specified memory location.
+- `MSTORE8` - Writes 1 byte of data (the 8 rightmost bits of the top item on the stack) into memory at a specified memory location.
+- `MLOAD` - Copies 32 bytes from a specified memory location onto the stack.
+
+Each of these opcodes takes **two** arguments:
+
+1. The **memory location** – a 32-byte index of *where* to write to
+2. The **data** itself – 32 bytes (or 1 byte in the case of `MSTORE8`) of *what* to write.
+
+While the data to write is simply what you put on the stack, the memory location is more complicated in concept and gas cost, as we’ll see in the next few sections.
+
+### Memory Layout
+
+Memory on the EVM is essentially a 2^256 length string:
+
+- A memory location behaves like a string index.
+- Each index holds one byte of data, initialized to `0x00`.
+- You can read or write to any index you want! …in theory, at least **🙂** (see next section, “Accessing Memory”).
+
+Every EVM function call gets a **fresh, isolated** string of memory:
+
+- **Fresh** as in, each index in memory is set to zero.
+- **Isolated** as in, each function call has its own memory; it cannot access the memory of other function calls.
+
+### Accessing Memory
+
+Memory is accessible via a 32-byte index. That’s an enormous key space!
+
+But you can’t access that entire space. You can in *theory*, but not in practice.
+
+The reason for this is **memory expansion gas costs**. Starting from zero, any time you access memory you haven’t before (within the same function call), you **pay** for that newly-accessed memory.
+
+On the other hand, if you access memory you’ve *already* accessed within the same function call, then you **do not pay** any extra gas, because there is no memory expansion in that scenario.
+
+In other words, reusing memory saves you gas.
+
+See the gas cost breakdown in <toc>Memory Expansion</toc>.
+
+## Memory Use Cases
+
+There are three main reasons your EVM programs will need to use memory:
+
+1. <toc>Returning data</toc>. Any data that your code wants to return needs to be *in memory first* so that the `RETURN` opcode to access it.
+2. <toc>Longer data lifespans</toc>. If you’re manipulating a piece of data over many opcodes or <chapter>raw/internal</chapter>, having a stable location in memory can make your opcode logic much simpler, especially considering the <chapter href="evm/stack#limited-swap-reach">16 swap/dup reach limitation</chapter>.
+3. <toc>Larger data</toc>. As large as the EVM’s word size is, not all working values can fit into 32 bytes. You will need to use memory as a workspace for larger amounts of data.
+
+### 1. Returning Data
+
+The `RETURN` opcodes *cannot* return an item from the stack. Instead, you *must* place your data into memory, and *then* return it.
+
+Here is an example of returning the value `7`:
+
+```jsx
+PUSH1 0x07
+PUSH1 0x50
+MSTORE
+
+PUSH1 0x20
+PUSH1 0x50
+RETURN
+```
+
+In the above example:
+
+- The `MSTORE` opcode takes two arguments: The **memory location** and the **value to store**.
+    - The memory location we are using is `0x50`. In practice, we’d want to choose a location that does not clash with other data in memory (note that in this rudimentary example, it doesn’t matter which value we pick, so we choose a unique one to make the code easier to read).
+    - The value we are storing is `0x07`. Note that `MSTORE` always writes 32 bytes of data.
+- The `RETURN` opcode takes two arguments: The **memory location** of the where the data-to-return resides, and the **length** of that data in bytes.
+    - The memory location we are using (`0x50`) is the same location we wrote to using `MSTORE`.
+    - The length is 32 bytes (`0x20`) to return the full data we wrote using `MSTORE`.
+
+Once the `RETURN` opcodes executes, the EVM **stops** execution of the function call, passing the return data to the parent context. This parent context may be the end of the transaction, or another function call that used a `CALL` opcode.
+
+For more information on how returning data works, see <chapter>fn/contexts</chapter>.
+
+### 2. Longer data lifespans
+
+Sometimes there will be data that you need to keep track of and continuously update throughout the lifespan of your function call, but not something you need to persist *across* function calls. Memory is the perfect use for this.
+
+Arguably, the most common example is Solidity’s “free memory pointer”. This value exists at memory location `0x40`. Semantically, it represents “the next location in memory that hasn’t been used yet” (read more at <chapter>solidity/memory</chapter>).
+
+This is useful not just for Solidity, but also for any bytecode architecture that allocates memory on a dynamic basis. It allows you to always have a handle on where to put new data, without conflicting with or overriding existing data.
+
+### 3. Larger Data
+
+Stack items are always 32 bytes in length. Memory is not limited in this respect.
+
+A common example is contract deployment. During the contract deployment process, your bytecode needs to **return the final state of the new contract’s bytecode**.
+
+This means your *deployment* bytecode is returning *runtime* bytecode, as a value in memory. This runtime bytecode will surely be larger than 32 bytes – up to 24 kilobytes on Layer 1. This is much larger than what can fit onto the stack.
+
+More info on this topic at <chapter>deploy/overview</chapter>.
+
+## Memory Expansion
+
+Any time you reference a memory address `n`, the EVM will **automatically allocate** any memory that *hasn’t already been allocated* from `0` to `n` (inclusive).
+
+In other words, any memory location you use will cause the EVM to ensure **all memory locations below it** are *also* allocated.
+
+This is called **memory expansion**.
+
+Every byte of memory that gets allocated incurs a memory expansion gas cost. On the flip side, reusing already-allocated memory *does not* incur memory expansion gas cost.
+
+In addition, the more memory you use, the more expensive it gets.
+
+You can check the size of your allocated memory at any time using the `MSIZE` opcode.
+
+### The Formula
+
+The formula for memory expansion gas cost is as follows (note that `/` in this context is integer devision):
+
+```jsx
+expansion_cost(bytes) = words^2 / 512 + words * 3
+  where
+    words = (bytes + 31) / 32
+```
+
+Note that this assumes **nothing has been allocated**.
+
+To accommodate for previously allocated bytes, you need to calculate **twice**: one for the total bytes used, and one for the *previous* total bytes used.
+
+```jsx
+real_cost(current, prev) = expansion_cost(current) - expansion_cost(prev)
+```
+
+### Memory Expansion Example 1
+
+```jsx
+PUSH1 0x01
+PUSH1 0x40
+MSTORE
+```
+
+Assuming this is the only bytecode that runs in a function call…
+
+The `MSTORE` operation causes the EVM to allocate a total of `96` bytes.
+
+- Although `MSTORE` only writes 32 bytes, in this example it writes to position `0x40`, which is memory location 64 (in decimal).
+- The highest memory location we reference is `0x5f`, or 95 in decimal. This is because we write 32 bytes *starting from* memory location `0x40`.
+- In total, this example has a memory expansion gas cost of `expansion_cost(96) = 3^2 / 512 + 3 * 3 = 9` gas.
+
+### Memory Expansion Example 2
+
+```jsx
+PUSH1 0x01
+PUSH1 0x20
+MSTORE
+
+PUSH1 0x02
+PUSH1 0x40
+MSTORE
+```
+
+Assuming this is the only bytecode that runs in a function call…
+
+The `MSTORE` operation causes the EVM to allocate a total of `96` bytes (again!).
+
+- Although we write 32 bytes *more* than the previous example, the highest memory location we use is **still** `0x5f`.
+- Therefore, we still only pay for a total of 96 bytes of memory expansion gas cost.
+
+## Opcodes that use Memory
+
+The following opcodes access memory, and therefore have the potential to expand memory (and thus incur memory expansion gas cost):
+
+- Opcodes that write to memory:
+    - `MSTORE` / `MSTORE8` – Writes data from the stack into memory.
+    - `CALLDATACOPY` – Copies data from calldata into memory.
+    - `CODECOPY` – Copies bytecode from the currently running contract into memory.
+    - `EXTCODECOPY` – Copies bytecode from an external contract address into memory.
+    - `RETURNDATACOPY` – Copies data returned from the last external call into memory.
+- Opcodes that read from memory:
+    - `MLOAD` – Copies 32 bytes of memory onto the stack.
+    - `RETURN` – Returns a specified slice of memory.
+    - `SHA3` – Performs a keccak hash of a specified slice of memory, then puts the result onto the stack.
+    - `LOG0` - `LOG4` – Reads a specified slice of memory and emits it as part of an event.
+    - `REVERT` – Reverts with a specified slice of memory as the revert message.
+    - `CREATE` / `CREATE2` – Creates a new contract with a specified slice of memory as the new contract’s deployment bytecode.
+- Opcodes that both read and write:
+    - `CALL` / `STATICCALL` / `DELEGATECALL` – Reads a slice of memory as calldata, calls an external contract, then writes the returned data to a slice of memory.
+
+For more details on these opcodes, see wolflo's excellent [opcode reference page](https://github.com/wolflo/evm-opcodes).
+
+## Conclusion
+
+The EVM makes working with memory simpler than most environments. There’s no need to manually allocate memory, and each function call gets its own, isolated string of memory.
+
+Many opcodes use memory, and understanding the gas costs associated with memory expansion is important for managing gas costs.
+
+Ultimately, memory is only temporary. To write real programs, we will need persistent data, which we cover in the next chapter.
+
+
+</template>
+</div>

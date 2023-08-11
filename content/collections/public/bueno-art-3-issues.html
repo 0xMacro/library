@@ -1,0 +1,291 @@
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## [L-1] `maxQuantity` is ignored when `maxPerWallet` is exceeded
+        
+    When minting through allowlist, `maxQuantity` can be specified for specific wallets, allowing for more granular control over who can mint how many tokens. Meaning that `maxQuantity` (on wallet-level) should take precedence over `maxPerWallet` (on phase-level). 
+
+    This is currently not the case due to the following check in the `_checkAllowlistPhaseMintConditions` function:
+
+    ```solidity
+    if (
+        // phases can have a maxPerWallet
+        (phase.maxPerWallet > 0 && updatedAmountMinted > phase.maxPerWallet) ||
+        // wallets can have a maxPerWallet encoded in the merkle tree
+    	  (maxQuantity > 0 && updatedAmountMinted > maxQuantity)
+        ) {
+            revert ExceedMaxPerWallet();
+        }
+    ```
+
+    With the above logic, the transaction reverts when `maxPerWallet` is set and exceeds the amount of mints. Thus, it doesn’t support the case when specific wallets should be allowed to mint more (via `maxQuantity`) than the mint limit set on phase-level (via `maxPerWallet`).
+
+    Consider changing the above logic so that `maxPerWallet` is ignored when `maxQuantity` is specified.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## [L-2] Users can overpay
+
+    In `Bueno721Drop.mintBatch` users can pay more than needed when `publicQuantity` is set to `0`. After the `for` loop, the following is checked when `publicQuantity > 0`:
+
+    ```solidity
+    if (publicQuantity > 0) { 
+       _checkPublicMintConditions(publicQuantity, balance);
+       ...
+    ```
+
+    In this case, overpay is not possible as the balance is checked accordingly inside the `_checkPublicMintConditions` function. However, if `publicQuantity = 0`, there is no further check for the remaining balance. 
+
+    Consider checking that there is no balance left (`balance = 0`) after the for-loop when `publicQuantity = 0`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## [Q-1] Documentation nitpicks
+
+    The documentation [says](https://github.com/codeblush/solidity-audit/tree/ztanner/mint-rules-updates#updating-settings): 
+
+    > `updatePhaseSettings` allows the creator to change all of the conditions of their minting phase, with the exception of `amountMinted` and `maxSupply`
+    > 
+
+    In addition to the above, `isActive` also cannot be changed via `updatePhaseSettings`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">medium</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## [Q-2] Contract size exceeds limit
+
+    When compiling the `Bueno721Drop` contract, the compiler outputs the following message:
+
+    ```solidity
+    Warning: Contract code size is 25037 bytes and exceeds 24576 bytes (a limit introduced in Spurious Dragon). This contract may not be deployable on Mainnet. Consider enabling the optimizer (with a low "runs" value!), turning off revert strings, or using libraries.
+      --> contracts/Bueno721Drop.sol:49:1:
+       |
+    49 | contract Bueno721Drop is
+       | ^ (Relevant source part starts here and spans across multiple lines).
+    ```
+
+    Saying that the contract size must not exceed the limit of 24576 bytes. Besides using proxy patterns such as Diamond proxy to address the issue with the maximum size, there are a couple of others, more simpler, solutions on how to reduce the contract size:
+
+    1. **Lowering number of runs**
+        - `Runs: 20`
+        
+            ```solidity
+            ·---------------------------------|--------------------------------|--------------------------------·
+             |  Solc version: 0.8.17           ·  Optimizer enabled: true       ·  Runs: 20                      │
+             ··································|································|·································
+             |  Contract Name                  ·  Deployed size (KiB) (change)  ·  Initcode size (KiB) (change)  │
+            ··································|································|·································
+             |  Bueno1155Drop                  ·                     22.332 ()  ·                     22.570 ()  │
+             ··································|································|·································
+             |  Bueno721Drop                   ·                     **23.998 ()**  ·                     24.236 ()  │
+             ·---------------------------------|--------------------------------|--------------------------------·
+            ```
+        
+    2. **Enabling `viaIR` flag**
+        - `Runs: 20` and `viaIR: true`
+        
+            ```solidity
+            ·---------------------------------|--------------------------------|--------------------------------·
+             |  Solc version: 0.8.17           ·  Optimizer enabled: true       ·  Runs: 20                      │
+             ··································|································|·································
+             |  Contract Name                  ·  Deployed size (KiB) (change)  ·  Initcode size (KiB) (change)  │
+            ··································|································|·································
+             |  Bueno1155Drop                  ·               20.838 (-0.407)  ·               21.037 (-0.407)  │
+             ··································|································|·································
+             |  Bueno721Drop                   ·               **22.617 (-0.778)**  ·               22.816 (-0.778)  │
+             ·---------------------------------|--------------------------------|--------------------------------·
+            ```
+        
+    
+        Further details about `viaIR` flag can be found [here](https://docs.soliditylang.org/en/latest/ir-breaking-changes.html). 
+    
+    3. **Refactor code to reuse redundant code blocks**
+        - Use `_mintPhaseTo()` and `_mintPublicTo()` helper functions
+        
+            `mintPhaseAllowlist()`, `mintPhase()` and `mintPhaseTo()` share common functionality that can be abstracted away into one internal function `_mintPhaseTo()`. It would result in the following code:
+        
+            ```solidity
+            /**
+             * @notice Mint tokens for an allowlisted phase
+             * @dev Calling this function for a phase that doesn't have an allowlist will fail
+             */
+            function mintPhaseAllowlist(
+                uint256 phaseIndex,
+                uint64 quantity,
+                uint32 maxQuantity,
+                bytes32[] calldata proof
+            ) external payable {
+                uint64 updatedAmountMinted = _checkAllowlistPhaseMintConditions(
+                    quantity,
+                    maxQuantity,
+                    proof,
+                    phaseIndex,
+                    msg.value
+                );
+        
+                _mintPhaseTo(msg.sender, quantity, phaseIndex, updatedAmountMinted);
+            }
+        
+            /**
+             * @notice Mint tokens for a non-allowlist phase.
+             * @dev Calling this function for a phase that has an allowlist will fail
+             */
+            function mintPhase(uint256 phaseIndex, uint64 quantity) external payable {
+                uint64 updatedAmountMinted = _checkPhaseMintConditions(
+                    msg.sender,
+                    quantity,
+                    phaseIndex,
+                    msg.value
+                );
+        
+                _mintPhaseTo(msg.sender, quantity, phaseIndex, updatedAmountMinted);
+            }
+        
+            /**
+             * @notice Mint a token to a specific address from a non-allowlisted sale phase
+             * @dev Useful in case the recipient of the tokens is not the sender (gifting, fiat checkout, etc)
+             */
+            function mintPhaseTo(
+                address account,
+                uint256 phaseIndex,
+                uint64 quantity
+            ) external payable {
+                uint64 updatedAmountMinted = _checkPhaseMintConditions(
+                    account,
+                    quantity,
+                    phaseIndex,
+                    msg.value
+                );
+        
+                _mintPhaseTo(account, quantity, phaseIndex, updatedAmountMinted);
+            }
+        
+            /**
+             * @notice Mint tokens for a given phase
+             * @param account The address to mint the tokens to
+             * @param quantity The number of tokens to mint
+             * @param phaseIndex The index of the phase to mint from
+             * @param updatedAmountMinted The updated amount minted for the phase
+             */
+            function _mintPhaseTo(
+                address account,
+                uint64 quantity,
+                uint256 phaseIndex,
+                uint64 updatedAmountMinted
+            ) internal {
+                _checkGlobalPerWalletMax(account, quantity);
+        
+                saleState.phases[phaseIndex].amountMinted += quantity;
+                amountMintedForPhase[account][phaseIndex] = updatedAmountMinted;
+        
+                _mint(account, quantity);
+        
+                emit TokensMinted(account, quantity);
+            }
+            ```
+        
+            Similarly, `mintPublic()` and `mintPublicTo()` also share repeated functionality which can be extracted out into internal helper function `_mintPublicTo()`, as such:
+        
+            ```solidity
+            /**
+             * @notice Mint tokens in the public sale
+             */
+            function mintPublic(uint64 quantity) external payable {
+                _mintPublicTo(msg.sender, quantity);
+            }
+        
+            /**
+             * @notice Mint a token to a specific address from the public sale
+             * @dev Useful in case the recipient of the tokens is not the sender (gifting, fiat checkout, etc)
+             */
+            function mintPublicTo(address account, uint64 quantity) external payable {
+                _mintPublicTo(account, quantity);
+            }
+        
+            /**
+             * @notice Mint tokens in the public sale
+             * @param account The address to mint the tokens to
+             * @param quantity The number of tokens to mint
+             */
+            function _mintPublicTo(address account, uint64 quantity) internal {
+                uint64 updatedAmountMinted = _checkPublicMintConditions(
+                    quantity,
+                    msg.value
+                );
+                _checkGlobalPerWalletMax(account, quantity);
+        
+                baseSettings.amountMinted = updatedAmountMinted;
+        
+                _mint(account, quantity);
+        
+                emit TokensMinted(account, quantity);
+            }
+            ```
+        
+    
+
+    Our tests have shown that the contract size can be reduced to 22.4 KB by applying above optimizations.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas</field>
+  <field name="impact">low</field>
+  <field name="status">fixedprivate</field>
+  <field name="content">
+    ## [Q-3] Redundant `wallet` parameter in `_checkAllowlistPhaseMintConditions()`
+
+    In Bueno721Drop.sol, on [line 698](https://github.com/codeblush/solidity-audit/blob/ztanner/mint-rules-updates/contracts/Bueno721Drop.sol#L698), `msg.sender` is used to verify that a given wallet is in allowlist. And later, on [line 704](https://github.com/codeblush/solidity-audit/blob/ztanner/mint-rules-updates/contracts/Bueno721Drop.sol#L704), `wallet` parameter is used to check the amount of NFTs a given wallet has minted.
+
+    In both `mintPhaseAllowlist` and `mintBatch` when `_checkAllowlistPhaseMintConditions()` is called the `wallet` parameter that is being passed refers to `msg.sender` i.e:
+
+    ```jsx
+    function mintPhaseAllowlist(...) external payable {
+        uint64 updatedAmountMinted = _checkAllowlistPhaseMintConditions(
+            msg.sender,
+            quantity,
+            maxQuantity,
+            proof,
+            phaseIndex,
+            msg.value
+        );
+    		...
+    }
+
+    function mintBatch(...) external payable { ...
+        if (phase.merkleRoot == bytes32(0)) {
+            ...
+        } else {
+            updatedAmount = _checkAllowlistPhaseMintConditions(
+                msg.sender,
+                quantity,
+                maxQuantity,
+                proof,
+                phaseIndex,
+                priceForPhase
+            );
+        }
+    }
+    ```
+
+    Consider removing `wallet` parameter from `_checkAllowlistPhaseMintConditions()` entirely, and use `msg.sender` instead. This improves readability, saves a little gas, and reduces the contract’s bytecode size.
+  </field>
+</item>

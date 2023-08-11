@@ -1,0 +1,63 @@
+<page
+  clientName="thirdweb"
+  reportDate="June 30th, 2023"
+  auditTitle="thirdweb A-13"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 13, 2023 to June 23, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>A audit handoff document provided through Notion.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash <b>(Dynamic Drops):</b>
+        <code>3cb172774ecbc4a77b7713ddd0e1ca6d56eb412c</code>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash <b>(Loyalty Card):</b>
+        <code>92dca09d6e621f74eb2462b8f338a15886875917</code>
+      </li>
+    </ul>
+  </content-for>
+
+<content-for name="source-code">
+
+  <p>We audited the following contracts specificially for the Dynamic Drops audit:</p>
+
+  <template type="file-hashes">
+    0221834d3c7730d145930f479fc98bcc03616eabfe23c497b14eb9d1b2c86dd9  contracts/drop/DropERC1155.sol
+    0a28be6097dcd800e22e100c782f45de8cbe812705f4709e9f292ad1a30697b0  contracts/drop/DropERC20.sol
+    58416dca2883e77353d01b9c4260e4a9f574a996e3dc64f374c9d894aac2a557  contracts/drop/DropERC721.sol
+    1f0e424580d57138ec83673e8f0bf36ed4acbdcc611d29a13eef57e08190a5fe  contracts/drop/extension/DropERC1155Logic.sol
+    a464054c1c1739f2b0a00cc3199d2387e741fb561e04625cd8b0755b1e35ac91  contracts/drop/extension/DropERC1155Storage.sol
+    0b60e52a768ed82f904f37dfcd2199679185a37285821d6e039fd4b110c216aa  contracts/drop/extension/DropERC20Logic.sol
+    2e4d2b99fcc3634bd7301546e98f92651981f3e97c2696a0fd9f5c0a9cffcbd6  contracts/drop/extension/DropERC20Storage.sol
+    7bfbe8b00f98f5ef7e4e1079dbb9d088d466801c50c7279973119b3d5eb38f24  contracts/drop/extension/DropERC721Logic.sol
+    fe7442085abda7c6599e9dd5d80300a8d38b977dd3e1a5b006366bf2b4df82d7  contracts/drop/extension/DropERC721Storage.sol
+  </template>
+
+  <p>We audited the following contracts specificially for the Loyalty Card audit:</p>
+
+  <template type="file-hashes">
+    964f38e8692c8d932cd1d7be3494ffa04e6bdcf349b7ac9d8cf0dfd348f864b7  contracts/LoyaltyCard.sol
+  </template>
+</content-for>
+

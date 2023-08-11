@@ -1,0 +1,324 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">6c7b7df55b0012462e549189c8f509d36548537c</field>
+    <field name="content">
+        ## (H-1) addRecipients adds empty airdrops on subsequent calls
+
+        AirdropERC721.sol, AirdropERC20.sol, and AirdropERC1155.sol, each have the function `addRecipients`, which with some variance adds airdrop recipients to a mapping, that will be used to issue airdrops. Since there is a lot of data being stored, multiple calls to this function may  be required to set all the desired airdrops.
+
+        However, on calls after the first, the loop that adds recipients to the mapping is not properly setup, and may not be executed.
+
+        (Provided code is from AirdropERC721.sol, but the same issue is present in AirdropERC20.sol and AirdropERC1155.sol)
+
+        ```solidity
+        function addRecipients(AirdropContent[] calldata _contents) external onlyRole(DEFAULT_ADMIN_ROLE) {
+            uint256 len = _contents.length;
+            require(len > 0, "No payees provided.");
+      
+            uint256 currentCount = payeeCount;
+            payeeCount += len;
+      
+            for (uint256 i = currentCount; i < len; i += 1) {
+                airdropContent[i] = _contents[i];
+            }
+      
+            emit RecipientsAdded(_contents);
+        }
+        ```
+
+        Since after the first call to `addRecipients` the `payeeCount` will be non-zero, and potentially greater than the length of `_contents`. At the start of the loop `i` is set to `currentCount` but the condition `i < len` expects `i` to be zero in order to loop through all of `_contents`. 
+
+        This leads to some or all of the airdrop recipients to not be included in the drop, while also increasing the `payeeCount` by number of recipients that were supposed to be added to the `airdropContent` mapping.
+
+        A couple issues arise from this bug:
+
+        - The contract thinks it has more recipients than it does, and will return values that are potentially empty when querying for `getAllAirdropPayments`, `getAllAirdropPaymentsPending`, `getAllAirdropPaymentsProcessed`, `getAllAirdropPaymentsFailed`, or `getAllAirdropPaymentsCancelled`. This could lead to problems for contracts that query and use this data, as well as effect front end applications that use it.
+        - Calling `processPayments` would revert when attempting to transfer as the tokenAddress of these missed recipients would be the zero address. The first recipients added can receive their airdrop, if `processPayments` is called with `paymentsToProcess` equal to the number of recipients initially added, but after that `processPayments` will no longer be able to be called.
+
+        **Remediations to Consider**
+
+        At the start of the loop set i to be equal to zero, and determine the index to store the recipient in the airdropContent mapping to be currentCount + i.
+    </field>
+</item>
+<item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">f2c7180f8f4f35225cece807bdfe36129e545fa5</field>
+    <field name="content">
+        ## (M-1) Fails for non-compliant ERC20 tokens
+
+        Some of the well known “ERC20” tokens - such as USDT - don’t fully comply to the ERC-20 standard and don’t return a boolean on e.g. `transfer` and `transferFrom`. For such tokens, `AirdropERC20::_transferCurrencyWithReturnVal` will fail on the following line:
+
+        ```solidity
+        try IERC20(_currency).transferFrom(_from, _to, _amount) returns (bool success_) {
+        ```
+
+        **Remediations to Consider**
+
+        In such cases, we usually recommend using `safeTransferFrom` from `SafeERC20` library.
+        However, in this specific case, library calls can’t be wrapped around try/catch and thus making it
+        difficult to implement a failsafe using try/catch. Instead of using `safeTransferFrom`, consider
+        using the low level `.call` method and implement error handling according to your needs.
+    </field>
+</item>
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">d222049d4d46f1916455fbb08579b9d070a42feb</field>
+    <field name="content">
+        ## (M-2) resetRecipients() can exceed block gas limit
+
+        In AirdropERC721.sol, AirdropERC20.sol, and AirdropERC1155.sol, `resetRecipients()` is called to cancel pending airdrops, and does so by setting `processedCount` to `payeeCount`, preventing any unprocessed airdrops from being processed. It also loops through each item canceled and sets its index in the `isCancelled` mapping to true, allowing getters to determine if an airdrop was canceled.
+
+        Looping through and setting the `isCancelled` mapping for each item is quite costly as it is a separate storage write for each item. In the case where a large airdrop was added using `addRecipients()` and contained an error, it would cost the owner of the contract a lot of gas to cancel all the items.
+        
+        It is also possible that if the amount of unprocessed airdrop recipients is very large (~1350 pending recipients), it may be impossible to call `resetRecipients()`, as it will try to cancel all pending airdrops, causing the transaction cost to exceed the block gas limit.
+
+        **Remediations to Consider**
+        - Allow the function to take a parameter determining the number of airdrops to cancel. Doing so would allow canceling large airdrops over multiple transactions without exceeding the block gas limit. It would also allow canceling individual airdrops that may be reverting or griefing, allowing a admin to call `processPayments`, processing up to the airdrop causing issues, then call `resetRecipients()` with a value of 1 to cancel the airdrop, then continue processing afterwords, thus preventing having to cancel all airdrops after the issue, and then having to reinsert the old airdrops.
+        - Instead of storing a bool for each canceled item in `isCancelled`, store a range of indexes that represent the canceled items, as cancelation is always done in a sequence. Doing so would allow `resetRecipients()` to only require 2-3 storage writes, in some cases substantially reducing gas costs.
+    </field>
+</item>
+<item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b6bc342e13fcff228e2695fea1726df6f1bf3614</field>
+    <field name="content">
+        ## (M-3) `processPayments()` can be griefed
+
+        In AirdropERC721.sol, AirdropERC20.sol, and AirdropERC1155.sol, `processPayments()` airdrops tokens to recipients set prior to the call. For AirdropERC721.sol, and AirdropERC1155.sol, `safeTransferFrom` is used to transfer their respective tokens, which if the recipient is a contract it calls either `onERC721Received`, or `onERC1155Received`, ensuring the contract can properly handle owning tokens, but as a side effect it gives execution control over to the contract, which can execute malicious code. For AirdropERC20.sol, execution control is handed over if the token being sent is the native token of the blockchain, and the recipient is a contract that has implemented a `receive()` fallback function.
+
+        In the case where tokens are sent to a contract that implements one of these hooks maliciously, there is little the contract can do other than consume all the gas provided. If this is done, then calls to `processPayments()` could cost substantially more than expected, or exceed the block gas limit, preventing calls from executing if processing the malicious recipient.
+
+        Currently the resolution would be to call `resetRecipients()` to clear the pending airdrops, then submit the recipients again by calling `addRecipients()` with the unprocessed recipients, omitting the griefer. Doing this is rather costly, especially if the griefer is queued before many other recipients.
+
+        **Remediations to Consider**
+
+        - Switch from a push method of transferring tokens, to a pull method. This makes users claim their airdrop and prevents malicious users from preventing others from receiving theirs.
+        - Or explicitly pass in the amount of gas for the transfer, ensuring there is enough gas to allow the contract to execute normal operations, but not provide the entire gas of the transaction that can be used maliciously.</field>
+</item>
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">f76df51944a79db5225976867f8713f337ec51a4</field>
+    <field name="content">
+        ## (M-4) Function clashes can occur between plugins
+
+        `PluginState.sol::_addPlugin` explicitly checks that a new function selector being added doesn’t already exist in the `pluginMetadata` mapping - thus avoiding function clashes between different plugins.
+
+        ```solidity
+        require( 
+            data.pluginMetadata[_plugin.functions[i].functionSelector].implementation == address(0),
+            "PluginState: plugin already exists for function."
+        );
+        ```
+
+        However, this check is not being done in the `_updatePlugin` function, allowing to override existing function selectors.
+
+        Consider the following scenario:
+
+        1. PluginD is added containing the function `d()`
+        2. PluginE is added containing the function `e()`
+        3. PluginE is updated with the function `d()`.
+
+        The last step overrides the mapping for `d()` pointing to PluginD, so that `d()` now points to PluginE. As a consequence, `TWRouter` forwards any calls targeting function `d()` to PluginE.
+
+        Moreover, deleting PluginA at this state would remove the `d()` function selector from the `pluginMetadata` mapping, also making the `d()` function of PluginE unreachable.
+
+        **Remediations to Consider**
+
+        Consider adding above require check to the `_updatePlugin` function as well.</field>
+</item>
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">9d8676ebdb467d72cbc481cf3d0df199064631b5</field>
+    <field name="content">
+        ## (M-5) Meta transactions don’t work
+
+        `MultichainRegistryCore.sol` should allow trusted forwarders to call `add(…)` and `remove(…)` on behalf of the `msg.sender`; as implemented here:
+
+        ```solidity
+        function _msgSender() internal view returns (address sender) {
+                if (IERC2771Context(address(this)).isTrustedForwarder(msg.sender)) {
+                    // The assembly code is more direct than the Solidity version using `abi.decode`.
+                    assembly {
+                        sender := shr(96, calldataload(sub(calldatasize(), 20)))
+                    }
+                } else {
+                    return msg.sender;
+                }
+            }
+        ```
+
+        In order to support trusted forwarders - and as seen in the above code - `ERC2771Context` has to be implemented by `TWMultichainRegistry`. This can be achieved either via directly inheriting from `ERC2771Context`, or in the current ThirdWeb setup, by adding `ERC2771Context` implementation as a plugin. 
+
+        The current setup involves:
+
+        1. Create `ERC2771Context` contract with trusted forwarders
+        2. Add `ERC2771Context` contract as a plugin to `TWMultichainRegistry`.
+
+        In step 1, when the `ERC2771Context` plugin is being created, the constructor stores the forwarders array into storage - **using the storage layout of `ERC2771Context` contract**. In step 2, the plugin is added to `TWMultichainRegistry`, thus forwarding all `isTrustedForwarder()` calls to the plugin. 
+        When e.g. an `add(..)` call (which forwards to `MultichainRegistryCore.add(..)`) is now initiated via the proxy, it runs under the proxy’s execution context and uses the proxy’s storage layout. However, the **forwarders haven’t been set in the proxy’s storage layout**, resulting in the following check to always return false:
+
+        ```solidity
+        IERC2771Context(address(this)).isTrustedForwarder(msg.sender)
+        ```
+
+        **Remediations to Consider**
+
+        Consider implementing the following changed:
+
+        1. Change `TWMultichainRegistry` to directly inherit from `ERC2771Context` contract.
+        2. Add a function like `_setupForwarders` to the `ERC2771Context` contract which adds the trusted forwarders to storage. 
+        3. Call `_setupForwarders` from within `TWMultichainRegistry::intialize` (similar to how `_setupRole` is called).
+
+        By doing so, the trusted forwarders will be correctly stored in the proxy’s storage layout. 
+    </field>
+</item>
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">27ab08bad476e2989f98a8758309ec647b43d329</field>
+    <field name="content">
+        ## (L-1) No event emitted within resetRecipients()
+
+        The event `PaymentsResetByAdmin` is defined in the corresponding interface for all three AirdropERC20/721/1155 contracts:
+
+        ```solidity
+        /// @notice Emitted when pending payments are cancelled, and processed count is reset.
+        event PaymentsResetByAdmin();
+        ```
+
+        However, it is not being emitted int the `resetRecipients` function.
+
+        **Remediations to Consider**
+
+        Emit the `PaymentResetByAdmin` event at the end of the `resetRecipients` function.
+    </field>
+</item>
+<item>
+    <field name="topic">Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">fd85a6a9180bf1a143347ba398bb98afd71f11b2</field>
+    <field name="content">
+        ## (Q-1) Unused library SafeERC20
+
+        In AirdropERC20.sol, `SafeERC20` is imported:
+
+        ```solidity
+        import "../openzeppelin-presets/token/ERC20/utils/SafeERC20.sol";
+        ```
+
+        and referenced here:
+
+        ```solidity
+        using SafeERC20 for IERC20;
+        ```
+        **Remediations to Consider**
+
+        remove the above lines as `SafeERC20` is not used anywhere in code. Instead use:
+
+        ```solidity
+        import "@openzeppelin/contracts/token/ERC20/IERC20.sol"; 
+        ```
+    </field>
+</item>
+<item>
+    <field name="topic">Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d1a38b1bcc6536b3f925a0ddc0c05988f3f9ff44</field>
+    <field name="content">
+        ## (Q-2) Unnecessary use of Clone pattern for MultichainRegistry 
+
+        *TWMultichainRegistry*’s purpose is to hold a global registry of deployments and thus intended to be deployed only once by ThirdWeb itself. In this manner, deploying the contract via the Clone pattern only adds complexity and gas costs, without any benefits.
+
+        **Remediations to Consider**
+
+        Deploy the contract without using the Clone pattern (and thus having a proxy in front). In this case all the logic for setting up the roles inside the `initialize` function can be moved to the constructor.
+        
+    </field>
+</item>
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">high</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## (G-1) AirdropContent struct stores redundant data
+
+        AirdropERC721.sol, AirdropERC20.sol, and AirdropERC1155.sol each use a variant of `AirdropContent` to store data in the airdropContent mapping to determine how to process airdrops. Some of this data is necessary, but in the case of both `tokenAddress` and `tokenOwner`, this data may be the same for an entire airdrop.
+
+        In the case where a collection owner want to airdrop 10k NFTs using AirdropERC721.sol’s `addRecipients()` to store the data of each recipient, the `tokenAddress` and `tokenOwner` would be the same for each entry, causing many unnecessary storage writes.
+
+        **Remediations to Consider**
+
+        Instead of storing the `tokenAddress` and `tokenOwner` for each airdrop recipient, this data could be stored in a separate mapping, along with a start and end range for the indexes this data applies. Doing so would only require a single write for `tokenAddress` and `tokenOwner` per airdrop, substantially reducing the cost of calling `addRecipients()` when airdropping multiple tokens of the same collection and owner.
+    </field>
+</item>
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">high</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## (G-2) Libraries only used in constructors are added to bytecode
+
+        Typically code run in the constructor is not stored in bytecode, and it is expected to be the same when code from a library is only used within the constructor.
+
+        However, [recently it was found](https://github.com/ethereum/solidity/issues/13680) that there is an error causing code from libraries to be added to the bytecode when it is only used in the constructor, adding unnecessary bytecode and increasing deployment costs..
+
+        In the case of when TWProxy.sol is deployed, it results with a bytecode size of 668 bytes, but with all references to the Address.sol library removed from the constructor, the deployed bytecode can be brought down to 180 bytes.
+
+        **Remediations to Consider**
+
+        Remove references to libraries in constructors if that is the only place the functions are used, to save on deployment costs.</field>
+</item>
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">9df9018eeabdd3d145f4dac3727c701dc4422f24</field>
+    <field name="content">
+        ## (G-3) Use unchecked blocks to reduce gas
+
+        AirdropERC721.sol, AirdropERC20.sol, and AirdropERC1155.sol each use loops for setting recipients and airdropping tokens.
+
+        In cases of large airdrops, there are many math operations that run, each checking to make sure no underflow/overflows occur, these checks consume gas and can add up, and are unnecessary if there is no way to underflow or overflow.
+
+        **Remediations to Consider**
+
+        Wrap operations that will not overflow/underflow in an unchecked block in order to save gas for users, especially for what is considered to be safe is wrapping `i++` in an unchecked block like: `unchecked {i++;}`..</field>
+</item>
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ea87439cca143ba8e96f46d165bf285212674d86</field>
+    <field name="content">
+        ## (G-4) Unnecessary to emit airdrop contents
+
+        AirdropERC721.sol, AirdropERC20.sol, and AirdropERC1155.sol emit events when `addRecipients()`, `processPayments()` that includes the data of the `AirdropContent` struct being added/processed for each recipient.
+
+        However, since this data is stored on chain, and can be queried for when needed, there is no need to emit this data.
+
+        **Remediations to Consider**
+
+        Instead of emitting the contents of an airdrop, emit the indexes of the content.
+</item>
+

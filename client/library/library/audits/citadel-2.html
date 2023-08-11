@@ -1,0 +1,141 @@
+<page
+  clientName="Citadel"
+  reportDate="April 11th, 2023"
+  auditTitle="Citadel A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thecitadelgame/contracts"
+  repoCommitHash="87bf731c00df5d4ca0709048ed58548ae49e7712"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_CITADEL_2"
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from
+    March 13, 2023 to March 24, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+    ac6bcd6f76b38cd0cd65e44f668677ba172f705290cd9cf56585c780612e8562  src/base/bridging/BaseChildTunnel.sol
+    25c8248b11c86079ae0c542fd362e329575b6b0e0e20cb4077ee1aaf56f15701  src/base/bridging/BaseRootTunnel.sol
+    36474ca4a9ecb9296479d1fc568a245a7bf6f9d4c0fd333915ea11df151abb5c  src/base/bridging/BaseRootTunnelMock.sol
+    dfb711b4e67aa35d629d74c24022e352b87a964e358f50b43c77c922cb73f01c  src/base/bridging/ITunnel.sol
+    cb45bf11ed1eb932062bae5daf247ba1c040dcf7321f6a78c052c12af3048d07  src/base/bridging/fx/FxChildMock.sol
+    750493219e2ff3c80b6f7c98f521f2075c28644a25350a54fd5c6ab7ae7875c8  src/base/bridging/fx/FxRootMock.sol
+    22a8995aaff3cc9f4d772c3909b1a4e1e5ad32dd3739c17319fbf724bd9655ca  src/base/bridging/fx/lib/ExitPayloadReader.sol
+    22cb0cc3202b7c3d99820b28851d23dd9fc979ef7d2855925e90e39a732e33f5  src/base/bridging/fx/lib/Merkle.sol
+    39d5e4fb784512ea35d3fe9b6f58ad3dc1b212b99da311fcac29b3853e10f4b1  src/base/bridging/fx/lib/MerklePatriciaProof.sol
+    d755df7673bce42d5edc72c488241ebeeeda4fef4bcb5a18d0770870e7d455a1  src/base/bridging/fx/lib/RLPReader.sol
+    b468b2d39954e837ea05b383ec2ac070a94096f0b8b6f76463896e9626ccbca8  src/base/bridging/fx/tunnel/FxBaseChildTunnel.sol
+    237d11d4cd2b16f70420b79997cb5f6a6be3c38410458a65fda20314d7acda34  src/base/bridging/fx/tunnel/FxBaseRootTunnel.sol
+    bf030f219b22dd35eecaa4c117649eae99553e4819dde9533e27737a49cd35bb  src/base/util/Bytes32Strings.sol
+    d8dd0ed4ea9f85eef98af6f80b784ea0f91c6f213d0128b8edd8813cf527a4b6  src/base/util/FixedPoint.sol
+    f5675c9047b39846a01f6ad2fea861dd9c86bfb5248dea2fa67f798f16f76cc8  src/base/util/IStructs.sol
+    1d984f802a2d8c3d9f8a3a407a7d612a0b27ffb401bd810e18f7cfbcc433a874  src/base/util/TokenContracts.sol
+    a205776e9d73ba0b41e8fdab6fa965faa5dfdd8fc3d6042fedaa60862e324c6f  src/dock/Dock.sol
+    b1b1c164a6479947ec410e15c47bcb3b4e157af84835828e46cf5c26e31e720e  src/dock/StandardChildTunnel.sol
+    61fb06152823e97580b7273326662567d6d1ec694a16531a0c2bf9c7dccc08fe  src/dock/StandardRootTunnel.sol
+    c15a4df12f481c927803d5e5ccc1acb732672a83bc8ec4f59e5b538066f7a623  src/dock/StandardRootTunnelMock.sol
+    a80b6f71af6b084e1019dc4c5ee45bd199843aba93ce3ae7a1f152a2e541b5de  src/game/GameInit.sol
+    37bd45559caac6c65fe2f61a17a6df12c3d1af725ce3834480d04d1f6e455fee  src/game/IGame.sol
+    d2f3eb7295e4566c9029ec597e9a923809e1335a64551ad222501a644b7cac81  src/game/access/AccessControlFacet.sol
+    d1d6d299561ee628f4e2e66891f48f8b986fc79fc4291e3c3741956915d1cf99  src/game/access/AccessControlPrivileged.sol
+    53bdf873952c842b5c86959961f347187c54117bc5dec4b384b26997afe359f1  src/game/access/IDiamondAccessControl.sol
+    c1361ff99cade7bcce1bc436ac13a5cf30f34018bb156d0b4e2bbf6cb0fb765c  src/game/belts/BeltsFacet.sol
+    63076c6a95e2eb94d0cfdc131823362d603a953035d46e12ce938171131db365  src/game/belts/BeltsPrivileged.sol
+    8fb4babdf1e44be411acbd6c0442bbb4b5aed5f63bdb74a237d37c57375fe04a  src/game/belts/IBelts.sol
+    30f4d2f2698f6dfed9cf9942c680a97c97b1f8b53dff45905eac3a067217bebf  src/game/common/CommonFacet.sol
+    cb7c9963020156f53e4de7532ad0a248f55b112337438030bab35bb7588b0307  src/game/common/CommonPrivileged.sol
+    aac1cc5211fcb3098fc9980ad8c47d869375e7f9600c704438380cdbc92a62d6  src/game/common/ICommon.sol
+    d9c4771256bd342d2ae19fbd53660bd3100b9a9ca03b82fa8b404ce5fddab4c8  src/game/glue/GlueFacet.sol
+    635d7f8921f9868d37e4d9d4d62202485ed95c7b29c795d48b3ed1e16bcfe036  src/game/glue/IGlue.sol
+    400606636881402e5db188e207aa996ff608299a6ec7a0ba0b3acfcdb0a879c4  src/game/outposts/IOutposts.sol
+    931ae63a301a3c9d82708ec99522035d980ef1d73574cbb1994bb22227d8db78  src/game/outposts/OutpostsFacet.sol
+    5e8f288caf6a88650bce89e8d1d9014813f7418f1a104f4ecfefe37d087ef24d  src/game/outposts/OutpostsPrivileged.sol
+    ff3f2772d07e3c55b9be660e9bb51c917827fc3579ff3bc5aa414615cd8c2fcf  src/game/randoms/IRandoms.sol
+    3e9aa919ed4a227ba254d25b0e043422dc8e9cb0fc7a1b43d2a6ffda8c1b026b  src/game/randoms/RandomsFacet.sol
+    efdd4cd774cb25e6c36c99c7123e5ab1d42dc2dc8cbfb32e9ecafe562b73e5df  src/game/randoms/RandomsPrivileged.sol
+    644e01f3a3b4c1d409102cf13e51b047e0292f8445769795ef4e6da3f1afbb2e  src/game/rewards/IRewards.sol
+    75ef95d4f8e702bc55acade8a5127b9c641b80d1028a363ea5639baf4a996a0c  src/game/rewards/RewardsFacet.sol
+    befa2da0b12d180cd907e4b9c0e277411e27224432cb3113eb96095596eddfbc  src/game/rewards/RewardsPrivileged.sol
+    86d70ca224c22478ebacc39539f4d07400c79b4d1e91f207cb5657375a866bb8  src/game/travel/ITravel.sol
+    f4b27563da4af0be4f6d255efaaaaa56874919f15e9ca75165e2cfb41500af41  src/game/travel/TravelFacet.sol
+    6cafdd27bd8a992f1ea53b5091ee2a60fdb1849467c37dab7fac7bbd92fa56c8  src/game/travel/TravelPrivileged.sol
+    9eb49dcb3f8961f4db0e3ee0fc4cd3903c37ac614bf1280fc312ea5878903c75  src/game/upgrades/IUpgrades.sol
+    734602ad26df4abb83abb9d205de9e460511e3fc415624a8f8ef3d5fc12fc69a  src/game/upgrades/UpgradesFacet.sol
+    77d8459815232c8d5431d0a00aced49b03cdd63dd06285e598ff219de6c340e9  src/game/upgrades/UpgradesPrivileged.sol
+    d14d0405ca62beb2e88fc821ac28907f41fff6238183bd3dafe410df820e3ca1  src/governance/CitadelGovernor.sol
+    cabe1159aad4061ae3ad907cdd87889f1fb4e5d05a90286c8e75c9228878d950  src/governance/CitadelTimelock.sol
+    b74b5c69cf09b7f340c19630dc7917dc59763a704e599368024b6ec57529a133  src/governance/GovernanceChildTunnel.sol
+    a823e7767172eb9b28abf04e86bf63cc17cff423545465ac2e8964dd5d249a93  src/governance/GovernanceRootTunnel.sol
+    8ac6d1e9e69737f9216617c6694959abca7edf21807aa6db095e4b34c003fcc2  src/governance/GovernanceRootTunnelMock.sol
+    c3facf93db52768b9e342062646b8ef83ac4546733d7f8a57f648ada3976bc74  src/governance/GovernanceTokenMock.sol
+    1bff3edb1fb5055ef353a8bdb7cc9dbdcf9beb22a729f7dac6785d0e4a1318a7  src/governance/IPilotBadge.sol
+    a88f6d3b97e68164aa3d1860394f3221cfe11b33d8f20eed7a17cd6ef9fb75ba  src/governance/PilotBadge.sol
+    2b6735546e923ad8fcbebf67c9ec615bfe500cb2cd2936b2ebc9bc1f2d34288d  src/ore/IOre.sol
+    dea3b7414975c09ec2f6e9396f8f0df0b16eb918779a2639bb63b85b8ca113e2  src/ore/Ore.sol
+    c4754c80dbd6d9ff9860914bd287914613eae035d37d6042c6f2444513ddfaa9  src/randoms/BaseRandomOracleConsumer.sol
+    d17008eefe6cf761222e2814de50c47c56ac39903893e675c9136928576e9d15  src/randoms/IRandomOracle.sol
+    6e8b4334613e70ca148be93c5a6955e343792bb272eb84a9698a5cfd6dde12b3  src/randoms/RandomOracle.sol
+    ccf94a8cfa9c5770f22856ee7cd3cb9c6808414b1c15de24545923450f491a7f  src/randoms/RandomOracleConsumer.sol
+    f030526b3d69ff4034bf1e06ec449eac560ba8ff250202c4d5aa1daf1252406e  src/randoms/RandomOracleConsumerMock.sol
+    f8ee844f381e962bb3e04dd373eb2a9313613c7e1c6d360a3aebb8a60ac63e95  src/randoms/RandomOracleMock.sol
+    2de51129aca8a3fbb2603a2d0df39e0ec137efc9d7ad14df2e76ed9fbc3494de  src/randoms/RandomOracleUtil.sol
+    d7115bac92bab494969452774ec1873aea68edd71fd11d41492f2d71f59ccaa2  src/randoms/VRFCoordinatorV2Mock.sol
+    6631ba7f55b8be18dccc5eaa947f9d8ee8f020c1833e15d74d8d42fabc6132be  src/ships/BaseShips.sol
+    4d9a97cb4a81c05e4d311a7ca3302951ac2d335770d89c9b0633bc5080fc715b  src/ships/CitadelPaymentSplitter.sol
+    403333930c0f08ac55bfd1e63aeeae19307e406d318549be92374679aa78a1dd  src/ships/DutchAuctionShips.sol
+    3aa83a216226ba74596c364976cdc7e36634146f225b9bcbfabdb6d45ec8f51b  src/ships/ERC721C.sol
+    585a61fff3ee54518b1fa9f1f664a49bcef7e72535a24e813015b2f958b7d310  src/ships/IERC721C.sol
+    6560c01d5cda1a1cf04e8bdde4ec8d2a2914c37e6760ca99ef0927d3113ce645  src/ships/IMetadataLib.sol
+    1a8c8aa7e8a62f56a942566298ded4cf6146cd53212590cf306ed0f41980fa58  src/ships/IProxyRegistry.sol
+    a4a291ec558a9b57e9879eb028475e63d24501838a40e7787d3eba8086c44bc1  src/ships/IShips.sol
+    d805908b9826bb72344b4151d32542640ee09bd92103842d2e5e8a6a8439e278  src/ships/MetadataLib.sol
+    99b72ccb3a023275c51707b029f979f58001d94d73a84decdad4f154352b6c85  src/ships/ProxyRegistryMock.sol
+    5ae13d704b8106b2e94ae8ba8de3b110da7c563cdb937631eebc74e74e9377ad  src/ships/ShipPacking.sol
+    52af24fd7d0abdd911d8ccd09d971bc0e32a7c98dbab4194c581d30eb6c459c5  src/ships/ShipsMock.sol
+    5a439bf60eaf748f16a8c91eb497b50c16fdfe3f8c281a6f56a9aeccc0466a41  src/ships/construction/CommitVerifier.sol
+    f483453ac1c870786ac85178e35f0949747d00439ffc8495557f2ac175f351a6  src/ships/construction/ConstructionBay.sol
+    d42a4bd22d28a64d2a498fb4ef03572fc87e57452c6f2bbd0aee554e8c118326  src/ships/construction/IConstructionBay.sol
+    e7da1eaa1c95ed5a42ab51143bb1c133e764f32cef0eb17b372d6a41f4e3bbc8  src/ships/construction/IERC20Burnable.sol
+    136c97aa287eefbe96465135d2973ae8c54588fb447902f02cceb3185eee1993  src/ships/construction/IVerifier.sol
+    15384e9f95a562ac57e7f12244cf5d5472b99376633c6b560e4fb55b1ca20b6d  src/ships/construction/RedBlackTreeLib.sol
+    eb32125eaa9dcd21c9e3353bea36d00fef041b0260fea0dbb76b772a97bef903  src/ships/construction/RevealVerifier.sol
+    4aaaa80c01bf3961a17a69f6848e14547bee4b2a9867717e3fe960a0b8781a4e  src/ships/traits/IShipTraits.sol
+    df39c536da7dd844ec740e09f51cd29985e8702d7605af2c83b2a88e29f6de3e  src/ships/traits/IUpgradesCalculatorLib.sol
+    d8f2df48449298338fdcd4b243f02ade8eec565211ef36873e27a9128238b4ee  src/ships/traits/ShipTraits.sol
+    cb10d28f26c4133d0b6b1132097db2e92386934625b18c31e91421b6aa9db17b  src/ships/traits/UpgradesCalculator.sol
+    6e570f1e79448d024c0f74fe0931d1506bd980fa485bacd7e2c4092317309ce9  src/ships/traits/UpgradesCalculatorLib.sol
+    a23e6f2cd52d86309deba42385bd3b62d78086b41d4d4b9435abd79534a545b1  src/upgrades/CitadelProxyAdmin.sol
+    eacfc40e78b698c2d882bc11eecc2297f6b60f6923558c790ce9d96151ea05d2  src/upgrades/TransparentUpgradeableProxyMock.sol
+    e9be3d9d7da9079483d3ee543a6413d136d0f1ed479e265d220bcdbc8959163e  src/upgrades/UpgradeableMockV1.sol
+    587bfb065276142fb246042bf706cce121ffcab6aabc4a40babe76e625664715  src/upgrades/UpgradeableMockV2.sol
+    574eba02b839e18a32e0b7649557fdee7168c376cf1add70e193e226cef1f70d  src/upgrades/diamond/Diamond.sol
+    c15c70654561b03f8119bf4690d9525d21f6d7d98813b528997c271291017f83  src/upgrades/diamond/FacetUtil.sol
+    798eb2b8de8db7a903e3c27f7ff9574416dedb9f7e15e1f817beb73a9209ffbe  src/upgrades/diamond/facets/DiamondCutFacet.sol
+    6c6c4f1d28a8df8192dd125b1c3e5a22ad65ae47684cba825a7196f250f053e9  src/upgrades/diamond/facets/DiamondLoupeFacet.sol
+    a7c6b5fa91261715ecc48d37f81c8e09c9c58641094bcead2b21a1e1f2fdae58  src/upgrades/diamond/facets/OwnershipFacet.sol
+    11c02ffa93bb126ea71a42d732de979bb82c1589a11b61c4d16767d27c3cb27f  src/upgrades/diamond/initializers/DiamondInit.sol
+    4a1a4f0689dd677646a284e06fbb30c0033971dcc34fe33264146884417a13f7  src/upgrades/diamond/initializers/DiamondMultiInit.sol
+    0b3bbe8c1b11c192232c960af1649233f268be18d5dcd84aca02a1b4d1abc7d0  src/upgrades/diamond/interfaces/IDiamond.sol
+    ad27910117702894e38d72692a1c2ff44f7cefbe58260edc34bd7697348e94c3  src/upgrades/diamond/interfaces/IDiamondCut.sol
+    3b78f1dfb42e11d6462ba9f37395f89ab0b9b3b227aedbb5344e03ed0aed0673  src/upgrades/diamond/interfaces/IDiamondLoupe.sol
+    34f20e66dfa9ae2d442d0798d9591ca0de2c4a14469efeb2f3cfa91a40e93b14  src/upgrades/diamond/interfaces/IERC165.sol
+    7c75945ba1c0a9462e67ea33af22bc58a44e1e4f9b37ed3fd8974de6334604be  src/upgrades/diamond/interfaces/IERC173.sol
+    9e21076eed933794ce97409ec9a489fe2ad29734b7e51b6e2e90c4fa237f792a  src/upgrades/diamond/libraries/LibDiamond.sol
+    
+    </template>
+    <p>
+        <b>Note:</b> This document contains an audit of the differences between Solidity contracts listed above and previous version from <a href="https://0xmacro.com/library/audits/citadel-1">Citadel-1</a> audit. Specifically, the audit pertains only to the contracts themselves, and does not pertain to any other programs or scripts, including deployment scripts.
+    </p>
+</content-for>

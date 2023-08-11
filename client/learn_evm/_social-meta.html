@@ -1,0 +1,28 @@
+{{var imagePath = locals.image || '/img/twitter-card.png' }}
+<meta property="og:type" content="website"/>
+
+<meta name="og:url" content="{{ page.location.href }}">
+<meta name="twitter:url" content="{{ page.location.href }}">
+
+<meta name="og:title" content="{{ locals.title }}">
+<meta name="twitter:title" content="{{ locals.title }}">
+
+<if cond="locals.description">
+  <meta name="og:description" content="{{ locals.description }}">
+  <meta name="twitter:description" content="{{ locals.description }}">
+</if>
+
+<meta name="og:image" content="{{page.location.origin}}{{imagePath}}">
+<meta name="twitter:image" content="{{page.location.origin}}{{imagePath}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@LearnEVM">
+<meta name="twitter:creator" content="@LearnEVM">
+
+<!-- Favicon -->
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="mask-icon" href="/safari-pinned-tab.svg" color="#000000">
+<meta name="msapplication-TileColor" content="#000000">
+<meta name="theme-color" content="#ffffff">

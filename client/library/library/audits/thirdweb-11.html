@@ -1,0 +1,59 @@
+<page
+  clientName="thirdweb"
+  reportDate="April 24th, 2023"
+  auditTitle="thirdweb A-11"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from March 27, 2023 to April 6, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>A provided audit handoff document provided through Notion.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash <b>(ExtensionRegistry):</b>
+        <code>d9b34dd1056aa2a1d77cac3c871c219fec8a60f5</code>
+      </li>
+      <li style="list-style: none;" class="break-words break-all">
+        Commit Hash <b>(PackVRF):</b>
+        <code>7896821b3d16dafeb2a0ea9d70d87c06a7ed4868</code>
+      </li>
+    </ul>
+  </content-for>
+
+<content-for name="source-code">
+
+  <p>We audited the following PackVRF contracts within this repository:</p>
+
+  <template type="file-hashes">
+    aa236d609972490ecc2386ce1876a28c8d8909607d8387a8ee7dfca996542930  contracts/pack-plugin/PackVRFDirectRouter.sol
+    17711612fa1ee2b95b351430779237dcf05a9d077e70220552e692f0df66b1d6  contracts/pack-plugin/extension/PackVRFDirectLogic.sol
+    bf5da18c5458111d26fc35578d8ad0185707ca08a2e6a801d6620c5f025b3e08  contracts/pack-plugin/extension/PackVRFDirectStorage.sol
+  </template>
+
+  <p>We audited the following ExtensionRegistry contracts within this repository:</p>
+
+  <template type="file-hashes">
+    f4d81d3d52f11a83e7a534e435110189a00ab40a142cda9c2eee9e98e33c154e  contracts/dynamic-contracts/ExtensionRegistry.sol
+    90674fac8e03296e483a376a5281530cd9bbe09e9156848cd03d4b900985cd6b  contracts/dynamic-contracts/ExtensionRegistrySig.sol
+    34f898f13dcec3502749b88812b3cbcd1cbbb4d256034a12837613a0976c5c91  contracts/dynamic-contracts/ExtensionRegistryState.sol
+  </template>
+</content-for>
+

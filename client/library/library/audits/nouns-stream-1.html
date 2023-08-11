@@ -1,0 +1,47 @@
+<page
+  clientName="Nouns Stream"
+  reportDate="May 8, 2023"
+  auditTitle="Nouns Stream A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/daokitchen/nouns-stream"
+  repoCommitHash="f7e600765bd2c8da0e07c8da6a86bf147693f864"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from April 17, 2023 to April 21, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    a11161bc74c88926d44784a86bb7aa6a538b510facf9d87966be2f672743aeea  app/web3/src/VersionedContract.sol
+    8c719bd3e5818322a54a188910f6f7149e7a917576a2690d5a62ae74ccb26529  app/web3/src/intervals/Intervals.sol
+    06002a887a3687482ef63d8131ec68bbab8764a8cc910b3f9e21f9141c2183e5  app/web3/src/intervals/storage/IntervalsStorageV1.sol
+    cde2035978d6bf4de5e915490c09815a3470b95cdba82e188a053f941b787093  app/web3/src/lib/Factory.sol
+    1e595ab036bc438ee6aa44f31925c3c09c8da014cf33f3620ad67cc062eefdba  app/web3/src/lib/Stream.sol
+    b188ab8c1ea1dbd7b98d234c950dcd0295d9283de3c8480af918a298b3b885bb  app/web3/src/lib/storage/FactoryStorageV1.sol
+    ddaae1b8f4276ec8ac1bd295e1e1938a04f8ce1bb25c1ca8ba5f23bfbc0f7ca4  app/web3/src/manager/Manager.sol
+    db42b3cae0f2058de9388f8d796af472d9e6a98f6cf26e5ae0cea1e9dffe76f7  app/web3/src/milestones/Milestones.sol
+    b1d2f27359c9f3237e0cbc091932cdbb0f5178b7abec0de4dd3985c25be9a44c  app/web3/src/proxy/ERC1967Proxy.sol
+    d3fd03cd782a6c6c985e6920dd7782d80d4868431eb827b9d63a0f61f963e30f  app/web3/src/proxy/ERC1967Upgrade.sol
+    0739c8b4ef57db555ed9296f137244d2b9b30e25b1b9a14c4c62cb8d50084a5b  app/web3/src/proxy/UUPS.sol
+    551c7ab8b97a01e994016373ad161951c03120808b6f34db31ef2a05758cedbb  app/web3/src/utils/Address.sol
+    64569dbcb986701b03b3ac4916823190dc48ceaf4af7746d0e048762c077353d  app/web3/src/utils/Clones.sol
+    0bc73712566628c5c0fa851f7b2450ae1ef50f83becafaeb0a79e374688ee843  app/web3/src/utils/FullMath.sol
+    791397428dae4722fce22a6400c6f18eef2af4ab0432449382087204862b5aad  app/web3/src/utils/Initializable.sol
+    01e43bf261e7b360f90538674907ca4e340f472913d8e7d3d7cbfeee3eb9d603  app/web3/src/utils/Ownable.sol
+    7a2242e65ef84149351ecbb6ab0cbd832b9fac6a313f97d2fcbdada8f800931a  app/web3/src/utils/Pausable.sol
+  </template>
+</content-for>
+
+</page>

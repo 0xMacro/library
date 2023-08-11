@@ -1,10 +1,13 @@
 <!DOCTYPE html>
-<title>{{ page.title }} | {{ site.name }}</title>
+{{ var title = page.title ? `${page.title} – ${site.name}` : site.name }}
+<title>{{ title }}</title>
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 
 <meta lancer>
+
+<include src="./_social-meta.html" locals="{ title: title }" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -1,0 +1,638 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">3a467ca8ef90f61ed132a0104ad9f36f90bfaa4b</field>
+    <field name="content">
+        ## (C-1) Anyone can drain funds
+        
+        In Stream.sol’s `_distribute()`, it is intended to be called internally and distribute funds in set amounts to the recipient based on the type of stream and conditions set.
+
+        However, `_distribute()` is a public function with no checks or restrictions on who can call:
+
+        ```solidity
+        function _distribute(address _to, uint256 _amount) public {
+            if (token != address(0)) {
+                /// ERC20 transfer
+                SafeERC20.safeTransfer(IERC20(token), _to, _amount);
+            } else {
+                /// ETH transfer
+                bool success;
+                assembly {
+                    /// Limit the call to 50,000 gas
+                    success := call(50000, _to, _amount, 0, 0, 0, 0)
+                }
+            }
+        }
+        ```
+        Reference: [Line 77 - 89, Streams.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/lib/Stream.sol#L77-L89)
+
+        This allows anyone to drain the contract of all its funds.
+
+        **Remediations to Consider**
+
+        Set the access of `_distribute()` to internal.    
+    </field>
+</item>
+
+<item>
+    <field name="topic">Frontrunning</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">5c4972226ec55e1881776b6be4b155a5217919c5</field>
+    <field name="content">
+        ## (C-2) Stream deployment can be front-run and set as owner
+
+        A Stream contract is intended to be deployed with a deterministic address, that is generated using various input parameters to generate a salt used to deploy via `CREATE2`. Users can predict this address and send funds intended to be held in escrow before deploying a Stream.
+
+        However, an important parameter missing in the salt generation is the `_owner`, which is the address that takes ownership of the Stream.sol contract and can call permissioned functions that can pause and withdraw all funds.
+
+        There are multiple cases where issues can arise because of this.
+
+        - In the case where a Stream is pre-funded in a separate transaction by predicting the address beforehand, then someone can front-run the Stream deployment with themselves as owner, then immediately withdraw all funds to themselves.
+        - In the case where an externally owned account attempts to create a Stream, another malicious actor can front-run the deployment, causing the users’s transaction to revert. This may not be clear to the user, as a contract with an address they expect is deployed. They may mistakenly send funds to it thinking they have ownership, which could then be drained.
+        - In the case where a DAO proposal intends to deploy a Stream, and potentially send funds to it, or take other actions described by the proposal. Since the deployment parameters are public and take time to vote on/execute, someone can front-run the deployment and depending on how the DAO handles errors, either revert the whole proposal, or potentially send funds to the Stream contract that it doesn’t own.
+        - General griefing can also potentially occur, preventing anyone from properly deploying a Stream contract.
+
+        **Remediations to Consider**
+
+        - Include the `_owner` parameter in the salt generation, so that the `_owner` address cannot be swapped out by someone malicious without changing the contract's address.
+        - Also, include the address of the deployer(`msg.sender`) that made the deployment call in the salt. This would prevent any possible griefing by deploying the same address beforehand, as a different address would be generated based on the sender.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">3a467ca8ef90f61ed132a0104ad9f36f90bfaa4b</field>
+    <field name="content">
+        ## (H-1) Interval funds locked after endTime
+
+        In Intervals.sol funds are escrowed in the contract and a set amount can be claimed after a given interval; a `startTime` and `endTime` of this contract determine the duration and payment intervals for funds being released.
+
+        However, if owed funds are claimed or released after the set `endTime`, then the call to `_nextPayment()` will revert:
+
+        ```solidity
+        if (block.timestamp > endDate) revert STREAM_FINISHED();
+        ```
+        Reference: [Line 121, Intervals.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/intervals/Intervals.sol#L121)
+
+        This will lock any unclaimed funds in the contract, locking all possible funds owed, and likely to lock the last intervals payment especially if the duration of the contract is divisible by the interval, as claiming would require execution to occur at the exact `endTime` of the contract, which may not be possible.
+            
+        **Remediations to Consider**
+
+        Instead of reverting, if `block.timestamp` is greater than the `endDate`, set a local time variable to `endDate` and proceed with the calculation, ensuring that the user will get paid up to the `endDate`.
+        
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">3a467ca8ef90f61ed132a0104ad9f36f90bfaa4b</field>
+    <field name="content">
+        ## (H-2) Owner may be prevented from withdrawing
+
+        In Stream.sol’s `withdraw()`, if the contracts payment `token` is ETH `transfer` is used to send the funds from the contract to the owner:
+
+        ```solidity
+        if (token == address(0)) {
+            bal = address(this).balance;
+            payable(owner()).transfer(bal);
+        }
+        ```
+        Reference: [Line 32-34, Stream.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/lib/Stream.sol#L32-L34)
+
+        However, `transfer` sends a fixed amount of gas, and assumes the address it sends the ETH to doesn’t have a `fallback` or `receive` function that runs code. If the owner is a contract with a custom fallback function, like a multi-sig or a DAO, then the transfer will fail, and the owner will be prevented from withdrawing their funds, potentially locking them in the contract.
+
+        **Remediations to Consider**
+
+        Use a low-level call to transfer ETH; doing so will allow any contract to be the owner and withdraw without issue.
+        
+    </field>
+</item>
+
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">ecbf396b80fd944bfd54434bbb012122afc1ccd7</field>
+    <field name="content">
+        ## (H-3) Not checking call return value in _distribute
+
+        In Stream.sol, the function `_distribute` transfers a specific amount of assets to an address. Depending on the `token` the logic will perform an ERC20 transfer or an assembly low-level call to send the assets to the recipient. 
+
+        ```solidity
+        function _distribute(address _to, uint256 _amount) public {
+            if (token != address(0)) {
+                        ...
+            } else {
+                /// ETH transfer
+                bool success;
+                assembly {
+                    /// Limit the call to 50,000 gas
+                    success := call(50000, _to, _amount, 0, 0, 0, 0)
+                }
+            }
+        }
+        ```
+        Reference: [Line 77 - 89, Stream.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/lib/Stream.sol#L77-L89)
+
+        This function is called in both, Intervals.sol and Milestones.sol contracts in `release()` and `claim()` functions.
+
+        For ETH payments, if the assembly `call` fails to send the assets, the transaction will not be reverted, the `paid`/`currentMilestone` variables will be updated and the `FundsDisbursed` event emitted. This could happen if the Stream contract doesn’t have enough funds or if the recipient fails to receive the assets.
+
+        **Remediations to Consider:**
+
+        - Revert the transaction if the call fails or,
+        - Using a `try-catch` to process failed transfers accordingly.
+          
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">This issue was found by an external third party and reported to us to verify.</field>
+    <field name="commit">5dd04581b3584c98e8463732228f69f098e984ba</field>
+    <field name="content">
+
+        ## [H-4] `recipient` can claim ETH earlier than intended
+
+        In Milestones.sol and Intervals.sol, the functions `claim()` and `release()` distribute the owed tokens or ETH to the `recipient`.
+
+        However, the state that determines the amount to send to the `recipient` is updated after the internal function `_distribute()` is called, which will send ETH to the recipient if the `token` address is set to `address(0)`.
+
+        ```solidity
+        function claim() external payable whenNotPaused returns (uint256) {
+            uint256 bal = _nextPayment();
+            if (bal == 0) revert NO_FUNDS_TO_DISBURSE();    
+            _distribute(recipient, bal);
+
+            currentMilestone++;
+
+            emit FundsDisbursed(address(this), bal, "Milestones");
+
+            return bal;
+        }
+        ```
+        Reference: [Line 75-86, Milestones.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/milestones/Milestones.sol#L75-L86)
+
+        ```solidity
+        function _distribute(address _to, uint256 _amount) public {
+            if (token != address(0)) {
+                /// ERC20 transfer
+                SafeERC20.safeTransfer(IERC20(token), _to, _amount);
+            } else {
+                /// ETH transfer
+                bool success;
+                assembly {
+                    /// Limit the call to 50,000 gas
+                    success := call(50000, _to, _amount, 0, 0, 0, 0)
+                }
+            }
+        }
+        ```
+        Reference: [Line 77-89, Stream.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/lib/Stream.sol#L77-L89)
+
+        In the case where the `recipient` is a contract that contains a malicious `fallback` or `receive` function that calls either `claim()` or `release()` when receiving ETH, it would allow the recipient to drain the entire contract of its funds after only needing to wait a single `interval`, or complete a single milestone.
+
+        **Remediations to Consider**
+
+        Follow the [Checks, Effects, and Interactions](https://docs.soliditylang.org/en/v0.6.11/security-considerations.html#use-the-checks-effects-interactions-pattern) pattern, and update `currentMilestone` for Milestones.sol and `paid` for Intervals.sol, before making the call to `_distribute()` for both `claim()` and `release()`.
+                
+    </field>
+</item>
+
+<!-- <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">TODO</field>
+    <field name="commit"></field>
+    <field name="content">
+
+        ## [H-5] Funds sent to a precomputed Stream contract can be locked
+
+        In Manager.sol, either a Milestone or Intervals Stream contract address can be pre-computed by calling either `getMSSStreamAddress()` or `getIntvStreamAddress()`. The address is pre-computed and deployed using the create2 opcode, which uses the bytecode of the deploying contract as well as a supplied salt.
+
+        However, the implementation addresses of either the Interval or Milestone stream can be changed if the owner upgrades the Manager.sol contract. Since the contract deployed is a minimal proxy that includes the implementation address in its bytecode, the deployed contract address returned for a given salt would also change. 
+
+        In the case where funds are sent to a pre-computed contract address before it is deployed, with the assumption that they can deploy this contract at a later date. If before this contract is deployed, the owner of the Manager contract changes the implementation address by upgrading it. The result would be that there would no longer be a way to deploy a contract with the address the funds were sent to, causing them to be locked.
+
+        **Remediations to Consider**
+
+        - Instead of having an immutable address for each Stream implementation, have an array that stores all implementation addresses that have been set for a Stream type.
+        - Then the index of the implementation array can be used to specify which implementation address to use for either pre-computing the address or deploying the contract.
+        - Add owner functions to push new implementation addresses to the proper array.
+
+        Doing this would allow a user to deploy a contract with an older implementation address that  they may have used to precompute the address of and sent funds to.
+
+    </field>
+</item> -->
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5e7183603bbe9463feb9bbb8b8d40ee10a4bc823</field>
+    <field name="content">
+        ## (M-1) receive should revert if token is non-zero
+        
+        A Stream contract intends to receive funds in either ETH or a set ERC20 token based on the `token` parameter it is initialized with. Based on the value of `token`, the contract can send out or have that token withdrawn. In the case the contract deals with ETH, `token` is set to `address(0)`.
+        However, if `token` is set to a non-zero address of an ERC20 token, the contracts `receive()` function still allows ETH to be directly sent into it, although it has no means of dealing with it, and it would be locked.
+
+        **Remediations to Consider**
+
+        `receive()` should revert if the set `token` value is non-zero in order to prevent ETH from being accidentally locked in the contact.
+        
+    </field>
+</item>
+
+<!-- <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">TODO</field>
+    <field name="commit"></field>
+    <field name="content">
+
+        ## [M-2] Payment info is not used in salt generation
+
+        In Manager.sol, either a Milestone or Intervals Stream contract address can be pre-computed by calling either `getMSSStreamAddress()` or `getIntvStreamAddress()`.
+
+        However, Milestone.sol’s `msPayments` parameter is not used in the salt to generate the contract address, and for Intervals.sol, `owed` is not used in the salt either.
+
+        In the case where either a Milestones or Intervals contract address is precomputed, and is interacted with prior to deployment, potentially by sending funds into it. There may be assumptions made about the payment parameters it will have once deployed, and since these payment parameters are not used to generate the salt, the contract can be deployed with anything. This could cause funds sent into a Stream before deployment to be withdrawn by the recipient much quicker than intended, if it is deployed with payment parameters that take all the funds after the first milestone or interval.
+
+        **Remediations to Consider**
+
+        - Add `msPayments` to the salt generation for Milestones contracts, and `owed` for the salt of Intervals contracts.
+        - Use `abi.encode` instead of `abi.encodePacked` to prevent salt collisions with differing inputs.
+    </field>
+</item> -->
+
+<item>
+    <field name="topic">Sanity checks</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## (L-1) Lack of initialization parameter sanity checks
+
+        The manager contract, allows any user to deploy an Interval or Milestone stream contract with a specific set of parameters that will initialize the state variables of the deployed contract.
+
+        While initializing these parameters, there are no sanity checks on whether these inputs will be within a functional range. Here is a list detailing sanity checks to ensure no misconfigurations are possible.
+
+        **Intervals.sol:**
+
+        - `_interval > 0`
+        - `_interval < _endDate`
+        - `block.timestamp **≤** _startDate < _endDate`
+        - `block.timestamp < _endDate`
+
+        **Milestones.sol:**
+
+        - `_msPayments.length == _msDate.length`
+        - `_msDates[i] < _msDates[i + 1]`
+        - `_msDates[0] ≥ block.timestamp`
+
+        **Remediations to Consider:**
+
+        - Consider adding these sanity checks in the `initialize` function or,
+        - Documenting possible pitfalls on initialization if inputs are not valid.
+        
+        
+    </field>
+    <field name="response">
+        The user interface will validate the parameters, and we will provide an NPM SDK that users must use to verify parameters before creating a stream. We aim to reduce gas costs by incorporating less code into the contracts.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## (L-2) Non-descriptive events
+
+        Events should be emitted to describe changes to the state of the contract, and allow off-chain applications to easily understand relevant information as it pertains to its desired functionality.
+
+        However, most of the events emitted in the contracts do not give the relevant information that would be useful for applications and users.
+
+        In the case of Manager.sol’s `StreamCreated` event, it contains two parameters that describe the created contracts address, and the stream type. It would, however, be useful if the owner address and the recipient address were present and indexed, as it would allow an application to query the Manager.sol contracts `StreamCreated` event and filter all streams created for a select address is either the owner or recipient.
+
+        In the case of Intervals.sol’s `FundsDisbursed` event, it contains three parameters that describe the stream contracts address, the amount of funds disbursed, and the stream type. However, the address of the stream contract is not useful as the event is emitted from its address, so anyone listening to this event has to know the address of this stream. The stream type may not be relevant as it is immutable within a given stream. The owner and recipient, however, can change and could be relevant information to emit, as well as either the milestone index or the time interval the payment was for, depending on the stream type.
+
+        **Remediations to Consider**
+
+        Refactor events to emit all the relevant info, and index the important parameters to allow an application to easily query and use with minimal friction. Remove any irrelevant information as well, like any instance where the event emits its own contract address.
+                      
+    </field>
+    <field name="response">
+        We’ve created a subgraph to index data and make it easy to access events and the data associated with them.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## (I-1) Escrow assets are not checked during initialization
+        
+        The current design of both stream contracts (Milestones.sol and Intervals.sol) doesn’t perform any checks on the balances of the contracts, neither while initializing the contract nor performing payments. 
+
+        This could result in stream contracts getting created without enough balance to perform the corresponding payments or even without any balances at all.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">fd14412906eb0f1afa11841c140e494f810d0620</field>
+    <field name="content">
+        ## (Q-1) isUpgrade mapping is not used
+        
+        Factory.sol inherits from FactoryStorageV1.sol to use its `isUpgrade` mapping. Factory.sol exposes functions that the owner can call to add and remove values in this mapping, as well as check if a value is set.
+
+        However, `isUpgrade` is not currently used and is not involved in the upgradability of the Factory.sol contract.
+
+        **Remediations to Consider**
+
+        Remove all references to FactoryStorageV1.sol and its `isUpgrade` mapping.
+        
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b1d16b2696439a6c33dd39cf0ace4089b79cc68</field>
+    <field name="content">
+        ## (Q-2) Unused imports
+
+        The following files are imported but are unused:
+
+        - Stream.sol: FullMath.sol and IFactory.sol
+        - Factory.sol: ERC1967Proxy.sol
+        - Milestones.sol: IFactory.sol
+        - Intervals.sol: IFactory.sol
+
+        IntervalsStorageV1.sol is a duplicate of FactoryStorageV1.sol and unused.
+
+        **Remediations to Consider**
+
+        Remove the above unused imports and files.    
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b1d16b2696439a6c33dd39cf0ace4089b79cc68</field>
+    <field name="content">
+        ## (Q-3) Add missing natSpec documentation
+        
+        Some functions are missing return parameters in their [natSpec documentation](https://docs.soliditylang.org/en/v0.8.17/natspec-format.html).
+
+        **Remediations to Consider**
+        
+        Complete the [natSpec documentation](https://docs.soliditylang.org/en/v0.8.17/natspec-format.html) for each function to describe the values each returns.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b1d16b2696439a6c33dd39cf0ace4089b79cc68</field>
+    <field name="content">
+        ## (Q-4) Intervals math can be cleaned up
+
+        In Intervals.sol’s `_nextPayment()` some math is done to determine the number of intervals that have passed since the last time the user has claimed or had their funds released:
+
+        ```solidity
+        uint256 elapsed = block.timestamp - paid;
+        if (elapsed < interval) return (0, 0);
+
+        uint256 multiplier = (elapsed - (elapsed % interval)) / interval;
+        ```
+        Reference: [Line 126-129, Intervals.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/intervals/Intervals.sol#L126-L129)
+
+        However, the multiplier calculation can be simplified and made more clear if changed to:
+
+        ```solidity
+        uint256 multiplier = elapsed / interval;
+        ```
+
+        **Remediations to Consider**
+
+        Replace the multiplier calculation with the above suggested line to be more clear about what is being calculated.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b1d16b2696439a6c33dd39cf0ace4089b79cc68</field>
+    <field name="content">
+        ## (Q-5) Unnecessary use of payable
+
+        Some functions and constructors contain the `payable` keyword when it is not necessary. This could cause users to be confused or accidentally send funds into the contract.
+
+        Functions with unnecessary `payable`:
+
+        - Intervals.sol: `constructor()` and `claim()`
+        - Milestones.sol: `claim()`
+        - Stream.sol: `withdraw()`
+        - Manager.sol: `constructor()`
+
+        **Remediations to Consider**
+
+        Remove the payable keyword from the functions listed above.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b1d16b2696439a6c33dd39cf0ace4089b79cc68</field>
+    <field name="content">
+        ## (Q-6) Unnecessary initialize return value
+
+        In Intervals.sol and Milestones.sol, their `initialize` function returns its own address. This is unnecessary as any caller already needed its address to call `initialize`.
+
+        **Remediations to Consider**
+
+        Remove the return value of `initialize`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## (Q-7) `tip` has no bounds
+
+        In both stream contracts, Intervals.sol and Milestones.sol, the `tip` variable acts as an incentive to a bot to perform push payments to the recipient. However, this value is not checked against the `owed`/`msPayments` amounts. 
+
+        **Remediations to Consider**
+
+        Consider using a percentage related to the amount owed.
+    </field>
+    <field name="response">
+        The user interface will validate the parameters, and we will provide an NPM SDK that users must use to verify parameters before creating a stream. We aim to reduce gas costs by incorporating less code into the contracts.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b1d16b2696439a6c33dd39cf0ace4089b79cc68</field>
+    <field name="content">
+        ## (Q-8) Initialization of storage variable to default value
+
+        Milestone.sol’s `initialize` function stores a zero value to the `currentMilestone` state variable. However, this is the default value of all variables on deployment.
+
+        ```solidity
+        currentMilestone = 0;
+        ```
+        Reference: [Line 47, Milestones.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/milestones/Milestones.sol#L47)
+
+        **Remediations to Consider**
+
+        Consider removing this variable assignment.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b1d16b2696439a6c33dd39cf0ace4089b79cc68</field>
+    <field name="content">
+        ## (Q-9) Duplicated check in _nextPayment()
+
+        In Interval.sol, `_nextPayment()` function we can see the following code:
+
+        ```solidity
+        uint256 nextInterval = paid + interval;
+        if (block.timestamp < nextInterval) return (0, 0);
+
+        uint256 elapsed = block.timestamp - paid;
+        if (elapsed < interval) return (0, 0);
+        ```
+        Reference: [Line 123-127, Intervals.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/intervals/Intervals.sol#L123-L127)
+
+        Both of these if statements, check the same interval correlation. 
+
+        **Remediations to Consider**
+
+        Since the first `nextInterval` variable is not used afterward, consider removing the first two redundant lines.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b1d16b2696439a6c33dd39cf0ace4089b79cc68</field>
+    <field name="content">
+        ## (Q-10) Inconsistent response to zero balance
+
+        In Interval.sol’s `claim` and `release` functions each have similar code returning zero if `bal` is zero:
+
+        ```solidity
+        (uint256 bal, uint256 multiplier) = _nextPayment();
+        if (bal == 0) return 0;
+        ```
+        Reference: [Lines 77-78](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/intervals/Intervals.sol#L77-L78) and [lines 93-94,Intervals.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/intervals/Intervals.sol#L93-L94)
+
+        However, in Milestones.sol’s same functions revert in the case where `bal` is zero:
+
+        ```solidity
+        uint256 bal = _nextPayment();
+        if (bal == 0) revert NO_FUNDS_TO_DISBURSE();
+        ```
+        Reference: [Lines 59-60](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/milestones/Milestones.sol#L59-L60) and [lines 76-77, Milestones.sol](https://github.com/daokitchen/nouns-stream/blob/main/apps/web3/src/milestones/Milestones.sol#L59-L60)
+
+        **Remediations to Consider**
+
+        Either choose to have both contracts return zero in this case, or have both revert in order to be more consistent.
+    </field>
+</item>
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b1d16b2696439a6c33dd39cf0ace4089b79cc68</field>
+    <field name="content">
+        ## (Q-11) Naming convention
+
+        Within the contracts, there are variables that may cause confusion given their uses. 
+
+        **Remediations to Consider**
+
+        Consider renaming the following:
+
+        - `Intervals.sol` and `Milestones.sol` `release()`/`claim()`: `_bal` to something like `_amount`.
+        - `Intervals.sol`: `paid` to something like `_lastTimePaid`. (Also consider updating the comment for this variable as it’s not accurate).
+        - `Manager.sol`  `createIntvStream()`/`createMSStream()`: `_owner` parameter to something like `_streamOwner`. To avoid confusion with the internal `_owner` of Manager.sol contract.
+    </field>
+</item>
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">8e2ddf321fd7a6acee174f0fead578aa78403f89</field>
+    <field name="content">
+        ## (Q-12) Merge Factory.sol with Manager.sol
+
+        The Intervals.sol contract initializes itself in its constructor, as it is intended to be a logic contract that is delegated to, and to prevent anyone from calling initialize on it.
+
+        However, this is missing in Milestones.sol. There isn’t anything malicious that can be done by calling `initialize()` on the contract itself, but is good practice and more consistent with how Intervals.sol is implemented.
+
+        **Remediations to Consider**
+
+        Initialize Milestones.sol in its constructor. Consider also using `_disableInitializers()` instead of the initializer modifier, in both Milestones.sol and Intervals.sol’s constructors to be more clear that these implementation contracts cannot be initialized maliciously.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5b916e4592b9baf14087e16c22b1388509667867</field>
+    <field name="content">
+        ## (Q-13) Missing initialized constructor in Milestones.sol
+
+        The Intervals.sol contract initializes itself in its constructor, as it is intended to be a logic contract that is delegated to, and to prevent anyone from calling initialize on it.
+
+        However, this is missing in Milestones.sol. There isn’t anything malicious that can be done by calling `initialize()` on the contract itself, but is good practice and more consistent with how Intervals.sol is implemented.
+        
+        **Remediations to Consider**
+
+        Initialize Milestones.sol in its constructor. Consider also using `_disableInitializers()` instead of the initializer modifier, in both Milestones.sol and Intervals.sol’s constructors to be more clear that these implementation contracts cannot be initialized maliciously.</field>
+</item>
+
+

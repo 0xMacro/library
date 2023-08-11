@@ -1,0 +1,154 @@
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8d15f1a21c4bba626fc12a7a01ef4edc3342efcf</field>
+    <field name="content">
+        ## [M-1] Low hardcoded `REQUEST_CONFIRMATIONS` can allow validators to reorganize blocks ****to increase their chances of receiving valuable rewards****
+
+        Impact: Medium
+        
+        Likelihood: Low
+        
+        `PackVRF` contracts are planned to be supported on multiple chains. In specific, in the *Polygon* chain, reorgs of length greater than 3 blocks are more frequent (see here [https://polygonscan.com/blocks_forked](https://polygonscan.com/blocks_forked)). 
+        
+        Validators may find it profitable to reorg blocks after receiving rewards from a Pack in order to get more valuable rewards.
+        
+        **Remediations to Consider:**
+        
+        - Increasing the request confirmations for the Polygon chain to a higher number.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c829f40de98fb60ef10cfe10a47cabeecc8b769a</field>
+    <field name="content">
+        ## [M-2] Update signature requests may override more recent extension
+
+        Impact: Medium
+        
+        Likelihood: Low
+        
+        Through a valid signature of any `DEFAULT_ADMIN_ROLE` user, the `ExtensionRegistry` contract allows users to add, remove, and update extensions.
+        
+        As there are no considerations for which extension implementation should be updated in the update case, a signature with a higher `validityEndTimestamp` can override a more recent, and potentially more secure implementation. 
+        
+        **Remediations to Consider:**
+        
+        Consider including the implementation address intended to be changed in the signature payload and ensure this matches the current implementation before updating an extension with signature.
+    </field>
+</item>
+
+<item>
+    <field name="topic">code quality</field>
+    <field name="status">fixed</field>
+    <field name="impact">low</field>
+    <field name="commit">1190c9cc7e6653008d0afb06591cc71b2d15cc10</field>
+    <field name="content">
+        ## [Q-1] Impossible condition
+
+        In `PackVRFDirectLogic.sol`, `_claimRewards()` function has the following require check: 
+        
+        ```solidity
+        require(isTrustedForwarder(msg.sender) || **msg.sender == address(VRF_V2_WRAPPER)** || opener == tx.origin, "!EOA");
+        ```
+        
+        The condition `msg.sender == address(VRF_V2_WRAPPER)` will never be true, since when the pack is opened by the VRF call `msg.sender` will equal the contract's address:
+        
+        ```solidity
+        function sendRewardsIndirect(address _opener) external {
+            **require(msg.sender == address(this));**
+            _claimRewards(_opener);
+        }
+        ```
+        
+        Consider removing the `msg.sender == address(VRF_V2_WRAPPER)` condition in the require statement.
+    </field>
+</item>
+
+<item>
+    <field name="topic">code quality</field>
+    <field name="status">ack</field>
+    <field name="impact">low</field>
+    <field name="content">
+        ## [Q-2] Inherited contracts declare unnecessary `__gap` variable
+
+        In `PackVRFLogic.sol`, the `ERC2771ContextUpgradeable` and `ERC1155Upgradeable` inherited contracts use an explicit storage slot pattern; this allows upgrading contracts without worrying about the variable order declaration and storage collisions. However, both of these contracts have declared a gap variable. Consider removing this declaration.
+    </field>
+    <field name="response">
+        Acknowledged. Not fixing at the moment.
+    </field>
+</item>
+
+<item>
+    <field name="topic">code quality</field>
+    <field name="status">fixed</field>
+    <field name="impact">low</field>
+    <field name="commit">bca8f6cdede096b78464d943ddcf669d12bb7ed4</field>
+    <field name="content">
+        ## [Q-3] `ExtensionRegistry` does not support ERC165
+
+        `ExtensionRegistry.sol` imports the `ERC165.sol` contract but doesn’t inherits from it.
+    </field>
+</item>
+
+<item>
+    <field name="topic">code quality</field>
+    <field name="status">fixed</field>
+    <field name="impact">low</field>
+    <field name="commit">7687ab64b2f70c85c7889d036c6552491b272f0d</field>
+    <field name="content">
+        ## [Q-4] Unused import
+
+        `ExtensionRegistry.sol` contract has an unused import:
+        
+        ```solidity
+        import "lib/dynamic-contracts/src/interface/IRouter.sol";
+        ```
+    </field>
+</item>
+
+<item>
+    <field name="topic">code quality</field>
+    <field name="status">fixed</field>
+    <field name="impact">medium</field>
+    <field name="commit">eaac2e4e319b55739b8b180e0d7ec9c4beec8e78</field>
+    <field name="content">
+        ## [Q-5] `setExtensionsForContractTypeWithSig` **doesn’t implement sanity checks
+
+        In `ExtensionRegistry.sol`, the `setExtensionsForContractTypeWithSig` function does not implement the sanity checks `setExtensionForContractType` does:
+        
+        ```solidity
+        require(_extensionNames.length > 0, "ExtensionRegistry: no extensions provided.");
+        require(bytes(_contractType).length > 0, "ExtensionRegistry: empty contract type.");
+        ```
+        
+        This allows an empty signature request not to revert without. Consider adding sanity checks to make signature requests with empty extensions revert.
+    </field>
+</item>
+
+<item>
+    <field name="topic">gas optimization</field>
+    <field name="status">fixed</field>
+    <field name="impact">medium</field>
+    <field name="commit">4d32529344458263a57e5d9ff238cf2c21f365c6</field>
+    <field name="content">
+        ## [G-1] Sanity check could revert early
+
+        In `ExtensionRegistryState.sol` consider performing the implementation `address(0)` check before storing into state the extension’s metadata to revert earlier and save gas from invalid function executions.
+        
+        ```solidity
+        data.extensions[name][nextId].metadata = _extension.metadata;
+        
+        require(
+            _extension.metadata.implementation != address(0),
+            "ExtensionRegistryState: adding extension without implementation."
+        );
+        ```
+    </field>
+</item>

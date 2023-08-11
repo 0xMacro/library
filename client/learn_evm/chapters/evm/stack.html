@@ -1,0 +1,294 @@
+<page title="Working with the Stack" layout="/chapters/_layout.html">
+
+<div class="prose">
+<template type="learn-evm-markdown">
+
+
+# Working with the Stack
+
+When working with a low-level machine like the EVM, you don’t have access to higher-level features like *variables*. Instead, you must **manage the state of a single stack** in order to pass parameters to the opcodes you want to use. This involves the usual operations you’d expect when working with a stack (pushing, etc).
+
+However, even if these operations are simple and easy to learn, *using* them to **manage** the stack can be quite intricate.
+
+## The Stack-Based Machine
+
+The EVM is a **stack-based virtual machine.** This means that “the stack” is the primary data structure that programs work with with when executing EVM opcodes.
+
+As it turns out, most *hardware* machines choose a stack as the way to read, write, and manage opcode arguments. The reason being, those arguments need to live *somewhere,* and a stack is a simple and effective data structure to house them.
+
+Consequently, *virtual* machines typically follow hardware machines in this respect, and the EVM is no different.
+
+## Basic Operations
+
+The main stack operations on the EVM are:
+
+1. <toc>**Pushing** a value</toc>.
+2. Implicitly <toc>**consuming** stack items</toc> by **running opcodes** that require arguments.
+3. <toc>**Swapping** two stack items</toc>.
+4. <toc>**Duplicating** a stack item</toc>.
+
+## 1. Pushing a Value
+
+All contracts will need to work with a known value at some point. For example, consider the following Solidity contract:
+
+```jsx
+contract Example3_3a {
+  uint counter;
+  function increment() public {
+    counter = counter + 7;
+  }
+}
+```
+
+Note how the `increment` function is increasing the `counter` state variable by a specific amount: `7`. Any time you have a hardcoded value like this – whether a number, boolean, address, string, and so on – this will involve a **push** opcode.
+
+The compiled output of above example will include this bytecode:
+
+```jsx
+6007
+```
+
+which translates to the following assembly:
+
+```jsx
+PUSH1 0x07
+```
+
+This pushes `0x07` **as a 32-byte value** onto the stack.
+
+### Stack Item Size
+
+Recall that all stack items are always 32 bytes. Even though `0x07` is only one byte, **it becomes a full 32 byte value** when pushed onto the stack!
+
+This is due to the EVM's <chapter href="evm/binary#the-256-bit-word-size">256-bit word size</chapter>.
+
+To be explicitly clear: `0x07` becomes `0x0000000000000000000000000000000000000000000000000000000000000007` when pushed onto the stack.
+
+<aside>
+
+💡 Even though a stack item is always 32 bytes, **in this course** we may still notate stack items in fewer characters, since writing the fully left-padded value is often too hard to read, or takes up too much space.
+
+</aside>
+
+### Raw Data
+
+The above `6007` example is a rare case where some bytes (`0x07` in this case) do *not* represent opcodes, but instead represent **raw data**.
+
+To put it another way, `60` is the opcode for `PUSH1`. However, even though `07` is the opcode for `SMOD`, it is *not* being treated as such here. Instead, because `07` follows `60`, `07` is treated as the raw data argument for the `60` opcode.
+
+### Pushing Larger Values
+
+You will often times need to push larger values than one byte.
+
+For example, a full Ethereum **address** is 20 bytes. To push a known address onto the stack, you need the `PUSH20` opcode, which would look something like this:
+
+```jsx
+PUSH20 0x6B175474E89094C44Da98b954EedeAC495271d0F
+```
+
+Again, this would push a 20 bytes of data **as a 32-byte value** onto the stack.
+
+The EVM has PUSH opcodes ranging from `PUSH1` up to `PUSH32`. There is no `PUSH33` or above, as such values would not be able to fit onto the stack.
+
+<aside>
+
+💡 Note how – apart from using stack-manipulating swaps and dups – every time you want to use a known address, your bytecode size increases by **21 bytes**.
+
+This and other reasons are why some protocols attempt to generate “short” addresses – to save on bytecode size and other gas costs ([see here](https://medium.com/coinmonks/on-efficient-ethereum-addresses-3fef0596e263) for more info).
+
+</aside>
+
+## 2. Consuming Stack Items
+
+The stack’s main purpose is to **pass arguments to opcodes.**
+
+For instance, take the `ADD` opcode. This opcode takes exactly **two arguments**. This means that when the `ADD` opcode runs, it pops two items off the stack to use as its arguments.
+
+When the `ADD` opcode is done, it **pushes back** onto the stack its computed result.
+
+Let’s see an example:
+
+```jsx
+PUSH1 0x03
+PUSH1 0x04
+PUSH1 0x05
+ADD
+```
+
+What is the final state of the stack after executing this bytecode?
+
+<details>
+  <summary>Answer</summary>
+
+  The final state is a stack with two items: `0x03` on bottom, and `0x09` (the result from running `ADD`) on top.
+
+</details>
+
+### Stack Overflows
+
+The max number of items the stack can have is **1024**. If you try to push more items than this, then execution will crash due to a stack overflow.
+
+### Stack Underflows
+
+If you attempt to run an opcode that requires *more* parameters that currently in the stack (e.g. running `ADD` with a stack size of zero or one), then execution will crash due to a stack underflow.
+
+## 3. Swapping Two Stack Items
+
+Because opcodes always consume the topmost items in the stack, you will sometimes need to **swap** the top of the stack with other items **deeper** in the stack in order to operate on the right data.
+
+As an example, let’s say you have a stack with two items:
+
+- The stack item on top labeled as `A` (labeled for the sake of explanation)
+- The stack item on bottom labeled as  `B`
+
+And let’s say you want to **add seven** to each of these items.
+
+Here’s an approach that **does not work**:
+
+```jsx
+; Does not work!
+PUSH1 0x07
+ADD
+PUSH1 0x07
+ADD
+```
+
+Why doesn’t this approach work?
+
+<details>
+  <summary>Answer</summary>
+
+  - Lines 1 and 2 do as intended; they multiply `A` by `7`.
+  - However, the next part is where things go wrong.
+      - Lines 1 and 2 consumed two items of the stack, but it also pushed back the result – namely, `A + 7`.
+      - Thus, Lines 3 and 4 *are not* adding `7` to `B`, but instead adding it to `A + 7`
+      - The end result of the stack is two items – `A + 14` on top, and the original `B` value on bottom.
+
+</details>
+
+Based on the answer, you can likely see that a `SWAP` is needed. Here are two approaches that work:
+
+```jsx
+; Works!
+PUSH1 0x07
+ADD
+SWAP1
+PUSH1 0x07
+ADD
+
+; Also works!
+PUSH1 0x07
+ADD
+PUSH1 0x07
+SWAP1
+SWAP2
+ADD
+```
+
+<aside>
+
+💡 Why bother with the second approach when it takes more opcodes? Well, the second approach *might* be easier to generate if you’re a compiler, as it pulls out a value positionally, instead of requiring “foreknowledge” of parameter order. That’s a big “might” though, as compilers are complicated beasts.
+
+</aside>
+
+### Limited SWAP Reach
+
+The SWAP opcodes range from `SWAP1` to `SWAP16`. This means that you cannot reach back farther than 16 stack items.
+
+This is part of the reason you'll run into Solidity's "stack too deep" compile-time error. Because Solidity stores variables onto the stack, this EVM limitation makes it difficult for Solidity to have 16 (or near 16) variables within a function.
+
+In theory, it's possible for Solidity to compile to opcodes that store stack variables into memory when necessary, but that may result in too much complexity, or too much bytecode size to be worth it.
+
+## 4. Duplicating a Stack Item
+
+Recall that when working with a stack-based machine, you don’t have access to variables.
+
+Therefore, when you want to *use* a value **more than once**, and **avoid redundant computation** while doing so, a good option is to **duplicate** that value using one of the `DUP` opcodes.
+
+<aside>
+
+💡 Another good option is to store it in memory, and then load it, since loading a value from memory does not “consume” that location in memory. More on this in <chapter>evm/memory</chapter>
+
+</aside>
+
+For example, let’s say there are three addresses on the stack (sourced from storage, parameters, etc.):
+
+```jsx
+STACK (grows downwards visually)
+- C
+- B
+- A
+```
+
+Now let’s say you want to check if one of them is the known address `0x11102220333044405550666077708880`.
+
+You *could* write a `PUSH20` and an `EQ` for each address:
+
+```jsx
+PUSH20 0x1110222033304440555066607770888099904444
+EQ
+
+SWAP1
+PUSH20 0x1110222033304440555066607770888099904444
+EQ
+
+SWAP2
+PUSH20 0x1110222033304440555066607770888099904444
+EQ
+
+OR
+OR
+```
+
+<details>
+  <summary>Opcode Explanation</summary>
+
+  - `EQ` takes two arguments and produces a `1` if the arguments are equal, or a `0` if they are not.
+  - Line 1 pushes a known address onto the stack.
+  - Line 2 compares the known address with `A`
+  - Line 3 swaps the `0` or `1` from `EQ` with `B`
+  - Lines 4 and 5 compare the known address with `B`
+  - Line 6 swaps the `0` or `1` from `EQ` with `C`
+  - Lines 7 and 8 compare the known address and `C`
+  - Lines 9 and 10 bitwise-OR all three `0`s and/or `1`s into a single value that represents “do any of `A`, `B`, or `C` equal to the known address?”
+
+</details>
+
+This approach works. However, notice how we need **63 bytes** of bytecode for the known address pushes! Can we do better?
+
+An alternate approach is to `PUSH20` once for the first use, and then `DUP` to reuse the value:
+
+```jsx
+PUSH20 0x1110222033304440555066607770888099904444
+DUP1
+DUP1  ; Dup all upfront
+SWAP3 ; Swap with A
+EQ
+
+SWAP3 ; Swap with B
+EQ
+
+SWAP3 ; Swap with C
+EQ
+
+OR
+OR
+```
+
+With this new approach, we save **40 bytes** in bytecode size by not needing to include a `PUSH20` more than once.
+
+Also note the order of `DUP`s in this approach. If you want to reuse a value, you **must** `DUP` it before the first use. If you don’t, then the first use will **consume** that value before you can `DUP` it for a second use.
+
+### Limited DUP Reach
+
+The DUP opcodes range from `DUP1` to `DUP16`. This means that you cannot reach back farther than 16 stack items.
+
+## Conclusion
+
+Working with basic stack operations is simple, but intricate. Because we don’t have access to variables when working with the EVM, we must push, dup, swap, and consume items on the stack in order to run the operations we desire.
+
+In a future chapter (<chapter>raw/internal</chapter>) we will learn how to use the stack to simulate internal function calls.
+
+
+</template>
+</div>

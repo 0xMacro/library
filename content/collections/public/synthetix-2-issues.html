@@ -1,0 +1,192 @@
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commitTree">eaecf6e6ef1d5e910c67306a3c9d0118e6032f4b</field> 
+  <field name="content">
+    ## [H-1] `UniswapNode` does not handle scaling correctly
+
+    All nodes are supposed to return prices denominated in USD with 18 decimal places. Currently, the Uniswap node is not doing so. The issue arises from the decimal places of the underlying ERC20 tokens not being used to determine how to scale.
+
+    For example, consider the following tokens on Ethereum and their used decimals:
+
+    - WBTC uses 8 decimal places
+    - WETH uses 18 decimal places
+    - USDC uses 6 decimal places
+    - DAI uses 18 decimal places
+
+    The current market price for ETH/USD is about `1559494200000000000000` with 18 decimal places. With testing on a fork of mainnet, the current `UniswapNode` returns the following prices:
+
+    - ETH/USDC = `0`
+    - ETH/DAI = `1555002674`
+
+    The current market price for BTC/USD is about `21118320000000000000000` with 18 decimal places. Testing with the same setup, the `UniswapNode` returns the following prices:
+
+    - BTC/USDC = `210678334`
+    - BTC/DAI= `210046722485431108603`
+
+    Note that none of the returned prices are correct in scale. 
+
+    The `UniswapNode`'s code is wrong in its hardcoded use of `1e6` as the base amount in the call to `getQuoteAtTick()`:
+
+    ```tsx
+    if (tickCumulativesDelta < 0 && (tickCumulativesDelta % secondsAgo.to256().toInt() != 0)) {
+                tick--;
+            }
+
+    int256 price = getQuoteAtTick(tick, 1e6, token0, token1).toInt();
+
+    return NodeOutput.Data(price, 0, 0, 0);
+    ```
+
+    Instead, this base amount value should take into account (1) the desired scale of 18 decimals, (2) the decimals used in `token0`, and (3) the decimals used in `token1`. The formula for the scaled base amount could look something like this: `10 ** (18 - (token1 decimals - token0 decimals))`.
+
+    For example, proper scaling occurs for the pairs when the following base amounts are used instead of `1e6`:
+
+    - ETH/USDC’s base amount is `1e30` (30 = 18 - (6 - 18)) = `1590707322797356032948`
+    - ETH/DAI’s base amount is `1e18` (18 = 18 - (18 - 18)) = `1587366312409757218705`
+    - BTC/USDC’s base amount is `1e20` (20 = 18 - (6 - 8)) = `21341355218589758060905`
+    - BTC/DAI’s base amount is `1e8` (8 = 18 - (18 - 8)) = `21203037103870610510463`
+
+    **Remediations to Consider:**
+
+    - Redoing the scaling logic to account for differences in the target token and stable coin token pairs.
+
+    Note: the function `getQuoteAtTick()` will overflow when larger base amounts are used. Scaling might need to be done post price querying.
+  </field>
+</item>
+
+<item>
+  <field name="topic">3rd Party Behavior</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## [H-2] Ethereum/Optimism Pyth prices not currently maintained
+
+    The Pyth EVM network is a ‘pull’ oracle model instead of a ‘push’ oracle model, meaning, prices are not maintained by Pyth for EVM chains. Rather, they are maintained by users pushing the prices on-chain themselves using [this Pyth Repo](https://github.com/pyth-network/pyth-js/tree/main/pyth-evm-js).
+
+    If Synthetix would like to pull EVM prices from Pyth, participating in the Pyth community to pull prices will be necessary, as the current on-chain Pyth prices are very stale.
+
+    For example, when querying the Pyth EVM mainnet price IDs:
+
+    - The ETH/USD pair was last updated on December 6th, 2022
+    - The BTC/USD pair was last updated on December 6th, 2022
+    - Some pairs, like DAI/USD do not return a price at all
+
+    Similar issues exist on the Pyth EVM Optimism chain, with the last price update being on December 8th, 2022 for any price.
+
+    See Pyth’s Ethereum’s price feed contract activity [here](https://etherscan.io/address/0x4305fb66699c3b2702d4d05cf36551390a4c69c6/advanced) and Optimism’s [here](https://optimistic.etherscan.io/address/0xff1a0f4744e8582DF1aE09D5611b887B6a12925C).
+
+    **Remediations to Consider:**
+
+    - Plan to ‘pull’ prices on-chain for Pyth when you’d like to query them on-chain, or,
+    - Do not assume Pyth on Ethereum/Optimism will have useable data.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">ce80aecb1debd8c8d9b8843d4f0b9b9c15de2001</field>
+  <field name="content">
+    ## [H-3] `PythNode` prices are being interpreted incorrectly
+
+    The Pyth network returns prices in a fixed-point numeric interpretation, encoded with a significand and an exponent. See from the [docs](https://github.com/pyth-network/pyth-sdk-solidity/blob/main/PythStructs.sol#L8): 
+
+    ```tsx
+    // Both the price and confidence are stored in a fixed-point numeric representation,
+    // `x * (10^expo)`, where `expo` is the exponent.
+    struct Price {
+        // Price
+        int64 price;
+        // Confidence interval around the price
+        uint64 conf;
+        // Price exponent
+        int32 expo;
+        // Unix timestamp describing when the price was published
+        uint publishTime;
+    }
+    ```
+
+    Currently, the code in PythNode.sol ignores the exponent piece and only uses the significand:
+
+    ```tsx
+    function process(bytes memory parameters) internal view returns (NodeOutput.Data memory) {
+            (address pythAddress, bytes32 priceFeedId, bool useEma) = abi.decode(
+                parameters,
+                (address, bytes32, bool)
+            );
+            IPyth pyth = IPyth(pythAddress);
+            PythStructs.Price memory pythData = useEma
+                ? pyth.getEmaPriceUnsafe(priceFeedId)
+                : pyth.getPriceUnsafe(priceFeedId);
+            return NodeOutput.Data(pythData.price, pythData.publishTime, 0, 0);
+        }
+    ```
+
+    This will lead to incorrect price interpretations.
+
+    For example, let’s use the latest Pyth data for the ETH-USD pair. The mainnet queried Pyth Struct returns a price at `125537479000`, exponent at `-8`, and publishTime at `1670329551` (which is December 6th 2022). The price of ETH then was about 1271.36 according to Coindesk, which makes sense.
+
+    Currently, the code is just returning `125537479000`, which is ignoring the exponent piece of data and is not scaled to 10**18. 
+
+    **Remediations to Consider:**
+
+    - Using the exponent piece of the return data to interpret the price data correctly, and, scaling the data to 18 decimals as desired.
+  </field>
+</item>
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">ce80aecb1debd8c8d9b8843d4f0b9b9c15de2001</field>
+  <field name="content">
+    ## [Q-1] Inconsistent Tolerance Thresholds
+
+    The documentation for Price Deviation Circuit Breaker Node states:
+
+    > *The Price Deviation Circuit Breaker Node passes through value of the first parent if the prices between the first two parents are within the deviation tolerance.*
+    > 
+
+    and the documentation for Staleness Circuit Breaker states:
+
+    > *The Staleness Circuit Breaker Node passes through the value of the first parent if the timestamp associated with it is within the staleness tolerance.*
+    > 
+
+    Although they both say they pass through the value of the first parent if the node’s concern is within the tolerance, they behave differently. The tolerance threshold for the Price Deviation Circuit Breaker Node is inclusive, while the tolerance threshold for the Staleness Circuit Breaker is non-inclusive. The code behavior should match or be better documented to help users know how the code will behave.
+
+    **Remediations to Consider:**
+
+    1. Make the tolerances consistent: inclusive or non-inclusive, and update the docs, or,
+    2. Document clearly that the deviation tolerance is inclusive, and the staleness tolerance is non-inclusive.
+  </field>
+</item>
+<item>
+  <field name="topic">Documentation Clarity</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="response">
+    We decided not to address this, because we think that the existing documentation is clear enough. </field>
+  <field name="content">
+    ## [Q-2] Chainlink Node’s documentation for TWAP implementation is unclear
+
+    The Chainlink Node’s documentation on the `twapTimeInterval` states:
+
+    > *The duration (in seconds) of the lookback window for price reports to be incorporated in a time-weighted average price calculation.*
+    > 
+
+    From reading this sentence, it is unclear which prices will be included in the lookback window. 
+
+    For example, if the `twapTimeInterval` is 35 minutes, and there were updates to the price 10 minutes ago, 25 minutes ago, and 50 minutes ago, it’s unclear if the 50 minutes mark (which was the price at 35 minutes) will be included. 
+
+    Currently, the node grabs the price 10 minutes ago and 25 minutes ago and not the price at the 35 minute mark to calculate the TWAP. This could be unintuitive to some developers.
+
+    **Remediations to Consider:**
+
+    - Document that the price only includes updates that happened during the window and not the price at the start of the window.
+  </field>
+</item>

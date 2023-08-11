@@ -1,0 +1,48 @@
+<page
+  clientName="Synthetix"
+  reportDate="March 2, 2023"
+  auditTitle="Synthetix 3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Synthetixio/synthetix-v3"
+  repoCommitHash="b50c83fde3d4967a366aedcb5c2d3e06246287c3"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from February 6, 2023 to February 10, 2023. This was the 2nd audit on this codebase, the first being a partial audit whose report can be found at Synthetix-2.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Discord with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+4a7d71969ace6a254d9bcbaf1885b5d0341e6e485c5bfe2d90ca88e1ea325507  contracts/interfaces/INodeModule.sol
+6bb31e2643c0a95ecff1903d61b21f3609bb5a5f01fec9fa226105e3c91f0a23  contracts/interfaces/external/IAggregatorV3Interface.sol
+20dbb2d2fc5eee8f17641b381fc143b6ff799f656bc496fae332aaa553137eb3  contracts/interfaces/external/IExternalNode.sol
+159b577f8dfc00b0cea383ca484d664ea3a99f12473796337251cbe97f83b70d  contracts/interfaces/external/IPyth.sol
+1c28cb50c0e42f4cbf6d74724f5db06e02af88e22e3c903af97b42e35a2953e7  contracts/interfaces/external/IUniswapV3Pool.sol
+e61f3485048125c368650f6aeb285710910b5b96ca2dbc0a78017190270d0e1d  contracts/modules/CoreModule.sol
+1166fd85eb570af80540ee27cfee7070e83e6b57af4a679229fd01582bf88fd9  contracts/modules/NodeModule.sol
+438cf0f610bd20e315924b43b325fe540c29e7f57fbb8ae55772c9b82ce677c6  contracts/nodes/ChainlinkNode.sol
+c78957d988fc938dd613d7c0bbd0f758bc5cda8401c72587601478d0d8d3d4b9  contracts/nodes/ExternalNode.sol
+536f7139e4c35d123e06b6ef52be24bed6bfcf22fb5dce2e03cbf05dd82c74d3  contracts/nodes/ExternalNodeUniswap.sol
+d510b681d34f5a32785646e8331b6afce0b65bd6234dbe08bfd9712772182da0  contracts/nodes/PriceDeviationCircuitBreakerNode.sol
+d2abe84fb1a19d3462d1ebd087ebe3a7b74c90544751be1872141ad8a102c480  contracts/nodes/PythNode.sol
+d52933f8a33a59ecf1af330020b25ea58509d59ea899f93893c409b5e9ed7dc9  contracts/nodes/ReducerNode.sol
+47442546b62b41dc8a0fb90ee6a11ad696c2d9e1be5014e4503f20da64879613  contracts/nodes/StalenessCircuitBreakerNode.sol
+f36e394e642069a34814a56b1edad7dafc2c7ede470dfce94da9c3f3d38d5bc3  contracts/nodes/UniswapNode.sol
+232a16c06b3ea103504829425e8df708ad8586fb8f2b6af30a8ec80940e84c93  contracts/storage/NodeDefinition.sol
+18b612549db0ce1c1682e18c862b90222fb8f2c8d7056099cc16d85ad607b7c6  contracts/storage/NodeOutput.sol
+115a0473ef75cbad65de51cd67b2023c64096d5e81633fb9eab8edf28bcac593  contracts/utils/FullMath.sol
+152cc5feab872139b4dcc7b1646c42d9653393dda54af656b9d3057fa1bfc5ec  contracts/utils/TickMath.sol
+  </template>
+</content-for>

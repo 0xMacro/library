@@ -1,0 +1,162 @@
+<item>
+    <field name="topic">Insolvency</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">addressed</field>
+    <field name="repoPath">pull/100</field>
+    <field name="content">
+    ## (H-1) Incorrect health check when exiting a market
+    `EulerETokenAdaptor:exitMarket` allows Strategist to declare a collateral as non-collateral.
+    ```
+    function exitMarket(IEulerEToken eToken, uint256 subAccountId) public {
+        markets().exitMarket(subAccountId, eToken.underlyingAsset());
+        // AUDIT: Note address(this)is being passed as account.
+        uint256 healthFactor = _calculateHF(address(this));
+        if (healthFactor < HFMIN()) revert EulerETokenAdaptor__HealthFactorTooLow();
+    }
+    ```
+    
+    However, observe that `markets().exitMarket()` is called on the sub account, but the health check is called on the primary account. **This means the primary account’s health factor instead of the sub account’s health factor is compared to** `HFMIN()`.
+    
+    Suppose:
+    
+    1. `HFMIN()` is `1.01`
+    2. `markets().exitMarket()` executes successfully and leaves the sub account’s `healthFactor` at `1.0` 
+    3. But the primary account has health factor of `1.2`
+    
+    Then `1.2` is incorrectly used to compared with `HFMIN()`. **The call does not revert when it should**.
+
+    **Remediation**
+    
+    Consider changing `_calculateHF(address(this))` to `_calculateHF(_getSubAccount(address(this), subAccountId))`
+    </field>
+</item>
+
+<item>
+    <field name="topic">Withdrawal</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+    ## (H-2) Entering a market can block Cellar share redemption 
+
+    Redemption of Cellar shares are intended to always be available to LPs.
+    
+    However, when a Cellar has an eToken position as the only position [1] the Strategist can enter the eTokens as Euler collateral; consequently the **redemption of Cellar shares will be blocked**. Collateralized eTokens cannot be withdrawn **because** `withdrawableFrom` **value is reduced**. [2]
+    
+    ```
+    // EulerETokenAdaptor
+    
+    function withdrawableFrom(bytes memory adaptorData, bytes memory) public view override returns (uint256) {
+        (IEulerEToken eToken, uint256 subAccountId) = abi.decode(adaptorData, (IEulerEToken, uint256));
+        ERC20 underlying = ERC20(eToken.underlyingAsset());
+    
+        bool marketEntered;
+        address subAccount = _getSubAccount(msg.sender, subAccountId);a
+    
+        address[] memory entered = markets().getEnteredMarkets(subAccount);
+        for (uint256 i; i < entered.length; ++i) {
+            if (entered[i] == address(underlying)) {
+                marketEntered = true;
+                break;
+            }
+        }
+        // AUDIT: Note the 0 being returned.
+        return marketEntered ? 0 : eToken.balanceOfUnderlying(subAccount);
+    }
+    ```
+    
+    This grants the Strategists managing Cellars with sole eToken position the privilege to block share redemption.
+
+    Two example problems:
+    
+    1. After blocking withdrawals, a Strategist starts doing dangerous trades but LPs will have no exit.
+    2. A chain of Cellars depend on a malicious Cellar; `withdrawableFrom` of which can be maliciously lowered to lower this chain of dependent Cellars’ `withdrawableFrom` values.
+    
+    **Remediation**
+    
+    Consider persisting `Cellar:assetsBeforeAdaptorCall` so an adaptor can query a tamper-proof Cellar TVL. Revert if the eToken position accounts for more than X%, say 50%, of Cellar TVL to avoid excessively lowering `withdrawableFrom`. We can reduce the cost of persisting by persisting only when current-TVL ≥ (1 + abs(delta)) * persisted-TVL.
+    
+    **Notes**
+    
+    [1] The eToken position can alternatively be a large position instead of a sole eToken position - the larger the eToken position, the larger the impact. 
+    
+    [2] Then `Cellar:_withdrawInOrder(…)` will skip this eToken position as it has 0 withdrawable balance.
+    </field>
+    <field name="response">
+      It is in a strategists best interest to keep enough liquid positions to facilitate withdraws. If a strategist is maliciously blocking withdraws by moving all assets to an illiquid position(like an Euler position or UniV3 Position), Somm Governance will remove them and replace them with a strategist who will properly run the cellar.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Redundancy</field>
+    <field name="impact">medium</field>
+    <field name="status">addressed</field>
+    <field name="repoPath">pull/101</field>
+    <field name="content">
+    ## (Q-1) Redundant implementations 
+
+    1. Consider defining the following in a base contract `EulerTokenBase.sol` to avoid duplication of logic:
+    - `market`
+    - `exec`
+    - `euler`
+    - `HFMIN`
+    - `_calculateHF`
+    - `_getSubAccount`
+
+    2. `EulerETokenAdaptor:depositToEuler` and `EulerETokenAdaptor:deposit` can be merged into one implementation:
+    
+    ```
+    function deposit(
+        uint256 assets,
+        bytes memory adaptorData,
+        bytes memory
+    ) public override {
+        (IEulerEToken eToken, uint256 subAccountId) = abi.decode(adaptorData, (IEulerEToken, uint256));
+        // AUDIT: note this call
+        depositToEuler(eToken, subAccountId, assets);
+    }
+    
+    function depositToEuler(
+        IEulerEToken tokenToDeposit,
+        uint256 subAccountId,
+        uint256 amountToDeposit
+    ) public {
+        ERC20 underlying = ERC20(tokenToDeposit.underlyingAsset());
+        underlying.safeApprove(euler(), amountToDeposit);
+        tokenToDeposit.deposit(subAccountId, amountToDeposit);
+    }
+    ```
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">medium</field>
+    <field name="status">addressed</field>
+    <field name="repoPath">pull/101</field>
+    <field name="content">
+    ## (Q-2) Documentation inaccuracy: `EulerDebtTokenAdatpor:balanceOf`
+
+    The comment on line 140 of `EulerDebtTokenAdaptor.sol` states:
+    
+    ```
+    /**
+     * @notice Returns the cellars balance of the positions debtToken.
+     */
+    function balanceOf...
+    ```
+    
+    However, it is the underlying token’s balance that is being returned. [[Ref](https://github.com/euler-xyz/euler-contracts/blob/6d1d7d11fc6cc74a92feded055315e562eaf9cb8/contracts/modules/DToken.sol#L78)]
+    
+    Consider changing to:
+    
+    ```
+    /**
+     * @notice Returns the cellar's balance in terms of the debtToken's underlying asset.
+     */
+    function balanceOf...
+    ```
+    </field>
+</item>
+

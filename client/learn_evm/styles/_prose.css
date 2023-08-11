@@ -13,9 +13,11 @@
   @apply text-4xl md:text-5xl;
 }
 
-.prose p, .prose ul > li, .prose ol > li {
-  letter-spacing: 0.02em;
-  word-spacing: 0.025em;
+.prose p,
+.prose ul > li,
+.prose ol > li,
+.prose details summary
+{
   @apply text-gray-800 dark:text-zinc-100;
 }
 
@@ -82,6 +84,7 @@
   margin: 0;
   font-size: 85%;
   border-radius: 6px;
+  letter-spacing: 0;
   @apply font-normal dark:text-zinc-100 bg-gray-200/75 dark:bg-zinc-700;
 }
 .prose pre {
@@ -106,4 +109,15 @@
 }
 .prose aside > *:last-child {
   margin-bottom: 0;
+}
+
+.prose details {
+  @apply pl-4;
+}
+.prose details > summary {
+  cursor: pointer;
+  @apply -ml-4;
+}
+.prose details > summary + * {
+  @apply mt-2;
 }

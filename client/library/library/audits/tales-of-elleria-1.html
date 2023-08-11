@@ -1,0 +1,31 @@
+<page
+  clientName="Tales of Elleria"
+  reportDate="June 19, 2023"
+  auditTitle="Tales of Elleria A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://gitlab.com/tales-of-elleria-source/contracts/elleria-contracts"
+  repoCommitHash="28d9648caeebf8e41f7a687d1fb82f78ae5bae68"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 5, 2023 to June 6, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    33ed5c11c27259aedb983c6068e561822f3686bc9091c872a799e074700e5b90  contracts/ElleriaElmBridge.sol
+    22de94f8ddcae94c8aadcb2544d317405e9edf069b248f8ccee6ea3f38026f52  contracts/ElleriumLPStakingPool.sol
+    a443de278f432f423622a6c51b0c55a8b085335870d87f550be3e0fbc9ddb533  contracts/VerifySignature.sol
+  </template>
+</content-for>
