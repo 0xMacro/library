@@ -1,0 +1,45 @@
+<page
+  clientName="Sommelier"
+  reportDate="Aug 12, 2023"
+  auditTitle="Sommelier A-10"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on Aug 12, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>ff4c71663293b2f0ba31553f000b32e02190c2ff</code>
+      </li>
+     
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      The CellarAdaptor was audited again with the added scope of using SavingsDai ERC4626 vault as a position, and no issues were found.
+    </p>
+
+    <template type="file-hashes">
+        d075112c14a8fe1cba4fb4735434ba0cb2ff763ae5391503e89e3e945bb5139b  src/modules/adaptors/Sommelier/CellarAdaptor.sol
+    </template>
+
+  </content-for>
+</page>
