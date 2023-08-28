@@ -1,0 +1,452 @@
+<item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/56</field>
+    <field name="content">
+        ## [M-1] Fee-on-transfer tokens not supported for quote token
+
+        ### Description
+        
+        The `deposit` function in *Exchange.sol* does not account for tokens applying transfer tax, which results in less value transferred to the custodian than requested. However, the balance stored in `BalanceTracking` is using the full amount without considering the fees. 
+        
+        In the current version of IDEX v4, only USDC is supported as quote token. The USDC token contract implements upgradable logic, thus there is no guarantee that USDC will not add fee-on-transfer logic in the future.  
+        
+        ### Remediations to Consider
+        
+        Consider handling fee-on-transfer tokens correctly by calculating `balanceAfter - balanceBefore` when collateral is deposited to custodian.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="commitTree"></field>
+    <field name="content">
+        ## [M-2] Oracle price can be outdated
+                
+        ### Description
+        
+        The call to Chainlink’s price feed using `latestRoundData()` can return stale data in extreme situations such as highly volatile market conditions and flash crashes. In such situations, users could `withdrawExit` their wallet and benefit from outdated price data. 
+        
+        ### Remediations to Consider
+        
+        Consider checking that the returned `updatedAt` timestamp - as referenced in the [Chainlink docs](https://docs.chain.link/data-feeds/api-reference#latestrounddata) - falls within a valid time period.
+
+    </field>
+    <field name="response">
+        withdrawExit does not validate oracle price update timing by design. 
+
+        1. The protocol is not sensitive to stale oracle pricing on exit withdrawals. While exiting wallets may receive out-of-date pricing when liquidating positions, the protocol is not at risk of insolvency due to exit pricing.
+
+        2. Preventing exit withdrawals due to oracle price update timing validation introduces a source of withdrawal censorship.
+            
+    </field>
+</item>
+
+<item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/81</field>
+    <field name="content">
+        ## [M-3] Delay calculations lead to shorter delays than specified
+                
+        ### Description
+        
+        The exchange uses hard-coded parameters listed in the [GOVERNANCE readme](https://github.com/idexio/idex-contracts-ikon/blob/main/GOVERNANCE.md).
+        
+        Some of the parameters - defined in *Constants.sol -* are subject to block timing:
+        
+        ```solidity
+        // 1 week at 3s/block
+        uint256 public constant EXIT_FUND_WITHDRAW_DELAY_IN_BLOCKS = (7 * 24 * 60 * 60) / 3;
+        
+        // 1 day at 3s/block
+        uint256 public constant FIELD_UPGRADE_DELAY_IN_BLOCKS = (1 * 24 * 60 * 60) / 3;
+        
+        // 1 week at 3s/block
+        uint256 public constant MAX_CHAIN_PROPAGATION_PERIOD_IN_BLOCKS = (7 * 24 * 60 * 60) / 3;
+        ```
+        
+        The division by 3 is derived from the average block time on Polygon, which is slightly [higher than 2 seconds](https://polygonscan.com/chart/blocktime). The intention was to calculate delays so that they are at least the specified amount or longer (depending on block time) rather than always falling short. 
+        
+        However, this is not the case with the current implementation - as they are always falling short. Let’s consider the parameter `FIELD_UPGRADE_DELAY_IN_BLOCKS` that is used for delaying upgrades to critical configuration settings such as changing the insurance wallet or market settings:
+        
+        - it is calculated as: `(1 * 24 * 60 * 60) / 3`, resulting in `28800` blocks that need to pass for finalizing the change.
+        - Using the average block time of 2 seconds (for Polygon), the change can be settled after `28000*2` seconds, resulting in `15.5 hours` (instead of the actual 24 hours).
+        
+        This behavior of delays falling shorter than specified, can have quite severe implications for users, as they might e.g. want to close their positions before any change comes into effect.   
+        
+        ### Remediations to Consider
+        
+        Consider calculating above block delays by dividing by a value that is at maximum the average block time, preferable a bit smaller.
+
+    </field>
+    <field name="response">
+        The targeted deployment chain does not have stable block times. As a result, we switched any logic that uses block numbers to timestamps.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">addressed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/69</field>
+    <field name="content">
+        ## [M-4] Traders have no control over incurring fees
+
+        ### Description
+        
+        For `trades`, `withdrawals`, and `transfers`, traders need to pay fees of [up to 20%](https://github.com/idexio/idex-contracts-ikon/blob/94726de9d487e1e34fff62c2436bf23ebc9fbad8/GOVERNANCE.md#fixed-parameter-settings-1) of the amount being moved. These fees are charged by IDEX to cover the incurred gas costs. 
+        
+        Despite this limit of 20%, traders have no control over the amount of fees they are willing to pay. 
+        
+        Hence, when traders perform one of the above operations, it is not transparent to them how much fees they gonna pay, and they can end up loosing 20% of the amount being moved.  
+        
+        Especially for withdrawals and transfers, where on-chain settlement happens almost immediately, the amount of gas required for the transaction can be predicted quite reliable. For such cases, traders want to have the transparency and control over the expected fees.
+        
+        ### Remediations to Consider
+        
+        Consider one of the following remediations:
+        
+        1. To give control over incurred fees back to traders, consider adding a field such as `predictedFee` amount to the signature message, so that traders can give their consent over paid fees when signing the message. The actual amount being paid on fees must then match the signed `predictedFee` amount, considering a certain tolerance. 
+        2. While the above remediation step adds quite some complexity, as a quicker solution it could be also considered to significantly lower the maximum allowed fee value.
+
+    </field>
+    <field name="response">
+        Fees are considerably more complex in Ikon than in many dapp trading protocols, such as swap AMMs. For example, fees vary between makers and takers, can be negative for promotional reasons, include variable gas, and can change over the course of trade executions against a single placed order. As such, providing a reasonable predictedFee is not straightforward and is a source of complexity we would like to avoid.
+        Notably, the value of the fee cap is largely driven by gas concerns. In prior releases, the fee cap was configured at 20% to allow for gas collection during price spikes while maintaining low trade minimums. Of course, it is in the interest of neither the user nor the exchange to lose 20% of trade value from gas. Recent developments in blockchain deployment target performance indicate that settlement gas may be negligible for this release. In that case, we would lower that value, likely to something in the 1% to 5% range.
+
+        ### More context on the fix change:
+
+        The fee cap is updated to 5% and may be lowered based on the gas characteristics of the production deployment chain.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">addressed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/52</field>
+    <field name="content">
+        ## [M-5] Missing validation for index price
+
+        ### Description
+        
+        In `MarketAdmin.publishIndexPrices_delegatecall`, there is no sanity check for the passed index price. Propagating an incorrect index price can have severe consequences on all the other operations relying on the index price. 
+        
+        Note that the likelihood of providing an incorrect index price is considered low, as IDEX stated that they take several precautions in off-chain components to mitigate this case. However, the possibility of a compromised service wallet or a logic bug in off-chain components is not negligible.
+        
+        ### Remediations to Consider
+        
+        Consider checking the provided index price is valid by e.g. checking against oracle price if the index price is too far off from previous value.
+
+    </field>
+    <field name="response">
+        We deeply considered potential validations for index pricing and ultimately decided against their inclusion. Index prices are a critical system input for a perpetuals exchange, and accuracy, timing, and update frequency are all important requirements. 
+
+        One potential validation scheme limits the rate of change of index prices over time. Crypto markets are volatile, of course, so picking limits that provide practical protection while allowing the necessary inputs during extraordinary events is a challenge. Further complicating the issue is Ikon’s lazy index price publishing system. If no activity happens in a market, and thus no price updates are published for an extended period of time, what change caps should apply?
+
+        Another potential scheme compares published index prices to another source, such as an on-chain oracle. Oracles are not perfect, however, and can themselves be wrong or delayed, likely under the very extraordinary market conditions when it’s most critical to apply up-to-date index pricing. Oracle price comparisons are also complicated by Ikon’s serialized dispatch model, both for out-of-date and up-to-date settlements. If dispatch is delayed, for example due to RPC issues, and settlement occurs an hour after trading, index prices from the time must be compared against matching historical oracle pricing. When dispatch is running normally, off-chain systems must accept propagation delays in on-chain pricing when deciding whether to accept a new index price update. Any conflict resulting from propagation time could interrupt operations.
+
+        While it is possible to pick an on-chain validation scheme, in our analysis such schemes introduce operational tradeoffs that can themselves increase risk for traders. Our design combines baseline validations, for example replay protection, while focusing engineering efforts in making index price collection as reliable, performant and secure as possible off chain.
+
+        ### More context on the fix change:
+
+        We modularized Ikon’s index price validation systems in an effort to diversify index prices sources. As a result, Ikon supports independent index price services with protocol-level validations, starting with Pyth Network. First party index prices are still supported for redundancy, subject to governance. 
+    </field>
+</item>
+
+<item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/57</field>
+    <field name="content">
+        ## [M-6] Missing validation for funding rate
+
+        ### Description
+        
+        In `Funding.publishFundingMultiplier_delegatecall`, there is no sanity check for the passed funding rate. An incorrect provided funding rate can have severe consequences on the funding payments, which can lead to wallets ending up with high negative balance or others that receive much more in payments than intended.
+        
+        ### Remediations to Consider
+        
+        Consider adding a minimum and maximum boundary to the funding rate.
+
+    </field>
+    <field name="response">
+        Funding rates are clamped to 75% of the maintenance margin ratio of a market in our off-chain systems. Validating that funding rates are less than the maintenance margin ratio of a market also makes sense as a contract validation.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [M-7] Missing reasonable limits for market fields
+
+        ### Description
+        
+        `Validations.validateOverridableMarketFields` lacks certain validation checks allowing to create and modify markets with undesirable behavior. For instance, markets could be created with `maintenanceMarginFraction` > 100%, making it possible to liquidate all positions. 
+        
+        ### Remediations to Consider
+        
+        Consider adding the following validation checks:
+        
+        - upper limit for `initialMarginFraction` and `maintenanceMarginFraction` (e.g. ≤ 100%)
+        - upper limit for `incrementalInitialMarginFraction`
+        - reasonable upper limit for `minimumPositionSize` (currently it is set to `uint64(type(int64).max - 1))`)
+
+    </field>
+    <field name="response">
+        We considered adding more hard limits to market fields but chose the implemented governance protections instead. Putting aside legitimate scenarios where it may make sense to have 100% or even higher margin requirements, any change to these settings must be published on chain significantly before taking effect. Even if there were validation capping the maintenance margin fraction at say 50%, an attacker changing a market with a 5% mmr to a 50% mmr could have a significant adverse effect on many users. The upgrade governance mechanism, however, significantly reduces such risk.
+    </field>    
+
+
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/54</field>
+    <field name="content">
+        ## [M-8] Outstanding funding payments are ignored when calculating maintenance requirements for IF wallet
+
+        ### Description
+        
+        For deleveraging “In Maintenance Acquisition”, the [documentation states](https://github.com/idexio/idex-contracts-ikon#in-maintenance-acquisition-wallet-in-maintenance) the following:
+        > Validations confirm that the insurance fund cannot liquidate the wallet in maintenance via a standard Wallet In Maintenance liquidation.
+        > 
+        
+        However, when checking if the IF wallet can liquidate the wallet, the outstanding funding payments for the IF wallet are not taken into account. Thus, it becomes possible under specific circumstances, that a wallet is getting deleveraged via `deleverageInMaintenanceAcquisition` while standard liquidation via the IF wallet would have been possible.  
+        
+        The same issue is present with the `deleverageExitAcquisition` call. 
+        
+        While the likelihood of this is low (see response by IDEX), it breaks one of the protocols invariants and can lead to undesirable outcome. 
+        
+        ### Remediations to Consider
+        
+        Consider taking outstanding funding payments into account when validating that the insurance fund cannot acquire a position.
+
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/72</field>
+    <field name="content">
+        ## [L-1] Lack of event emission for critical, state-changing functions
+
+        ### Description
+        
+        The following state-changing functions in *Exchange.sol* don’t emit events:
+        
+        - `setCustodian`
+        - `setDepositIndex`
+        - `setDispatcher`, `removeDispatcher`
+        - `addMarket`, `activateMarket`, `deactivateMarket`
+        - `unsetMarketOverridesForWallet`
+        - `skim`
+        
+        In addition, all the liquidation and deleverage functions don’t emit any events, which we assume is intentional to save gas costs for expected exchange activities. 
+        
+        ### Remediations to Consider
+        
+        Consider adding events for above functions.
+
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/62</field>
+    <field name="content">
+        ## [L-2] Maximum allowed value for chain propagation period makes nonce invalidation ineffective.
+
+        ### Description
+        
+        The maximum value for the chain propagation period (`MAX_CHAIN_PROPAGATION_PERIOD_IN_BLOCKS`) is defined with `7 days`. Especially for nonce invalidation - which should protect against “canceled-order submission attacks” - using a high value for the `chainPropagationPeriodInBlocks` parameter makes nonce invalidation rather ineffective. 
+        
+        ### Remediations to Consider
+        
+        Consider lowering the maximum allowed `chainPropagationPeriodInBlocks` to a much smaller value.
+        
+    </field>
+</item>
+
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/50 </field>
+    <field name="content">
+        ## [L-3] Missing `chainId` in signature
+
+        ### Description
+        
+        The signature generation doesn’t include `chainId` parameter. This makes the protocol susceptible to replay attacks when the protocol is deployed to multiple chains or when a hard fork of the chain happens. 
+        
+        ### Remediations to Consider
+        
+        Consider including the `chainId` to the signature message.
+        
+    </field>
+    <field name="response">
+        Rather than using our own message format for signature creation, we decided to use **[EIP712](https://eips.ethereum.org/EIPS/eip-712)** signature scheme (which protects against above attack vector).
+    </field>
+</item>
+
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/63</field>
+    <field name="content">
+        ## [L-4] Possible to `withdrawExit` from the IF wallet
+
+        ### Description
+        
+        Insurance fund is an important instrument in perpetual swaps to keep the exchange solvent whilst trading with leverage. In doing so, the insurance fund accumulates value over time under normal market conditions. 
+        
+        The insurance fund has the ability to close open positions at the market price via order book trades. However, under no circumstances should the insurance fund be able to `withdrawExit` and thus close its positions against the `exitFund`. This is guaranteed by the following check in [Withdrawing.sol#L59](https://github.com/idexio/idex-contracts-ikon/blob/94726de9d487e1e34fff62c2436bf23ebc9fbad8/contracts/libraries/Withdrawing.sol#L59):
+        
+        ```solidity
+        require(wallet != insuranceFundWallet, "Cannot exit IF");
+        ```
+        
+        Consider the following scenario where an admin could run the following steps making it possible to `withdrawExit` from an IF wallet:
+        
+        1. Admin uses a new wallet address and calls `exitWallet()` setting this new wallet to exit status.
+        2. Admin can use the respective Governance functions to set the above wallet to become the new insurance fund wallet.
+        
+        Following the above steps, an admin could now `withdrawExit` from insurance fund wallet.
+        
+        Note that this attack vector is considered as low likelihood, however it needs to be taken into consideration that this can potentially damage the trustworthiness of the protocol.  
+        
+        ### Remediations to Consider
+        
+        Consider checking that the new insurance fund wallet hasn’t been exited before.
+        
+    </field>
+    <field name="response">
+        Preventing the insurance fund wallet from exiting is primarily an operational concern. An exited insurance fund wallet cannot participate in trade settlements to close positions, and the protocol assumes that the insurance fund wallet itself acquires the positions of an exited wallet during normal operations. While the outlined scenario is possible, it does not provide the attacker any profit angle due to exit pricing. That said, agreed that validating that the new insurance fund wallet is not exited in Governance.initiateInsuranceFundWalletUpgrade and Governance.finalizeInsuranceFundWalletUpgrade provides additional operational assurances.
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-1] Use custom errors
+
+        It is advised to revert with custom errors over using require statements. Using them saves bytecode on deployment, a little gas on execution, and allows for more detailed error messages with the ability to pass in parameters.
+
+        Consider replacing require statements with custom errors to give more context about errors and save a bit of gas.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">addressed</field>
+    <field name="customCommits">https://github.com/idexio/idex-contracts-ikon/pull/56,https://github.com/idexio/idex-contracts-ikon/pull/82/files#diff-524b3227f3ccd14cb2f46d339208f5b244501e5afc0ed642e3145675fa1005e0</field>
+    <field name="content">
+        ## [Q-2] Use `safeTransfer`/`safeTransferFrom`
+
+        For deposits and withdrawals, `transfer` and `transferFrom` are used. It is advised to check return values for `transfer` and `transferFrom` or to use OpenZeppelin’s `safeTransfer`/`safeTransferFrom`.
+    </field>
+    <field name="response">
+        Return value checks are not necessary due to the balance checks implemented.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-3] Missing zero-check in `withdrawNativeAsset`
+
+        In `ExchangeStargateAdapter.withdrawNativeAsset`, there is no check if the provided destination wallet is address(0). 
+
+        Consider adding a check `destinationWallet ≠ address(0)` to ensure no funds are lost by sending it to address(0).
+
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [Q-4] Newly added markets use current timestamp rather than oracle timestamp
+
+        When a new market is added in `MarketAdmin.addMarket_delegatecall`, the current timestamp is used for setting `lastIndexPriceTimestampinMs`. While this doesn’t impose any immediate security risks, it would be more accurate to use the `updatedAt` timestamp returned from Chainlink’s  `latestRoundData` call (see [here](https://docs.chain.link/data-feeds/api-reference/#getrounddata)).
+    </field>
+    <field name="response">
+        Market.lastIndexPriceTimestampinMs prevents the publishing of old index prices. The current timestamp provides a consistent up-to-date value, unlike oracle providers which may be out of date.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/50</field>
+    <field name="content">
+        ## [Q-5] Create signatures according to EIP-712 standard
+        
+        Moving funds via trades, withdrawals, and transfers, requires a valid signature from the trader. Currently, the protocol uses its own message format for signature creation. 
+
+        Consider supporting signature creation according to the **[EIP712](https://eips.ethereum.org/EIPS/eip-712)** standard for better security and usability.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/idexio/idex-contracts-ikon/pull/79/files#diff-5f606b23144e9f224c94f00662f316ea8ae52f3579c712b8b2a09fe78b5d67ec</field>
+    <field name="content">
+        ## [I-1] `sgReceive` can be called by anyone
+
+        The `sgReceive` function in `ExchangeStargateAdapter.sol` is not restricted and can be called by anyone. If USDC tokens are left in the contract, anyone can call `sgReceive` to deposit the leftover tokens to their own wallet. However, this can be a desired behavior and doesn’t impose any security risks. Additionally, [all the recommendations](https://stargateprotocol.gitbook.io/stargate/developers/contract-addresses/caveats-sgreceive#sgreceive-does-not-know-the-source-chain-caller) are met that are expected from a permissionless `sgReceive` function.
+
+    </field>
+  </item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [I-2] Only USDC is supported as collateral
+
+        As stated in the [documentation](https://github.com/idexio/idex-contracts-ikon/tree/94726de9d487e1e34fff62c2436bf23ebc9fbad8#perpetuals), the current version supports USDC as collateral only. Supporting any other collateral assets than USDC would require an upgrade of the Exchange contract.  
+        USDC is supposed to be pegged to USD and usually variations in price between USDC and USD are small, but - as recent events have shown - it is never guaranteed that USDC doesn’t get depegged from USD and drops in value (see [here](https://hackernoon.com/usdc-got-depegged-following-the-svb-collapse)).
+    </field>
+    <field name="response">
+        Ikon supports any ERC-20 token as a collateral asset, but the collateral asset cannot be changed after deployment without an upgrade.
+    </field>
+    </item>
+
