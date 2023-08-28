@@ -1,0 +1,244 @@
+<item>
+    <field name="topic">Trust Assumption</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">00c7234805424672db618caecc86b350c9dfa6c3</field>
+    <field name="content">
+      ## [H-1] Governance can set malicious oracle
+  
+      Currently the trust model is setup so that both governance and the multi-sig need to be compromised before anyone can act maliciously. This requires that positions and trusted addresses that governance may want to use are set in the registry contract by it’s multi-sig owner. However, `CellarWithOracle.sol`’s `setSharePriceOracle()` allows governance to set the cellars `sharePriceOracle` to any address as it is not verified by the registry contract.
+  
+      ```solidity
+      function setSharePriceOracle(ERC4626SharePriceOracle _sharePriceOracle) external onlyOwner {
+          if (_sharePriceOracle.ORACLE_DECIMALS() != ORACLE_DECIMALS) revert Cellar__OracleFailure();
+          sharePriceOracle = _sharePriceOracle;
+          emit SharePriceOracleUpdated(address(_sharePriceOracle));
+      }
+      ```
+      Reference: [CellarWithOracle.sol#L63-L67](https://github.com/PeggyJV/cellar-contracts/blob/3d7b18a2cde018f980b60f9819c20017e6d2df78/src/base/permutations/CellarWithOracle.sol#L63-L67)
+  
+      This could allow governance to set the `sharePriceOracle` to be a malicious contract that could return favourable pricing, allowing minting and redeeming of shares to drain the cellar of its assets. 
+  
+      **Remediations to Consider**
+  
+      Instead of passing in the address of the new `sharePriceOracle`, use a registry id and call `getAddress()` on the registry with that id to receive an address that has been approved. This adds an additional layer of protection for shareholders as it would require both the multisig and governance to act maliciously to set an invalid oracle. There should also be a check to ensure the returned address from the registry is the one expected, doing so prevents the registry’s multisig from front-running the transaction and setting the address to an unintended address, as is done in `Cellar.sol`’s `setAutomationActions()`.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Trust Assumption</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">00c7234805424672db618caecc86b350c9dfa6c3</field>
+    <field name="content">
+      ## [H-2] Governance can set an unverified `automationActions`
+  
+      As discussed in issue H-1, addresses set should be trusted by the registry beforehand. In `Cellar.sol`’s `setAutomationActions()` it seems like the address being set has been verified by the registry.
+  
+      ```solidity
+      function setAutomationActions(uint256 _registryId, address _expectedAutomationActions) external onlyOwner {
+          address registryAutomationActions = registry.getAddress(_registryId);
+          if (registryAutomationActions != _expectedAutomationActions) revert Cellar__ExpectedAddressDoesNotMatchActual();
+          automationActions = registryAutomationActions;
+      }
+      ```
+      Reference: [Cellar.sol#L1206-L1210](https://github.com/PeggyJV/cellar-contracts/blob/3d7b18a2cde018f980b60f9819c20017e6d2df78/src/base/Cellar.sol#L1206-L1210)
+  
+      However, in `Registry.sol`’s `setAddress()`, if the `id` being set is `0`, and the current address set as the zero `id` is the caller, they can change the address.
+  
+      ```solidity
+      function setAddress(uint256 id, address newAddress) external {
+          if (id > 0) {
+              _checkOwner();
+              if (id >= nextId) revert Registry__ContractNotRegistered(id);
+          } else {
+              if (msg.sender != getAddress[0]) revert Registry__OnlyCallableByZeroId();
+          }
+  
+          emit AddressChanged(id, getAddress[id], newAddress);
+  
+          getAddress[id] = newAddress;
+      }
+      ```
+      Reference: [Registry.sol#L60-L71](https://github.com/PeggyJV/cellar-contracts/blob/3d7b18a2cde018f980b60f9819c20017e6d2df78/src/Registry.sol#L60-L71)
+  
+      Since the address of id zero is the `gravityBridge` address, which is controlled by governance, this allows governance to set the `id` zero to be any address. Doing so allows governance to set a malicious address as the cellar’s `automationActions`, allowing this address to call `callOnAdaptor()`, which could be used to make many rebalances and drain assets from the cellar.
+  
+      **Remediations to Consider**
+  
+      When using the `Registry.sol`’s `getAddress()` ensure that the `_registryId` is not zero, preventing governance from setting an unverified `automationActions` address.
+    </field>
+  </item>
+  <item>
+    <field name="topic">Trust Assumption</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">00c7234805424672db618caecc86b350c9dfa6c3</field>
+    <field name="content">
+      ## [H-3] Trusted positions can be forced out
+  
+      `Cellar.sol`’s `forcePositionOut()` allows the strategist to remove a position from being tracked while it still has a balance. This is supposed to only be used in cases where there is an issue with the position, such as it reverting when calculating share price. If the strategist were to force out a position that the cellar has a large balance in, the share price would drop. If shares were purchased, then governance added the position back, it would increase the share price, allowing bought shares to be sold for a profit and drain assets from the cellar.
+  
+      **Remediations to Consider**
+  
+      Check to ensure that the position being forced out is set to be untrusted in the registry. Doing so prevents the position from being added back by governance maliciously.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">00c7234805424672db618caecc86b350c9dfa6c3</field>
+    <field name="content">
+      ## [M-1] Missing oracle data validation
+  
+      In `ERC4626SharePriceOracle.sol`’s `performUpkeep()` there are multiple checks to ensure the upkeep condition has been met, and the data’s timestamp is newer than the previous observation. However, it assumes that the data provided is honest, and not malicious. If chainlink automation were to act maliciously, `performUpKeep()` could accept either a very large new share price, and/or a timestamp that is larger than the current time. A sufficiently large share price would effect anything directly using the latest price, and would slowly effect the TWAA. If the provided timestamp is larger than the current time, then the price could have an immediate effect on the TWAA as well. 
+  
+      **Remediations to Consider**
+  
+      - Add a check to unsure the provided `currentTime` is not greater than the current timestamp.
+      - Add a check to ensure the new share price is not too far deviated from the current price values
+      - Consider adding a flag that marks the oracle unsafe to use if the provided values do not satisfy the suggested checks, as it may mean chainlink is acting malicious.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+   <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">300e3f50b162dabb20aef5c26db4bb23dffc6a79</field>
+    <field name="content">
+      ## [L-1] `setAutomationActions` missing event
+  
+      `Cellar.sol`’s `setAutomationActions()` is missing an event that would indicate it’s been called. 
+  
+      It may be useful to watch for calls to this function, especially if they are not expected.
+  
+      **Remediations to Consider**
+  
+      Add an event to indicate what the `automationActions` address is set to.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+     <field name="status">fixed</field>
+    <field name="commit">a33838df36f45ad711a194dcc60be24cef934ce6</field>
+    <field name="content">
+      ## [L-2] `distrustPosition` missing event
+  
+      In `Registry.sol`’s `distrustPosition()` does not emit an event. It would be beneficial to emit an event here so that call to this function can be more easily watched and reacted to in case a position is unexpectedly distrusted by the registry’s owner as well as to more easily determine which positions are trusted by the registry.
+  
+      **Remediations to Consider**
+  
+      Add an event that emits the information of the position when it is distrusted.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">0dab457139c75e96355d25094c275b1a47eae77d</field>
+    <field name="content">
+      ## [Q-1] Comments mention curve rather than uniswap
+  
+      In `StEthExtension.sol` there are multiple mentions of using curve as a secondary pricing source, however uniswapV3 is used for pricing instead.
+  
+      **Remediations to Consider**
+  
+      Replace all mentions of curve with uniswap.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">300e3f50b162dabb20aef5c26db4bb23dffc6a79</field>
+    <field name="content">
+      ## [Q-2] Missing callable address for `callOnAdaptor()`
+  
+      In `Cellar.sol`’s `callOnAdaptor()` a change was made to allow a set `automationActions` address to call it as well as the strategist, however the comments only mention that its callable by the strategist.
+  
+      ```solidity
+      * @dev Callable by Sommelier Strategist.
+      ```
+      Reference: [Cellar.sol#L1311](https://github.com/PeggyJV/cellar-contracts/blob/e10e66952ba637c432f2aa681b8d2a86d05239ff/src/base/Cellar.sol#L1311)
+  
+      **Remediations to Consider**
+  
+      Mention that `callOnAdaptor()` is also callable by the `automationActions` address.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6a411542781cf6380bacabec5927f39aac8dd0ef</field>
+    <field name="content">
+      ## [Q-3] Comment typo
+  
+      There is a typo `haas` in Cellar.sol
+  
+      ```solidity
+      // After making every external call, check that the totalAssets haas not deviated significantly, and that totalShares is the same.
+      ```
+      Reference: [Cellar.sol#L1333](https://github.com/PeggyJV/cellar-contracts/blob/e10e66952ba637c432f2aa681b8d2a86d05239ff/src/base/Cellar.sol#L1333)
+  
+      **Remediations to Consider**
+  
+      Replace `haas` with `has`
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a33838df36f45ad711a194dcc60be24cef934ce6</field>
+    <field name="content">
+      ## [Q-4] `positionCount` no longer used
+  
+      In `Registry.sol` the public variable `positionCount` is not longer used or referenced by anything and displays an inaccurate position count.
+  
+      ```solidity
+      /**
+       * @notice Stores the number of positions that have been added to the registry.
+       *         Starts at 101.
+       */
+      uint32 public positionCount = 100;
+      ```
+      Reference: [Registry.sol#L387-L391](https://github.com/PeggyJV/cellar-contracts/blob/e10e66952ba637c432f2aa681b8d2a86d05239ff/src/Registry.sol#L387-L391)
+  
+      **Remediations to Consider**
+  
+      Remove this variable as it is no longer used and displays inaccurate information about the registry.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [I-1] AutomationActions is in development
+  
+      In `Cellar.sol`, there is an addition to allow an `automationActions` contract to be able to call `callOnAdaptor()`. The intention is for this to be a contract that strategists can set actions to be called if certain conditions are met, with the intent to use chainlink automation to verify and trigger these calls. This contract has yet to be developed, and should be audited before cellars use it, but this functionality was added so that new cellars would be able to take advantage of it in the future once it is ready.
+    </field>
+    <field name="response">
+        all Automation Action contracts will be audited BEFORE `automationActions` is set to a non zero value in newly deployed Cellars.
+    </field>
+
+  </item>
+  
+  
+  
+  

@@ -1,0 +1,204 @@
+<item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">86306a7ce6f70d6eecb1299a201bad864a1fd54c</field>
+    <field name="content">
+        ## [H-1] Malicious user can prevent getting liquidated
+
+        A malicious user can perform a sandwich attack on the liquidate call which results in the liquidate call to be reverted. Consider the following scenario:
+        <ol>
+            <li>Attacker creates `giver` profile `p1`</li>
+            <li>Attacker creates `creator` profile `p2`</li>
+            <li>Attacker subscribes `p1` to `p2` with the maximum allowed `rate` value (to make the attack more profitable)</li>
+            <li>At this state, funds are flowing with a high rate from `p1` to `p2`.</li>
+            <li>After some time, `p1` is running out of funds and `canBeLiquidated` returns true.</li>
+            <li>Another user calls `liquidate` on p1, but attacker front-runs the `liquidate` tx:</li>
+            <ol>
+                <li>Attacker uses another profile `p3` (or could use p2) and creates subscription to `p1`, thereby setting `inflow > outflow` for p1.</li>
+                <li>Since `inflow > outflow`, the liquidate call initiated by another user will revert.</li>
+                <li>Attacker can back-run the `liquidate` tx  and unsubscribes `p3` from `p1`.</li>
+            </ol>
+            <li>Funds are still flowing from `p1` to `p2`, thereby increasing the negative balance of `p1` and increasing balance of `p2`.</li>
+            <li>Attacker can withdraw the balance from `p2`; the negative value in p1 remains and must be compensated with funds from the treasury.</li>
+        </ol>
+
+        Because step 6 happens in the same block, there are no funds flowing from `p3` to `p1`, but the setup is enough to get the `liquidate` call reverted. Thus, the costs of the attack are only the tx costs for `subscribe` and `unsubscribe`.
+        
+        The attacker can repeatedly perform the attack, to keep the funds flowing from `p1` to `p2` and thereby draining the funds of the protocol. 
+        
+        Note that this attack only pays off under the following circumstances:
+        
+        - when the attacker manages to sandwich the `liquidate` call for the entire liquidation period and beyond.
+        - when the balance of `p2` increased due to preventing liquidation is higher than the cost of the attack (= tx costs for sandwiching `liquidate` call).
+        
+        ### **Remediations to Consider**
+        Consider adding a delay between `subscribe` and `unsubscribe` to make the above attack vector unprofitable.
+    </field>
+</item>
+
+
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">addressed</field>
+    <field name="content">
+        ## [L-1] Subscription owner is not transferred when profile is transferred
+
+        When a profile NFT is transferred to a new owner, `ProfilesModule.notifyProfileTransfer` is called to revoke all existing permissions and to set new owner.
+        
+        However, for subscription NFTs associated to a profile, the new owner is not set and thus still pointing to the original owner when checking `GratefulSubscriptions.ownerOf`.
+        
+        Consider also transferring the profile’s associated subscription NFTs to the new owner when the the profile is transferred to a new owner.
+    </field>
+    <field name="response">
+        There is no subscriptions list in the contracts to know which NFTs to transfer. So we agreed to add it to the [documentation](https://grateful.gitbook.io/docs/subscriptions), and delegate the responsibility to the user (also with a batch call from the frontend)
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">944b7db9d9185572fb8d4e19e19144c8f24588f0</field>
+    <field name="content">
+        ## [L-2] Call to liquidate doesn’t validate `liquidatorId`
+
+        `LiquidationModule.liquidate` takes `liquidatorId` as an argument. However, there is no validation done whether the `liquidatorId` is associated to a profile.
+        
+        If this is not a requirement, consider including `msg.sender` when emitting the event. 
+        
+        Also the `SubscriptionLiquidated` event is emitted with `0` rewards. Since there are no incentives for liquidators in this version of the contract, consider removing the `reward` argument in the emitted event.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1e2bf3bbea0324fd21f6058d48b7da64c4738a06</field>
+    <field name="content">
+        ## [L-3] Duration property for subscriptions returns wrong value when unsubscribed
+
+        `Subscription.getDuration` returns the `duration + elapsedTime` where `elapsedTime` is calculated as follows:
+        
+        ```solidity
+        uint256 elapsedTime = block.timestamp - lastUpdate;
+        ```
+        
+        While this is true for active subscriptions, the calculation is not correct for unsubscribed subscriptions, as in this case `elapsedTime` should be 0.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-4] Adding a new vault can fail when vault implementation is used in another vault already
+
+        Some “weird” ERC20 tokens (e.g. USDT) require the approval to be set to 0 before setting it to a new value (see [here](https://github.com/d-xo/weird-erc20#approval-race-protections)). For such tokens, `VaultsModule.addVault` would fail when trying to add a vault implementation that is already used within another vault. 
+        
+        Note that this is seen as a low-level issue, as the scenario of adding multiple vaults pointing to same implementation is considered as very unlikely according to the Grateful team.
+    </field>
+    <field name="response">
+        Each vault will have it’s own implementation even though using the same ERC20 asset.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">04532782f04498956c5e9047ac26c232280b5655</field>
+    <field name="content">
+        ## [Q-1] `isVaultPaused` always returns wrong value
+
+        `VaultUtil.isVaultPaused` returns the value from `Vault.isPaused()`. However, `isPaused` is not implemented correctly and returns `true` for unpaused vaults and `false` for paused vaults. 
+        
+        The only reason why `FundsModule.withdrawFunds` correctly allows to withdraw funds from unpaused vaults is because it checks against the inverted value as seen below:
+        
+        ```solidity
+        if (!VaultUtil.isVaultPaused(vaultId))
+           revert VaultErrors.InvalidVault();
+        ```
+        
+        Consider changing `Vault.isPaused` so that it returns `true` for pause vaults and `false` for unpaused vaults.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">f1f06a331e077a388feeab96cc62c1d6c5f97f54</field>
+    <field name="content">
+        ## [Q-2] `tokenURI` returns value for invalid token ids
+
+        `GratefulProfile.tokenURI` and `GratefulSubscription.tokenURI` don’t revert when the token id doesn’t exist but instead returns default values for subscription. 
+        
+        In order to comply with behavior of well known ERC721 implementation like the one from [Openzeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol), consider reverting for non-existent token ids.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [Q-3] `_EDIT_PERMISSIONS` not used
+
+        Consider removing `_EDIT_PERMISSIONS` from ProfileRBAC.sol as it is not used anywhere in the code.
+    </field>
+    <field name="response">
+        The edit permission is used by the frontend to update the optionally off-chain data from the profile
+    </field>
+</item>
+
+<item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">d15624dd2b07ee39e889f62b0d3361a738b5a89e</field>
+    <field name="content">
+        ## [G-1] `_hasEnoughBalance` makes `_isSolvent` redundant
+
+        In Balance.sol, `canWithdraw` and `canStartSubscription` check for both `_hasEnoughBalance` and `_isSolvent`:
+
+        ```solidity
+        return _hasEnoughBalance(self, time) && _isSolvent(self, time);
+        ```
+
+        However, `_hasEnoughBalance` (as it only accounts for outflow) is a much more stricter check, thus making the additional check `_isSolvent` redundant. 
+
+        Consider removing `_isSolvent` from the above functions to save gas costs and make the code more readable.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Use Case</field>
+    <field name="impact">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [I-1] Enabling burning of `GratefulProfile` NFTs would break the `createProfile` operation
+
+        Note that at the current state, the protocol doesn’t allow burning of GratefulProfile NFTs. If this is something being considered to allow in future versions, it is worth noting that this would break `ProfilesModule.createProfile`. 
+
+        The function `createProfile` calculates the `tokenId` as follows:
+
+        ```solidity
+        uint256 tokenId = profile.totalSupply() + 1;
+        ```
+
+        When a token id is burned, `totalSupply` decreases by 1, meaning that for the next call to `createProfile`, a `tokenId` will revert, as the token id is created that was already minted before. As a result, `safeMint` will revert, essentially breaking the entire `createProfile` functionality.
+    </field>
+    <field name="response">
+        The Grateful profile will not have the burning capability.
+    </field>
+</item>
