@@ -1,0 +1,46 @@
+<page
+  clientName="Farcaster"
+  reportDate="August 29th, 2023"
+  auditTitle="Farcaster A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/farcasterxyz/contracts"
+  repoCommitHash="5cf9b4ab044a40c84af8801fffb46390cd6f6099"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_FARCASTER_2"
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from
+    August 23, 2023 to August 25, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+        f7218dfe9d2a4d164f2555dee0abceb745ca863c79434f25d2ba2b4021f80985  src/Bundler.sol
+        2b4bc7ee17b09231a602a0b5a25cdd1b606cf150dba0cc6e34b6aa07052c715a  src/FnameResolver.sol
+        615e9d592cce11bb3a23f44860a4a7ecabd595bf451b51f566c36f55dceed725  src/IdRegistry.sol
+        2e2a2a5fe783fc1c3dd82040d1b672406a055484a4e90fa8c713fd9129167d9d  src/KeyRegistry.sol
+        8f6ae232c3a0825ca65a0bf85ec3214d90a1e4678986ad3f7e1581887d6c5b97  src/StorageRegistry.sol
+        629939888f8936cf93d370de3c97095268d904b412b5fa178c859ddf0423dbbe  src/interfaces/IMetadataValidator.sol
+        467ca6a78f711421b4a24abe96c77e1880213dd193a237b5192a02627db30b14  src/interfaces/IdRegistryLike.sol
+        88b797d9f2b098fe3f54bdfeb0476ca7f03f3289b87c99d5edf2c4c90871d70a  src/lib/EIP712.sol
+        db4f0878ee70a5c9229be76bf1309984763fa77bc4a9c96c4fe9d1970a34a42b  src/lib/Signatures.sol
+        43af182279e1984145d649cb00a2c97560d4eba673d2b8abbd9fb4236d58fac1  src/lib/TransferHelper.sol
+        e40c1a4ab0a3343a72fcbac27b2e15e98c6d3518552b5582095daf9e086465af  src/lib/TrustedCaller.sol
+        7515254d361422c8dccc6d0d8408c467b24df82f8ada8c26861ea2bc493e82c6  src/validators/SignedKeyRequestValidator.
+    
+    </template>
+    <p>
+        <b>Note:</b> This document contains an audit of the differences between Solidity contracts listed above and previous version from <a href="https://0xmacro.com/library/audits/citadel-1">Citadel-1</a> audit. Specifically, the audit pertains only to the contracts themselves, and does not pertain to any other programs or scripts, including deployment scripts.
+    </p>
+</content-for>
