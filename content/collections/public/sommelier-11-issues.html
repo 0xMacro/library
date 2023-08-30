@@ -1,0 +1,225 @@
+<item>
+    <field name="topic">Input Parameters</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">4d792b65be13f5b7df2d53d38dec1aa2021ed11c</field>
+    <field name="content">
+      ## [M-1] Wrong exchange rate used for health factor calculations can bring positions close to liquidation
+  
+      In both `CollateralFTokenAdaptorV2.sol` and `DebtFTokenAdaptorV2.sol` the exchange rate used to calculate the health factor of the position is the `lowExchangeRate`.
+  
+      ```solidity
+      function _updateExchangeRate(IFToken _fraxlendPair) internal virtual returns (uint256 exchangeRate) {
+          (, exchangeRate, ) = _fraxlendPair.updateExchangeRate();
+      }
+      ```
+      Reference: [CollateralFTokenAdaptorV2.sol#L235-L237](https://github.com/PeggyJV/cellar-contracts/blob/a1c5a1b2b0cecac76b7290510bca327f87e66248/src/modules/adaptors/Frax/CollateralFTokenAdaptorV2.sol#L235-L237) and [DebtFTokenAdaptorV2.sol#L284-L286](https://github.com/PeggyJV/cellar-contracts/blob/a1c5a1b2b0cecac76b7290510bca327f87e66248/src/modules/adaptors/Frax/DebtFTokenAdaptorV2.sol#L284-L286)
+  
+      ```solidity
+      function updateExchangeRate()
+          external
+          nonReentrant
+          returns (bool _isBorrowAllowed, uint256 _lowExchangeRate, uint256 _highExchangeRate)
+      {
+          return _updateExchangeRate();
+      }
+      ```
+      Reference: [FraxLendPairCore.sol#L480-L486](https://github.com/FraxFinance/fraxlend/blob/main/src/contracts/FraxlendPairCore.sol#L480-L486)
+  
+      However in Frax Lend, when calculations are done to check if a user is solvent, which is what the code for `_getHealthFactor()` is based on, it uses the `highExchangeRate`.
+  
+      ```solidity
+      modifier isSolvent(address _borrower) {
+          _;
+          ExchangeRateInfo memory _exchangeRateInfo = exchangeRateInfo;
+  
+          if (!_isSolvent(_borrower, exchangeRateInfo.highExchangeRate)) {
+              revert Insolvent(
+                  totalBorrow.toAmount(userBorrowShares[_borrower], true),
+                  userCollateralBalance[_borrower],
+                  exchangeRateInfo.highExchangeRate
+              );
+          }
+      }
+      ```
+      Reference:  [FraxLendPairCore.sol#L236-L247](https://github.com/FraxFinance/fraxlend/blob/main/src/contracts/FraxlendPairCore.sol#L236-L247)
+  
+      Using a the lower exchange rate reduces the Loan to Value (LTV) calculated and thus increases the health factor calculated. Since the minimum health factor is set to ensure the position remains a set percent above the liquidation threshold, this may cause the position to be allow to get closer to insolvency than desired if there is a sufficient deviation between the high and low exchange rate.
+      
+      **Remediations to Consider**
+  
+      Use the `highExchangeRate` when calling `_getHealthFactor()` to use the same value that is used to calculate if a position is solvent, and prevent a cellars position from getting too close to insolvency.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">66a0b55e6afe48439f7c2f6aee0f348e935ef449</field>
+    <field name="content">
+      ## [M-2] Strategist can execute arbitrary code, potentially extracting value from the cellar
+  
+      In `CollateralFTokenAdaptorV2.sol`'s `removeCollateral()` function, there is no check to see of the passed in `_fraxlendPair` is a valid position used by the cellar.
+  
+      ```solidity
+      function removeCollateral(uint256 _collateralAmount, IFToken _fraxlendPair) public {
+        // remove collateral
+        _removeCollateral(_collateralAmount, _fraxlendPair);
+        uint256 _exchangeRate = _updateExchangeRate(_fraxlendPair); // need to calculate LTV
+        // Check if borrower is insolvent (AKA they have bad LTV), revert if they are
+        if (minimumHealthFactor > (_getHealthFactor(_fraxlendPair, _exchangeRate))) {
+            revert CollateralFTokenAdaptor__HealthFactorTooLow(address(_fraxlendPair));
+        }
+      }
+      ```
+      Reference: [CollateralFTokenAdaptorV2.sol#L151-L159](https://github.com/PeggyJV/cellar-contracts/blob/a1c5a1b2b0cecac76b7290510bca327f87e66248/src/modules/adaptors/Frax/CollateralFTokenAdaptorV2.sol#L151-L159)
+  
+      Since calls are directly made to this address, it could be any contract that isn’t verified. This can allow a contract to execute arbitrary code that is unverified. This contract call could interact with protocols the cellar has positions in and potentially effect the outcome of other calls executed within the same cellar `callOnAdaptor` call, potentially extracting value from the cellar. 
+  
+      This issue is also present in `FTokenAdaptor.sol`'s `withdraw()` function.
+  
+      **Remediations to Consider**
+  
+      Call `_validateFToken()` on the passed in `_fraxlendPair` in `CollateralFTokenAdaptorV2.sol`'s `removeCollateral()` function and `FTokenAdaptor.sol`'s `withdraw()` function, to ensure the pair is a valid contract that the cellar has a position in.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Ranges</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+     <field name="status">fixed</field>
+    <field name="commit">c69363768c411033e6ef7a3636d0157cb78a4047</field>
+    <field name="content">
+      ## [L-1] Using uint256.max as a `nonce` can prevent future strategist and governance calls to the cellar
+  
+      In `AxelarProxy.sol`, each call to execute requires that the nonce provided is greater than the last nonce used to call a target cellar. These nonces are incremented on the protocol side on each transaction.
+      However, since there is limit on the nonce provided, if it is set for a cellar as the max value of `uint256`, then no further calls can be made by the proxy to that cellar, since the nonce cannot exceed it.
+      This situation is unlikely to occur as the nonces should be properly handled by the protocol, but there should be a bound placed to ensure the `nonce` provided is reasonable and will not reach the max `unit256` value.
+  
+      **Remediations to Consider**
+  
+      Add a reasonably large bound on the `nonce` provided from the previously set `nonce`, something that could not be exceeded by regular means, to ensure calls can always be made to it cellars via the proxy.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+     <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c69363768c411033e6ef7a3636d0157cb78a4047</field>
+    <field name="content">
+      ## [L-2] Unnecessary use of `minimumNonce`
+  
+      In `AxelarProxy.sol`, a `minimumNonce` is setup in the constructor, and is used to ensure that nonces below that value cannot be used in `_execute()`.
+  
+      ```solidity
+      if (nonce < minimumNonce) revert AxelarProxy__MinimumNonceUnmet();
+      ```
+      Reference: [AxelarProxy.sol#L74](https://github.com/PeggyJV/cellar-contracts/blob/9e17494c2acd906718310b3e99fa6c1e918beaf6/src/AxelarProxy.sol#L74)
+  
+      The intent behind setting the `minimumNonce` is to invalidate prior accepted function calls in the case a new `AxelarProxy` is deployed, in case of an update or there is a new `AxelarGateway` contract, with the intention of the `minimumNonce` being set above the current protocols nonce as a buffer to
+  
+      However, each call that is accepted on the `AxelarGateway` contract is specific to a target `destinationAddress`, which when the `AxelarProxy` validates the call when executing, it is only valid if it is the set destination address, since `msg.sender` is used to generate the key when `validateContractCall()` is called on the `AxelarGateway`.
+  
+      ```solidity
+      function validateContractCall(
+          bytes32 commandId,
+          string calldata sourceChain,
+          string calldata sourceAddress,
+          bytes32 payloadHash
+      ) external override returns (bool valid) {
+          bytes32 key = _getIsContractCallApprovedKey(commandId, sourceChain, sourceAddress, msg.sender, payloadHash);
+          valid = getBool(key);
+          if (valid) _setBool(key, false);
+      }
+      ```
+      Reference: [AxelarGateway.sol#L229-L238](https://github.com/axelarnetwork/axelar-cgp-solidity/blob/main/contracts/AxelarGateway.sol#L229-L238)
+  
+      This means that old validated contract calls, are not valid for the new AxelarProxy, meaning there is not need to set a `minimumNonce`.
+  
+      Since the `nonce` used when making these calls is tied to the number of proposals made on the sommelier side, setting the minimum nonce to a large value could make it difficult to execute calls on the `AxelarProxy` as nonce would have to be incremented above the minimum nonce set before calls can execute.
+  
+      **Remediations to Consider**
+  
+      Remove the use of `minimumNonce` as it is not required and could cause issues if improperly set.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">66a0b55e6afe48439f7c2f6aee0f348e935ef449</field>
+    <field name="content">
+      ## [Q-1] Inaccurate comment
+  
+      In `FraxlendHealthFactorLogic.sol`'s `_getHealthFactor()` there is a comment that mentions fraxlend’s “getHealthFactor() function”, however this may be referring to fraxlend’s `isSolvent()` function instead.
+  
+      ```solidity
+      // need interest-adjusted and conservative amount (round-up) similar to `_getHealthFactor()` function in actual Fraxlend contracts.
+      ```
+      Reference: [FraxlendHealthFactorLogic.sol#L27](https://github.com/PeggyJV/cellar-contracts/blob/a1c5a1b2b0cecac76b7290510bca327f87e66248/src/modules/adaptors/Frax/FraxlendHealthFactorLogic.sol#L27)
+  
+      **Remediations to Consider**
+  
+      Adjust the comment to be more accurate.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">66a0b55e6afe48439f7c2f6aee0f348e935ef449</field>
+    <field name="content">
+      ## [Q-2] `_fraxlendPairAsset` is defined but not used
+  
+      In `CollateralFTokenAdaptorV2.sol` the function `_fraxlendPairAsset()` is defined, but is never called.
+  
+      **Remediations to Consider**
+  
+      Remove `_fraxlendPairAsset()` since it is not used.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2641f732e3bed01224a998d7dde7e4f61a29289c</field>
+    <field name="content">
+      ## [Q-3] Rename Frax V2 adaptors
+  
+      To follow the pattern of `FTokenAdaptor.sol` instead of differentiating adapters as `V2` in the cases of `DebtFTokenAdaptorV2.sol` and `CollateralFTokenAdaptorV2.sol`.
+  
+      **Remediations to Consider**
+  
+      Rename `DebtFTokenAdaptorV2.sol` to `DebtFTokenAdaptor.sol` and `CollateralFTokenAdaptorV2.sol` to `CollateralFTokenAdaptor.sol` to maintain the naming pattern set by `FTokenAdaptor.sol`.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4d792b65be13f5b7df2d53d38dec1aa2021ed11c</field>
+    <field name="content">
+      ## [G-1] Frax Lend exchange rates do not need to be updated
+  
+      In the Frax Lend adaptors, `_updateExchangeRate()` is called in the collateral adaptors after `removeCollateral()` is called, and is called by the debt adaptors after `_borrowAsset()` is called. In both versions of Frax Lend when either collateral is removed by calling `removeCollateral()` or an asset is borrowed by calling `borrowAsset()`, the exchange rate is updated. Since the exchange rate can only be updated once per block, calling `updateExchangeRate()` will have no effect. Instead, in order to get the updated exchange rate, a call to `exchangeRateInfo()` will return an `ExchangeRateInfo` struct, which does vary from versions V2 and V1, and the updated exchange rate can pulled from it.
+  
+      **Remediations to Consider**
+  
+      Call the view function `exchangeRateInfo()` on the `FraxLendPair` instead of `updateExchangeRate()` to save a bit of gas.
+    </field>
+  </item>
+  
