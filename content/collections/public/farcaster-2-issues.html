@@ -1,43 +1,104 @@
 <item>
-  <field name="topic">NatSpec</field>
-  <field name="impact">low</field>
-  <field name="status">fixed</field>
-  <field name="commit">38b1f6975c21165d3786d823c9a3f1c1a7d663b1</field>
-  <field name="content">
-    ## [Q-1] Update Natspec documentation In `KeyRegistry`: - Consider
-    correcting the in line comments in the bulk add and reset functions to
-    reflect the correct name of the items array. ```solidity function
-    bulkAddKeysForMigration(BulkAddData[] calldata items) external onlyOwner {
-    ... // Safety: i and j can be incremented unchecked since they are bound by
-    items.length and // item[i].keys.length respectively. //== Corrected below
-    == // Safety: i and j can be incremented unchecked since they are bound //by
-    items.length and items[i].keys.length respectively. ... } function
-    bulkResetKeysForMigration(BulkResetData[] calldata items) external onlyOwner
-    { ... // Safety: i and j can be incremented unchecked since they are bound
-    by items.length and // fidKeys[i].length respectively. //== Corrected below
-    == // Safety: i and j can be incremented unchecked since they are bound //by
-    items.length and items[i].keys.length respectively. ... } ``` - Consider
-    making the following corrections to the notice tags for the `pause` and
-    `unpause` functions in the `KeyRegistry`. ```solidity //Originally /** *
-    @notice Pause add, remove, and reset.e registration, transfer, and recovery.
-    * Must be called by the owner. */ //Corrected /** * @notice Pause add,
-    remove, and reset. * Must be called by the owner. */ function pause()
-    external onlyOwner { _pause(); } //Originally /** * @notice Unpause add,
-    remove, and reset.otice Unpause registration, transfer, and recovery. * Must
-    be called by the owner. */ //Corrected /** * @notice Unpause add, remove,
-    and reset. * Must be called by the owner. */ function unpause() external
-    onlyOwner { _unpause(); } ``` In `IdRegistry`: - Consider updating the
-    notice for `recoverFor()` function to reflect that one of the signatures is
-    from the recovery address associated with the `fid` being recovered rather
-    than the `from` address. ```solidity /** * @notice Transfer the fid owned by
-    the from address to another address that does not * have an fid. Caller must
-    provide two signed Transfer messages: one signed by * the from address and
-    one signed by the to address. // Corrected /** * @notice Transfer the fid
-    owned by the from address to another address that does not * have an fid.
-    Caller must provide two signed Transfer messages: one signed by * the
-    recovery address and one signed by the to address. ``` In `Bundler`: -
-    `signers` param natspec for `register()` function is missing `metadataType`
-    in its list of fields ```solidity @param signers Array of structs containing
-    signer parameters: keyType, key, metadata, deadline, and signature. ```
-  </field>
-</item>
+    <field name="topic">NatSpec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">38b1f6975c21165d3786d823c9a3f1c1a7d663b1</field>
+    <field name="content">
+      ## [Q-1] Update Natspec documentation
+  
+  
+      In `KeyRegistry`:
+  
+      - Consider correcting the in line comments in the bulk add and reset functions to reflect the correct name of the items array.
+      
+          ```solidity
+        function bulkAddKeysForMigration(BulkAddData[] calldata items) external onlyOwner {
+            ...	
+            // Safety: i and j can be incremented unchecked since they are bound by items.length and
+            // item[i].keys.length respectively.
+        
+            //== Corrected below ==
+        
+            // Safety: i and j can be incremented unchecked since they are bound 
+            //by items.length and items[i].keys.length respectively.
+            ...
+        }
+      
+        function bulkResetKeysForMigration(BulkResetData[] calldata items) external onlyOwner {
+            ...
+            // Safety: i and j can be incremented unchecked since they are bound by items.length and
+            // fidKeys[i].length respectively.
+        
+            //== Corrected below ==
+        
+            // Safety: i and j can be incremented unchecked since they are bound 
+            //by items.length and items[i].keys.length respectively.
+        
+            ...
+        }
+      
+          ```
+      
+      - Consider making the following corrections to the notice tags for the `pause` and `unpause` functions in the `KeyRegistry`.
+      
+          ```solidity
+          //Originally
+          /**
+           * @notice Pause add, remove, and reset.e registration, transfer, and recovery.
+           *     Must be called by the owner.
+           */
+      
+          //Corrected
+          /**
+           * @notice Pause add, remove, and reset.
+           * Must be called by the owner.
+           */
+      
+          function pause() external onlyOwner {
+              _pause();
+          }
+      
+          //Originally
+          /**
+           * @notice Unpause add, remove, and reset.otice Unpause registration, transfer, and recovery.
+           *         Must be called by the owner.
+           */
+      
+          //Corrected
+          /**
+           * @notice Unpause add, remove, and reset.
+           * Must be called by the owner.
+           */
+          function unpause() external onlyOwner {
+              _unpause();
+          }
+          ```
+      
+  
+      In `IdRegistry`:
+  
+      - Consider updating the notice for `recoverFor()` function to reflect that one of the signatures is from the recovery address associated with the `fid` being recovered rather than the `from` address.
+      
+          ```solidity
+          /**
+           * @notice Transfer the fid owned by the from address to another address that does not
+           *         have an fid. Caller must provide two signed Transfer messages: one signed by
+           *         the from address and one signed by the to address.
+      
+          // Corrected
+          /**
+           * @notice Transfer the fid owned by the from address to another address that does not
+           *         have an fid. Caller must provide two signed Transfer messages: one signed by
+           *         the recovery address and one signed by the to address.
+          ```
+      
+  
+      In `Bundler`:
+  
+      - `signers` param natspec for `register()` function is missing `metadataType` in its list of fields
+      
+          ```solidity
+          @param signers      Array of structs containing signer parameters: keyType, key, metadata, deadline, and signature.
+          ```
+    </field>
+  </item>
