@@ -1,0 +1,766 @@
+<item>
+    <field name="topic">Griefing</field>
+    <field name="impact">high</field>
+    <field name="chance">high </field>
+    <field name="status">fixed</field>
+    <field name="commitTree">7a0cc77806da3105a5bf0b4fb69daa2ef945f454</field>
+    <field name="content">
+        ## [H-1] RootManager.propagate susceptible to DoS
+        
+        In the RootManager contract, `propagate()` function is responsible for distributing aggregate roots to all connectors for corresponding domains. Implementation of this function does not revert when interaction with a specific connector fails. This prevents a single inaccessible chain from causing a complete system halt. Particular functionality was introduced to fix a previously reported issue in Spearbit audit https://github.com/spearbit-audits/connext-nxtp/issues/34.
+        
+        When `propagate()` is called, a set of initial validation checks is performed. If these checks are successful `lastPropagatedRoot` value will be set in `_sendRootToHubs()`. In the rest of `propagate()` function, even if interaction with all connectors fails, `propagate()` function will not revert. In this case, the `lastPropagatedRoot` value will remain set. This means that follow-up invocations of `propagate()` function will not be possible until `_aggregateRoot` is updated. This is indeed the original intention of this code.
+        
+        ```solidity
+        // Sanity check: make sure we are not propagating a redundant aggregate root.
+        require(_aggregateRoot != lastPropagatedRoot, "redundant root");
+        lastPropagatedRoot = _aggregateRoot;
+        ```
+        
+        However, `propagate()` function can be invoked by anyone. Since it doesn’t have any access control limits. As a result, a malicious actor can invoke this function with inappropriate arguments. For example, by providing encoding data of unexpected length. This will cause most, if not all, connectors to revert when invoked. For example, processing will fail for:
+        
+        - PolygonHubConnector in `_sendMessage()` function when `encodedData.length` is not 0
+        - ZKSyncHubConnector when `encodedData.length` is not 32
+        - BaseMultichain in `_sendMessage()` when `encodedData.length` is not 0
+        - GnosisBase in `_getGasFromEncoded()` when `encodedData.length` is not 32
+        - ArbitrumHubConnector in `_sendMessage()` when `encodedData.length` is not 96
+        
+        As a result of malicious actor actions, aggregate roots won’t be propagated to destination domains. The system may recover if a new root is added and `propagate()` is called with proper inputs. However, an attacker may front-run these calls with their own invocation with adverse inputs.
+        
+        **Remediations to Consider:**
+        
+        1. Implement per domain check and take into account that the same scenario is possible due to the reset of `finalizedOptimisticAggregateRoot` variable in `_optimisticPropagate()` and `_slowPropagate()` functions, or
+        2. Restrict access to `propagate()` and `finalizeAndPropagate()` function to relayers only.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">spec</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">6221147fdfb836f00e2944aef22ebc5c0e014940</field>
+    <field name="content">
+        ## [H-2] Trust model affected when `addBypass()` is enabled to be bypassable
+        
+        The `Conductor` contract serves as an upgrade timelock for the messaging layer; it enables the owner to queue transactions and execute them after a delay period. Additionally, the `addBypass`/`removeBypass` functions can be utilized to skip the execution delay for a specific `_target` and `_selector`. These bypass whitelisted functions must undergo the same queue and delay period before their addition.
+        
+        However, the `addBypass` function allows the owner to execute any arbitrary function call without queueing and waiting for the corresponding delay by:
+        
+        - Queue and execute (after `delay()`) the `addBypass` function using the `addBypass.selector` and `address` of the conductor as `_target`.
+        - Assemble and `executeWithBypass` a transaction array with:
+            - `addBypass(anyTarget, anySelector)`
+            - `anyTarget.anySelector()`
+        
+        Since the logic checks if the target/selector is bypassed and executes it in order, the owner can add any `_target` and `_selector` atomically in one `executeWithBypass` call.
+        
+        **Remediations to Consider:**
+        
+        - Disallowing the address of the conductor as `_target` in `addBypass`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">c7834ba5fd84bded25dfa88d69cf09706452e661</field>
+    <field name="content">
+        ## [H-3] `directSwapperCall` allows arbitrary calls to any contract
+        
+        `SwapAdapter` is a shared contract that allows swapping assets by implementing adapters for each exchange that can be used both in the origin and destination chain.
+        
+        However, in the `directSwapperCall` function, there are no checks on whether the `_swapper` address is a swapper implementation. Allowing anyone to execute **any** arbitrary call on **any** address with the contract’s context. Although the contracts are not intended to hold any assets, any future integration implementation built on top of `SwapAdapter` contract will inherit this dangerous function, essentially acting as a public backdoor entry point.
+        
+        **Remediations to Consider:**
+        
+        - Consider restricting `_swapper` parameter value to entries in the `allowedSwappers` mapping.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Wrong implementation</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">0dcfd0b11c812cc946359da6380041d8a749b334</field>
+    <field name="content">
+        ## [H-4] `exactSwap()` does not send any value to `swapETH` call
+        
+        In SwapAdapter.sol, `exactSwap()` function calls with `_fromAsset` equal to `address(0)` will perform the specific logic for native asset in the intended Swapper contract, `swapETH()`:
+        
+        ```solidity
+        function exactSwap(
+          address _swapper,
+          uint256 _amountIn,
+          address _fromAsset,
+          address _toAsset,
+          bytes calldata _swapData // comes directly from API with swap data encoded
+        ) external payable returns (uint256 amountOut) {
+          ...
+        
+          if (_fromAsset == address(0)) {
+            amountOut = ISwapper(_swapper).swapETH(_amountIn, _toAsset, _swapData);
+          } else {
+            ...
+            }
+            ...
+          }
+        }
+        ```
+        
+        However, no value is sent to this call, making this function to revert always in the swapper if:
+        
+        - `_fromAsset == address(0)`,
+        - `_amountIn > 0` and,
+        - `_fromAsset != _toAsset`.
+        
+        **Remediations to Consider:**
+        
+        - Send the corresponding `msg.value` to the `swapETH` call.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">657c3fa12b547d19a6c38c446b6dce14424eef14</field>
+    <field name="content">
+        ## [H-6] `swap()` function does not consider `_fromAsset == _toAsset`
+        
+        In the UniV2Swapper contract, if the `swap` function is called with an equal asset in `_fromAsset` and `_toAsset` the tokens will not be processed and will be stuck in the swapper contract, returning a zero `amountOut`. This behavior is not consistent with the other swapper implementations.
+        
+        **Remediations to Consider:**
+        
+        - Consider adding this case to the `if` statements and sending the assets back to the caller.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">addressed</field>
+    <field name="statusNote">PR closed after noticing that new functionality is not required taking into account H-8 change</field>
+    <field name="content">
+        ## [H-7] `OneInchUniswapV3` can’t receive native assets
+        
+        The current `OneInchUniswapV3` implementation does not implement a `receive()` or `fallback()` function, disallowing it to receive any native assets and reverting any attempt of swap to native assets. This will happen to any swap calls where `_toAsset` is equal to `address(0)`.
+        
+        **Remediations to Consider:**
+        
+        - Consider adding a `receive()` function.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status"> fixed</field>
+    <field name="commit">bb8176198cbd5f6f88d3b1b9b3bd2761301cf00c</field>
+    <field name="content">
+        ## [H-8] `OneInchUniswapV3` incorrect `swapETH` implementation
+        
+        In the `OneInchUniswapV3` swapper contract, the `swapETH()` function is incorrectly implemented and is not consistent with the other swapper implementations that use `WETH` as an intermediate swap for native assets. The `oneInchUniRouter.uniswapV3Swap()` call (line 102) does not send any value to the call. Another point to take into account is that the [uniswapV3Swap() function](https://docs.1inch.io/docs/aggregation-protocol/smart-contract/UnoswapV3Router/#uniswapv3swap) is not payable and therefore doesn’t accept ETH transfers.
+        
+        **Remediations to Consider:**
+        
+        - Implementing `WETH9` as an intermediate swap, similar to the other swapper contracts or,
+        - Using [oneInchUniRouter.uniswapV3SwapTo() function](https://docs.1inch.io/docs/aggregation-protocol/smart-contract/UnoswapV3Router/#uniswapv3swapto) to swap native assets.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed </field>
+    <field name="commitTree">a98ef5d35156f4d97143f40f897604e3a6a59e5d</field>
+    <field name="content">
+        ## [M-1] Incomplete cooldown feature for proposing aggregate root
+        
+        The `RelayerProxyHub` contract contains functionality meant to prevent more frequent invocation of `proposeAggregateRoot()`. This is based on using `lastProposeAggregateRootAt` and `proposeAggregateRootCooldown` variables.
+        
+        However, this functionality does not work since:
+        
+        1. `proposeAggregateRootCooldown` is never set, and there are no means to update it
+        2. `lastProposeAggregateRootAt` is never set
+        3. corresponding `AggregateRootCooldownChanged` event is missing, which is necessary to have consistent implementation
+        
+        As a result, relayers are able to propose aggregate roots with any frequency without restriction.
+        
+        **Remediations to Consider:**
+        
+        1. Update `RelayerProxyHub` contract functionality to have proper cooldown functionality for proposing aggregate root, or
+        2. Remove this functionality if it is unnecessary
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed </field>
+    <field name="commit">3723ea9d811a8ce1d0584003a541c28194fc933d</field>
+    <field name="content">
+        ## [M-2] Native assets sent to `exactSwap()` may get lost
+        
+        In the `SwapAdapter` contract, `exactSwap()` is a wrapper function for performing ERC20 token and native asset swaps in the interaction with allowlisted swappers. 
+        
+        In case native assets are incorrectly sent together with ERC20 token assets, native assets may get lost since they will not be accounted for.
+        
+        **Remediations to Consider:**
+        
+        - Remove the payable modifier from the `exactSwap()` function, or
+        - Add a guard to prevent further processing if `msg.value` is non-zero.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed </field>
+    <field name="statusNote">Fixed in updated <i>chain-abstraction-integration</i></field>
+    <field name="commitTree">ac7932652d506615a58a9f21e2819117ecd4428d</field>
+    <field name="content">
+        ## [M-3] Native assets sent to `swap()` may get lost
+        
+        In the `OneInchUniswapV3` contract, `swap()` is a wrapper function for performing ERC20 token swap in the interaction with the 1inch router. In addition, `swap()` is defined as payable even though it doesn’t handle native assets.
+        
+        In case native assets are incorrectly sent together with ERC20 token assets, native assets may get lost since they will not be accounted for.
+        
+        **Remediations to Consider:**
+        
+        - Remove the payable modifier from the `swap()` function, or
+        - Add a guard to prevent further processing if `msg.value` is non-zero.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed </field>
+    <field name="commitTree">00725bbe776fa2a96c7138ee721d37d235840005</field>
+    <field name="content">
+        ## [M-4] Native assets sent to `swapAndXCall()` may get lost
+
+        The `SwapAndXCall` contract implements two `swapAndXCall()` functions, one which pays the relayer fee in the native asset and the second one that uses the output asset to pay for the relayer fee. However, both of these functions are payable. If users mistakenly send native assets to the `swapAndXCall()` function with the `_relayerFee` argument, these funds will get stuck in the contract.
+        
+        Following edge case scenarios are not correctly handled when a variant of `swapAndXCall()` with `_relayerFee` is invoked:
+        
+        1. `_fromAsset == address(0)` and `msg.value` is greater than `amountIn`. In this case, the amount of native assets equal to the difference of `msg.value` and `amountIn` will remain stuck in the contract.
+        2. `fromAsset` is a non-zero address and `msg.value` is also non-zero. In this case, the amount of native assets equal to the `msg.value` will remain stuck in the contract. 
+        
+        **Remediations to Consider:**
+        
+        - Removing the payable modifier for the `swapAndXCall()` function that uses the output asset for paying the relayer fee, or
+        - Splitting the internal `_setupAndSwap()` function into two separate functions to appropriately handle edge cases for each higher-level variant of the `swapAndXCall()`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">f177f30c861650e3af3c5ec227f89e09aa0fa1aa</field>
+    <field name="content">
+        ## [M-5] Unsafe transfer of ERC20 tokens
+        
+        In `ForwarderXReceiver` and `AuthForwarderXReceiver` contracts, `xReceive()` function implementation contains an identical piece of code that handles the fallback case when a transfer of ERC20 tokens to provided target has failed.
+        
+        ```solidity
+        if (!successfulForward) {
+          IERC20(_asset).transfer(_fallbackAddress, _amount);
+        }
+        ```
+        
+        These contracts are supposed to handle generic ERC20 tokens, some of which do not follow ERC20 conventions with respect to how they report transfer failure. Some revert, as specified by the standard, but others return false.
+        
+        As a result, mentioned implementation is unsafe since potentially some transfer failures will be considered successful even when they are not. In these cases, assets will remain in the custody of a particular contract instead of being transferred to the `_fallbackAddress`.
+        
+        **Remediations to Consider:**
+        
+        - Use OZ’s `SafeERC20` and its `safeTransfer()` wrapper for a more secure transfer of ERC20 tokens.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">ed3680e264d13f3f6f64319608e4f7e7f2d57b66</field>
+    <field name="content">
+        ## [M-6] `ZkSyncHubConnector` fee refunds will be sent to L2 address of `RootManager`
+        
+        In `ZkSyncHubConnector`, the `_sendMessage` internal function, used to propagate the root to the ZkSync domain, sets as the `_refundAddress` the `msg.sender` of the call:
+        
+        ```solidity
+        IZkSync(AMB).requestL2Transaction{value: fee}(
+          // The address of the L2 contract to call
+          mirrorConnector,
+          // We pass no ETH with the call
+          0,
+          // Encoding the calldata for the execute
+          _calldata,
+          // l2 Gas limit
+          l2GasLimit,
+          // The default l2GasPricePerPubdata
+          l2GasPerPubdataByteLimit,
+          // factory dependencies
+          new bytes[](0),
+          msg.sender
+        );
+        ```
+        
+        However, in the context of this call, `msg.sender` will be the `RootManager` contract, and since the refund will happen on the L2 after the transaction gets executed. These funds will be locked in this address.
+        
+        **Remediations to Consider:**
+        
+        - Consider providing the `_refundAddress` parameter with an address owned by Connext to use these potential refunded assets.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed </field>
+    <field name="commit">abd55e1e34d153b974edee4379261f8410b1e3b7</field>
+    <field name="content">
+        ## [M-7] Native assets sent to `OneInchUniswapV3` may get lost
+        
+        In `OneInchUniswapV3`, the `msg.value` used in the `swapETH` function could be higher than the `_amountIn`. In this case, the amount of native assets equal to the difference of `msg.value` and `amountIn` will remain stuck in the contract.
+        
+        **Remediations to Consider:**
+        
+        - Requiring that the `msg.value` is equal to the `_amountIn` if `_fromAsset == address(0)`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="response">It is difficult to decide `deadline` on the destination side. Because `xReceive` function is called by `connext` contract via relayer.</field>
+    <field name="content">
+        ## [M-8] Default deadline value of the `block.timestamp` allows pending transactions to be maliciously executed
+        
+        In the `UniV2Swapper` and `UniV3Swapper` contracts, `swap()` and `swapETH()` functions feature calls to `uniswapV2Router` and `uniswapV3Router` with deadline/expiration parameter hardcoded to `block.timestamp` value. These functions do not allow users to configure a deadline for their underlying swaps on UniswapV2 and UniswapV3. As a consequence, this missing feature enables pending transactions to be maliciously executed at a later point.
+        
+        Hardcoded deadline value of `block.timestamp` makes it possible for the transaction to be executed long after its expected execution time. For example, it may remain in the mempool for extended periods until it becomes interesting for block builders to include it. Also, it can be intentionally delayed to extract the maximum slippage value.
+        
+        UniswapV2 and UniswapV3 offer deadline/expiration parameters in their functions as a protection mechanism. Hardcoding these parameters to `block.timestamp` circumvents this protection mechanism and makes this integration layer built upon UniswapV2 and UniswapV3 less secure for end users.
+        
+        **Remediations to Consider:**
+        
+        - Introduce a configurable `deadline` parameter to all functions which perform a swap on the user's behalf, such as `swap()` and `swapETH()`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed </field>
+    <field name="commit">955c88727ddbd91c371fc0e6777ad4608ddcf069</field>
+    <field name="content">
+        ## [L-1] Incorrect event arguments for MinDisputeBlocksUpdated and DisputeBlocksUpdated
+
+        In `RootManager` contract, the following events are declared:
+        
+        ```solidity
+        event DisputeBlocksUpdated(uint256 previous, uint256 updated);
+        
+        event MinDisputeBlocksUpdated(uint256 previous, uint256 updated);
+        ```
+        
+        However, when these events are emitted in `setDisputeBlocks()` and `setMinDisputeBlocks()` order of arguments is switched and incorrect.
+        
+        ```solidity
+        emit MinDisputeBlocksUpdated(_minDisputeBlocks, minDisputeBlocks);
+        minDisputeBlocks = _minDisputeBlocks;
+        ...
+        emit DisputeBlocksUpdated(_disputeBlocks, disputeBlocks);
+        disputeBlocks = _disputeBlocks;
+        ```
+        
+        **Remediations to Consider:**
+        
+        - Update implementation to provide correct arguments when emitting these events.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Data Consistency</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed </field>
+    <field name="commit">301271f5fc6b81a08e01ce326c44bf5a75b6d867</field>
+    <field name="content">
+        ## [L-2] AuthForwarderXReceiver allows adding duplicated origin domains
+        
+        In `AuthForwarderXReceiver`, `constructor()` and `addOrigin()` do not perform any checks on whether the `_originDomain` to be added is already in the `originDomains` array. This can cause an origin to be in the array multiple times.
+        
+        In order to remove a duplicated domain and rectify an invalid state, the function `removeOrigin` would need to be called multiple times since the logic will only delete one value per call.
+        
+        **Remediations to Consider:**
+        
+        - Consider checking whether the `originRegistry[_originDomain]` is already set and reverting if that is the case. Otherwise, add a new origin.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed </field>
+    <field name="commit">53e2432671352a56291ba5e632aec631dab7399d</field>
+    <field name="content">
+        ## [L-3] Functions `addSwapper()` and `removeSwapper()` do not check for the current state values nor emit events
+        
+        In the `SwapAdapter` contract, consider adding events to `addSwapper()` and `removeSwapper()` functions and checking if the address to be added or removed is not already in the desired state.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed </field>
+    <field name="statusNote">Fixed in updated <i>chain-abstraction-integration</i></field>
+    <field name="commitTree">ac7932652d506615a58a9f21e2819117ecd4428d</field>
+    <field name="content">
+        ## [L-4] Allowance check in `_setupAndSwap()` references incorrect variable
+        
+        In the `SwapAndXCall` contract, function `_setupAndSwap()` contains an allowance check which, if satisfied, approves the max amount of `_toAsset` tokens to the `connext` contract.
+        
+        ```solidity
+        if (IERC20(_toAsset).allowance(address(this), address(connext)) < _amountIn) {
+          IERC20(_toAsset).approve(address(connext), type(uint256).max);
+        }
+        ```
+        
+        However, this check incorrectly references `_amountIn` instead of the `amountOut` variable, which represents the amount of `_toAsset` that `connext` uses in subsequent `xcall()` operations.
+        
+        In a situation when the current `connext` allowance for `_toAsset` is greater or equal to `_amountIn` but less than `amountOut`, this may result in unexpected operation processing failure.
+        
+        **Remediations to Consider:**
+        
+        - Update particular allowance check to reference the correct variable, which is `amountOut` instead of `_amountIn`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">spec</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [L-5] Queued transactions do not have an expiry date for execution
+        
+        The `Conductor` contract timelock functionality can potentially be bypassed by queueing multiple transactions on deployment. Since there is no time limit on when these could be executed, the owner can add any arbitrary number of calls, wait for the `delay()`, and execute them at any given moment after the delay.
+        
+        **Remediations to Consider:**
+        
+        - Consider adding an expiry check date to execute queued transactions (e.g. `X` weeks/days after the `delay`).
+    </field>
+</item>
+
+<item>
+    <field name="topic">Third-party Integration</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed </field>
+    <field name="commit">0d68eb70d640fc84e11136cc237725a2c5b2342b</field>
+    <field name="content">
+        ## [L-6] ZkSync `l2GasPerPubdataByteLimit` is hardcoded
+        
+        The `l2GasPerPubdataByteLimit` is a parameter that contains the L2 gas price per each published to L1 calldata byte. In the current `ZkSyncHubConnector` implementation, it’s hardcoded in the `_sendMessage` logic function:
+        
+        ```solidity
+        // The maximum amount L2 gas that the operator may charge the user for.
+        uint256 l2GasPerPubdataByteLimit = 800;
+        ```
+        
+        However, [ZkSync's recommendation](https://github.com/matter-labs/era-contracts/blob/main/ethereum/contracts/zksync/facets/Mailbox.sol#L221-L226) regarding this parameter is that this constant shouldn’t be relied on to be fixed and that every contract should provide the ability to supply the `_l2GasPerPubdataByteLimit` for each independent transaction. 
+        
+        **Remediations to Consider:**
+        
+        - Consider providing the `_l2GasPerPubdataByteLimit` on the client side and using it in the function parameters.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-1] ProposerAdded and ProposerRemoved events emitted when not needed
+
+        In the `RootManager` contract, in the `addProposer()` and `removeProposer()` functions, there is no check if the operation to be performed will result in state changes. Therefore, events like `ProposerAdded` and `ProposerRemoved` will be emitted even if no state change happened, which may confuse off-chain monitoring tools and services.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-2] BypassAdded and BypassRemoved events emitted when not needed
+
+        In the `Conductor` contract, in the `addBypass()` and `removeBypass()` functions, there is no check if the operation to be performed will result in state changes. Therefore, events like `BypassAdded` and `BypassRemoved` will be emitted even if no state change happened, which may confuse off-chain monitoring tools and services.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed </field>
+    <field name="commit">c0fd852c055ebcee041e461ed78fcdb868202146</field>
+    <field name="content">
+        ## [Q-3] Missing indexed attributes for events in `ForwarderXReceiver` and `AuthForwarderXReceiver`
+
+        For easier off-chain tracking and monitoring, consider adding an indexed attribute to the `_transferId` argument for the following events:
+        
+        ```solidity
+        event ForwardedFunctionCallFailed(bytes32 _transferId);
+        event ForwardedFunctionCallFailed(bytes32 _transferId, string _errorMessage);
+        event ForwardedFunctionCallFailed(bytes32 _transferId, uint _errorCode);
+        event ForwardedFunctionCallFailed(bytes32 _transferId, bytes _lowLevelData);
+        event Prepared(bytes32 _transferId, bytes _data, uint256 _amount, address _asset);
+        ```
+    </field>
+</item>
+
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed </field>
+    <field name="commit">bd9060c4990ff00e7b1fd8652255f436323caf83</field>
+    <field name="content">
+        ## [Q-4] Missing indexed attributes for events in AuthForwarderXReceiver
+
+        For easier off-chain tracking and monitoring, consider adding an indexed attribute:
+        
+        - for `_transferId` in the following events
+            
+            ```solidity
+            event ForwardedFunctionCallFailed(bytes32 _transferId);
+            event ForwardedFunctionCallFailed(bytes32 _transferId, string _errorMessage);
+            event ForwardedFunctionCallFailed(bytes32 _transferId, uint _errorCode);
+            event ForwardedFunctionCallFailed(bytes32 _transferId, bytes _lowLevelData);
+            event Prepared(bytes32 _transferId, bytes _data, uint256 _amount, address _asset);
+            ```
+            
+        - for `_originDomain` in the following events
+            
+            ```solidity
+            event OriginAdded(uint32 _originDomain, address _originSender);
+            event OriginRemoved(uint32 _originDomain);
+            ```
+    </field>
+</item>
+
+<item>
+    <field name="topic">Error Handling</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed </field>
+    <field name="statusNote">Fixed in updated <i>chain-abstraction-integration</i></field>
+    <field name="commitTree">ac7932652d506615a58a9f21e2819117ecd4428d</field>
+    <field name="content">
+        ## [Q-5] Incorrect error message
+        
+        In the `SwapAndXCall` contract, we can see the following require statement:
+        
+        ```solidity
+        require(msg.value >= _amountIn, "SwapAndXCall: msg.value != _amountIn");
+        ```
+        
+        The string message in this require statement is inconsistent with the code since the `msg.value` can be `!= _amountIn` without reverting.
+ 
+        Consider changing the text to `msg.value < _amountIn`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">2a75ae0201db7af15880d48d895c45a513bf1130</field>
+    <field name="content">
+        ## [Q-6] Validate `_originSender` address when it is added instead of when it used
+
+        In the `AuthForwarderXReceiver` contract, consider verifying that `_originSender` is not a 0 address when it is added in the `addOrigin()` function instead of checking it in the `onlyOrigin` modifier; this will ensure every origin address added in the `originRegistry` to be `!= address(0)`. As a result, this check won’t be necessary for every `xReceive` call.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Duplicated Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed </field>
+    <field name="commit">2a75ae0201db7af15880d48d895c45a513bf1130</field>
+    <field name="content">
+        ## [Q-7] Duplicated constructor logic
+
+        In the `AuthForwarderXReceiver` contract, consider calling `addOrigin()` in the constructor while adding the initial set of allowed origins instead of reimplementing the same functionality.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Unnecessary Code</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">2e54f9d0d228e007105b2d8827886b4f3ec8a86b</field>
+    <field name="content">
+        ## [Q-8] Unnecessary `allowedSwappers` assignment
+
+        In SwapAdapter.sol, the constructor logic assigns `address(this)` as an allowed swapper.
+        
+        ```solidity
+        constructor() {
+          allowedSwappers[address(this)] = true;
+          allowedSwappers[uniswapSwapRouter] = true;
+        }
+        ```
+        
+        However, this mapping is checked while calling `exactSwap` which will call `swap()` on the swapper address, a function that doesn’t exist in the `SwapAdapter.sol` contract.
+        
+        Consider removing this assignment.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Consistency</field>
+    <field name="impact">low</field>
+    <field name="status">fixed </field>
+    <field name="commit">69f8a150c27336195ed628700d78fef94d0567a5</field>
+    <field name="content">
+        ## [Q-9] Inconsistent ownership transfer
+
+        AuthForwarderXReceiver inherits directly from the OZ Ownable contract instead of using Connext’s custom Ownable2Step contract. 
+        
+        Consider changing the ownable implementation of AuthForwarderXReceiver.sol to Ownable2Step to make it consistent with ForwarderXReceiver.sol.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Unnecessary Code</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">fa00d32fdfdf8ef568c1aaf78296c3971601a3f3</field>
+    <field name="content">
+        ## [Q-10] Unnecessary Address library usage
+
+        In `OneInchUniswapV3`, `UniV2Swapper`, and `UniV3Swapper` contracts Address library is used for the address type. However, extra functionality from the Address library is not utilized within contract implementations. Therefore, consider removing the Address library.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">ddacd4e8a29b160447360b77d99d2a6dee47ea85</field>
+    <field name="content">
+        ## [Q-11] Simplify check in the `removeOrigin()`
+
+        In the `AuthForwarderXReceiver` contract, the following check can be simplified by replacing `≥` with `==`, since `>` state can never happen due to the previous code.
+        
+        ```solidity
+        if (indexToRemove >= uint32(originDomains.length)) {
+          revert ForwarderXReceiver__removeOrigin_invalidOrigin(_originDomain);
+        } 
+        ```
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">high</field>
+    <field name="status">fixed </field>
+    <field name="commit">eacfc1713af94d7b0a985d9865a1f1d51618a2b2</field>
+    <field name="content">
+        ## [Q-12] Documentation improvements
+
+        - RelayerProxyHub - missing natspec for `_signature` param in `proposeAggregateRootKeep3r()`
+        - SpokeConnector - missing natspec for `SnapshotRootSaved` event
+        - SwapAdapter - missing natspec for a return value in `exactSwap()` and `directSwapperCall()`
+        - ISwapper - missing natspec for `ISwapper:swap()`
+        - ForwarderXReceiver - missing natspec for a return value in `xReceive`, `prepareAndForward`, `_prepare`, `_forwardFunctionCall` functions
+        - AuthForwarderXReceiver - missing natspec for a return value in `xReceive`, `prepareAndForward`, `_prepare`, `_forwardFunctionCall` functions
+        - SwapForwarderXReceiver - missing natspec for a return value in `_prepare`
+        - UniV2Swapper
+            - swap() notice natspec incorrectly mentions 1inch
+            - missing natspec for a return value in `swap()`
+        - UniV3Swapper
+            - swap() notice natspec incorrectly mentions 1inch
+            - missing natspec for a return value in `swap()`
+        - OneInchUniswapV3
+            - missing natspec for a return value in `swap()`
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Consistency</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">85da8edf4b69ce915a24ff2abdec301ef9c4f48a</field>
+    <field name="content">
+        ## [Q-13] `renounceOwnership` logic is not consistent across contracts
+
+        Although `renounceOwnership` is disabled in all current contracts, there are different logic implementations:
+        
+        - Conductor.sol reverts with a custom `rennounceOwnership` error.
+        - MekleTreeManager.sol, RootManager.sol, WatcherClient.sol, WatcherManager.sol, SpokeConnector.sol, GnosisSopokeConnector.sol, MultichainSpokeConnector.sol, and OptimismSpokeConnector.sol do not revert but do not perform any state changes in the logic either.
+        
+        Consider following a consistent implementation approach in all contracts.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Consistency</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed </field>
+    <field name="commit">d38e1a8bfac9655c96e5dcaaf36824fd1f77b66f</field>
+    <field name="content">
+        ## [Q-14] Inconsistent processed messages in ZkSync hub
+
+        In `ZkSyncHubConnector`, `processMessageFromRoot()` calls to an already processed root message won’t revert. This implementation differs from Arbitrum and Optimism hubs, which revert if users attempt to reprocess a message root.
+        
+        Consider making this behavior consistent across all implementations.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">high</field>
+    <field name="status">fixed </field>
+    <field name="commit">00725bbe776fa2a96c7138ee721d37d235840005</field>
+    <field name="content">
+        ## [Q-15] `SwapAndXCall` functions do not document `address(0)` treatment
+
+        In `SwapAndXCall` contract, `swapAndXCall()` functions do not document the special considerations on native assets.
+        
+        Consider adding natspec comments explaining the possible use cases of `address(0)` for both `_toAsset` and `_fromAsset` in `swapAndXCall()`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Trust Model</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [I-1] Optimistic mode increases centralization risks
+
+        By enabling the optimistic mode, the propagation of messages to domains will completely bypass the native AMBs of each domain. A unique off-chain agent will be responsible for proposing aggregate roots and propagating them to every domain, concentrating the on-chain aggregation into one centric point. 
+        
+        Watchers will still execute their duties as protection against fraudulent messages but, at the moment, all the execution and safeguard controls will be centralized in Connext’s off-chain components.
+    </field>
+</item>
