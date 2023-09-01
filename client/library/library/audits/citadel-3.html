@@ -1,0 +1,196 @@
+  <page
+    clientName="Citadel"
+    reportDate="June 26th, 2023"
+    auditTitle="Citadel A-3"
+    auditVersion="1.0.0"
+    repoUrl="https://github.com/thecitadelgame/contracts"
+    customRepoInfo
+    customReviewInfo
+    layout="/library/audits/_layout.html"
+  >
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from June 26,
+    2023 to June 30, 2023.
+  </content-for>
+
+    <content-for name="spec">
+      <ul>
+        <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+        <li>Citadel documentation.</li>
+        <li>Citadel provided separate PRs to audit.</li>
+      </ul>
+    </content-for>
+
+    <content-for name="repo-info">
+      <ul>
+        <li>
+          <b>PR#19: Add alternate auth system</b>
+          <a
+            href="https://github.com/thecitadelgame/contracts/pull/19/"
+            target="_blank"
+          >
+            thecitadelgame/contracts/pull/19
+          </a>
+        </li>
+        <li class="break-words break-all">
+          Commit Hash:
+          <code>9ebe18a32355596febc46931c16ab601eaff9a7a</code>
+        </li>
+        
+        <li>
+          <b>PR#20: Use separate contracts for the ship token and genesis sale</b>
+          <a
+            href="https://github.com/thecitadelgame/contracts/pull/20/"
+            target="_blank"
+          >
+            thecitadelgame/contracts/pull/20
+          </a>
+        </li>
+        <li class="break-words break-all">
+          Commit Hash:
+          <code>71531ab6d239a90dc019f1177648da6949dc2ab7</code>
+        </li>
+
+        <li>
+          <b>PR#21: Add setContractURI to ships to reduce the necessity for upgrades</b>
+          <a
+            href="https://github.com/thecitadelgame/contracts/pull/21/"
+            target="_blank"
+          >
+            thecitadelgame/contracts/pull/21
+          </a>
+        </li>
+        <li class="break-words break-all">
+          Commit Hash:
+          <code>271e65eda4e8bd8eb299baf2f27899aafa9b8f1f</code>
+        </li>
+
+        <li>
+          <b>PR#23: Make existing events more normalized, add some missing events that may be useful</b>
+          <a
+            href="https://github.com/thecitadelgame/contracts/pull/23/"
+            target="_blank"
+          >
+            thecitadelgame/contracts/pull/23
+          </a>
+        </li>
+        <li class="break-words break-all">
+          Commit Hash:
+          <code>3c473bba216968f00b7e214526cd01cc6590a7ea</code>
+        </li>
+
+        <li>
+          <b>PR#24: Fix audit report findings</b>
+          <a
+            href="https://github.com/thecitadelgame/contracts/pull/24/"
+            target="_blank"
+          >
+            thecitadelgame/contracts/pull/24
+          </a>
+        </li>
+        <li class="break-words break-all">
+          Commit Hash:
+          <code>26a29f397a2ddbff662630e4005a69cd8ebf054c</code>
+        </li>
+
+      </ul>
+    </content-for>
+
+    <content-for name="source-code">
+      <p>Specific changes (PR#19) to add alternate auth system</p>
+      <p>
+        <i>./src/</i>
+      </p>
+      <template type="file-hashes">
+      
+          32f4e6224314ded43336045e08eea3c0d9a8176aea424870dd1bf5cc3a4b69d3  src/auth/dc/DelegateCashStrategy.sol
+          bd7ff2d2aaaf79e8f911fff6ea3a5ec084665fd5d15c9161a8ca911de5aedb13  src/auth/dc/IDelegationRegistry.sol
+          e150d5ceb6834347be91f14fcff54b69a04c83671fb9273aa951e66a9abb478f  src/auth/self/SelfAuthStrategy.sol
+          48e1c7f34adf29112960897e994dc24961b5eef29a18af9432cdd99254150eab  src/auth/session/ISessionStrategy.sol
+          d01c61a7ffe6cae339a4221a707e0efc0be7a77b203940b033946703a8a83acf  src/auth/session/IWMATIC.sol
+          9e11e8f5cd3b51891ee776748172d2156cfc2c7788330bbf390abccdc84be34e  src/auth/session/SessionStrategy.sol
+          7043188d6cf444ef261e16170d40c6365c37d0b4d09a88d2d124f8bdccc44f2b  src/auth/session/WMATIC.sol
+          cb3116953fa017687e995bbab23974100b400ad346a767069de9e31ae03ecc89  src/auth/AuthCompatible.sol
+          f81b09501d7a9fef53dc7558108bde6f2f60ae435a7e2844c5eeb304d9308221  src/auth/AuthManager.sol
+          c65f16cdca5020ee6783feb538b13dd1b207fdbb2e0fd7bc1a33baba9f1dc362  src/auth/BaseAuthCompatible.sol
+          9bc2416c6db5eba9f91dddf6724d303286890d92461ca3030baa971e472718c4  src/auth/IAuthManager.sol
+          9ae7c413d39e1897e0f93e62bc542ff59f997de33e57acb12901390488f1e771  src/auth/IAuthStrategy.sol
+          22117430d653f4d15dfdc0e966b5cc9ab862b83b8030cab34ea82efc893ad61c  src/game/access/AccessControlFacet.sol
+          7021a2d64f2c43a06bc2955f12cf7558a1287509be341bb420725a9d6101828e  src/game/access/AccessControlPrivileged.sol
+          8e334e6d7bef456081c356c9e7884b762a51ada4db24276e0ed61ae17a6bb61e  src/game/auth/AuthFacet.sol
+          7ad03b17084a2353478aa38d1bc44c3ab820643c0494839d89beee2e5941c3fb  src/game/auth/AuthPrivileged.sol
+          b2d8f780460dc0490f9c6184b2f327dedbe7ccfdfbe63e35b6c9e95d95975c9a  src/game/auth/IAuth.sol
+          5df8433d239441252caf1d13505a5208376c3b7156f839494ebd976ef00c8f92  src/game/common/CommonPrivileged.sol
+          4274815bcd3fbb1f22774a8cf6ea72646b9e604dc8f4f7e8027f3e52fc0d374a  src/game/glue/GlueFacet.sol
+          b5bcc49c5b61cd7417a8dcfad295154ea841df51e681c8d6edd07366e6efa53e  src/game/upgrades/UpgradesPrivileged.sol
+          5cabdb31b4a7f697f94ee5fb787de79c9544540437d062a9afa2940b3966ee7e  src/game/GameInit.sol
+          11c4be575782cca00d61a3a786e8aaa98f0b1c04b28225a469cbc6fc93f7baf6  src/game/IGame.sol
+      
+      </template>
+
+      <p>Specific changes (PR#20) use separate contracts for the ship token and genesis sale</p>
+      <p>
+        <i>./src/</i>
+      </p>
+      <template type="file-hashes">
+    
+        c5e2445ecde7cef153d948a94691944379119db6d805df0f7ca2969186ef6703  src/ships/genesis/DutchAuctionSale.sol
+        66cc1b9cdcf3d7c020e95173889e4360822faa387d59d0864198b23dd624411f  src/ships/ERC721C.sol
+        16cca66e03d2f58153b611f68a6b60308fb50c6f11525190e22d8e792389110d  src/ships/IERC721C.sol
+        b0273e48482d9fa5ddb9e13aa18f75706d94c77a4cc0d8abe3a1f684aaec40df  src/ships/IMetadataLib.sol
+        72850e54f02197049b8a2207af1ac588e364ab42c49d4607b3b4e012e88a88d7  src/ships/IShips.sol
+        0f6f3153311194c0770fa067a071bff6d3d1cd6d7f282c1e4e22d8e0491d7ef7  src/ships/MetadataLib.sol
+        c23a1170222977d1d0043eda5c2fa0d445b50538bb7c06d0dbfa51a2ed7418e6  src/ships/Ships.sol
+        9954f161e912b191dc23d364c270e10b30dd903d3e6e442e6ea291a3a0082f64  src/ships/ShipsMock.sol
+    </template>
+
+    <p>Specific changes (PR#21) to add setContractURI to ships to reduce the necessity for upgrades</p>
+    <p>
+      <i>./src/</i>
+    </p>
+    <template type="file-hashes">
+
+        c23a1170222977d1d0043eda5c2fa0d445b50538bb7c06d0dbfa51a2ed7418e6  src/ships/Ships.sol
+  </template>
+
+  <p>Specific changes (PR#23) to make existing events more normalized, add some missing events that may be useful</p>
+      <p>
+        <i>./src/</i>
+      </p>
+      <template type="file-hashes">
+        f81b09501d7a9fef53dc7558108bde6f2f60ae435a7e2844c5eeb304d9308221  src/auth/AuthManager.sol
+        9bc2416c6db5eba9f91dddf6724d303286890d92461ca3030baa971e472718c4  src/auth/IAuthManager.sol
+        f90d6488bd000e3f0d17f7e1089cef5531f2f825115b61468015d81c28039dc0  src/game/belts/BeltsPrivileged.sol
+        6c0f227accb574a70c2963851c68fc285fc784d4a24495fbbcd0245c582853db  src/game/belts/IBelts.sol
+        5df8433d239441252caf1d13505a5208376c3b7156f839494ebd976ef00c8f92  src/game/common/CommonPrivileged.sol
+        5d08db2cab4adcd0f3d601d62818933dbdca652f4cd3fcfcd6823bfc0a25f27f  src/game/common/ICommon.sol
+        4274815bcd3fbb1f22774a8cf6ea72646b9e604dc8f4f7e8027f3e52fc0d374a  src/game/glue/GlueFacet.sol
+        9bc8d260f8b10c6c47cd6668a7ffcb166f7618aa8f772a9e3a8302ebaf721e35  src/game/glue/IGlue.sol
+        e5c285452dfad49c9939c54288629a67340aebaf8bf75faee03c5feada200762  src/game/outposts/IOutposts.sol
+        cf3d5d96b522328a4c62ec9f837d33ad9a5c1df474f33b865b433c1143a6ff2f  src/game/rewards/IRewards.sol
+        22827f43348934dba2e01b069dcabe05c51013650e5520a2cbb43ba59a9c06f0  src/game/rewards/RewardsPrivileged.sol
+        060b7cf9f9f9c612f7f74321729deaf2ea367ed2ef67ef7af481eebe6ce243d9  src/game/travel/ITravel.sol
+        b129b13c6ef7e9d56a7e0a1218258e530406a09100ec65b6b00fe7d99fbd01ca  src/game/travel/TravelPrivileged.sol
+        ddaf819021cd75f6ce44219e1d17efcc4c4ab3081d523bcd96716ccd03273ea9  src/game/upgrades/IUpgrades.sol
+        b5bcc49c5b61cd7417a8dcfad295154ea841df51e681c8d6edd07366e6efa53e  src/game/upgrades/UpgradesPrivileged.sol
+        5fd212965410624879041f2710c2e9c43ddf3a430af76269e8d22f60ec70511a  src/governance/CitadelGovernor.sol
+        c5e2445ecde7cef153d948a94691944379119db6d805df0f7ca2969186ef6703  src/ships/genesis/DutchAuctionSale.sol
+
+    </template>
+
+      <p>Specific changes (PR#24) to fix audit report findings</p>
+      <p>
+        <i>./src/</i>
+      </p>
+      <template type="file-hashes"> 
+        9645c261f7b5fb67e4d322c907e5d24305c5cf26e8c23eeed0ea4522a987afce  src/base/util/IStructs.sol
+        f90d6488bd000e3f0d17f7e1089cef5531f2f825115b61468015d81c28039dc0  src/game/belts/BeltsPrivileged.sol
+        22827f43348934dba2e01b069dcabe05c51013650e5520a2cbb43ba59a9c06f0  src/game/rewards/RewardsPrivileged.sol
+        060b7cf9f9f9c612f7f74321729deaf2ea367ed2ef67ef7af481eebe6ce243d9  src/game/travel/ITravel.sol
+        f4b27563da4af0be4f6d255efaaaaa56874919f15e9ca75165e2cfb41500af41  src/game/travel/TravelFacet.sol
+        b129b13c6ef7e9d56a7e0a1218258e530406a09100ec65b6b00fe7d99fbd01ca  src/game/travel/TravelPrivileged.sol
+        b5bcc49c5b61cd7417a8dcfad295154ea841df51e681c8d6edd07366e6efa53e  src/game/upgrades/UpgradesPrivileged.sol
+          </template>
+
+</content-for></page
+></page>
