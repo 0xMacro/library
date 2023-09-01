@@ -12,14 +12,12 @@
 
     The `MedianDeltaBreaker` contract implements an Exponential Moving Average (EMA) to calculate the percentage difference between the current reported median and the previous median rate EMA value, calculated from the following formula:
 
-    $
-    currentMedian * smoothingFactor + previousMedianEMA * (1 - smoothingFactor)
-    $
+    _**currentMedian * smoothingFactor + previousMedianEMA * (1 - smoothingFactor)**_
 
     Where
 
-    - $smoothingFactor$ is set for each specific `rateFeedID` with `setSmoothingFactor()` and can’t be higher than `1`.
-    - $currentMedian$ is the externally reported value from the `SortedOracles.medianRate()`.
+    - _**smoothingFactor**_ is set for each specific `rateFeedID` with `setSmoothingFactor()` and can’t be higher than `1`.
+    - _**currentMedian**_ is the externally reported value from the `SortedOracles.medianRate()`.
 
     This allows the `MedianDeltaBreaker` to weigh the latest median provided by oracles (reported through `SortedOracles.report()` and read through `SortedOracles.medianRate()`) and consider the previously stored value.
 
@@ -305,10 +303,8 @@ It is possible that the conditions that trigger a breaker may already be present
     ## [Q-4] Documentation improvements
 
     1. In the `BiPoolManager` docs page, the ***[Executing Swaps](https://docs.mento.org/mento/developers/smart-contracts/bipoolmanager#executing-swaps)*** section mentions the following:
-
     > This function executes, in that it prices the swap and updates the virtual bucket sizes of the PoolExchange.
     > 
-
     However, it doesn’t consider the case where an exchange uses the `ConstantSumPricingModule`, which doesn’t update the bucket sizes on swaps.
 
     1. On the Pricing Modules page, both pricing module links to GitHub are broken. Also, the [constant sum pricing module formula](https://docs.mento.org/mento/developers/smart-contracts/pricing-modules#constantsumpricingmodule) should be updated to reflect the newly implemented value constant sum formula.
