@@ -1,0 +1,384 @@
+<item>
+  <field name="topic">Specification</field>
+  <field name="impact">spec</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">
+    Restricted access to shouldTrigger() function so only BreakerBox can call it. 
+  </field>
+  <field name="commit">4a0e5de16cd2839458f62a9f25319e6bf2523ae8</field>
+  <field name="content">
+    ## [H-1] `MedianDeltaBreaker.shouldTrigger()` allows any external actor to incorrectly update the `medianRatesEMA`
+
+    The `MedianDeltaBreaker` contract implements an Exponential Moving Average (EMA) to calculate the percentage difference between the current reported median and the previous median rate EMA value, calculated from the following formula:
+
+    $
+    currentMedian * smoothingFactor + previousMedianEMA * (1 - smoothingFactor)
+    $
+
+    Where
+
+    - $smoothingFactor$ is set for each specific `rateFeedID` with `setSmoothingFactor()` and can’t be higher than `1`.
+    - $currentMedian$ is the externally reported value from the `SortedOracles.medianRate()`.
+
+    This allows the `MedianDeltaBreaker` to weigh the latest median provided by oracles (reported through `SortedOracles.report()` and read through `SortedOracles.medianRate()`) and consider the previously stored value.
+
+    ```solidity
+    function shouldTrigger(address rateFeedID) public returns (bool triggerBreaker) {
+      (uint256 currentMedian, ) = sortedOracles.medianRate(rateFeedID);
+
+      uint256 previousRatesEMA = medianRatesEMA[rateFeedID];
+      ...
+      FixidityLib.Fraction memory smoothingFactor = FixidityLib.wrap(getSmoothingFactor(rateFeedID));
+      medianRatesEMA[rateFeedID] = FixidityLib
+        .wrap(currentMedian)
+        .multiply(smoothingFactor)
+        .add(FixidityLib.wrap(previousRatesEMA).multiply(FixidityLib.fixed1().subtract(smoothingFactor)))
+        .unwrap(); 
+
+      return exceedsThreshold(previousRatesEMA, currentMedian, rateFeedID);
+    }
+    ```
+
+    However, this implementation will only remain true if `shouldTrigger()` function is called once per value update in the `SortedOracle` median rate; and since the `shouldTrigger()` function is public (as per the `IBreaker.sol` interface) and doesn’t have any access control, any external actor can perform any arbitrary `shouldTrigger()` calls incorrectly updating the `medianRatesEMA` values with the same reported `medianRate`.
+
+    **Remediations to Consider**
+
+    - Updating the `medianRatesEMA` only if a new report was provided for that specific `rateFeedID` or
+    - Adding access control to this function and allowing only to call it by `SortedOracles` or `BreakerBox` contracts.
+
+    Note: For the second suggestion, it's worth adding an additional view function to allow users or external points to check this condition.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">
+    Removed the function since precision multipliers are automatically set in createExchange() and are only used for exchanges. 
+  </field>
+  <field name="commit">aa5520d9e32f0fb4bf4b1eb90fe9e0bc392b5ac4</field>
+  <field name="content">
+    ## [M-1] `setTokenPrecisionMultipliers` allows arbitrary decimal multipliers
+
+    When the `BiPoolManager` creates an exchange, after performing several validations on the inputs, the token precision multipliers are set in order to deal with assets with different token decimals while calculating swap amounts. 
+
+    For example, `USDC` has `6` decimal places, having a token precision multiplier of `1e12` (`10 ** (18 - 6)`), as we can see in the function’s logic:
+
+    ```solidity
+    tokenPrecisionMultipliers[exchange.asset0] = 10**(18 - uint256(IERC20Metadata(exchange.asset0).decimals()));
+    tokenPrecisionMultipliers[exchange.asset1] = 10**(18 - uint256(IERC20Metadata(exchange.asset1).decimals()));
+    ```
+
+    However, the function `setTokenPrecisionMultipliers` allows to arbitrarily change the token precision multipliers, in this case, say for `USDC`, from `1e12` to an arbitrarily large or small value. Which would then affect the calculations in the swap in/out and in the get amounts in/out functions.
+
+    Additionally, the function doesn’t check whether the tokens are valid and registered with the `Reserve` contract. 
+
+    **Remediations to Consider**
+
+    - Perform the same proper input validations implemented in the `createExchange` function or
+    - Remove the `setTokenPrecisionMultipliers` from the contract.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">
+    Introduced a new pricingModules mapping that tracks the current pricingModule implementations. 
+  </field>
+  <field name="commit">ac882b2f2ac2461cdf7d73f29df78288e76bf85b</field>
+  <field name="content">
+    ## [M-2] Pricing module is not verified when creating exchanges
+
+    When creating an exchange in the `BiPoolManager` contract, the pricing module is specified as an input parameter in the `PoolExchange _exchange` struct. However, there are no validations that the address of the pricing module corresponds to a canonical version of this module. This can cause, for example, the previous version of the constant sum module to be used in the exchange creation and, therefore, to calculate swap amounts incorrectly. The only check performed during swaps is in the `pricingModuleIdentifier`:
+
+    ```solidity
+    function pricingModuleIdentifier(PoolExchange memory exchange) internal view returns (bytes32) {
+      return keccak256(abi.encodePacked(exchange.pricingModule.name()));
+    } 
+    ```
+
+    This also opens up other scenarios where invalid pricing module addresses can be used.
+
+    **Remediations to Consider**
+
+    Keeping in the `BiPoolManager` contract’s storage the address of the latest or allowed pricing modules and asserting it’s used in `createExchange`.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## [M-3] `MedianDeltaBreaker` will store the first median reference without restrictions
+
+    The `MedianDeltaBreaker` contract implements an EMA (Exponential Moving Average) that weights the current median rate and adds as a consideration the previously stored median EMA rate; this mitigates immediate price spikes in the median but also allows constant trends in the price to move without triggering the breaker. 
+
+    As we can see in the `shouldTrigger()` logic, there is a special consideration when the `previousRatesEMA == 0`. This condition will only be true in the initial call after enabling this breaker for a specific `rateFeedID`.
+
+    ```solidity
+    function shouldTrigger(address rateFeedID) public returns (bool triggerBreaker) {
+    	...
+      uint256 previousRatesEMA = medianRatesEMA[rateFeedID];
+      if (previousRatesEMA == 0) {
+        // Previous recorded EMA will be 0 the first time this rate feed is checked.
+        medianRatesEMA[rateFeedID] = currentMedian;
+        return false;
+      }
+    	...
+    }
+    ```
+
+    However, since this function will store the current median without any constraints, the reported median, at the execution time of `shouldTrigger()` call, could be outside of the expected values or manipulated. This will render an invalid median that will be used as a reference to check every subsequent oracle report for that `rateFeedID`.
+
+    **Remediations to Consider**
+
+    - Adding an expected range of median values where the initial `medianRatesEMA` value will be stored and used as reference, or
+    - Setting an initial reference median value, similar to the `ValueDeltaBreaker` contract.
+
+  </field>
+    <field name="response">
+    We don’t believe the situation described is a credible threat, the assumption is that we have an attacker that can manipulate an Oracle price and set the initial EMA value when a circuit breaker gets added or activated via Governance proposal. In this situation, it wouldn’t make sense for the attacker to wait until that moment to manipulate the price. 
+
+    And even so, there’s no clear way to seed the value that makes sense. If we provide an initial value, it will already be old until the governance proposal passes to the execution state so we would be seeding an old value. A range would add a lot of configuration complexity without providing many benefits and could result in problematic behavior if the range is too tight or too wide.
+    </field>    
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">
+    Added additional checks for trading limits.
+    </field>
+  <field name="commit">a4b01b00916d8c8278c4a04edac9773a17089c61</field>
+  <field name="content">
+    ## [L-1] Potential misconfiguration in trading limits
+
+    The trading limits act as a safeguard and are checked during the swap operation if the trading config was created for the token. A valid configuration should not permit setting these limits to `0` for enabled directional trading flags. 
+
+    The function `Broker.configureTradingLimit()` doesn’t validate the above criteria when setting the trading config for a token. 
+
+    In addition, there are no checks to ensure that the trading limit for `L0` is smaller than the trading limit for `L1`, and they’re both smaller than the global trading limit `LG`. 
+
+    **Remediations to Consider**
+
+    Consider validating the trading config inputs to ensure that invalid trading limits cannot be set. 
+  </field>
+</item>
+
+<item>
+  <field name="topic">Edge Case</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">
+    Added a call to checkAndSetBreakers() intoggleBreaker()
+    </field>
+  <field name="commit">c60bbf1ad0212e58959a40f2efe0e96b8a9c24cd</field>
+  <field name="content">
+    ## [L-2] toggleBreaker does not update the trading mode for newly added breakers
+
+    In `BreakerBox.sol`, when turning on the breakers for certain `rateFeedId`s, there will be an execution gap between the `toggleBreaker()` call and the comparison of the corresponding breaker trigger conditions in `checkAndSetBreakers()`. 
+
+Since the `BiPoolManager` contract uses the view function `getRateFeedTradingMode()` before executing swaps, which reads the current breaker status but doesn’t update each dependency:
+
+```solidity
+function getRateFeedTradingMode(address rateFeedID) external view returns (uint8) {
+  require(rateFeedStatus[rateFeedID], "Rate feed ID has not been added");
+  uint8 tradingMode = rateFeedTradingMode[rateFeedID];
+  for (uint256 i = 0; i < rateFeedDependencies[rateFeedID].length; i++) {
+    tradingMode = tradingMode | rateFeedTradingMode[rateFeedDependencies[rateFeedID][i]];
+  }
+  return tradingMode;
+}
+```
+
+It is possible that the conditions that trigger a breaker may already be present. However, until the next oracle feed `SortedOracles::report()`, or external call to `checkAndSetBreakers()`, the trading mode won’t consider this breaker. This is especially visible with the `MedianDeltaBreaker`, where the first update will only store the median rate.
+
+**Remediations to Consider**
+
+- Calling `checkAndSetBreakers` when adding breakers to a specific `rateFeedID` in the `toggleBreaker` logic or,
+- Make sure to execute a `checkAndSetBreakers` atomically call after enabling a breaker.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Interoperability</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">
+    Introduced a new protected resetMedianRateEMA() function.
+    </field>
+  <field name="commit">46ce2ce3edc9248b3e148ac60d74bb0403baf7b7</field>
+  <field name="content">
+    ## [L-3] `MedianDeltaBreaker` previous rates can not be reset if needed
+
+    In `MedianDeltaBreaker`, the initial value and start point, where `medianRatesEMA == 0`, only exist the first time a specific `rateFeedID` is set for this breaker. When a `rateFeedID` needs to be removed and later added again into the `MedianDeltaBreaker`, there is no way to reset the initial reference value, which means it cannot easily adjust to newly established rates. It will require a custom higher configuration of the breaker threshold to temporarily bypass the reported values.
+
+    **Remediations to Consider**
+
+    Implementing a reset function if the breaker is disabled from the `BreakerBox` contract to allow a new initialization of the median rates.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Duplicated Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">6c642832832b94608145b699adcb2ded49e66b3f</field>
+  <field name="content">
+    ## [Q-1] Repetitive validation code can be converted to a function modifier
+
+    The following `require` statement is used in the internal functions`_getAmountIn` and `_getAmountOut` contained in the `BiPoolManager.sol`. This is repeated code that could be refactored into a function modifier. 
+
+    ```solidity
+    //The following require statement is used in multiple functions 
+    require(
+          (tokenIn == exchange.asset0 && tokenOut == exchange.asset1) ||
+            (tokenIn == exchange.asset1 && tokenOut == exchange.asset0),
+          "tokenIn and tokenOut must match exchange"
+        );
+    ```
+
+    **Remediations to Consider**
+
+    Consider converting this validation code to a function modifier and using it for the internal functions `_getAmountOut` and `_getAmountIn`.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Model</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">9d9a4aa1f9f2d81e5d018915fabfa7718ccf8da1</field>
+  <field name="content">
+    ## [Q-2] The function `removeRateFeed()` doesn’t delete the rate feed dependencies
+
+    In the `BreakerBox` contract, a `rateFeedId` could have a set of rate feed dependencies mapped to it via the `setRateFeedDependencies` function. 
+
+    However, when a rate feed is removed, its dependencies are not deleted. 
+
+    **Remediations to Consider**
+
+    Consider adding the following line to the `removeRateFeed` function
+
+    ```solidity
+    delete rateFeedDependencies[rateFeedID];
+    ```
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Natspec</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">d4671c2dd9ce3c82101ad54a698c8d99c03a4141</field>
+  <field name="content">
+    ## [Q-3]  Missing natspec comments for `struct state` and `struct config` in the `TradingLimits` library
+
+    Consider adding the corresponding natspec comments to these structs.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Documentation</field>
+  <field name="impact">medium</field>
+  <field name="status">addressed</field>
+  <field name="content">
+    ## [Q-4] Documentation improvements
+
+    1. In the `BiPoolManager` docs page, the ***[Executing Swaps](https://docs.mento.org/mento/developers/smart-contracts/bipoolmanager#executing-swaps)*** section mentions the following:
+
+    > This function executes, in that it prices the swap and updates the virtual bucket sizes of the PoolExchange.
+    > 
+
+    However, it doesn’t consider the case where an exchange uses the `ConstantSumPricingModule`, which doesn’t update the bucket sizes on swaps.
+
+    1. On the Pricing Modules page, both pricing module links to GitHub are broken. Also, the [constant sum pricing module formula](https://docs.mento.org/mento/developers/smart-contracts/pricing-modules#constantsumpricingmodule) should be updated to reflect the newly implemented value constant sum formula.
+
+    1. Some of the links included in the documentation pages are currently broken:
+        - The config contract link is broken on the deployment parameters page: https://docs.mento.org/mento/developers/deployments/parameters
+        - Github links in the `BreakerBox` section: https://docs.mento.org/mento/developers/smart-contracts/breakerbox
+
+    1. Consider adding documentation pages for the specific breaker contract implementations (`MedianDeltaBreaker` and `ValueDeltaBreaker`). 
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Duplicated Call</field>
+  <field name="impact">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">2608809f1b1d2fbc00843e0894f59750e5abca09</field>
+  <field name="content">
+    ## [Q-5] `createExchange` performs the same external call twice
+
+    In `BiPoolManager.sol`, when asserting the `asset0` and `asset1` decimals and setting the `tokenPrecisionMultipliers`, `createExchange()` function performs the same external call twice for each operation. 
+
+    ```solidity
+    if (IERC20Metadata(exchange.asset0).decimals() > 18) {
+      revert("asset0 decimals must be <= 18");
+    }
+    if (IERC20Metadata(exchange.asset1).decimals() > 18) {
+      revert("asset1 decimals must be <= 18");
+    }
+
+    tokenPrecisionMultipliers[exchange.asset0] = 10**(18 - uint256(IERC20Metadata(exchange.asset0).decimals()));
+    tokenPrecisionMultipliers[exchange.asset1] = 10**(18 - uint256(IERC20Metadata(exchange.asset1).decimals()));
+    ```
+
+    Consider saving these values to memory to save gas and avoid unnecessary external calls.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">fcf091996de81abd84809ecb00246e340c6a7571</field>
+  <field name="content">
+    ## [Q-6] Use returned values for declarations in `getOracleExchangeRate()`
+
+    Consider using the return values in the function declaration to improve readability and consistency with other functions.
+
+    ```solidity
+    function getOracleExchangeRate(address target) internal view returns (uint256 rateNumerator, uint256 rateDenominator) {
+        (rateNumerator, rateDenominator) = sortedOracles.medianRate(target);
+        require(rateDenominator > 0, "exchange rate denominator must be greater than 0");
+      }
+    ```
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Model</field>
+  <field name="impact">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">06020bedd561d65f2d8f42cc45ee29c8d0329b3c</field>
+  <field name="content">
+    ## [Q-7] `StableTokenV2` storage `__gap` uses existent storage slots
+
+    In `StableTokenV2`, the storage layout implemented deprecated variables for unused slots from the previous `StableToken` implementation. However, for slots 8 and 12, `inflationState` and `exchangeRegistryId` respectively, there aren’t any deprecated variables declarations. These slots are included in the `__gap` reserve variable. 
+
+    Consider adding deprecated variables for these slots to keep track of these unused but non-empty variables in case of any future implementation migration.
+  </field>
+</item>
