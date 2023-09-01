@@ -1,0 +1,41 @@
+<page
+  clientName="Kwenta"
+  reportDate="July 21, 2023"
+  auditTitle="Kwenta A-6"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kwenta/smart-margin"
+  repoCommitHash="5cc3ccc3817d41ad28e2b777450b308f460c9d4c"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from July 17, 2023 to July 20, 2023.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+    <li><a href="https://github.com/Kwenta/kwenta-state-log/blob/master/kips/kip-080.md">KIP-80</a></li>
+    <li><a href="https://github.com/Kwenta/kwenta-state-log/blob/master/kips/kip-087.md">KIP-87</a></li>
+  </ul>
+  
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    2f7e12de5990f91e637fbffe52687165974a565260dbfa390c7a5becf290634c  src/Account.sol
+    589e2b8ba86ce005e781484c4a60e560f520f907914b2c83fa05603af8baddf4  src/Events.sol
+    899249ee3c5f8b6abf35b08787f3960639a2c8837078d5d05d29998ee6ef43b7 src/Settings.sol
+    7903c99885cbaf879e23620a6d622139b0b5b9f9bc90c0af0170645ede99ea42  src/utils/uniswap/BytesLib.sol
+    35fad5748bc13afa2f849e7840c6955bbbc249414b5b24dfc9380f0274b6a2d6  src/utils/uniswap/Constants.sol
+    8b6ef0f56be154d60c3e3ddef5f940c1c100ed4b2a1cebf843c91ca59f96870a  src/utils/uniswap/SafeCast160.sol
+    c38051ae1c2ef6bc53413eb57146ffb377f6dc9a8d854572a5ff8605ab515393  src/utils/uniswap/V3Path.sol
+  </template>
+</content-for>
+
+</page>

@@ -15,28 +15,9 @@
     <p class="mt-4">Check them out below.</p>
   </div>
 
-  <section class="mt-12 max-w-lg">
-    <h2 class="text-2xl font-bold">Cool Stuff</h2>
-    <p class="mt-2">Useful resources for developing on Solidity, Ethereum, and the EVM.</p>
-    <ul class="mt-4 text-xl space-y-2 font-medium">
-      <li>
-        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/gas-nums">⛽️&nbsp;&nbsp;Gas Numbers Every Solidity Dev Should Know</a>
-      </li>
-      <li>
-        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/trim/repl">✂️&nbsp;&nbsp;Trim REPL</a>
-      </li>
-      <li>
-        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/evm/explorer">🗺&nbsp;&nbsp;EVM Bytecode Explorer</a>
-      </li>
-      <li>
-        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/evm/solidity-repl">🪚&nbsp;&nbsp;Quick & Crude Solidity REPL</a>
-      </li>
-    </ul>
-  </section>
-
   <section class="mt-12 max-w-2xl">
-    <h2 class="text-2xl font-bold">Audit Works</h2>
-    <p class="mt-2">A curated list of audits and clients we have worked with in the past.</p>
+    <h2 class="text-2xl font-bold">Public Audits</h2>
+    <p class="mt-2">A curated list of audits  we have worked with in the past, available to the community.</p>
 
     <div class="mt-4 space-y-8">
 
@@ -54,21 +35,9 @@
           <div class="border-t dark:bg-gray-900 border-gray-200 dark:border-gray-800 px-4 py-5 sm:p-0">
             <dl class="sm:divide-y sm:divide-gray-200 dark:sm:divide-gray-800">
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">Scope</dt>
+                <dt class="text-sm font-medium text-gray-500">Audit Report Release Date</dt>
                 <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
-                  {{audit.scope}}
-                </dd>
-              </div>
-              <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">Dates Performed</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
-                  {{audit.dates}}
-                </dd>
-              </div>
-              <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">Team Size</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
-                  {{audit.teamSize}}
+                  {{audit.date}}
                 </dd>
               </div>
               <if cond="audit.about">
@@ -79,8 +48,51 @@
                   </dd>
                 </div>
               </if>
+
+              {{var match = audit.report.match('/library/audits/([^)]+)') }}
+              <if cond="match">
+                {{var issues = collection(`public/${match[1]}-issues`).map(Issues.normalize)}}
+                <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
+                  <dt class="text-sm font-medium text-gray-500">Summary of Findings</dt>
+                  <dd class="--sm mt-3 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
+                    <div class="grid sm:grid-flow-col sm:grid-rows-3 gap-4">
+                      {{var totalShown = 0}}
+                      <for let="severity of 'CHMLQGI'.split('')">
+                        {{var subset = issues.filter(i => i.severity === severity)}}
+                        <if cond="subset.length > 0 && totalShown < 6">
+                          {{void(totalShown += 1)}}
+                          <div class="flex items-center gap-2">
+                            <div
+                              class="w-7 h-7 flex-center flex-shrink-0 rounded-sm font-medium font-ui {{
+                                severity === 'C' ? 'bg-gray-800 dark:bg-black text-white dark:text-white' :
+                                severity === 'H' ? 'bg-red-400 dark:text-black' :
+                                severity === 'M' ? 'bg-yellow-400 dark:text-black' :
+                                severity === 'L' ? 'bg-yellow-200 dark:text-black' :
+                                severity === 'Q' ? 'bg-blue-300 dark:text-black' :
+                                'bg-gray-200 dark:text-black'
+                              }}"
+                            >
+                              {{subset.length}}
+                            </div>
+                            <div class="whitespace-nowrap sm:pl-0 pr-3  font-medium text-gray-900 dark:text-gray-300 text-right">
+                              {{Issues.severityNames[severity] + (severity === 'G' && subset.length >= 2 ? 's' : '')}}
+                            </div>
+                          </div>
+                        </if>
+                      </for>
+                    </div>
+                  </dd>
+                </div>
+              </if>
+
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">Links</dt>
+                <dt class="text-sm font-medium text-gray-500">Report Link</dt>
+                <dd class="Copy --sm mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
+                  {{AuditMarkdown.renderIssueContent(audit.report)}}
+                </dd>
+              </div>
+              <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">References</dt>
                 <dd class="Copy --sm mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
                   {{AuditMarkdown.renderIssueContent(audit.attachments)}}
                 </dd>
@@ -92,6 +104,25 @@
       </for>
 
     </div>
+  </section>
+
+  <section class="mt-12 max-w-lg">
+    <h2 class="text-2xl font-bold">Cool Stuff</h2>
+    <p class="mt-2">Useful resources for developing on Solidity, Ethereum, and the EVM.</p>
+    <ul class="mt-4 text-xl space-y-2 font-medium">
+      <li>
+        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/gas-nums">⛽️&nbsp;&nbsp;Gas Numbers Every Solidity Dev Should Know</a>
+      </li>
+      <li>
+        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/trim/repl">✂️&nbsp;&nbsp;Trim REPL</a>
+      </li>
+      <li>
+        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/evm/explorer">🗺&nbsp;&nbsp;EVM Bytecode Explorer</a>
+      </li>
+      <li>
+        <a class="border px-5 py-4 block dark:hover:bg-gray-600" href="/library/evm/solidity-repl">🪚&nbsp;&nbsp;Quick & Crude Solidity REPL</a>
+      </li>
+    </ul>
   </section>
 
 </div>

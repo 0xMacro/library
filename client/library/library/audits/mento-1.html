@@ -1,0 +1,48 @@
+<page
+  clientName="Mento"
+  reportDate="August 17th, 2023"
+  auditTitle="Mento A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/mento-protocol/mento-core"
+  repoCommitHash="9879bdb4d5e22da2eacb0c3629fd8a032d2d7f9a"
+  repoCommitHashFinal="c2e344ebd5f3018253cf26cb39a50f81d8db7c21"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from July 17, 2023 to August 2, 2023. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+      <li>Available repository documentation and protocol documentation.</li>
+    </ul>
+
+    <!-- <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+
+    </template> -->
+  </content-for>
+
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+        3c9be43f61b59320ef4b1adfb4cc3ecc729d07d7fa9a8cc56af924ea0e6c8e1c  contracts/interfaces/IBiPoolManager.sol
+        09fbdc17b0e3eeb23ed0e8b256f4838a29e6a46363df4d95d89cdc4312263e18  contracts/interfaces/IBreaker.sol
+        9c916b36827f3eea1c9ac3d969c12398793e6abf68c2b16f05dca7d1b3843cb4  contracts/interfaces/IBreakerBox.sol
+        d6bb235ed782868ea3872ba33b7dccdee0a453b7ca1f798a91fdb0b11e8f3ed8  contracts/interfaces/IPricingModule.sol
+        f3e8adfe9b07940a6fe9899b57a60f4d5f8325774a2fbf30b4befc5c211ce62b  contracts/interfaces/IStableTokenV2.sol
+        73ae9fa34b7b5e132466ac25c533ef8b2c5d1d235f7ad088d2100abfc91e0c96  contracts/oracles/BreakerBox.sol
+        ee5ad0d553a382b6943536ac75006b4161b272b0afd794b5ead4671aa29bfd5f  contracts/oracles/breakers/MedianDeltaBreaker.sol
+        5199d9836a5e500e3ec690863c4495c16368c943529b14182ebf35ef5bd8adf3  contracts/swap/BiPoolManager.sol
+        cc6aa0fb52a6ae6f31ce16e46c4a9c2bf5852bcd89b908d231d5c3c162680f96  contracts/swap/ConstantSumPricingModule.sol
+        74244e13bd8ba02b17826710fed12b4c881bf4b560ae25b02b5733d0ac0ca53d  contracts/tokens/StableTokenV2.sol
+        439b890871561da7e35aa337f306e4b11f82d224fa01f33f6c7b54843333577b  contracts/tokens/patched/ERC20PermitUpgradeable.sol
+        7840f75996155cbd18c4e2589a0c235266adaa15491324f793e4c9ab49d243ff  contracts/tokens/patched/ERC20Upgradeable.sol
+    </template>
+  </content-for>
+  
+</page>
