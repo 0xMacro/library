@@ -1,0 +1,41 @@
+<page
+  clientName="Sommelier"
+  reportDate="Aug 30, 2023"
+  auditTitle="Sommelier A-11"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="9e17494c2acd906718310b3e99fa6c1e918beaf6"
+  repoCommitHashFinal="0fa2a8ee2842eb7253439a3ee1f1acf5922c8c18"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from August 22, 2023 to August 24, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository for the initial part of the audit, additionally the UniswapV3Adaptor was audited to ensure it would work with SushiswapV3 contracts.
+    </p>
+
+    <template type="file-hashes">
+      b47e1da0a00263db9b2898713d61adfc254acc6e2ca988752ccaa78fce723fc6  src/AxelarProxy.sol
+      549e11be9b6c55073d92fb1f294ca50d483f52af983fd184fb339f5428e21019  src/modules/adaptors/Frax/CollateralFTokenAdaptorV1.sol
+      18de0265ca2067e6f1512f77c93bc0fec7784fab530ba42a433b8cb6ecedc63f  src/modules/adaptors/Frax/CollateralFTokenAdaptorV2.sol
+      84342fc4dcd5fb9becc98d76573baaa267cce104755b597024d6873bfc4c3ee6  src/modules/adaptors/Frax/DebtFTokenAdaptorV1.sol
+      4b2273816b8c2a5816e9ebd0a61ead1982114fa6317429cb185705e5d977abf0  src/modules/adaptors/Frax/DebtFTokenAdaptorV2.sol
+      b949ce28991511c63c095346858566b67986085f9caa56a3a0e4196fd4f2bbc5  src/modules/adaptors/Frax/FTokenAdaptor.sol
+      c3a2638038d5526d13882288c69a0e56ddc4292026348ab952d11b9d7f09895f  src/modules/adaptors/Frax/FTokenAdaptorV1.sol
+      2a6476ab594bea4c2438dcef069e53e158b203d7c06b5f2244f6c438518edf55  src/modules/adaptors/Frax/FraxlendHealthFactorLogic.sol
+      02f12375ad25274a4c827fa63a74c44b80881e06eea99e0efc2eb2fb8a5e162b  src/modules/adaptors/Uniswap/UniswapV3Adaptor.sol
+      bf1f09a14ad795bce2986bbb760daee45e4d2750384e03c4d50b6d74b9e4f5de  src/modules/adaptors/Uniswap/UniswapV3PositionTracker.sol
+    </template>
+
+  </content-for>
+</page>

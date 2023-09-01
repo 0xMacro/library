@@ -1,0 +1,48 @@
+<page
+  clientName="thirdweb"
+  reportDate="August 21st, 2023"
+  auditTitle="thirdweb A-14"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  repoCommitHash="cfc3b05e719941d7787263a897542bddb05a6017"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_THIRDWEB_14"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from August 8, 2023 to August 21, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the thirdweb team.</li>
+    <li>A audit handoff document provided through Notion.</li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    
+    5a29b078c40eb0c585775e7e5cc40265299023165cc969054b0c09e40781026a  contracts/dynamic-contracts/extension/RulesEngine.sol
+    6ae8b789f73e18584343bd6a2665f49896b13a534613e2115919cb349502f56a  contracts/dynamic-contracts/extension/SharedMetadataBatch.sol
+    5e986de2977d9ecf9360931be97eaad976509acb7026ee1825b0b4e795842100  contracts/smart-wallet/dynamic/DynamicAccount.sol
+    416d40d2f3aa0c8f0895705477ab23973b41c1002751628427ac6bcf5f0fa5a9  contracts/smart-wallet/dynamic/DynamicAccountFactory.sol
+    c3b4c601c4106391d59a9b3dff6ae1c89b83c8992a51adaac89f73d8b7bb0e63  contracts/smart-wallet/managed/ManagedAccount.sol
+    5b33e3ef1a0491147e24c1047e68f852cf7061e1671894a2e0e2a9242a80914d  contracts/smart-wallet/managed/ManagedAccountFactory.sol
+    8bce0fb10cac41141478a228a96dad12afe39db384d1938f2529cc455d27081f  contracts/smart-wallet/non-upgradeable/Account.sol
+    ca1b595fe2f19497d4c1a01b76144ec3b2d5c635192171c00332ad258ec5fdec  contracts/smart-wallet/non-upgradeable/AccountFactory.sol
+    ae8078e8955b24c02c588a5b132813b9c9a08b32ae0db39b1cf7348e2c29ff2c  contracts/smart-wallet/utils/AccountCore.sol
+    2311f64bd2875e63ff395cacb12083411597c3731d42a70e676f2fec925c065a  contracts/smart-wallet/utils/AccountExtension.sol
+    05841a1d7f05df8113f5e3c2e692121f69c190bdc3c6072c954a9925d44ab6a2  contracts/smart-wallet/utils/BaseAccount.sol
+    d7181834e702d81b76569e722e342208fea45db7f21a38c28839fb427c2d0a35  contracts/smart-wallet/utils/BaseAccountFactory.sol
+    b33c12660ea5b934875a66f992c228da0d7cd019fabe7feeaf81efac2fffcc72  contracts/unaudited/LoyaltyPoints.sol
+    90c1072ed646669a51d7bcadaf92d6891d030739a2ea67123d143901443938b8  contracts/unaudited/evolving-nfts/EvolvingNFT.sol
+    4fb77518d6c3134349bd6a420e35a1c30fb155892f1ae78b2c108ff9c134d503  contracts/unaudited/evolving-nfts/EvolvingNFTLogic.sol
+    cbccc956811152c42e3804b848f387fb6bd9ac68d2576f10af61ec25cb380854  contracts/unaudited/evolving-nfts/extension/RulesEngineExtension.sol
+  </template>
+
+</content-for>
+

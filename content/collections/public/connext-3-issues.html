@@ -1,0 +1,87 @@
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">50ef68103d192a5c19789fb84a8ce4a39c720892</field>
+    <field name="content">
+        ## [Q-1] `IWormholeReceiver` interface is not up to date
+
+        The `IWormholeReceiver` interface used in connext-monorepo is not up to date with the [wormhole-foundation interface](https://github.com/wormhole-foundation/wormhole/blob/main/ethereum/contracts/interfaces/relayer/IWormholeReceiver.sol). The critical difference between these two is that in Connext’s version, the [natspec documentation](https://github.com/connext/monorepo/blob/4538-wormhole-connector/packages/deployments/contracts/contracts/messaging/interfaces/ambs/wormhole/IWormholeReceiver.sol#L10-L15) of `receiveWormholeMessages()` describes that it will be invoked by a different address than the Wormhole Relayer, while in the official wormhole foundation interface, we can see this is not accurate:
+        
+        ```solidity
+        /**
+         * @notice When a `send` is performed with this contract as the target, this function will be
+         *     invoked by the WormholeRelayer contract
+         *
+         * NOTE: This function should be restricted such that only the Wormhole Relayer contract can call it.
+        ```
+        
+        Consider updating it to be consistent with the source bridge implementation.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">User Experience</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">8bbd58f408bed9a21111772f09a25c1525a1e45e</field>
+    <field name="content">
+        ## [Q-2] Encoded gas limit higher than `gasCap` revert is unclear
+
+        In `BaseWormhole.sol`, if the `_encodedData` gas forwarder to `_sendMessage()` is higher than the gas limit set in `GasCap`, the logic will cap and reassign this value as the `gasCap`. 
+        
+        ```solidity
+        //calculate cost to deliver message
+        uint256 gasLimit = _getGasFromEncoded(_encodedData);
+        
+        ...
+        
+        /**
+         * @notice Using Wormhole relayer (AMB), the gas is provided to `sendMessage` as an encoded uint
+         */
+        function _getGasFromEncoded(bytes memory _encodedData) internal view returns (uint256 _gas) {
+          // Should include gssas info in specialized calldata
+          require(_encodedData.length == 32, "!encoded data length");
+        
+          // Get the gas, if it is more than the cap use the cap
+          _gas = _getGas(abi.decode(_encodedData, (uint256)));
+        }
+        ```
+        
+        However, since the `msg.value` is required to be equal to the `deliveryCost`, and in the public `quoteEVMDeliveryPrice` the `_gasLimit` is not being capped, the final `deliveryCost` in quoted in `_sendMessage` could change after the `_gasLimit` is capped.
+        
+        Consider capping the gas limit in the public `quoteEVMDeliveryPrice` or requiring that the gas limit in `_encodedData` is `=<` than `gasCap`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Consistency</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ec9d93aa7d53d56ca63e7485d946c3c256a50a0e</field>
+    <field name="content">
+        ## [Q-3] `renounceOwnership` logic is not consistent across contracts
+
+        In the Connext-2 audit, [the fix for issue Q-13](https://github.com/connext/monorepo/pull/4034/commits/85da8edf4b69ce915a24ff2abdec301ef9c4f48a) changed the implementation of `renounceOwnership()` to revert and return an error when called instead of succeeding without any change. Consider doing the same for `renounceOwnership()` in the `WormholeSpokeConnector` contract.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Code Consistency</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="response">
+        `processedWhMessages` of the `BaseWormhole` is different. While the `processedMessages` of other connectors means if the `connext` processed message, but `processedWhMessages`  is to prevent replaying of wormhole relaying separately.
+    </field>
+    <field name="content">
+        ## [Q-4] Use consistent naming across contracts for replay protection data variable
+
+        In `BaseWormhole` data variable for keeping status of processed messages is named `processedWhMessages`. However, in `ArbitrumHubConnector`, `OptimismHubConnector`, and `ZkSyncHubConnector`, this variable is named `processed`.
+
+        ```markdown
+        mapping(bytes32 => bool) public processedWhMessages;
+        ```
+
+        Consider renaming `processedWhMessages` to `processed` for consistency.
+    </field>
+  </item>
