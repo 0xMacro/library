@@ -1,0 +1,74 @@
+<page
+  clientName="towns"
+  reportDate="September 8, 2023"
+  auditTitle="towns A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/HereNotThere/harmony"
+  repoCommitHash="cdda95a7c25a2f69a56d0398b190415c4b61c082"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_TOWNS"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from August 28, 2023 to September 6, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the HNT team.</li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within <i>contracts/src/diamond/</i> repository directory:</p>
+
+  <template type="file-hashes">
+    e9e910360b0788b09d9b00726e0569c46244fc9eb7b8a89db91d9a680872ddc0  Diamond.sol
+    d54aec00fe70c96aff644caba575ec1c2b10719f6e4acfd9af25847924c926e3  IDiamond.sol
+    1d1d06e97e85007cbf1b1b636d336bf108a19c4d5cab2472d409a1df1937a845  facets/Facet.sol
+    7b0e7fd417b0583fccdd0eca9026cc4cd8a04839aa947d7e39fb37fe6621b40f  facets/cut/DiamondCutBase.sol
+    d38fc41f68fadaab07abd3d0ef06a8c3e49d73352a300bebc88453d4e3fdb6c1  facets/cut/DiamondCutFacet.sol
+    2ae36597441aea4f732700ea91a6dbe02f9bd6a34defb6cf5b07622ef0b0d0f5  facets/cut/DiamondCutStorage.sol
+    026d1231ae4b2643eb1dba4534adef69d42e7037be2347609be034a1d7cb813a  facets/cut/IDiamondCut.sol
+    6a3f3cd7fd680c51f75f02158bfa28ebe1a7c6bbcf6a6bc16d98f4b9c12ce8f4  facets/initializable/Initializable.sol
+    5e14ff2f16494b4598893087bc8a1ac721ce8a63ed26d0924e4af8f0fcb638a7  facets/initializable/InitializableStorage.sol
+    1d9943b8b6364717bce5453ecaf2fbba3e22cfa3b349d60b9dcb7ac5edbb3dba  facets/introspection/IERC165.sol
+    146b02ee6d13f88f2cc6499f7ccf1530d6568978d4b0aa1024fddaf5b644ffe7  facets/introspection/IntrospectionBase.sol
+    d44c7459e75cffecfd95c8e746f41e642cc8f5d394429cb923bac473319ba4dd  facets/introspection/IntrospectionFacet.sol
+    387f7b6f07958cc39072c1a9fa14d7355ad25e3eb50080d3af4eef7be468e50f  facets/introspection/IntrospectionStorage.sol
+    d6b80da16ecc88c4cdd2c565ecf72b598055d92bb524940b19e396a6c4f7cfea  facets/loupe/DiamondLoupeBase.sol
+    c410dc0dc93aa60e500484ef63c26f8e61903f7a61e76a2e48bc7bf3e59f7710  facets/loupe/DiamondLoupeFacet.sol
+    03e56b4e2078a830d4783b976ebf8728c5091a697118845568194478171d68e3  facets/loupe/IDiamondLoupe.sol
+    5992517e05228174acbb41711de24bb0538b911b74996fbd12d243aede15fc48  facets/ownable/IERC173.sol
+    18a8d2448c189ed73e398d9de9091a5775c34d20ceb3baaaa7d99cd07bdfe063  facets/ownable/OwnableBase.sol
+    473d9a2bd21b504f0f3ac04829fd99bbe3fe8e6331b194f50fe895838e289e54  facets/ownable/OwnableFacet.sol
+    f2c989de2554e64b6cd8f1d8380c8a31786dc0bd6df675651392ce0fb8025137  facets/ownable/OwnableStorage.sol
+    6bdf20216158f17db15c608a067352837d3e39283c78955b4eda80aa7a3f20b6  facets/ownable/token/TokenOwnableBase.sol
+    2f2042f356bb14bd34bff8d252c279e62b8b6c41a768723f259c38db20217738  facets/ownable/token/TokenOwnableFacet.sol
+    ec9c8b8926afe17815ddc22207edc8180e52d8a96adb53720446a4b18e93b23f  facets/ownable/token/TokenOwnableStorage.sol
+    e057b8f76ce8f6423e870bf6fc27908d2fc0aee1385961594734f6e6329ae1e7  facets/pausable/IPausable.sol
+    182c50e032933fac7312d0bc46ca1b74496d0170721ce51f875ef3306582ec89  facets/pausable/PausableBase.sol
+    2f433cf422a74fba3dee2091566c93239428bad8b3fe7fbe4e5c8a0ce6bae291  facets/pausable/PausableFacet.sol
+    30a711e70722baccae54962d298fb58c93a736fcded070c6acfa787dbdaa43a7  facets/pausable/PausableStorage.sol
+    702c7b4ee5df2ef38d58ea2a8ae905a7c9df7e5d3e4aa4906e2e56fa45b88d56  facets/pausable/token/TokenPausableFacet.sol
+    46244c2d215c9650becd81df6e6840e16a96581d0e2bc6c1a7f5411eb37e4ffc  facets/reentrancy/IReentrancyGuard.sol
+    4528f6dce8e9817b32d2895324c9a24b55b83fc48392cfc26c72b6c9415dae35  facets/reentrancy/ReentrancyGuard.sol
+    c7fc660156ae5ee7e286bac62eb06f2d7786dc731b32a415a028559dda1d6336  facets/reentrancy/ReentrancyGuardStorage.sol
+    3fed3ccbbf89835b4b7fe0713d25f4a6bc3729a04e81aa5c61427f1515376e36  initializers/MultiInit.sol
+    46f718ce1182e6af11f80559c82ecff31008600ee3fd9d8b7a4064d5b6a20152  proxy/IProxy.sol
+    f2c379c4c4c8a48ee209b7c3e853a119c137b1c43c195e0c90fa9b8b4b58927d  proxy/Proxy.sol
+    a85f15713cd43789bacd8b34d1c154779a4c3dc81f354506c52e44592b79c9d7  proxy/managed/IManagedProxy.sol
+    549022af29376b419be4fe9821c11e1e38dadeaa4a761afc26f21dec0cb037e0  proxy/managed/ManagedProxy.sol
+    6059b0d5f5c4eb713c12f23ac8777fb22353b8b68bb02ec1fa025e7e13165aa9  proxy/managed/ManagedProxyBase.sol
+    90c1cb147aeb3df43e48e7fea8cfbb85e54cc46bfd12d633fb334129ebde8c5f  proxy/managed/ManagedProxyStorage.sol
+    dfdc216198239f579d83b91796c3c1944c248d48c08be4a50565c8f903b9daf7  proxy/manager/IProxyManager.sol
+    9fee31244b4349cbfde41148cd22bb727b6c03fd2df027a674827e11d0147999  proxy/manager/ProxyManager.sol
+    5f48582df4935b30e563f3e8c7e9ab36713f9235ff4c2edaf9f485f50276aa5b  proxy/manager/ProxyManagerBase.sol
+    00ead409a5d12dda2940e138b43484b465e1ac52fddcd131e34793815561433e  proxy/manager/ProxyManagerStorage.sol
+    692386a7ffcf74f265792daf49e6c3ee82bcd23a92be43ab356faf665b54d351  utils/multicall/IMulticall.sol
+    73ee0c94a58086dd023ce94c9e9ebb65db3a4918b69624c30c1e5fc071d7ad0d  utils/multicall/Multicall.sol
+  </template>
+
+</content-for>
+
