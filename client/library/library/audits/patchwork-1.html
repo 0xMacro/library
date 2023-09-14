@@ -1,0 +1,33 @@
+<page
+  clientName="Patchwork"
+  reportDate="Sep 14, 2023"
+  auditTitle="Patchwork A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/runic-inc/patchwork"
+  repoCommitHash="fae3910c9fc0e544ee700b949e0a699bfb0c55f6"
+  passwordEncrypt="env:PAGE_PASS_PATCHWORK_1"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from Aug 14, 2023 to Aug 21, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>Description of the system in operation.</li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    b71780f2006d0766390d1017292cc1b599114bb8d17f86cc4520149b010b49f5  src/IERC5192.sol
+    698b29e16347b89243b711bb5cc7496a929e7635993ab14fe30de8329b792779  src/PatchworkNFTBase.sol
+    441649858ec9c009715ed104773c78b8e770b28171792ff3ac2d54626a512f9c  src/PatchworkNFTInterface.sol
+    3f0174e1680b79bb64a54550c732e7018f81b83aad185f066ea9b4dd2d66d816  src/PatchworkProtocol.sol
+  </template>
+</content-for>
