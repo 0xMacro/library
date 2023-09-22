@@ -1,0 +1,122 @@
+<page
+  clientName="The Graph"
+  reportDate="Sep 22, 2023"
+  auditTitle="The Graph A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/edgeandnode/billing-contracts"
+  repoCommitHash="81a44aede886fc972b2f2422038a804f00789966"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_THE_GRAPH_2"
+
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from
+    September 4 to September 8, 2023.
+
+    Review of fixes was conducted on September 15, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>An information summary delivered over chat.</li>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        ### Entities
+
+        - **Gateway** – The nodes that process queries.
+        - **Consumer** – The user paying for graph queries. Creates a Subscription in Billing 2.0, funded by themselves or by someone else; or adds to their own balance in Billing 1.0.
+        - **Indexers** – The user getting paid for running graph queries.
+        - **Collector (Billing 1.0)** – Special role that pulls user funds (query fees). Currently only the Gateway is a collector, serving as the intermediary between Consumers and Indexers. Roles can be added/removed by the Governor.
+        - **Governor (Billing 1.0)** – Special role that controls which addresses have the Collector role. Can be transferred.
+        - **Governor (Recurring)** – Special role that adds / removes payment types, updates global contract configuration, and rescues tokens sent to the contract. Also can update `maxGasPrice` for Gelato tasks and manages the Gelato task treasury.
+        - **Subscription (Billing 2.0)** – A struct with a start date, end date, and rate per second. Off-chain, intended to represent a subscription to a gateway’s processing resources.
+        - **Pending Subscription (Billing 2.0)** – A struct representing a potential subscription, to be fulfilled by a 3rd party (specifically, Banxa for the initial MVP).
+        
+        ### Trust Model (Billing 1.0 / Billing.sol)
+        
+        - Consumers adds GRT to the contract, trusting that the Collector will only pull out as many funds as agreed off-chain.
+        - Collectors pull GRT as graph queries, trusting that the Consumer will not pull their funds back out before the Collector gets a chance to collect query fees.
+        - Because of this trust model, The Graph recommends keeping GRT balances low for the consumer, and Collectors pulling GRT to reconcile balances frequently.
+        
+        ### Trust Model (Billing 2.0 / Subscriptions.sol)
+        
+        - Primary goal of 2.0 is to make payments between Consumers and Gateways more trustless.
+        - A User should be able to unsubscribe and get a refund of their balance for any unused Subscription time.
+        - It is the gateway’s sole discretion, off-chain, whether or not a subscription is valid. Consumers are expected to use rates that the gateway agrees with off-chain.
+        
+        ### General Assumptions
+        
+        - Subscription statuses are intended to be aggregated and queried through The Graph subgraphs.
+        
+        ### Accepted Risks
+        
+        - If The Graph does not keep a positive balance for Gelato, Consumer recurring payments will get delayed, which could result in a disruption of Gateway service.
+    </template>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(initial)</b>:
+        <code>b2883f5586d11fd2b225e18649cda971a1335a8f</code>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(final)</b>:
+        <code>810d7504dd6a0dd5b6826cee5e17745481443048</code>
+      </li>
+      <li>
+        <b>Repository:</b>
+        <a href="https://github.com/edgeandnode/subscription-payments/" target="_blank">
+          {{"https://github.com/edgeandnode/subscription-payments".split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(initial)</b>:
+        <code>ab4a467188a79b9d355e7f64acd663405bdaa93f</code>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(final)</b>:
+        <code>435c70034f125b7a9f27a723a6fa0984956e8274</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>We audited the following contracts within <b>billing-contracts</b> repository:</p>
+
+    <template type="file-hashes">
+        c4f658b3eef256b7b1906efef9bbc602840e13d11f62d629a240d0f1575ec005  contracts/BanxaWrapper.sol
+        656fd4e22c7f4419135dfccd004cb34401447bb15f0386c046071fd84084e5fe  contracts/Billing.sol
+        d7e366e67e020208f5c0f9d1a63c4dea925f2bc3393132afa895bc1c5232e019  contracts/BillingConnector.sol
+        c5adde97549bdb163bed5be6f60c1b6a7b773deda247ef9f2019e82f138a354b  contracts/GelatoManager.sol
+        302631452d79514bcd418e66be1142c527d7a663b1fb0802e2b2806ed9fc80a3  contracts/Governed.sol
+        faa1f9f496ad33bc53180b24f49722a9d10f004d1579c87de52ec59ac59817f6  contracts/RecurringPayments.sol
+        78ff255b9321f92de51baabd6346d44218a6dadb25e1e7d6d4d2d2fd5e3f699d  contracts/Rescuable.sol
+        ac921740d92abbc29519d2fb9351b6fc83f40bd67441b5c71f95428496ec2906  contracts/gelato/AutomateReady.sol
+        e7b7392540902254bc999e5dc890ec219ce8ca8db4123e1dcfc3315b8ba364f3  contracts/gelato/AutomateTaskCreator.sol
+        2ab1637f6a9ab5904e95b71f3c14154dfca85ff14e841e7f92ba5ac4ec42d110  contracts/gelato/Types.sol
+        ff1a8f0f516598a6b154c799517ee6b273e1bdd3c17ef23d5f1d994192a83d4e  contracts/interfaces/IBilling.sol
+        c7bf35e3184138fb4bc86709da7d3643c5d708df045450861108105baa5c553d  contracts/interfaces/IBillingConnector.sol
+        df8245a16b6e915f5e5e4bf103efac2afc1fc6e994f85d2f2d8ea26bb71074d6  contracts/interfaces/IERC20WithPermit.sol
+        51890f4a4c071b672df7f6d62f0de9cd4891c86bb849598ad8cb3c79bbb10ea6  contracts/interfaces/IPayment.sol
+        7e8652507af8123b7019c64b03a3780b4cdbc35123e92cd1cbbd6fb0fba912b1  contracts/interfaces/IRecurringPayments.sol
+        368b5df041977b9845692165f53e285e69bf1ba9bc9fb3ca92a6b1b4a812d1e9  contracts/interfaces/ISubscriptions.sol
+    </template>
+
+    <p>We audited the following contracts within <b>subscription-payments</b> repository:</p>
+
+    <template type="file-hashes">
+        3212a303d16cff78d7b83f80a033305ac1cfaf68b7a772822fa93c6b35830b6a  contracts/contracts/Subscriptions.sol
+    </template>
+  </content-for>
