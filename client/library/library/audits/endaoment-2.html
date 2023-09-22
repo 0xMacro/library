@@ -1,0 +1,44 @@
+<page
+  clientName="Endaoment"
+  reportDate="September 22, 2023"
+  auditTitle="Endaoment A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/endaoment/endaoment-contracts-v2-private"
+  repoCommitHash="13b8a2405574c29bfd1a88af76cc147ace4bb8ed"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from September 18, 2023 to September 19, 2023.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    The contracts pose a centralization risk whereby the contract owner can shut down the portfolio; withdraw all assets; change the redemption, deposit, and AUM fees; and arbitrarily execute any function at any time. It is trusted that the owner will not abuse this power.
+    </template>
+  
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    21fff0824694a525bb947f409a76cd4a9e15548a535911b289f8839e89e8c5c0  src/portfolios/AaveUSDCPortfolio.sol
+    3631f3e3f27100b179bb3d5342bc2e74d0c3db5ef1f7f4c80af750b03f14267e  src/portfolios/AaveV3USDCPortfolio.sol
+    cf79d72906d61254e887efeae54ca8c6ae0a7503165bb44f05f31247ac77bf82  src/portfolios/CompoundUSDCPortfolio.sol
+    f9a2d7fac30e0efc35ec30ddcf9015846a422eb06968cd1955103a92e71dd203  src/portfolios/CompoundV3USDCPortfolio.sol
+    a2da3add3bb4c3adcd6c29d3435ff103ccdf6c69a86fa0460ba67559d823f459  src/portfolios/YearnUSDCPortfolio.sol
+    df36195ba086b5251a17264b03e7ca1188383dfd7d0fe17f2ee9fd358405acc6  src/Portfolio.sol
+    fc2c744004e4bc4445878f4ae932f121240a1fd47c285c1e0d37d3fbadd0ea30  src/lib/auth/EndaomentAuth.sol
+  </template>
+</content-for>
+
+</page>
