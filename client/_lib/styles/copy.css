@@ -121,3 +121,35 @@
 {
   @apply mt-0;
 }
+
+.Copy .audit-md-table {
+  overflow-x: auto;
+}
+
+.Copy .audit-md-table table {
+  border-collapse: collapse;
+  margin: 25px 0;
+  font-size: 0.9em;
+  font-family: sans-serif;
+  min-width: 400px;
+}
+
+.Copy .audit-md-table table thead tr {
+  background-color: #F5F5F5;
+  text-align: left;
+  border: 1px solid #dddddd;
+}
+
+.Copy .audit-md-table table th,
+.Copy .audit-md-table table td {
+  padding: 12px 15px;
+}
+
+.Copy .audit-md-table table tbody tr {
+  border: 1px solid #dddddd;
+  border-top: none;
+}
+
+.Copy .audit-md-table table tbody tr:nth-of-type(even) {
+  background-color: #f3f3f3;
+}
