@@ -1,0 +1,45 @@
+<page
+  clientName="Nori"
+  reportDate="October 2, 2023"
+  auditTitle="Nori 4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/nori-dot-eco/contracts"
+  repoCommitHash="1dac591651e554cecec4909ab1d565b9c0ae767c"
+  passwordEncrypt="env:PAGE_PASS_NORI_4"  
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from September 12, 2023 to September 18, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+      <li>Specific context document provided by the {{page.clientName}} team.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">\
+    f83f5ddd9f13b337a2706bff8b87727bad9ea1e2de36d6ae17c2712963fbaef8  ./contracts/ArrayLib.sol
+    75b58f7e2499611804e0e03849525bca6403ece2fb2c39ce65840030b5ed1c7c  ./contracts/Certificate.sol
+    6ded82376e991b8bcf928cde8727a1d23be68c4f3570b28e5efe591bf805c156  ./contracts/Errors.sol
+    04d133aa342b76c8c0711dbe56d675026d614b4b85d67e4ad927c7194ccbc191  ./contracts/ICertificate.sol
+    bd10f82c53f6984e2bd52ed3b7499f96fe1e4ac38995c4b138c6e6769558bbfa  ./contracts/IERC20WithPermit.sol
+    5e83ef1c43c154274d4457d452267a6db61e4184fe831d4edf770011b68b9964  ./contracts/IMarket.sol
+    e7cd030a213ca08354f8780bb9f7d081b0de8b5044648f319cfffe1af44c321f  ./contracts/IRemoval.sol
+    4fbbca2b2b3a7b987211a720253a5acfe517fef298043c373648489efb87e55e  ./contracts/IRestrictedNORI.sol
+    9a000acb25c0609e527d4651e907b84ed57895d99f85b181e5b45e160168a4b8  ./contracts/Market.sol
+    748d78a5d90f95d67194f8c41058fc8b3107674d0a9a26ce495cbf7a7e4c2c79  ./contracts/Removal.sol
+    9e4ce41e51fde409d2738b73a47609b0985368179b532e69752b71095e9d067f  ./contracts/RemovalIdLib.sol
+    75c0d70dc6c21ba6f449b6ecda7b9a42721363a682e795c23eab075418e51836  ./contracts/RemovalsByYearLib.sol
+    6a10b4a77f55cfadd6dec05277ace652ef8a9c83a3df586846df6671d92902b8  ./contracts/RestrictedNORI.sol
+    d822cee544c4d4e911a77f0f207396e68eaabc8050f209da2b4b37969833ec39  ./contracts/RestrictedNORILib.sol
+  </template>
+</content-for>
