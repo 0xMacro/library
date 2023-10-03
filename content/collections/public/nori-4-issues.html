@@ -1,0 +1,116 @@
+<item>
+    <field name="topic">Configuration</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ddc9c21537159e99ffbee078a4a657717e02f4b5</field>
+    <field name="content">
+      ## [M-1] `_priceMultiple` can be set lower than `100`
+  
+      In `Market.sol` the setter function `setPurchasingTokenAndPriceMultiple()` allows to set the price multiple to any arbitrary unbounded value.
+  
+      However, if the value is set lower than `100`, the calculations would lose precision and break the assumption used in price calculations.
+  
+      **Remediations to Consider**
+  
+      Consider checking whether the provided value for the `priceMultiple` is equal to or higher than `100`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Naming</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ddc9c21537159e99ffbee078a4a657717e02f4b5</field>
+    <field name="content">
+      ## [Q-1] `Removal.sol` confusing naming for function and variable
+  
+      In the `_beforeTransfer()` logic, to perform the proper input sanity checks and validations there is a function and a local variable with the same `isValidTransfer` name. Consider changing one of these to avoid any potential confusion with the separate checks each element is used for.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">ddc9c21537159e99ffbee078a4a657717e02f4b5</field>
+    <field name="content">
+      ## [Q-2] Missing documentation for `MARKET_ADMIN_ROLE` access control role
+  
+      The [current documentation](https://github.com/nori-dot-eco/contracts/blob/master/docs/Market.md#additional-behaviors-and-features) is missing the following allowed operations for the `MARKET_ADMIN_ROLE`:
+  
+      - Set the purchasing token and price multiple through `setPurchasingTokenAndPriceMultiple()`.
+      - Execute replacement operations through `replace()`.
+      - Submit special orders through `swapWithoutFeeSpecialOrder()`.
+  
+      Consider updating the access control documentation for `MARKET_ADMIN_ROLE` to better communicate all potential gated operations it can perform.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ddc9c21537159e99ffbee078a4a657717e02f4b5</field>
+    <field name="content">
+      ## [Q-3] `feeDecimals` should be a constant
+  
+      In `Market.sol`, function `_validateCertificateAmount()` ([lines 1412 to 1418](https://github.com/nori-dot-eco/contracts/blob/1dac591651e554cecec4909ab1d565b9c0ae767c/contracts/Market.sol#L1412-L1418)) declares the `feeDecimals` variable and assigns it with a constant value that’s only being used as a read-only value. Consider making this variable a constant.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ddc9c21537159e99ffbee078a4a657717e02f4b5</field>
+    <field name="content">
+      ## [Q-4] Inconsistent logic implementation
+
+      In `Market.sol`, there are two different implementations for the same loop logic conditions:
+  
+      ```solidity
+      uint256 vintage = supplierRemovalQueue.earliestYear;
+      uint256 latestYear = supplierRemovalQueue.latestYear;
+      for (; vintage <= latestYear; ++vintage) {
+      ```
+  
+      ```solidity
+      for (
+        uint256 vintage = supplierRemovalQueue.earliestYear;
+        vintage <= latestYear;
+        ++vintage
+      ) {
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Implementation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">d9a135d508c52025db145c833842d3705c244e30</field>
+    <field name="content">
+      ## [G-1] `slice()` logic can be improved
+  
+      The `Market.sol` contract's `replace()` and `_fulfillorder()` functions utilize the `slice()` function from the `ArrayLib` to create new arrays for `ids` and `amounts`, which contain the actual filled values for the supply allocation. This process essentially shortens the length of the initial array to match the number of listed supplies that were used by storing the same values that are in the original array in a new memory array.
+  
+      One way to improve this implementation is by overriding the length of the memory array with the count of supplies used. This involves using the known value of the `count` and storing it in the memory slot where the array is declared. Doing so will reduce the complexity of each `slice()` call from _O(n)_ to _O(1)_, leading to significant reductions in both complexity and gas costs. It is important to note that since assembly blocks cannot directly access nested data type members, the array memory slot must be pre-calculated and used in the `mstore`.
+  
+      A code implementation would look similar to this:
+  
+      ```solidity
+      assembly {
+          /**
+         * Update length of `array` to `count`
+         * `array` is declared at 0x80 in this example
+         * 
+         * This will override the length value stored in the array position
+         * note that this won't remove the elements stored in the original remaining indexes
+         */
+          mstore(0x80, count)
+      }
+      ```
+    </field>
+  </item>
+  
