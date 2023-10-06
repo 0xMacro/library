@@ -1,0 +1,95 @@
+<!-- @format -->
+
+<page
+  clientName="thirdweb"
+  reportDate="October 6th, 2023"
+  auditTitle="thirdweb A-15"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  repoCommitHash="46e69070978c23b9533edb381e838a5dddf7ed9d"
+  customReviewInfo
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_THIRDWEB_15"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from September 11, 2023 to September 22, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the thirdweb team.</li>
+      <li>A audit handoff document provided through Notion.</li>
+    </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        <b>MarketplaceV3</b> and <b>BurnToClaimDropERC721</b> contracts implement role-based access control including the roles listed below. In particular, DEFAULT_ADMIN_ROLE and EXTENSION_ROLE have high privileges such as making upgrades to the contracts. Both roles are assumed to be trusted and to act in a reliable and good manner.
+        
+        Specifically, the different roles have the following privileges:
+        ### ******************************************MarketplaceV3******************************************
+        `DEFAULT_ADMIN_ROLE`: grant and revoke roles; set platform fee info; set contract URI; set royalty engine
+        
+        `EXTENSION_ROLE`: add, replace, or remove extensions
+        
+        `LISTER_ROLE`: create listings and auctions. Only applies when restriction is enabled. By default, restriction is disabled so that everybody can create listings and auctions.
+        
+        `ASSET_ROLE`: Only NFT contracts with ASSET_ROLE can be listed or auctioned, when restriction is enabled. By default, restriction is disabled so that every NFT can be listed or auctioned.
+        
+        ### ******************************************BurnToClaimDropERC721******************************************
+        
+        `DEFAULT_ADMIN_ROLE`: grant and revoke roles; set platform fee info; set contract URI; set royalty info; set primary sale recipient; set owner; set claim conditions
+        
+        `EXTENSION_ROLE`: add, replace, or remove extensions
+        
+        `MINTER_ROLE`: lazy mint tokens; reveal the URI
+        
+        `TRANSFER_ROLE`: transfers to or from `TRANSFER_ROLE` holders are valid, when transfers are restricted.
+    </template>
+
+</content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank"> {{page.repoUrl.split('/').slice(-1)[0]}} </a>
+      </li>
+      <li style="list-style: none" class="break-words break-all">
+        Commit Hash <b>(Marketplace):</b>
+        <code>46e69070978c23b9533edb381e838a5dddf7ed9d</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="review-info">
+    <p>
+        <b>Note:</b> 
+        This document contains an audit solely of the Solidity contracts listed above. Specifically, the audit pertains only to the contracts themselves, and does not pertain to any other programs or scripts, including deployment scripts.
+    </p>
+    <p>
+        In addition, for the marketplace contracts, the audit was focused on the changes made since the previous audit of <a href="https://0xmacro.com/library/audits/thirdweb-6">MarketplaceV3</a> including:
+        <ul>
+            <li>latest plugin pattern setup</li>
+            <li>support for Manifold's Royalty Registry</li>
+        </ul>
+    </p>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the following contracts within this repository:</p>
+    <template type="file-hashes"> 
+        3313a1a020c6dea590f54b0be51da0746f6ae403f237de4b331ed8d3c2ba00cc  contracts/prebuilts/marketplace/IMarketplace.sol
+        34eefa1719ac1ac314406d59c6b0c8a54a6db5ff7ca3b16c16281f0ae23c5a0d  contracts/prebuilts/marketplace/direct-listings/DirectListingsLogic.sol
+        323b76b4ac66470241fd83b76d89882edf0514eafbb8f3a3e507f798865f8fb7  contracts/prebuilts/marketplace/direct-listings/DirectListingsStorage.sol
+        5c3e0e3d331c38b1f9487230002f0f68b8972d10232ad435338229549995f52e  contracts/prebuilts/marketplace/english-auctions/EnglishAuctionsLogic.sol
+        d6c11797d33d215b5101c5d68884df8038e6ab94f7873847a001484b52091fa4  contracts/prebuilts/marketplace/english-auctions/EnglishAuctionsStorage.sol
+        ee794f6bdb80442fc34cfc0cd646e9d7ccdbc345bc52f15a814b1bdd52041a93  contracts/prebuilts/marketplace/entrypoint/MarketplaceV3.sol
+        3e00e6ccfd4a7b93c3648628ee16fce2132b88815577fd2db6bca9b3e63bbc05  contracts/prebuilts/marketplace/offers/OffersLogic.sol
+        7eaa2bb7340ebe38bfbed618fca403cd55435964b7d0742748d155aed17865f2  contracts/prebuilts/marketplace/offers/OffersStorage.sol
+
+        1da3f3c6359815ff480629fe879143b94d43a5cf0b7bbcde323ba3691e82ff9e  contracts/prebuilts/unaudited/burn-to-claim-drop/BurnToClaimDropERC721.sol
+        7db94a6af68b73a4fbf7d0af53b4a1f3e3483a569e1765456f3189fa85038096  contracts/prebuilts/unaudited/burn-to-claim-drop/extension/BurnToClaimDrop721Logic.sol
+        2094fddca9d0b4018e8d66bc07dda4ccd5ffc1d120ed6134597f3929ad614900  contracts/prebuilts/unaudited/burn-to-claim-drop/extension/BurnToClaimDrop721Storage.sol
+   </template>
+  </content-for>
+</page>
