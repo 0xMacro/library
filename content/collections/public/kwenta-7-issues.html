@@ -1,0 +1,224 @@
+<item>
+    <field name="topic">Locked Funds</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">27657227483eba6f99d22d8c8215f4885c16fa02</field>
+    <field name="content">
+        ## [M-1] Early vest fees can get locked in Migrator contract
+        
+        **Reference**: [RewardEscrowV2.sol#L405](https://github.com/Kwenta/token/blob/9cceb6d5efd73b8e4794d253ce36daefe7123e0c/contracts/RewardEscrowV2.sol#L405), [RewardEscrowV2.sol#L410](https://github.com/Kwenta/token/blob/9cceb6d5efd73b8e4794d253ce36daefe7123e0c/contracts/RewardEscrowV2.sol#L410)
+        
+        Once migration starts, `treasuryDAO` address in `RewardEscrow.sol` is set to the address of the `EscrowMigrator` contract, thus transferring all early vesting fees to the migrator. This is required for users who want to migrate their escrowed KWENTAs to the V2 contracts.
+        
+        However, if a user has no intention to migrate, but only wants to vest the escrowed KWENTAs (without registering any entries on the migrator), any vesting fees will be transferred to the migrator contract where there is no possibilities to withdraw those KWENTAs and give it back to the `treasuryDAO`.
+        
+        **Remediations to Consider**
+        
+        Consider adding a function to `EscrowMigrator.sol` that allows to withdraw leftover KWENTAs that haven't been registered.
+
+        **Note:**
+        The Kwenta team was already aware of this issue and had considered the plan of upgrading and sweeping the 
+        contract at a later date. After the recommendation from the Macro team, Kwenta decided to fix the issue preemptively.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8fd83aaa4140864e0c1d9179e871e039ed138a39</field>
+    <field name="content">
+        ## [L-1] Missing zero address checks for staking contracts
+
+        **Reference**: [EscrowMigrator.sol#L92-L93](https://github.com/Kwenta/token/blob/9cceb6d5efd73b8e4794d253ce36daefe7123e0c/contracts/EscrowMigrator.sol#L92-L93)
+
+        EscrowMigrator.sol checks for zero address in the constructor for the parameters `_rewardEscrowV1` and `_rewardEscrowV2`, but is missing the zero address check for the staking parameters:
+
+        - `_stakingRewardsV1`
+        - `_stakingRewardsV2`
+
+        **Remediation to Consider**
+
+        Consider adding the missing zero address checks for above parameters.
+  </field>
+</item>
+
+<item>
+    <field name="topic">Accounting</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-2] `getVestingQuantity` doesn’t consider duplicates
+
+        **Reference**: [RewardEscrowV2.sol#L296](https://github.com/Kwenta/token/blob/9cceb6d5efd73b8e4794d253ce36daefe7123e0c/contracts/RewardEscrowV2.sol#L296)
+
+        In RewardEscrowV2, `getVestingQuantity` doesn’t work with duplicate entryIDs. Off-chain components and other contracts can call this function and might unintentionally pass duplicate entryIDs into the `_entryIDs` array. As `getVestingQuantity` double counts duplicate entries, a caller can make false assumption based on the wrong `total` and `totalFee` values returned. 
+
+        **Remediation to Consider**
+
+        Consider handling duplicate entryIDs appropriately.
+  </field>
+  <field name="response">
+    Decided it is not worth the gas costs to check for duplicates - hence we are pushing the responsibility to the calling contract not to pass in duplicate values.
+  </field>
+</item>
+
+<item>
+    <field name="topic">Accounting</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">422d75ec9a86d44084da9fdda8ecf064cc850a73</field>
+    <field name="content">
+        ## [L-3] `balanceAtTime`, `escrowedbalanceAtTime`, and `totalSupplyAtTime` can return different values for not-finalized block.
+
+        **Reference**: [StakingRewardsV2.sol#L509](https://github.com/Kwenta/token/blob/9cceb6d5efd73b8e4794d253ce36daefe7123e0c/contracts/StakingRewardsV2.sol#L509), [StakingRewardsV2.sol#L519](https://github.com/Kwenta/token/blob/9cceb6d5efd73b8e4794d253ce36daefe7123e0c/contracts/StakingRewardsV2.sol#L519), [StakingRewardsV2.sol#L529](https://github.com/Kwenta/token/blob/9cceb6d5efd73b8e4794d253ce36daefe7123e0c/contracts/StakingRewardsV2.sol#L529)
+
+        In StakingRewards.sol, the function `balanceAtTime`, `escrowedbalanceAtTime`, and `totalSupplyAtTime` can be used to retrieve the balance at a certain time in the past. 
+
+        However, when those functions are called with a timestamp that equals the current block timestamp, then the functions might return inaccurate values as further transactions changing the balances can still occur within the same block. 
+
+        **Remediation to Consider**
+
+        Consider reverting with an appropriate error if a timestamp is passed that equals `block.timestamp`. If this is a scenario that should be supported, consider documenting it appropriately to prevent misinformation.
+  </field>
+  <field name="response">
+    This is intended behaviour but we have added documentation to clarify it as suggested (rather than the reverting option - as this requires callers to implement extra logic, rather than just understanding the implications)
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Kwenta/token/commit/d687fcbdd2a58b1fb876325a6971e8aea23b22fe,https://github.com/Kwenta/token/commit/96e13fb0214bdb7580c8447e85b58d74979632de</field>
+    <field name="content">
+        ## [Q-1] Use of `override` is not required
+
+        Since [Solidity 0.8.8](https://github.com/ethereum/solidity/releases/tag/v0.8.8), when implementing an interface, those functions don't require the `override` keyword anymore. In fact, this is misleading, as the function don't actual override any parent functions.
+
+        Consider removing the `override` keyword from functions that only implement the function definition from the derived interface.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Specification</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">07e9931c82fc24d55004319460e2fd9ce6c050a0</field>
+    <field name="content">
+        ## [Q-2] Inaccurate comment
+
+        - In [EscrowMigrator.sol#L51](https://github.com/Kwenta/token/blob/9cceb6d5efd73b8e4794d253ce36daefe7123e0c/contracts/EscrowMigrator.sol#L51), the comment says:
+            
+            ```
+            /// @notice Contract for RewardEscrowV1
+            ```
+            
+            But it should be RewardEscrow**V2** instead.
+            
+        - In [RewardEscrowV2.sol#L64](https://github.com/Kwenta/token/blob/9cceb6d5efd73b8e4794d253ce36daefe7123e0c/contracts/RewardEscrowV2.sol#L64), the comment says:
+            
+            ```solidity
+            /// @notice Contract for StakingRewardsV2
+            IEscrowMigrator public escrowMigrator;
+            ```
+            
+            But it should be EscrowMigrator instead of StakingRewardsV2.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">27657227483eba6f99d22d8c8215f4885c16fa02</field>
+    <field name="content">
+        ## [Q-3] Inconsistent behavior between `getVestingSchedules` and `getAccountVestingEntryIDs`
+
+        In RewardEscrowV2.sol, `getVestingSchedules` reverts with `InvalidIndex` when `endIndex < index`, while `getAccountVestingEntryIDs` returns an empty array in this case.
+        
+        Consider implementing consistent behavior across those two functions.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">27657227483eba6f99d22d8c8215f4885c16fa02</field>
+    <field name="content">
+        ## [Q-4] Import of `IERC20.sol`
+
+        In StakingRewardsV2.sol, `IERC20` is imported from SafeERC20.sol:
+        
+        ```solidity
+        import {IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+        ```
+        
+        However, SafeERC20 is not used anymore in V2 and thus it is preferred to directly import from IERC20.sol interface:
+        
+        ```solidity
+        import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+        ```
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Specification</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">07e9931c82fc24d55004319460e2fd9ce6c050a0</field>
+    <field name="content">
+        ## [Q-5] Missing `natspec` param description in constructors
+
+        In StakingRewardsV2.sol, RewardEscrowV2.sol, and EscrowMigrator.sol, the constructor arguments are missing `natspec` param descriptions.
+        Consider adding proper `natspec` param descriptions for the constructor arguments.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6e6ca55a1b008bced7019a5a9e398312a549fa6f</field>
+    <field name="content">
+        ## [Q-6] `escrowedbalanceAtTime` incorrectly spelled according to naming convention
+
+        In StakingRewardsV2.sol, functions and state variables use the *lowerCamelCase* naming convention. However, this is not the case for the newly introduced function `escrowedbalanceAtTime`, which uses a lower b for balance (as opposed to e.g. `escrowedBalanceOf`).
+        
+        Consider renaming the function to `escrowed**B**alanceAtTime` to follow the naming convention.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Gas Optimizations</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">44f88dcedf4ffa38c5850f5f0b3f6141b8f56d9b</field>
+    <field name="content">
+        ## [G-1] Tracking block number in `Checkpoint` struct is not necessarily needed
+
+        In StakingRewardsV2.sol, the following `Checkpoint` struct is used:
+        
+        ```solidity
+        struct Checkpoint {
+                // The timestamp when the value was generated
+                uint256 ts;
+                // The block number when the value was generated
+                uint256 blk;
+                // The value of the checkpoint
+                uint256 value;
+            }
+        ```
+        
+        In its current state, `Checkpoint.blk` is not required anywhere in the code and checkpointing entirely relies on the timestamp `Checkpoint.ts`. 
+        
+        Consider removing `blk` from `Checkpoint` struct to save gas.
+    </field>
+    <field name="response">
+        We want to store the block number because incase we need it in the future. However to make this more agreeable we have used storage packing to fit the whole Checkpoint struct into a single slot so that it doesn’t make much difference anyway.      </field>
+  </item>
