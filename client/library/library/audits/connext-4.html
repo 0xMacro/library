@@ -1,0 +1,42 @@
+<page
+  clientName="Connext"
+  reportDate="October 18th, 2023"
+  auditTitle="Connext A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/connext/monorepo"
+  repoCommitHash="2c28f1939b9a2f05ef915f9e8b07a005476aab5a"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_CONNEXT_4"
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from October 9, 2023 to October 13, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Specification documentation provided by {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository, in the `packages/deployments/contracts/contracts/messaging/` directory:</p>
+
+    <template type="file-hashes">
+    fc5e4d39388ed7773666b7cd1ca5267f363a01e691178b71520600175d47117b  RootManager.sol
+    e44e905d731d0ff5840c440b6778dfcca93a67371d3f993e49978decbc0c6bb8  connectors/SpokeConnector.sol
+    296dbc8c9ddccc6263c74fc008b8ba365075ea96e9783a1de9704577e65f38ed  connectors/arbitrum/ArbitrumSpokeConnector.sol
+    3fddec06d217ff129d90527dc313eafac588de2432fa455781d0770bb8bddaf5  connectors/consensys/ConsensysSpokeConnector.sol
+    aaa63fbef02c0f135799444d2ee3ef213f97b72b6feeac3956bd4d3e4a911f58  connectors/gnosis/GnosisSpokeConnector.sol
+    5f5829aad68788bc148cd181b25992068ce287cf353ba22a52cf5aad496bdef9  connectors/mainnet/MainnetSpokeConnector.sol
+    95700d436db03358564dc644ad8b9059600bd1256b4a700e85dd716e1cd0ef6f  connectors/multichain/MultichainSpokeConnector.sol
+    adb8a0e6116bd52aa551389964385ca8cb7c933f16fe711917e133e99fd6874a  connectors/optimism/OptimismSpokeConnector.sol
+    94f428e4b9a0f3250472d9ac3de9d44712a7a3875459f510860c165c219182dc  connectors/polygon/PolygonSpokeConnector.sol
+    89f9c118a31f01e33516850ea47e3e097bf3f32c074fbd26bfcdef544f329ee3  connectors/polygonzk/PolygonZkSpokeConnector.sol
+    5b91fd771fa43c7f23879c4373d86cc284a4c0ee47d347e3cb6198c5ba9e2e58  connectors/wormhole/WormholeSpokeConnector.sol
+    3502d24729b6580aab63b0005bd8c6e1672f3bd5ec12b97a0e60df5fa3771b28  connectors/zksync/ZkSyncSpokeConnector.sol
+    219b250306c18a654a3f755bb03e287a769756b1cf492f993459ede81079e26a  interfaces/IHubSpokeConnector.sol
+    </template>
+</content-for>
