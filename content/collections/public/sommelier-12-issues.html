@@ -30,7 +30,7 @@
       ```
       Reference: [CurveEmaExtension.sol#L93-L95](https://github.com/PeggyJV/cellar-contracts/blob/4faacd442fefe1d4d2b39182ad7ed2bc67786d6b/src/modules/price-router/Extensions/Curve/CurveEMAExtension.sol#L93-L95)
   
-      However, the price returned by a curve pool’s `price_oracle()` function is not using the base asset’s decimals, since pools using [USDT](https://etherscan.io/address/0x390f3595bca2df7d23783dfd126427cceb997bf4#readContract) or [USDC](https://etherscan.io/address/0x7f86bf177dd4f3494b841a37e810a34dd56c829b#readContract) as their base asset return a price with 18 decimals, when these tokens both have 6 decimals. This can lead to incorrect price values for pools using a base asset that doesn't use 18 decimals.
+      However, the price returned by a curve pool’s `price_oracle()` function is not using the base asset’s decimals, since pools using [USDT](https://etherscan.io/address/0x390f3595bca2df7d23783dfd126427cceb997bf4#readContract) or [USDC](https://etherscan.io/address/0x7f86bf177dd4f3494b841a37e810a34dd56c829b#readContract) as their base asset return a price with 18 decimals, when these tokens both have 6 decimals. This can lead to incorrect price values for pools with a base asset that doesn't use 18 decimals.
       **Remediations to Consider**
   
       It seems like all prices returned from a curve pool’s `price_oracle()` function uses 18 decimals, so instead of using the base asset’s decimals, 18 could be used instead. Alternatively the price’s decimals could be set as a value in the `extensionStorage` struct for each asset.
