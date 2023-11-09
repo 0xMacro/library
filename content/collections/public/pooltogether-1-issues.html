@@ -1,0 +1,1647 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/140c8c96d38aa124be8f8d0b82e688b7a006b46c</field>
+    <field name="content">
+      ## [C-1] Malicious Vault can claim all prizes with incorrect odds calculation due to TWAB balance manipulation
+  
+      The `PrizePool` contract relies on `TwabController` reporting proper values for the average user balance contributed through a particular vault (during a specific time period) and the average total balance contributed through that same vault (during a specific time period). This interaction is performed in `PrizePool._getVaultUserBalanceAndTotalSupplyTwab()` function.
+  
+      Individual vault is responsible for the timely and correct recording of user contributions with `TwabController`. Vault is expected but not trusted to perform this function correctly. When it does not properly record user contributions, the winning odds of users contributing through that vault will be affected, but the expectation is that this cannot affect the winning odds of users from other vaults.
+  
+      Winning odds are based on the following parameters:
+  
+      - `vaultContributionFraction` [0, 1]
+      - `tierOdds` [0, 1]
+      - `vaultTwabTotalSupply` [0, type(uint256).max]
+      - `userTwab` [0, `vaultTwabTotalSupply`]
+  
+      The formula for calculating odds is similar to the following, although differently implemented within the codebase:
+  
+      `winningOdds`=`tierOdds` * `vaultContributionFraction` * (`userTwab`/`vaultTwabTotalSupply`)
+  
+      The assumption within the system is that `userTwab` / `vaultTwabTotalSupply` ratio is always ≤ 1.
+
+      When this assumption holds, even if a particular vault misbehaves in interaction with `TwabController`, the odds of other vaults and users contributing through those vaults will not be affected. However, there is an implementation error in `TwabController` logic which allows this assumption to be invalidated, causing total system failure.
+  
+      In the `TwabController`, a malicious vault can `mint()` any `uint96` amount for a particular user. This will update:
+  
+      1. the corresponding `Account` tracking balance of a particular user in `TwabController._increaseBalances()` and underlying `TwabLib.increaseBalances()`.
+      2. the corresponding `Account` tracking total supply for a vault in `TwabController._increaseTotalSupplyBalances()` and underlying `TwabLib.increaseBalances()`.
+  
+      Balances are tracked in `Account.details.balance` and `Account.details.delegateBalance`, which are fields of type `uint112`. In addition, for calculating time-weighted average balance, `Observation.balance` and `Observation.cummulativeBalance` fields are used, which are of type `uint96`.
+  
+      ```markdown
+      // TwabLib.sol
+      function increaseBalances(...) {
+        ...
+        accountDetails.delegateBalance += _delegateAmount;
+        ...
+        observation = ObservationLib.Observation({
+          // silent overflow when delegateBalance > type(uint96).max
+          balance: uint96(accountDetails.delegateBalance),
+            ...
+          });
+      }
+      ```
+  
+      If Account’s `delegateBalance` becomes greater than `type(uint96).max`, corresponding `observation.balance` will have incorrect value due to the silent overflow because of unsafe downcast of `uint112` to `uint96`. Since provided balance is externally controlled and unrestricted, a malicious vault can initialize the Account tracking balance of a particular user and the associated `observation.balance` to an enormous but valid value. On the other hand, it can cause an overflow of `observation.balance` for the Account tracking the total supply of the vault. This will cause `userTwab` to have enormous value while `vaultTwabTotalSupply` will incorrectly and unexpectedly have a minuscule value. Within `PrizePool` ratio of `userTwab` / `vaultTwabTotalSupply` will consequently become much larger > 1, giving the malicious vault odds for winning and claiming every prize.
+  
+      - PoC validating the finding:
+      
+          ```markdown
+          // add to TwabController.t.sol
+          function testGetTwabBetween_WithOverflow() external {
+            uint32 initialTimestamp = PERIOD_OFFSET + PERIOD_LENGTH;
+            uint32 currentTimestamp = initialTimestamp + PERIOD_LENGTH;
+      
+            vm.warp(initialTimestamp);
+      
+            vm.startPrank(mockVault);
+      
+            uint96 _amount = type(uint96).max;
+            twabController.mint(alice, _amount);
+      
+            TwabLib.Account memory account = twabController.getTotalSupplyAccount(mockVault);
+            TwabLib.AccountDetails memory accountDetails = account.details;
+      
+            assertEq(account.observations[0].balance, type(uint96).max);
+      
+            uint96 _amount2 = 3;
+            twabController.mint(bob, _amount2);
+      
+            account = twabController.getTotalSupplyAccount(mockVault);
+            accountDetails = account.details;
+      
+            assertEq(account.observations[0].balance, 2);
+      
+            vm.warp(currentTimestamp);
+      
+            // [before,after] observation
+            uint256 balance = twabController.getTwabBetween(
+              mockVault,
+              alice,
+              initialTimestamp - 50,
+              initialTimestamp + 50
+            );
+            uint256 totalSupply = twabController.getTotalSupplyTwabBetween(
+              mockVault,
+              initialTimestamp - 50,
+              initialTimestamp + 50
+            );
+            assertEq(balance, _amount / 2);
+            assertEq(totalSupply, 1);
+            assertLt(totalSupply, balance);
+      
+            // console.log(balance);     // 39614081257132168796771975167
+            // console.log(totalSupply); // 1
+          }
+      
+          // add to PrizePool.t.sol
+          function testIsWinnerGrandPrize_WithCorruptedTWAB() public {
+            uint256 amount1ETH = 1e18;
+            uint256 amount100ETH = 100e18;
+            address otherUser = address(0x100);
+            address otherVault = address(0x200);
+      
+            prizeToken.mint(address(prizePool), amount1ETH);
+            prizePool.contributePrizeTokens(address(this), amount1ETH);
+      
+            vm.startPrank(otherUser);
+            prizeToken.mint(address(prizePool), amount100ETH);
+            prizePool.contributePrizeTokens(otherVault, amount100ETH);
+            vm.stopPrank();
+      
+            vm.warp(prizePool.openDrawEndsAt());
+            prizePool.closeDraw(winningRandomNumber);
+      
+            (uint64 startTime, uint64 endTime) = prizePool.calculateTierTwabTimestamps(0);
+      
+            vm.mockCall(
+              address(twabController),
+              abi.encodeWithSelector(
+                TwabController.getTwabBetween.selector,
+                address(this), // _vault
+                msg.sender,    // _user
+                uint32(startTime),
+                uint32(endTime)
+              ),
+              abi.encode(uint256(39614081257132168796771975167))
+            );
+      
+            vm.mockCall(
+              address(twabController),
+              abi.encodeWithSelector(
+                TwabController.getTotalSupplyTwabBetween.selector,
+                address(this), // _vault
+                uint32(startTime),
+                uint32(endTime)
+              ),
+              abi.encode(uint256(1))
+            );
+      
+            // mock twab results for other vault
+            vm.mockCall(
+              address(twabController),
+              abi.encodeWithSelector(
+                TwabController.getTwabBetween.selector,
+                otherVault, // _vault
+                otherUser,    // _user
+                uint32(startTime),
+                uint32(endTime)
+              ),
+              abi.encode(uint256(amount100ETH / 2))
+            );
+      
+            vm.mockCall(
+              address(twabController),
+              abi.encodeWithSelector(
+                TwabController.getTotalSupplyTwabBetween.selector,
+                otherVault, // _vault
+                uint32(startTime),
+                uint32(endTime)
+              ),
+              abi.encode(uint256(amount100ETH / 2))
+            );
+      
+            // user with x100 smaller contribution wins grand prize because of incorrect TWAB
+            assertEq(prizePool.isWinner(address(this), msg.sender, 0, 0), true);
+            assertEq(prizePool.isWinner(otherVault, otherUser, 0, 0), false);
+          }
+          ```
+      
+  
+      **Remediations to consider:**
+  
+      - Use OpenZeppelin’s `SafeCast` to safely cast the `accountDetails.delegateBalance`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/96c3a8315ff6319f314cbf99ff465391c616b790</field>
+    <field name="content">
+      ## [C-2] Malicious Vault can steal the grand prize
+  
+      As explained in issue **[C-1]**, the `PrizePool` contract relies on `TwabController` to provide the correct values for `userTwab` and `vaultTwab` for specific prize period interval. The expectation is that when there is a single user/contributor for a particular vault, the ratio of `userTwab` and `vaultTwab` can never be greater than 1. When there are multiple users/contributors, the expectation is that ratio of the sum of `userTwab`s and `vaultTwab` also can never be greater than 1. When this invariant is satisfied, winning odds for different vaults are correctly calculated in the PrizePool. However, when this invariant is not satisfied, the vault/s will have incorrect odds and may incorrectly claim prizes affecting other vaults and their users. 
+  
+      In `PrizePool._computeVaultTierDetails()`, the draw duration for the grand prize is calculated in the following way and ends up being 366 days due to rounding up.
+  
+      ```markdown
+       drawDuration = uint16(TierCalculationLib.estimatePrizeFrequencyInDraws(tierOdds));
+      ```
+  
+      In `PrizePool._getVaultUserBalanceAndTotalSupplyTwab()`, previously calculated draw duration is used to generate start and end timestamps for a particular time interval. This time interval is then used to query TwabController for a user and vault TWAB values.
+  
+      ```markdown
+      function _getVaultUserBalanceAndTotalSupplyTwab(
+        address _vault,
+        address _user,
+        uint256 _drawDuration
+      ) internal view returns (uint256 twab, uint256 twabTotalSupply) {
+        uint32 _endTimestamp = uint32(_lastClosedDrawStartedAt + drawPeriodSeconds);
+        uint32 _startTimestamp = uint32(_endTimestamp - _drawDuration * drawPeriodSeconds);
+  
+        twab = twabController.getTwabBetween(_vault, _user, _startTimestamp, _endTimestamp);
+  
+        twabTotalSupply = twabController.getTotalSupplyTwabBetween(
+          _vault,
+          _startTimestamp,
+          _endTimestamp
+        );
+      }
+      ```
+  
+      In `TwabController`, the number of observations kept in history per user and vault account for historical lookups is 365. For each period, there is at most one observation record in case there was a balance change for that user or vault account within a particular period.
+  
+      ```markdown
+      // ObservationLib.sol
+      uint16 constant MAX_CARDINALITY = 365;
+  
+      // TwabLib.sol
+      /**
+      * @notice Account details and historical twabs.
+      * @param details The account details
+      * @param observations The history of observations for this account
+      */
+      struct Account {
+          AccountDetails details;
+          ObservationLib.Observation[MAX_CARDINALITY] observations;
+      }
+      ```
+  
+      The `TwabLib.getTwabBetween()` function is responsible for calculating TWAB values for user and vault accounts based on the provided time interval. This function finds in account observations records of previous occurrences relative to start and end timestamps. It then performs extrapolations of balance amounts if timestamps of occurrences do not exactly match provided time interval. In the end, it calculates the final result according to this formula.
+  
+      ```markdown
+      return
+            (endObservation.cumulativeBalance - startObservation.cumulativeBalance) /
+            (_endTime - _startTime);
+      ```
+  
+      When a set of records in history covers a wider time period than the queried interval this formula and implementation works properly. However, when the start of the period has already been overwritten with new observation records, there is an issue that causes the overall calculation to be incorrect. The issue is in the underlying `_getPreviousOrAtObservation()` function which sets `cumulativeBalance` to 0 even though `cumulativeBalance`, at this particular point in time before being overwritten, was not 0.
+  
+      ```markdown
+      (oldestTwabIndex, prevOrAtObservation) = getOldestObservation(_observations, _accountDetails);
+      if (_targetTime < prevOrAtObservation.timestamp) {
+        return
+          ObservationLib.Observation({ cumulativeBalance: 0, balance: 0, timestamp: PERIOD_OFFSET });
+      }
+      ```
+  
+      In this edge case, the difference between the final cumulative balance and the initial cumulative balance becomes larger than expected. Consequently calculated TWAB value also becomes larger than expected.
+  
+      Malicious vault can exploit the previously mentioned issue in the following way:
+  
+      1. Mint an arbitrarily large amount of balance at period 1 to user Alice.
+      2. In period 2, the vault burns almost the whole of Alice’s balance.
+      3. In order to fill the user account observations history but not cause the same for the corresponding vault account, the malicious vault repeatedly for at least 368 periods does the following:
+          1. as Alice, delegates to Bob
+          2. as Alice, delegates back
+      4. At period 370 query arrives for TWAB values related to time interval [3,369]. Because of time interval overflow, the system returns for user and vault TWABs following:
+          1. for user TWAB
+              1. end cumulative balance: 
+              
+                  ```markdown
+                  (initial amount) * 1 period + 1 wei * 368 periods
+                  ```
+              
+              2. start cumulative balance (due to the overflow and last occurrence being after the start): 0
+          2. for vault TWAB
+              1. end cumulative balance: 
+              
+                  ```markdown
+                  (initial amount) * 1 period + 1 wei * 368 periods
+                  ```
+              
+              2. start cumulative balance (extrapolation of occurrence recorded at burn operation): 
+              
+                  ```markdown
+                  (initial amount) * 1 period + 1 wei * 2 periods
+                  ```
+              
+      5. As a result of the above, the ratio of user and vault TWAB values becomes approximately equal to an arbitrary initial amount, which allows the malicious vault to become a grand prize winner with almost no contribution to the PrizePool.
+      
+          ```markdown
+          ((initial amount) * 1 period + 1 wei * 368 periods) - 0) /
+          ((initial amount) * 1 period + 1 wei * 368 periods) - ((initial amount) * 1 period +  1 wei * 2 periods)
+      
+          or -------------------
+      
+          ((initial amount) * 1 period +  1 wei * 368 periods) / 1 wei * 366 periods
+          ```
+      
+      - PoC validating the finding:
+      
+          ```markdown
+          function testGetTwabBetween_PeriodOverflow() external {
+            uint32 initialTimestamp = PERIOD_OFFSET + PERIOD_LENGTH;
+            uint32 currentTimestamp = initialTimestamp + PERIOD_LENGTH;
+      
+            // period 1
+            vm.warp(initialTimestamp);
+      
+            vm.startPrank(mockVault);
+      
+            uint96 _amount = 100e18;
+            twabController.mint(alice, _amount);
+      
+            TwabLib.Account memory account = twabController.getTotalSupplyAccount(mockVault);
+            assertEq(account.observations[0].balance, _amount);
+      
+            // period 2
+            vm.warp(currentTimestamp);
+      
+            twabController.burn(alice, _amount - 1); // 99.99...%
+      
+            changePrank(alice);
+            for (uint256 i = 2; i < 400; i++) {
+              vm.warp(initialTimestamp + i * PERIOD_LENGTH);
+                  // used to increase cardinality of user's account observations
+              // without increasing cardinality of the vault's account observations
+              twabController.delegate(mockVault, bob);
+              twabController.delegate(mockVault, alice);
+            }
+            vm.warp(initialTimestamp + 400 * PERIOD_LENGTH);
+      
+            uint32 endTime = initialTimestamp + 399 * PERIOD_LENGTH;
+            uint32 startTime = endTime - 366 * PERIOD_LENGTH;
+      
+            // [before,after] observation
+            uint256 balance = twabController.getTwabBetween(
+              mockVault,
+              alice,
+              startTime,
+              endTime
+            );
+            uint256 totalSupply = twabController.getTotalSupplyTwabBetween(
+              mockVault,
+              startTime,
+              endTime
+            );
+            console.log(balance);     // 273224043715846995
+            console.log(totalSupply); // 1
+            assertLt(totalSupply, balance);
+      
+            vm.stopPrank();
+          }
+          ```
+      
+  
+      **Remediations to consider:**
+  
+      - Ensure that the RingBuffer size for observations is big enough to cover the largest time interval queried by the PrizePool.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/6fa132cb7fd211b7b77230085d89c8165c700c84</field>
+    <field name="content">
+      ## [H-1] Assets stuck in PrizePool if a number of tiers go over the intended maximum
+  
+      In the `PrizePool` contract, `_computeNextNumberOfTiers()` is responsible for calculating the number of tiers for the next draw based on the number of tiers in the previous draw. This function enforces the specification requirement that there should be a minimum of 3 tiers in each draw. However, there is no corresponding functionality that would prevent an increase in the number of tiers over a maximum number of tiers for a particular draw.
+  
+      The specification defines the maximum number of tiers within the system to be 15. In addition, parts of the functionality in the rest of the codebase assume the maximum number of tiers to be 15. For example, `_canaryPrizeCountFractional()` returns 0 for `numTiers` input which is outside of the range [3,15].
+  
+      ```markdown
+      function _canaryPrizeCountFractional(uint8 numTiers) internal view returns (UD60x18) {
+        if (numTiers == 3) {
+          return CANARY_PRIZE_COUNT_FOR_2_TIERS;
+          ...
+          } else if (numTiers == 15) {
+            return CANARY_PRIZE_COUNT_FOR_14_TIERS;
+          }
+          return ud(0);
+      }
+      ```
+  
+      Due to a missing restriction in `_computeNextNumberOfTiers` and unmet expectation within the rest of the codebase that number of tiers will never be higher than 15, when this edge case happens `PrizePool` contract **will end up in bricked state** since `closeDraw()` function will never be processed successfully.
+  
+      Whenever the conditions are met for `_computeNextNumberOfTiers()` to return 16, `closeDraw()` will fail due to division by 0. More precisely, `_computePrizeSize()` will fail when calculating prize size for the canary tier because the number of prizes for the canary tier with index 15 is 0. For `_computeNextNumberOfTiers` to return 16, the previous draw should have the maximum number of tiers, and the `largestTierClaimed` should be the canary tier (tier with index 14). In addition, the number of prize claims for the canary and highest standard tier should be over the tier expansion threshold.
+  
+      **Note:** due to issue **[M-1]** in the current implementation, the last precondition is not necessary.
+  
+      **Remediations to consider:**
+  
+      - Update `_computeNextNumberOfTiers()` implementation to enforce the maximum number of tiers being 15.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/d3f95233f541bd94665022195379188acfb07498</field>
+    <field name="content">
+      ## [H-2] Winner cannot claim a prize through multiple Vaults if it is the same user
+  
+      In the `PrizePool` contract, `claimPrize()` function enables Vaults to claim prizes of winners on their behalf. When the winner's claim is checked and confirmed, the function updates the state variable `claimedPrizes` used to prevent double claims. State variable update takes into account `user`, `drawId`, `tier`, and `prizeIndex`. 
+  
+      ```markdown
+      if (claimedPrizes[_winner][lastClosedDrawId][_tier][_prizeIndex]) {
+        revert AlreadyClaimedPrize(msg.sender, _winner, _tier, _prizeIndex, _prizeRecipient);
+      }
+  
+      claimedPrizes[_winner][lastClosedDrawId][_tier][_prizeIndex] = true; 
+      ```
+  
+      However, the `claimedPrizes` state variable is defined in a way that doesn’t take into account Vault or `msg.sender`. As a result, if the same user contributes prize tokens through 2 or more different vaults and wins, she will not be able to claim all the prizes but instead only one.
+  
+      On top, the way that a user’s specific random number is calculated does not take into account the vault for which the prize claim is made. In essence, this means that a user holds the same ticket across all different vaults to which he/she has made a deposit. As a result, if a user wins in one of the vaults, then he/she wins in the rest of the vaults too, skewing the prize distribution.
+  
+      **Remediations to consider:**
+  
+      - Update TierCalculationLib.sol `calculatePseudoRandomNumber()` to take into account the vault for which the random number is calculated. In the end, the calculated pseudo-random number would be the result of a hash of a user’s address, vault’s address, tier, prize index, and winning random number, or
+      - Update `claimPrize()` implementation and `claimedPrizes` state variable to be able to differentiate between claims with the same user, draw, tier, and prizeIndex but coming from different vaults.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/6ffa6797f6b88d8a3dbbd8f9420f4debbaa731d9</field>
+    <field name="content">
+      ## [H-3] Odds calculation for closed draw affected by contribution to the open draw
+  
+      In the `PrizePool` contract, `claimPrize()` function enables winners to claim their prizes. In this function, the portion of the overall contributions for which a particular Vault is responsible is calculated in the `_computeVaultTierDetails()` and `_getVaultPortion()` functions.
+  
+      ```markdown
+      function _computeVaultTierDetails(
+          address _vault,
+          uint8 _tier,
+          uint8 _numberOfTiers,
+          uint16 _lastClosedDrawId
+        ) internal view returns (SD59x18 vaultPortion, SD59x18 tierOdds, uint16 drawDuration) {
+              ...
+          drawDuration = uint16(TierCalculationLib.estimatePrizeFrequencyInDraws(tierOdds));
+          vaultPortion = _getVaultPortion(
+            _vault,
+            uint16(drawDuration > _lastClosedDrawId ? 0 : _lastClosedDrawId - drawDuration + 1),
+            **_lastClosedDrawId + 1,**
+            smoothing.intoSD59x18()
+          );
+        }
+      ```
+  
+      However, there is an error in the provided arguments for the `_getVaultPortion()` call. `_getVaultPortion()` performs the calculation of disbursed amount between `startDrawId` and `endDrawId` with those draws included. `_computeVaultTierDetails()` calculates the correct `startDrawId` based on the `drawDuration`, but it is off-by-one in calculating `endDrawId` as it includes the currently open draw.
+  
+      As a result, potential attackers may misuse this implementation error to increase their chances of winning a previously closed draw. After getting to know `winningRandomNumber` they can frontrun new contributions for the currently open draw and skew winning odds in their favor. In addition, with a carefully prepared sequence of contributions of increasing sizes, a potential attacker may create more than the expected number of winners for the closed draw and drain all available `reserve`.
+  
+      - PoC validating the finding:
+      
+          ```markdown
+          // add to PrizePool.t.sol
+          function testIsWinner_notAffectedByNewContributions() public {
+            contribute(100e18);
+            closeDraw(winningRandomNumber);
+            mockTwab(msg.sender, 1);
+            assertEq(prizePool.isWinner(address(this), msg.sender, 1, 0), true);
+            // amount is large because of the current mock data setup
+            contribute(100_000e18, sender1);
+              // here it fails as isWinner returns false
+            assertEq(prizePool.isWinner(address(this), msg.sender, 1, 0), true);
+          }
+          ```
+      
+  
+      **Remediations to consider:**
+  
+      - Update `_computeVaultTierDetails()` implementation to provide proper value for the `endDrawId` argument in a call to the `_getVaultPortion()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/1d7cd90be4752f1258dbe33b011c08dda9d7bdfb</field>
+    <field name="content">
+      ## [H-4] Delegate balance operation can be irreversible
+  
+      In `TwabController`, the system allows users to `delegate` their balance to other users. Specification and expectation is that this operation can be reversed by either delegating back to itself or delegating to a different user. In addition, the system aims to prevent delegation to the same user multiple times.
+  
+      However, in the case of one specific delegate address - **zero address**, these mechanisms break. The core cause is in the handling of zero address delegate in `_delegateOf()` and `_delegate()` functions.
+  
+      ```markdown
+      function _delegateOf() {
+          ...
+        _userDelegate = delegates[_vault][_user];
+        // If the user has not delegated, then the user is the delegate
+          if (_userDelegate == address(0)) {
+            _userDelegate = _user;
+          }
+        ...
+      }
+      ```
+  
+      As seen above, when `delegates[_vault][_user]` record is zero address, `_userDelegate` will be initialized to `_user` and `_currentDelegate` as well as seen below.
+  
+      ```markdown
+      function _delegate() {
+        ...
+        address _currentDelegate = _delegateOf(_vault, _from);
+          if (_to == _currentDelegate) {
+            revert SameDelegateAlreadySet(_to);
+          }
+          delegates[_vault][_from] = _to;
+        ...
+      }
+      ```
+  
+      In `_delegate()`, since `_to` is a zero address, `delegates[_vault][_from]` will also be set to zero address, and this will allow a user to delegate to a zero address multiple times if there is an available `delegateBalance` in his account.
+  
+      In addition, a malicious user to whom someone already delegated may prevent the reclaim of those balances by frontrunning those operations with its own delegation to zero address. In this case, a malicious user’s delegate balance will be inadequate for the system to retrieve delegated balance back, and the operation of `_transferDelegateBalance()` will fail due to `DelegateBalanceLTAmount` error as shown in PoC below.
+  
+      - PoC validating the finding:
+      
+          ```solidity
+          function testDelegate_duplicateDelegatePossibleWhenDelegatingToZeroAddress() external {
+            vm.startPrank(mockVault);
+      
+            uint96 _amount = 5e18;
+            twabController.mint(alice, _amount);
+      
+            assertEq(twabController.delegateOf(mockVault, alice), alice);
+            assertEq(twabController.balanceOf(mockVault, alice), _amount);
+            assertEq(twabController.delegateBalanceOf(mockVault, alice), _amount);
+      
+            assertEq(twabController.delegateBalanceOf(mockVault, bob), 0);
+            assertEq(twabController.balanceOf(mockVault, bob), 0);
+      
+            assertEq(twabController.delegateBalanceOf(mockVault, charlie), 0);
+            assertEq(twabController.balanceOf(mockVault, charlie), 0);
+      
+            changePrank(alice);
+            twabController.delegate(mockVault, address(0));
+      
+            assertEq(twabController.delegateOf(mockVault, alice), alice);
+            assertEq(twabController.balanceOf(mockVault, alice), _amount);
+            assertEq(twabController.delegateBalanceOf(mockVault, alice), 0);
+      
+            twabController.mint(bob, _amount);
+      
+            changePrank(bob);
+            twabController.delegate(mockVault, alice);
+      
+            assertEq(twabController.delegateOf(mockVault, alice), alice);
+            assertEq(twabController.balanceOf(mockVault, alice), _amount);
+            assertEq(twabController.delegateBalanceOf(mockVault, alice), _amount);
+      
+            assertEq(twabController.balanceOf(mockVault, bob), _amount);
+            assertEq(twabController.delegateBalanceOf(mockVault, bob), 0);
+      
+            changePrank(alice);
+            twabController.delegate(mockVault, address(0));
+      
+            assertEq(twabController.delegateOf(mockVault, alice), alice);
+            assertEq(twabController.balanceOf(mockVault, alice), _amount);
+            assertEq(twabController.delegateBalanceOf(mockVault, alice), 0);
+      
+            changePrank(bob);
+            twabController.delegate(mockVault, charlie);
+      
+            vm.stopPrank();
+          }
+          ```
+      
+  
+      **Remediations to consider:**
+  
+      - Consider preventing delegation to zero address.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/11a747a2522af8e37cd3577535a35bb0dabf8a10</field>
+    <field name="content">
+      ## [M-1] Number of tiers may increase without meeting the expansion criteria
+  
+      In the `PrizePool` contract, `_computeNextNumberOfTiers()` is responsible for determining the number of tiers in the next draw. The spec states that the number of tiers is increased when:
+  
+      - the number of claimed standard prizes exceeds the expansion threshold, and
+      - the number of claimed canary prizes exceeds the expansion threshold.
+  
+      In function implementation, `_nextNumberOfTiers` is first initialized to `largestTierClaimed + 2`. After initialization, various tier expansion criteria calculations and checks are performed, but at the end, `_nextNumberOfTiers` is returned.
+  
+      ```solidity
+      function _computeNextNumberOfTiers(uint8 _numTiers) internal view returns (uint8) {
+        UD2x18 _claimExpansionThreshold = claimExpansionThreshold;
+  
+        uint8 _nextNumberOfTiers = largestTierClaimed + 2; // canary tier, then length
+    
+          // ... here perform additional checks for claim threshold %
+        // ... IF threshold is met, set _nextNumberOfTiers = _numTiers + 1;
+  
+          return _nextNumberOfTiers;
+      }
+      ```
+  
+      In case when `largestTierClaimed` is the canary tier, `_nextNumberOfTiers` will be initialized to a value which is `_numTiers + 1`, and that will be the return value without considering the rest of the function implementation. However, this is not in line with the specification.
+  
+      - PoC validating the finding:
+      
+          ```solidity
+          function testIncreaseTier() public {
+            uint256 winningRandomNumber = 1;
+            uint256 amount = 10 ether;
+      
+            // current number of tiers is 3
+            assertEq(prizePool.numberOfTiers(), 3);
+      
+            // contribute prize tokens to prize pool
+            prizeToken.mint(address(this), amount);
+            prizeToken.transfer(address(prizePool), amount);
+            prizePool.contributePrizeTokens(address(vaults[0]), amount);
+      
+            // deposit tokens to vault
+            vm.startPrank(winner);
+            underlyingToken.mint(winner, amount);
+            underlyingToken.approve(address(vault), amount);
+            vault.deposit(amount, winner);
+            vm.stopPrank();
+      
+            // close the 1st draw
+            vm.warp(block.timestamp + 2 days);
+            prizePool.closeDraw(winningRandomNumber);
+      
+            // claim canary tier
+            vm.startPrank(address(vault));
+            prizePool.claimPrize(winner, 2, 1, winner, 0, address(0));
+            vm.stopPrank();
+      
+            // close the 2nd draw
+            vm.warp(block.timestamp + 1 days);
+            prizePool.closeDraw(winningRandomNumber);
+      
+            // new number of tiers is 4
+            assertEq(prizePool.numberOfTiers(), 4);
+          }
+          ```
+      
+  
+      **Remediations to consider:**
+  
+      - Update `_nextNumberOfTiers` initialization in `_computeNextNumberOfTiers()`  to add 1 instead of 2 to `largestTierClaimed`
+  
+      ```solidity
+      function _computeNextNumberOfTiers(uint8 _numTiers) internal view returns (uint8) {
+        ...
+          uint8 _nextNumberOfTiers = largestTierClaimed + 1;
+          ...
+      }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/11a747a2522af8e37cd3577535a35bb0dabf8a10</field>
+    <field name="content">
+      ## [M-2] A malicious actor may prevent the reduction of the number of tiers
+  
+      In the `PrizePool` contract, `_computeNextNumberOfTiers()` is responsible for determining the number of tiers in the next draw. While specification defines what should be satisfied to increase the number of tiers it doesn’t define what should happen to decrease the number of tiers. A decrease in the number of tiers aggregates available liquidity. It also causes an increase in the size of individual prizes. This is desirable in particular circumstances because claiming a small prize may not be cost-effective as it is gas prohibitive.
+  
+      The current implementation works in a way that if a single claim happens in a canary prize tier/highest standard tier, the number of tiers will not be reduced. A malicious actor may claim this single prize even if it is not cost-effective for him to do it in order to cause liquidity to be trapped in tiers with prize sizes too small for profitable claiming. While the motives of such an actor are not obvious to us at the moment, the small cost of this type of griefing attack and the fact it is relatively easy to perform increase the likelihood of it happening. 
+  
+      **Remediations to consider:**
+  
+      - Introduce `claimReductionThreshold` in an analogy to the current `claimExpansionThreshold` system parameter. Update `_computeNextNumberOfTiers()` to consider `claimReductionThreshold` for the canary prize tier and reduce the number of tiers if the number of claims is below that threshold. In `_nextDraw()` and `_computeNewDistributions()`, reclaim liquidity for obsolete tiers similarly as it is currently done.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [M-3] A malicious actor may increase the cost of claiming prizes
+  
+      The `PrizePool` contract determines the winner on claim requests based on TWAB values returned from the `TwabController`. TWAB values are calculated based on corresponding observations previously retrieved using binary search.
+  
+      A malicious actor may intentionally cause a buffer of observations for a particular user or set of users to fill up. As a result, TWAB calculation for them will be more costly, and consequently, prize claiming will have different cost-benefit tradeoff.
+  
+      A malicious actor can achieve the creation of new observation records by repeatedly performing delegate to one or more users in sequence within the same transaction. In the current implementation, the griefer needs to have at least 1 wei of `delegateBalance` to perform this.
+  
+      **Remediations to consider:**
+  
+      - Consider removing delegate functionality, or
+      - Prevent multiple delegations from the same user within a single block.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/bc6bf688f5a99fddd149e34b5f43db0d626f7c8b</field>
+    <field name="content">
+    ## [M-4] A zero period may contain more than one observation
+
+    In the `TwabLib` contract, `increasesBalances()` and `decreasesBalances()` functions rely on  `_getNextObservationIndex()` to know when a new observation record should be created or not. When `PERIOD_OFFSET` is in the future, observations may be created on each block for the duration of period 0 (until `PERIOD_OFFSET` is reached). This may result in a ring buffer of observations for a particular account getting filled with less than 365 different periods that guarantee to be able to provide proper TWAB.
+  
+      ```markdown
+      if (currentPeriod == 0 || currentPeriod > newestObservationPeriod) {
+        return (
+          uint16(RingBufferLib.wrap(_accountDetails.nextObservationIndex, MAX_CARDINALITY)),
+          newestObservation,
+          true
+        );
+      }
+      ```
+  
+      The above edge case invalidates the specification invariant that there should be at most one observation per period.
+  
+      **Remediations to consider:**
+  
+      - Ensure that `PERIOD_OFFSET` is in the past, or
+      - Update existing observation for period 0 if it exists instead of creating a new record.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use case</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/5ee63a546fb0590f2f34defaebe25e235a894928</field>
+    <field name="content">
+      ## [L-1] PrizePool tier with remaining liquidity may have a prize size of 0
+  
+      In the `PrizePool` contract, the implementation allows tiers that have non-zero remaining liquidity to have a prize size of 0. In this case, end users will be able to claim 0 prize, but without effect on the remaining tier balance. The only effect will be on the claim count, which will increase on successful prize claims.
+  
+      - PoC validating the finding:
+      
+          ```markdown
+          function testCloseAndOpenNextDraw_ZeroPrize() public {
+            uint8 startingTiers = 11;
+      
+            // reset prize pool at higher tiers
+            ConstructorParams memory prizePoolParams = ConstructorParams(
+              prizeToken,
+              twabController,
+              address(this),
+              drawPeriodSeconds,
+              lastClosedDrawStartedAt,
+              startingTiers, // higher number of tiers
+              100,
+              10,
+              10,
+              ud2x18(0.9e18), // claim threshold of 90%
+              sd1x18(0.9e18) // alpha
+            );
+            prizePool = new PrizePool(prizePoolParams);
+      
+            contribute(10200);
+            closeDraw(1234);
+      
+            // tiers should not change upon first draw
+            assertEq(prizePool.numberOfTiers(), startingTiers, "starting tiers");
+            assertEq(prizePool.getTierRemainingLiquidity(9), 100, "small liquidity");
+            assertEq(prizePool.getTierPrizeSize(9), 0, "zero price");
+      
+            assertEq(prizePool.reserve(), 10, "reserve after first draw");
+      
+            // now claim only smallest prize
+            address winner = makeAddr("winner");
+            address recipient = makeAddr("recipient");
+            mockTwab(winner, 9);
+      
+            vm.expectEmit();
+            emit ClaimedPrize(
+              address(this),
+              winner,
+              recipient,
+              1,
+              9,
+              0,
+              0,
+              0,
+              address(0)
+            );
+            prizePool.claimPrize(winner, 9, 0, recipient, 0, address(0));
+          }
+          ```
+  
+      **Remediations to consider:**
+  
+      - Consider not allowing 0 prize claims, or
+      - Reclaim liquidity of mentioned tiers for less frequent tiers.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Loss of Precision</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/2155e33eb1ef906fd843e1b3cf9230e2e003a1fc</field>
+    <field name="content">
+      ## [L-2] Overflow of lastClosedDrawId (uint16) will brick the PrizePool contract
+  
+      In TieredLiquidityDistributor.sol `lastClosedDrawId` is set as `uint16`. After every draw, its value is increased by 1. Given daily draws, the maximum value of `uint16` would be reached in 180 years, after which the contract would get bricked since `lastClosedDrawId` could no longer be incremented any further and result in the overflow error. Given hourly draws, the issue would occur in 7.8 years.
+  
+      - PoC validating the finding:
+      
+          ```solidity
+          contract PrizePoolHarness is PrizePool {
+            constructor(ConstructorParams memory params) PrizePool(params) {
+                  // set lastClosedDrawId at a maximum value of uint16 - 1
+              lastClosedDrawId = type(uint16).max - 1;
+            }
+          }
+      
+          function testLastClosedDrawIdOverflow() public {
+            uint256 amount = 10 ether;
+      
+            // contribute prize tokens to prize pool
+            prizeToken.mint(address(this), amount);
+            prizeToken.transfer(address(prizePool), amount);
+            prizePool.contributePrizeTokens(address(vaults[0]), amount);
+      
+            // close draw
+            vm.warp(block.timestamp + 2 days);
+            prizePool.closeDraw(1);
+      
+            // close draw
+            vm.warp(block.timestamp + 1 days);
+          
+              // impossible to closeDraw due to overflow error
+            vm.expectRevert(stdError.arithmeticError);
+            prizePool.closeDraw(1);
+          }
+          ```
+      
+  
+      **Remediations to consider:**
+  
+      - Increase the value type of `lastClosedDrawId` to `uint32` to accommodate larger values.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Loss of Precision</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/9efbd00cae6d6c93fd7a94ee3293236583e5b433</field>
+    <field name="content">
+      ## [L-3] Overflow of the total available amount (uint96) will break contribution accounting
+  
+      In the `PrizePool`, an `_amount` parameter in `contributePrizeTokens()` which is of type `uint256` denotes the amount of prize tokens being contributed to the prize pool. Then, we add the amount to the prize pool accumulator as such:
+  
+      ```solidity
+      function contributePrizeTokens(address _prizeVault, uint256 _amount) external returns (uint256) {
+        ...
+          DrawAccumulatorLib.add(
+          totalAccumulator,
+          _amount,
+          lastClosedDrawId + 1,
+          smoothing.intoSD59x18()
+        );
+        ...
+      }
+      ```
+  
+      Inside the `DrawAccumulatorLib.add()` function, the tracked total amount `available` is set by summing `_amount` and `remainingAmount`, with cast down to `uint96`:
+  
+      ```solidity
+      function add(...) internal returns (bool) {
+        ...
+          if (_drawId != newestDrawId_) {
+          ...
+          accumulator.observations[_drawId] = Observation({
+            available: uint96(_amount + remainingAmount),
+            disbursed: uint168(newestObservation_.disbursed + disbursedAmount + remainder)
+          });
+              ...
+      }
+      ```
+  
+      In a scenario where the final amount exceeds the max value of `uint96`, the `available` variable will overflow. As a result, `PrizePool._accountedBalance()` will return an incorrect result and allow the first next caller of `contributePrizeTokens()` to become the largest contributor (of almost all of the balance that was lost in the overflow of `available` variable) and claimer of almost all prizes. 
+  
+      - PoC validating the finding:
+      
+          ```solidity
+          function testContributeOverMaxUint96() public {
+            uint256 contributeAmount = uint256(type(uint96).max) + 1;
+        
+            // contribute max value of uint96 to the prize pool
+            prizeToken.mint(address(this), contributeAmount);
+            prizeToken.transfer(address(prizePool), contributeAmount);
+            prizePool.contributePrizeTokens(address(vault), contributeAmount);
+      
+            // close the 1st draw
+            vm.warp(block.timestamp + 2 days);
+            prizePool.closeDraw(1);
+      
+            // prize sizes for all tiers are 0,
+              // even though the contributed amount is > 0
+            assertEq(prizePool.getTierPrizeSize(0), 0);
+            assertEq(prizePool.getTierPrizeSize(1), 0);
+            assertEq(prizePool.getTierPrizeSize(2), 0);
+          }
+          ```
+      
+  
+      **Remediations to consider:**
+  
+      - Use OpenZeppelin’s `SafeCast` to safely cast the sum of `_amount` and `remainingAmount` to `uint96`, which will revert in case of overflow.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Loss of Precision</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/4b33c53821e1e2c5ae473e522e659f4c74c9f06d</field>
+    <field name="content">
+      ## [L-4] Overflow of _userTwab (uint128) and/or _vaultTwabTotalSupply (uint128) will change winning odds
+  
+      In PrizePool.sol `_isWinner()` function `_userTwab` and `_vaultTwabTotalSupply`, both of which are `uint256`, are cast into `uint128`, as shown in the snippet below:
+  
+      ```solidity
+      function _isWinner(...) internal view returns (bool) {
+          ...
+          (uint256 _userTwab, uint256 _vaultTwabTotalSupply) = _getVaultUserBalanceAndTotalSupplyTwab(
+            _vault,
+            _user,
+            _drawDuration
+          );
+      
+          return
+            TierCalculationLib.isWinner(
+              userSpecificRandomNumber,
+              uint128(_userTwab),
+              uint128(_vaultTwabTotalSupply),
+              _vaultPortion,
+              _tierOdds
+            );
+          }
+      ```
+  
+      Then, inside the TierCalculationLib.sol `isWinner()`, we use those two values to determine if a given user is a winner:
+  
+      ```solidity
+      function isWinner(...) internal view returns (bool) {
+        ...
+          int256 constrainedRandomNumber = _userSpecificRandomNumber % (_vaultTwabTotalSupply);
+        uint256 winningZone = calculateWinningZone(_userTwab, _vaultContributionFraction, _tierOdds);
+  
+        return constrainedRandomNumber < winningZone;
+      }
+      ```
+  
+      Since these casts are silent casts, values above the max value of `uint128` may overflow. For example, if `_vaultTwabTotalSupply` original value is `type(uint128).max + 2`, then after cast to `uint128`, it will turn into 1. If this situation happens it may affect the correctness of `isWinner()` implementation. The overflow of `_vaultTwabTotalSupply` will increase the user’s chances of being a winner, while the overflow of `_userTwab` will decrease the user’s chances of becoming a winner.
+  
+      **Remediations to consider:**
+  
+      - Use `uint256` for `_userTwab` and `_vaultTwabTotalSupply`, or
+      - Use Open Zeppelin’s SafeCast and revert if either `_userTwab` or `_vaultTwabTotalSupply` is above the maximum value of `uint128` to avoid incorrect odds calculation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/d52b56a4144dfcda375866c5156d406d24d0be93</field>
+    <field name="content">
+      ## [L-5] Missing checks for valid values of TwabController constructor arguments
+  
+      In the `TwabController` contract, `PERIOD_LENGTH` and `PERIOD_OFFSET` are two important contract constants set in the constructor. Even though these constants have very specific ranges of valid input values there are no corresponding validation checks to ensure those are respected.
+  
+      For example, if `PERIOD_LENGTH` is set to 0, contract execution may revert due to division by zero errors. In case `PERIOD_LENGTH` is set to large values, the system will exhibit incorrect behavior since many `draws` will fall within a single period. 
+  
+      In the case of `PERIOD_OFFSET`, natspec documentation for the variable and constructor indicates that its value should be in the past (note: dev comment in constructor incorrectly indicates that there would be underflow if the provided value is in the future). However, there is code in `TwabLib._getNextObservationIndex()` that handles situations when `PERIOD_OFFSET` is in the future and the corresponding period is 0.
+  
+      **Remediations to consider:**
+  
+      - Add corresponding input validations to enforce valid input ranges for `PERIOD_OFFSET` and `PERIOD_LENGTH` immutable variables.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use case</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/e970d10bc2301363b04a48f4894d8792810a0c0b</field>
+    <field name="content">
+      ## [L-6] When startTime and endTime are equal getTwabBetween() reverts
+  
+      In the `TwabLib` contract, when startTime and endTime are equal, the implementation of `getTwabBetween()` reverts due to division by zero error.
+  
+      ```markdown
+      return
+        (endObservation.cumulativeBalance - startObservation.cumulativeBalance) /
+        (_endTime - _startTime);
+      ```
+  
+      **Remediations to consider:**
+  
+      - Consider updating the implementation to return one of the balances: `startObservation.balance` or `endObservation.balance` to more gracefully handle this edge case.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Implementation Logic</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/7f3ff1ac580ef53efc84dac1dea84096c4cd6630</field>
+    <field name="content">
+      ## [L-7] Incorrect startDrawId in _computeVaultTierDetails()
+
+      In `PrizePool._computeVaultTierDetails()`, the implementation logic for calculating the `startDrawId` value for `_getVaultPortion()` call incorrectly initializes it with a 0 value when the draw duration is bigger than the number of closed draws.
+  
+      ```markdown
+      uint16(drawDuration > _lastClosedDrawId ? 0 : _lastClosedDrawId - drawDuration + 1),
+      ```
+  
+      However, the first valid `startDrawId` value is 1 (there is a condition at the beginning of the function which enforces this). Due to how `DrawAccumulatorLib.getDisbursedBetween()` is implemented, this incorrect value does not result in an error in downstream calculation.
+  
+      **Remediations to consider:**
+  
+      - Update `PrizePool._computeVaultTierDetails()` with proper initialization value of 1 instead of 0 for `startDrawId` in the mentioned edge case.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/6fa132cb7fd211b7b77230085d89c8165c700c84</field>
+    <field name="content">
+      ## [Q-1] Lack of input validation for `_numberOfTiers` in TieredLiquidityDistributor constructor
+  
+      In the `TieredLiquidityDistributor` constructor, there is a check to validate that `_numberOfTiers` is above `MINIMUM_NUMBER_OF_TIERS`. However, there is no corresponding validation to ensure that  `_numberOfTiers` is not above the intended maximum number of tiers.
+  
+      **Remediations to consider:**
+  
+      - Add an additional check in the constructor to validate that `_numberOfTiers` being passed is below the intended maximum number of tiers, and
+      - Move validation to the top of the constructor in order to avoid performing expensive operations, which will get reverted if `_numberOfTiers` input is invalid due to the [validation check later on, in line 322](https://github.com/pooltogether/v5-prize-pool/blob/4cbd0dbb40704c21cc07b42b2e3057a7e90b1057/src/abstract/TieredLiquidityDistributor.sol#L322).
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Extra code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/6365025d37c3015667531a9888ab24f0ae361cb5</field>
+    <field name="content">
+      ## [Q-2] _tierOdds() features code that should never be used
+  
+      In `TieredLiquidityDistributor._tierOdds()`, the if else statement has a branch for handling the case when `_numTiers` is 16. This is unnecessary since it is the above predefined max num of tiers expected to be 15.
+  
+      In addition following constants are also unnecessary:
+  
+      ```markdown
+      SD59x18 internal constant TIER_ODDS_0_16 = SD59x18.wrap(2739726027397260);
+      SD59x18 internal constant TIER_ODDS_1_16 = SD59x18.wrap(4060005854625059);
+      SD59x18 internal constant TIER_ODDS_2_16 = SD59x18.wrap(6016531351950262);
+      SD59x18 internal constant TIER_ODDS_3_16 = SD59x18.wrap(8915910667410451);
+      SD59x18 internal constant TIER_ODDS_4_16 = SD59x18.wrap(13212507070785166);
+      SD59x18 internal constant TIER_ODDS_5_16 = SD59x18.wrap(19579642462506911);
+      SD59x18 internal constant TIER_ODDS_6_16 = SD59x18.wrap(29015114005673871);
+      SD59x18 internal constant TIER_ODDS_7_16 = SD59x18.wrap(42997559448512061);
+      SD59x18 internal constant TIER_ODDS_8_16 = SD59x18.wrap(63718175229875027);
+      SD59x18 internal constant TIER_ODDS_9_16 = SD59x18.wrap(94424100034951094);
+      SD59x18 internal constant TIER_ODDS_10_16 = SD59x18.wrap(139927275620255366);
+      SD59x18 internal constant TIER_ODDS_11_16 = SD59x18.wrap(207358528757589475);
+      SD59x18 internal constant TIER_ODDS_12_16 = SD59x18.wrap(307285046878222004);
+      SD59x18 internal constant TIER_ODDS_13_16 = SD59x18.wrap(455366367617975795);
+      SD59x18 internal constant TIER_ODDS_14_16 = SD59x18.wrap(674808393262840052);
+      SD59x18 internal constant TIER_ODDS_15_16 = SD59x18.wrap(1000000000000000000);
+      ```
+  
+      Consider removing unnecessary code.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/11a747a2522af8e37cd3577535a35bb0dabf8a10</field>
+    <field name="content">
+      ## [Q-3] canaryPrizeCount() implementation potentially misleading
+  
+      `TierCalculationLib.canaryPrizeCount()` returns the canary prize count for a tier with an index equal to provided `_numberOfTiers` argument instead of the canary prize count for a tier with an index equal to `_numberOfTiers - 1`.
+  
+      Even though this is misleading, there is no issue within the codebase since the code in `TieredLiquidityDistributor_canaryPrizeCountFractional()` references proper constant (e.g., for `numTiers = 3` it uses the result of `canaryPrizeCount(2)` call).
+  
+      Consider updating implementation by renaming argument `_numberOfTiers` in `canaryPrizeCount()` to `_canaryTier` and updating corresponding function documentation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Extra code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/11a747a2522af8e37cd3577535a35bb0dabf8a10</field>
+    <field name="content">
+      ## [Q-4] Simplify condition expression in _computeNextNumberOfTiers()
+  
+      In `PrizePool._computeNextNumberOfTiers()`, the following check can be simplified
+  
+      ```
+      if (_nextNumberOfTiers >= _numTiers) {
+      ```
+  
+      by replacing `≥` with `>` in condition expression. If `_nextNumberOfTiers` is equal to `_numTiers` that means that largestTierClaimed has been `_numTiers - 2`, which is the highest standard tier. That also means that none of the claims happened in the canary tier. As a result, the `canaryClaimCount` will be 0. Therefore, the inner expression will never be satisfied (we are assuming `_claimExpansionThreshold` is not 0).
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Extra code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/11a747a2522af8e37cd3577535a35bb0dabf8a10</field>
+    <field name="content">
+      ## [Q-5] Simplify calculation in _computeNextNumberOfTiers()
+  
+      In `PrizePool._computeNextNumberOfTiers()`, when performing a calculation for `canaryClaimCount` being over the defined threshold `floor()` call is unnecessary since the `fromUD60x18()` conversion will achieve the same effect.
+  
+      ```
+      fromUD60x18(intoUD60x18(_claimExpansionThreshold).mul(_canaryPrizeCountFractional(_numTiers).floor()))
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Extra code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/11a747a2522af8e37cd3577535a35bb0dabf8a10</field>
+    <field name="content">
+      ## [Q-6] Simplify calculation in _canaryPrizeCount()
+  
+      In `TieredLiquidityDistributor._canaryPrizeCount()`, when retrieving `_canaryPrizeCount` `floor()` call is unnecessary since the loss of precision in conversion `fromUD60x18()` will achieve the same.
+  
+      ```markdown
+      function _canaryPrizeCount(uint8 _numberOfTiers) internal view returns (uint32) {
+        return uint32(fromUD60x18(_canaryPrizeCountFractional(_numberOfTiers).floor()));
+      }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/f1eb0114e892c25bfa2402414ae2427e23abe85d</field>
+    <field name="content">
+      ## [Q-7] Set `drawManager` parameter in PrizePool constructor only if it is not `address(0)`
+  
+      In the `PrizePool` constructor, `params.drawManager` parameter is set to the `drawManager` state variable regardless of whether it is `address(0)` or not. A line after that, there is a check that emits an event `DrawManagerSet` if the `drawManager` parameter is not `address(0)`, as shown below:
+  
+      ```solidity
+      constructor(...) {
+        ...
+        drawManager = params.drawManager;
+        if (params.drawManager != address(0)) {
+          emit DrawManagerSet(params.drawManager);
+        }
+      }
+      ```
+  
+      Consider moving `drawManager` state variable update within the `if` expression.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use case</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/a0d836f352cf76ef3646a0b6716ef6d6bcebe297</field>
+    <field name="content">
+      ## [Q-8] getTierRemainingLiquidity for invalid tier fails due to an assertion failure
+  
+      After the first draw is closed, `getTierRemainingLiquidity()` for an invalid tier fails due to an assertion failure in `_computePrizeSize()`. The execution trace goes through the following path:
+  
+      - `getTierRemainingLiquidity()`
+      - `_getTier()`
+      - `_computePrizeSize()`
+  
+      Tests, such as `PrizePool.t.sol:testGetRemainingTierLiquidity_invalidTier()`, indicate that the expectation is to return 0 in this case.
+  
+      Consider updating the `getTierRemainingLiquidity()` implementation to return 0 for an invalid tier or at least a specific error.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Extra code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/753efcb7ece7d1f8fb24a21e058d60e296135d1e</field>
+    <field name="content">
+      ## [Q-9] Unnecessary imports
+  
+      - In PrizePool
+      
+          ```markdown
+          import { E, toSD59x18, fromSD59x18 } from "prb-math/SD59x18.sol";
+          import { UD60x18, ud } from "prb-math/UD60x18.sol";
+          import { fromUD60x18 as fromUD60x18toUD34x4, intoUD60x18 as fromUD34x4toUD60x18, toUD34x4 } from "./libraries/UD34x4.sol";
+          import { BitLib } from "./libraries/BitLib.sol";
+          ```
+      
+      - In TieredLiquidityDistributor
+      
+          ```markdown
+          import { E, toSD59x18 } from "prb-math/SD59x18.sol";
+          import { intoSD59x18 } from "prb-math/UD60x18.sol";
+          import { UD2x18, intoUD60x18 } from "prb-math/UD2x18.sol";
+          import { SD1x18, unwrap, UNIT } from "prb-math/SD1x18.sol";
+          import { toUD34x4 } from "../libraries/UD34x4.sol";
+          ```
+      
+      - In DrawAccumulatorLib
+      
+          ```markdown
+          import { E } from "prb-math/SD59x18.sol";
+          ```
+      
+      - In TierCalculationLib
+      
+          ```markdown
+          import { fromUD60x18 } from "prb-math/UD60x18.sol";
+          ```
+      
+      - In UD34x4.sol
+      
+          ```markdown
+          import { uMAX_UD60x18 } from "prb-math/UD60x18.sol";
+          ```
+      </field>
+    </item>
+          
+    <item>
+      <field name="topic">Extra code</field>
+      <field name="impact">low</field>
+      <field name="status">wontdo</field>
+      <field name="content">
+      ## [Q-10] Unused code in UD34x4.sol
+  
+      The following functions, errors, and constants are not being used outside of the `UD34x4.sol` library.
+  
+      - `convert(UD34x4 x)`
+      - `convert(uint128 x)`
+      - `fromUD34x4(UD34x4 x)`
+      - `toUD34x4(uint128 x)`
+      - `PRBMath_UD34x4_Convert_Overflow`
+      - `uUNIT`
+  
+      Consider removing unused code.
+      </field>
+      <field name="response">
+        Code was being used by tests, so just left it in.
+      </field>
+    </item>
+    
+    <item>
+      <field name="topic">Extra code</field>
+      <field name="impact">low</field>
+      <field name="status">fixed</field>
+      <field name="commitTree">6db4484c2f28831530622a6d7298fad95607245f</field>
+      <field name="content">   
+      ## [Q-11] `BitLib` library is not used
+  
+      `BitLib` is imported in `PrizePool`, yet it is not being used. Consider removing import and `BitLib` entirely to reduce contract bytecode size.
+      </field>
+    </item>
+
+    <item>
+      <field name="topic">Natspec</field>
+      <field name="impact">low</field>
+      <field name="status">fixed</field>
+      <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/16e723631d57f4d131f4e4e1b0a4a6300023720d</field>
+      <field name="content"> 
+      ## [Q-12] Incomplete NatSpec documentation
+  
+      In the following instances, the NatSpec documentation is incomplete:
+  
+      1. `UD34x4.fromUD60x18()` NatSpec is incorrect. Both notice and dev.
+      
+          ```markdown
+          /// @notice Casts an UD34x4 number into UD60x18.
+          /// @dev Requirements:
+          /// - x must be less than or equal to `uMAX_UD2x18`.
+          function fromUD60x18(UD60x18 x) pure returns (UD34x4 result) {
+          ```
+      
+      2. `PrizePool.isWinner()` is missing `_prizeIndex` description.
+      3. `PrizePool.getTierAccrualDurationInDraws()` contains an incomplete `@notice` description.
+      4. `PrizePool._openDrawStartedAt()` is missing `@return` field.
+      5. `PrizePool._openDrawEndsAt()` is missing `@return` field.
+      6. `PrizePool._isWinner()` is missing `_prizeIndex`, `_vaultPortion`, `_tierOdds`, and `_drawDuration` description.
+      7. `PrizePool.getVaultPortion()` NatSpec contains in `@notice` field some obsolete information.
+      
+          ```markdown
+          endDrawId - startDrawId as the _durationInDraws argument
+          ```
+      
+      8. `DrawAccumulatorLib.getDisbursedBetween()` has regular comments within the code which are misleading:
+          - comment should be “…, or startId is after the **newest** record” since `drawIds.second` represents the newest record.
+          
+              ```markdown
+              // if there is only one observation, or startId is after the oldest record
+              if (_startDrawId >= drawIds.second) {
+              ```
+          
+          - comment should be “then use the **newest** record”
+          
+              ```markdown
+              // then use the last record
+              observationDrawIdBeforeOrAtStart = drawIds.second;
+              ```
+          
+          - comment should be “if the start is before the **oldest** record” since `drawIds.first` represents the oldest record.
+          
+              ```markdown
+              } else if (_startDrawId <= drawIds.first) {
+                // if the start is before the newest record
+                // then set to the oldest record.
+                firstObservationDrawIdOccurringAtOrAfterStart = drawIds.first;
+              ```
+      </field>
+    </item>
+ 
+    <item>
+      <field name="topic">Events</field>
+      <field name="impact">low</field>
+      <field name="status">fixed</field>
+      <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/f55d8b2a9d3e8ed02b1f4c9ccfda6fc5e8aeeee2</field>
+      <field name="content"> 
+      ## [Q-13] Events emitted in TwabController even when there are no state changes
+      
+      When the amount to `transfer()` and `delegate()` is 0, the system emits events even though there are no state changes. In addition, anyone can call these external methods and cause multiple events per call to be emitted. This may cause unnecessary processing in off-chain monitoring and tracking tools that rely on emitted events. Therefore, consider not emitting events in case no amount has been transferred or delegated.
+      </field>
+    </item>
+
+      
+    <item>
+      <field name="topic">Natspec</field>
+      <field name="impact">low</field>
+      <field name="status">fixed</field>
+      <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/98fee786856d74ed21f7c3d1b286c03f226d0dde</field>
+      <field name="content"> 
+      ## [Q-14] Improve TwabController repo documentation
+  
+      1. In `TwabLib.getBalanceAt()`, the following dev comment is incorrect since extrapolation is not performed when the **balance** is retrieved.
+      
+          ```markdown
+          @dev If the time is not an exact match of an observation, the balance is extrapolated using the previous observation.
+          ```
+      
+      2. TwabController’s natspec for a return value in `isTimeSafe()` and `isTimeRangeSafe()` function indicates that the return variable is named `isSafe` - which is not the case.
+      3. In `ObservationLib.binarySearch()` following code comment is incorrect and should say - *to the right of the current index.*
+      
+          ```markdown
+          } else {
+            // Otherwise, we keep searching higher. To the left of the current index.
+            leftSide = currentIndex + 1;
+          }
+          ```
+      
+      4. In `TwabLib._getNextObservationIndex()`, natspec for the `index` argument is misleading since the `index` can have two different values/meanings depending on if a new observation should be created or a current observation updated. Only when `isNew` is true the `index` value represents the index of the next observation.
+      
+          ```markdown
+          @return index The index of the next observation
+          ```
+      </field>
+    </item>
+
+    <item>
+      <field name="topic">Best Practices</field>
+      <field name="impact">low</field>
+      <field name="status">fixed</field>
+      <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/c5aa4b2e13d982d1218ef66f30786e97ac0217b8</field>
+      <field name="content">
+      ## [Q-15] Reduce code redundancy in increasesBalances() and decreasesBalances() functions
+  
+      In TwabLib’s contract, `increasesBalances()` and `decreasesBalances()` functions feature this same identical code:
+  
+      ```markdown
+      if (isObservationRecorded) {
+        (index, newestObservation, isNew) = _getNextObservationIndex(
+          PERIOD_LENGTH,
+          PERIOD_OFFSET,
+          _account.observations,
+          accountDetails
+        );
+  
+        if (isNew) {
+          // If the index is new, then we increase the next index to use
+          accountDetails.nextObservationIndex = uint16(
+            RingBufferLib.nextIndex(uint256(index), MAX_CARDINALITY)
+          );
+  
+          // Prevent the Account specific cardinality from exceeding the MAX_CARDINALITY.
+          // The ring buffer length is limited by MAX_CARDINALITY. IF the account.cardinality
+          // exceeds the max cardinality, new observations would be incorrectly set or the
+          // observation would be out of "bounds" of the ring buffer. Once reached the
+          // Account.cardinality will continue to be equal to max cardinality.
+          if (accountDetails.cardinality < MAX_CARDINALITY) {
+            accountDetails.cardinality += 1;
+          }
+        }
+  
+        observation = ObservationLib.Observation({
+          balance: uint96(accountDetails.delegateBalance),
+          cumulativeBalance: _extrapolateFromBalance(newestObservation, currentTime),
+          timestamp: currentTime
+        });
+  
+        // Write to storage
+        _account.observations[index] = observation;
+      }
+      // Write to storage
+      _account.details = accountDetails;
+      ```
+  
+      Consider extracting this functionality into a separate function and reusing it from `increasesBalances()` and `decreasesBalances()` functions to reduce code redundancy.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-prize-pool/commit/0615e1cdd4be5253523c9237b96e2f2c527139bc</field>
+    <field name="content">
+      ## [Q-16] Subtract fee in `claimPrize()` only if the fee is not 0
+  
+      In `PrizePool.claimPrize()` the claim reward is updated for fee recipient, and a fee is subtracted from the prize payout, as shown in the snippet below:
+  
+      ```solidity
+      if (_fee != 0) {
+        emit IncreaseClaimRewards(_feeRecipient, _fee);
+        claimerRewards[_feeRecipient] += _fee;
+      }
+  
+      // `amount` is now the payout amount
+      amount = tierLiquidity.prizeSize - _fee;
+      ```
+  
+      However, the fee subtraction is performed regardless of whether the fee is set or not. Consider subtracting the fee from the prize payout only if it is not 0, as such: 
+  
+      ```solidity
+      if (_fee != 0) {
+        emit IncreaseClaimRewards(_feeRecipient, _fee);
+        claimerRewards[_feeRecipient] += _fee;
+  
+          // `amount` is now the payout amount
+          amount = tierLiquidity.prizeSize - _fee;
+      }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-1] Simplify disbursedAmount calculation in DrawAccumulatorLib
+  
+      In `DrawAccumulatorLib`, within `add()` function `disbursedAmount` is calculated in the following way:
+  
+      ```markdown
+      uint256 remainingAmount = integrateInf(_alpha, relativeDraw, newestObservation_.available);
+      uint256 disbursedAmount = integrate(_alpha, 0, relativeDraw, newestObservation_.available);
+      uint256 remainder = newestObservation_.available - (remainingAmount + disbursedAmount);
+      ...
+  
+      accumulator.observations[_drawId] = Observation({
+          available: uint96(_amount + remainingAmount),
+          disbursed: uint168(newestObservation_.disbursed + disbursedAmount + remainder)
+      });
+      ```
+  
+      Since the remainder variable is not used for anything other than the calculation of new `disbursed` value, consider replacing the above with the following more efficient implementation:
+  
+      ```markdown
+      uint256 remainingAmount = integrateInf(_alpha, relativeDraw, newestObservation_.available);
+      uint256 disbursedAmount = newestObservation_.available - remainingAmount;
+  
+      ...
+  
+      accumulator.observations[_drawId] = Observation({
+          available: uint96(_amount + remainingAmount),
+          disbursed: uint168(newestObservation_.disbursed + disbursedAmount)
+      });
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/a9bf35952934da3112b9f61929e41d24d1d3ef58</field>
+    <field name="content">
+      ## [G-2] Unnecessary RingBufferLib.wrap() call
+  
+      In the `TwabLib` contract, the `_getNextObservationIndex()` function implementation contains an unnecessary `RingBufferLib.wrap()` call. 
+  
+      ```markdown
+      if (currentPeriod == 0 || currentPeriod > newestObservationPeriod) {
+        return (
+          **uint16(RingBufferLib.wrap(_accountDetails.nextObservationIndex, MAX_CARDINALITY)),**
+          newestObservation,
+          true
+        );
+      }
+      ```
+  
+      The variable `_accountDetails.nextObservationIndex` is already `uint16` and guaranteed to be within bounds since `RingBufferLib.wrap()` call is used when it is set in `increaseBalances()` and `decreaseBalances()` functions.
+  
+      As a result, the above can be replaced with the following:
+  
+      ```markdown
+      if (currentPeriod == 0 || currentPeriod > newestObservationPeriod) {
+        return (
+          **_accountDetails.nextObservationIndex,**
+          newestObservation,
+          true
+        );
+      }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/GenerationSoftware/pt-v5-twab-controller/commit/96c3a8315ff6319f314cbf99ff465391c616b790</field>
+    <field name="content">
+      ## [G-3] Unnecessary handling of cardinality 1 in _getPreviousOrAtObservation()
+  
+      In `TwabLib` contract, `_getPreviousOrAtObservation()` has a specific code for handling edge cases when cardinality is equal to 1. Since cardinality > 1 is more frequent, this code is less frequently used and adds unnecessary overhead to overall processing. 
+  
+      In addition, the first part of the inner if expression is an unreachable code since the previous statement performs the exact same check and return. The else branch is unnecessary since the follow-up code retrieves the oldest observation (which is the same as the newest observation when cardinality is 1) and returns the same identical result.
+  
+      ```markdown
+      if (_accountDetails.cardinality == 1) {
+        if (_targetTime >= prevOrAtObservation.timestamp) {
+          return prevOrAtObservation;
+        } else {
+          return
+            ObservationLib.Observation({
+              cumulativeBalance: 0,
+              balance: 0,
+              timestamp: PERIOD_OFFSET
+            });
+        }
+      }
+      ```
+  
+      Consider removing the code above from the `TwabLib._getPreviousOrAtObservation()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [G-4] Avoid usage of signed fixed-point number (SD59x18) unless necessary
+  
+      In `TierCalculationLib`, the implementation of `getTierOdds()` relies on signed fixed point numbers for calculating the odds of a specific tier within an environment with a defined number of tiers and grand prize period. In addition, due to the usage of `getTierOdds()` across the codebase, many other functions also need to perform conversions from unsigned to signed fixed-point numbers and vice versa. However, the result of `getTierOdds()` must always be positive because the probability of something happening can never be a negative number.
+  
+      ```markdown
+      function getTierOdds(
+          uint8 _tier,
+          uint8 _numberOfTiers,
+          uint16 _grandPrizePeriod
+        ) internal pure returns (SD59x18) {
+          SD59x18 _k = sd(1).div(sd(int16(_grandPrizePeriod))).ln().div(
+            sd((-1 * int8(_numberOfTiers) + 1))
+          );
+  
+          return E.pow(_k.mul(sd(int8(_tier) - (int8(_numberOfTiers) - 1))));
+        }
+      ```
+  
+      Consider casting the result of `E.pow(..)` expression to `UD60x18` before returning in order to avoid unnecessary usage of signed fixed-point number type across the codebase.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">System Design</field>
+    <field name="content">
+      ## [I-1] Reserve size in proportion to prize pool goes lower as the number of tiers increases
+  
+      Per the current architecture design, each standard tier, canary tier, and reserve gets assigned a fixed number of shares. As the number of standard tiers increases, the total number of shares allocated to all standard tiers also increases. As a result, standard tiers receive an ever-increasing proportion of total tokens distributed, while the reserve and canary tiers’ proportional share is decreasing.
+  
+      Given that one of the purposes of a reserve is to provide a cushion when there is insufficient tier liquidity for prizes, this cushion will proportionally get smaller and smaller, adding extra risk that any given prize draw will result in insufficient liquidity.
+  
+      A potential mitigation is to calculate the number of tokens that the reserve should receive based on a set percentage of total tokens being distributed rather than the reserve’s total shares. Alternatively, as the number of tiers increases, the number of reserve shares could grow in proportion to the number of tiers. Another possibility is to enable depositing tokens directly into reserve if insufficient liquidity becomes problematic enough.
+    </field>
+    <field name="response">
+        Not applicable anymore due to implementation changes in how reserves are handled.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">System Design</field>
+    <field name="content">
+      ## [I-2] Un-permissioned Vault interaction with TwabController source of increased risk
+  
+      The `TwabController` is a highly trusted system component. The `PrizePool` relies on `TwabController` to provide the correct TWAB values necessary for the proper calculation of winning odds. When this is not the case whole system may get affected, as shown in **[C-1]** and **[C-2]** findings.
+  
+      What increases the likelihood of any miscalculations being exploited by external parties is the un-permissioned interaction of 3rd party Vaults with the TwabController. Malicious 3rd party Vaults may directly leverage unexpected interaction flows with the TwabController to trigger miscalculations in the TWAB value calculation process. This channel enables them to affect overall system security.
+  
+      Due to the above, consider limiting interaction with the TwabController only to vault contract instances created through the official VaultFactory.
+    </field>
+    <field name="response">
+        We acknowledge that permissionless vault creation carries more risk.
+    </field>
+  </item>
+  

@@ -1,0 +1,83 @@
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">c2e90d982e83058afb1dbca879a926a5a3cea339</field>
+  <field name="content">
+    ## [Q-1] Useful comment removed
+
+    These changes added an additional command type, `PERPS_V2_SET_MIN_KEEPER_FEE`, which has a value of 16. In `_dispatch()` it goes through a branching path of conditional statements based on the passed in `commandIndex`. Where this command was added, a comment explaining that commandIndex 14 and 15 have already been checked was removed.
+
+    ```solidity
+    // commandIndex 14 & 15 valid and already checked
+    ```
+    Reference: [Account.sol diff](https://github.com/Kwenta/smart-margin/pull/174/files#diff-99e7850ffccb8470b686ca209e4c8d4d5c00154c281811bb7af1ac7388e9f9b5L484)
+
+    Removal of this comment makes the code confusing as the checks jump from 
+    `commandIndex < 14` to `commandIndex == 16`
+
+    ```solidity
+    } else if (commandIndex < 14) {
+        // **code**
+    } else if (commandIndex == 16) {
+    ```
+    Reference: [Account.sol#L452-L490](https://github.com/Kwenta/smart-margin/blob/c2e90d982e83058afb1dbca879a926a5a3cea339/src/Account.sol#L452-L490)
+
+    **Remediations to Consider**
+
+    Add back in the comment that was removed to make it more clear those commands aren’t skipped.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## [G-1] Execute `PERPS_V2_SET_MIN_KEEPER_FEE` earlier in `_dispatch()`
+
+    The intention of the command `PERPS_V2_SET_MIN_KEEPER_FEE` is to update Synthetix’s min keeper fee to ensure that the fee is sufficient to incentivize the execution of core synthetix functions. This command is expected to be bundled before commands that require a keeper to later complete the execution, like for delayed order executions. Since this may be called frequently alongside the command `PERPS_V2_SUBMIT_DELAYED_ORDER`, it should be checked earlier relative to the expected frequency of its use compared to other commands, as the more checks required for a given command increases its gas cost.
+
+    **Remediations to Consider**
+
+    Reorder when `PERPS_V2_SET_MIN_KEEPER_FEE` is executed to reflect how often it is expected to be used relative to other commands to reduce the average gas cost of interacting with an account.
+
+  </field>
+  <field name="response"> Acknowledged with no action taken </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">ack</field>
+ 
+  <field name="content">
+    ## [G-2] `ConditionalOrder` struct can be packed more efficiently
+
+    The `ConditionalOrder` struct is stored when a conditional order is placed, and used when making a conditional order. 
+
+    ```solidity
+    struct ConditionalOrder {
+        bytes32 marketKey;
+        int256 marginDelta;
+        int256 sizeDelta;
+        uint256 targetPrice;
+        bytes32 gelatoTaskId;
+        ConditionalOrderTypes conditionalOrderType;
+        uint256 desiredFillPrice;
+        bool reduceOnly;
+    }
+    ```
+    Reference: [IAccount.sol#L89-L98](https://github.com/Kwenta/smart-margin/blob/213922234843f39438a95a7d431fdf32aff79ffc/src/interfaces/IAccount.sol#L89-L98)
+
+    Currently it uses 8 storage slots, one for each of the parameters. However, since `ConditionalOrderTypes` is an enum, it only uses 1 byte of storage. If this was reordered to be next to  `reduceOnly`, they would share the same storage slot and reduce the number of storage writes to 7.
+
+    It is important to note, however, that since this would change how the `ConditionalOrder` data is stored and read, and prior values have been set by existing accounts, upgrading accounts to use the updated struct would cause active conditional orders to be read improperly, preventing their execution and cancelation.
+
+    **Remediations to Consider**
+
+    If a new factory is deployed with updated accounts, consider reordering the `ConditionalOrder` struct values to have `conditionalOrderType` and `reduceOnly` next to each other, so they will be packed into the same storage slot.
+  </field>
+  <field name="response"> Acknowledged with no action taken </field>
+</item>

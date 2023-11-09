@@ -1,0 +1,79 @@
+<page
+  clientName="PoolTogether"
+  reportDate="Sep 19, 2023"
+  auditTitle="PoolTogether A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/GenerationSoftware/pt-v5-prize-pool"
+  repoCommitHash="4cbd0dbb40704c21cc07b42b2e3057a7e90b1057"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from July 3, 2023 to July 28, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+    <li>Description of <a href="https://dev.pooltogether.com/protocol/next/design/">PoolTogether V5 Protocol Design</a>.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(initial)</b>:
+        <code>4cbd0dbb40704c21cc07b42b2e3057a7e90b1057</code>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(final)</b>:
+        <code>6db4484c2f28831530622a6d7298fad95607245f</code>
+      </li>
+      <li>
+        <b>Repository:</b>
+        <a href="https://github.com/GenerationSoftware/pt-v5-twab-controller/" target="_blank">
+          {{"https://github.com/GenerationSoftware/pt-v5-twab-controller".split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(initial)</b>:
+        <code>1cdf78e87a3d9127f85a3755024f143664643c5e</code>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(final)</b>:
+        <code>49240b4fdf715f258104168da5321d675c6af003</code>
+      </li>
+    </ul>
+  </content-for>
+
+
+<content-for name="source-code">
+
+  <p>We audited the following contracts within <b>pt-v5-prize-pool</b> repository:</p>
+
+  <template type="file-hashes">
+    64a676cf3c6e704e126de4957574c56fcfb508b703588ef859832e817279e3d2  src/PrizePool.sol
+    7995093da3f4027fa171f605e5b5169a8d56708b95b04a488c67e519ca21c0ba  src/abstract/TieredLiquidityDistributor.sol
+    7d9f69094e9216e8c2fe266de48270f1938545593f8d784a9fc97245c9ee75c8  src/libraries/BitLib.sol
+    1327c0ba10b973c1937866e4f76c5d691014df0135e5a9c34ce35bd30fbf0f71  src/libraries/DrawAccumulatorLib.sol
+    b9ce730421456503c5cd7f57cd3345443d51636b0427b2693ce587865c23522c  src/libraries/TierCalculationLib.sol
+    b552a0a31ddcd88ed6780fcf7624e4e99024a720a7b731168773a65583663f4d  src/libraries/UD34x4.sol
+  </template>
+
+  <p>We audited the following contracts within <b>pt-v5-twab-controller</b> repository:</p>
+
+  <template type="file-hashes">
+    cc7eb9fe2e8f8c4438bfb880f3d93f5d15d5a65d2d85f3dc6168a5d2df4c956b  src/TwabController.sol
+    6b26451f7f514494eb9302e1139babc2210332787ea6a2a900ac7fbc39c6990f  src/libraries/ObservationLib.sol
+    c3778e6a274e36274869502d1b710a82910f8190616826e1614c92701cac5f4b  src/libraries/OverflowSafeComparatorLib.sol
+    e72c8452b0eab5f669b86ec53c626e797f52563d1e7932a919730bd776c38f3e  src/libraries/TwabLib.sol
+  </template>
+</content-for>

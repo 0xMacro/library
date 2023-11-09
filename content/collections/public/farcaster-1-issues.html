@@ -1,0 +1,364 @@
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">spec</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">addf8683d7fda012dce007c0fcd54e183058e3f5</field>
+    <field name="content">
+      ## [M-2] Incorrect `rentedUnits` accounting in `continuousCredit()` function
+  
+      In the `StorageRegistry` contract, the contract operator may credit a sequence of fids with free storage units. Natspec documentation and implementation indicate that start and end arguments are inclusive range boundaries, meaning that fids equal to start and end should be granted free credits too.
+  
+      The current implementation does indeed credit all fids in the mentioned range with free credits. However, due to an off-by-one error in calculating the length of the range, the calculated value of `totalUnits` is smaller by `units` amount than what it is supposed to be. As a result, the invariant that `rentedUnits` is always equal to the sum of all units rented ever will be invalidated. In addition, the check related to the `maxUnits` may be ineffective.
+  
+      **Remediations to Consider**
+  
+      Update `len` calculation to `len = end - start + 1` and update for loop condition to `i < len`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">spec</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">8391dbdd01ebe3af1abcd7004af4073af5ca14df</field>
+    <field name="content">
+      ## [M-3] Incorrect `_TRANSFER_TYPEHASH` prevents all fid transfers
+  
+      In the `IdRegistry` contract, `_TRANSFER_TYPEHASH` is set to an incorrect value. The underlying event signature is incorrect for the first argument - instead of `address from`, it should be `uint256 fid`.
+  
+      ```solidity
+      bytes32 internal constant _TRANSFER_TYPEHASH =
+              keccak256("Transfer(address from,address to,uint256 nonce,uint256 deadline)");
+      ```
+  
+      As a result, `_TRANSFER_TYPEHASH` within the contract has an incorrect value, and consequently, the request digest, which `_TRANSFER_TYPEHASH` is a composite part of, will have an incorrect value. Due to that, `_verifyTransferSig()` execution will fail unless callers replicate the same error in generating `_TRANSFER_TYPEHASH` on their end.
+  
+      **Remediations to Consider**
+  
+      Update `_TRANSFER_TYPEHASH` with the expected signature for the arguments in use.
+  
+      ```solidity
+      bytes32 internal constant _TRANSFER_TYPEHASH =
+              keccak256("Transfer(uint256 fid,address to,uint256 nonce,uint256 deadline)");
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="response">
+      This is by design. Registrations are intentionally restricted during the trusted phase, but if a user owns an FID, we want them to be able to add and remove keys even during the trusted phase. The meaningful authorization check here should be ensuring that the caller owns an FID.
+
+      The trusted caller’s special privilege in the context of this contract is the ability to add a key on behalf of an FID without owning that FID or providing a signature from the owner. Once the trusted phase ends, we revoke that privilege and the only way to add/remove a key is to own the associated FID or provide a signature from the owner.
+
+      The different meanings of “trustedOnly” between this contract and the Bundler/IdRegistry are a bit confusing. We’ll add an explanation to documentation.  
+    </field>
+    <field name="content">
+      ## [L-1] `KeyRegistry` does not restrict public interactions in the trusted phase
+  
+      As per the [specification](https://github.com/farcasterxyz/contracts/blob/main/docs/docs.md#13-key-registry):
+  
+      > The KeyRegistry is deployed in the trusted state where keys may not be registered by anyone except the owner.
+      > 
+  
+      However, `KeyRegistry` public functions `add()`, `addFor()`, `remove()`, and `removeFor()` are not being restricted by any access control.
+  
+      **Remediations to Consider**
+  
+      Consider using the `whenNotTrusted()` modifier for these functions to disallow users from registering and removing keys before the open registrable phase.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">920b867f961a05a3e8a83d5e9399e0b0274f87e0</field>
+    <field name="content">
+      ## [L-2] Assets can get stuck in the `Bundler` contract
+  
+      The `Bundler` contract implements a `receive()` function to allow overpayments to be sent and later refunded in the `register()` logic. However, assets sent incorrectly to the contract will get stuck in this contract without recovery.
+  
+      **Remediations to Consider**
+  
+      - Consider implementing some logic in the `receive()` function to check whether the `msg.sender` is the `StorageRent` contract and revert to avoid users mistakenly sending funds to the contract, or
+      - Remove the need for Bundler to store native assets by passing the original `msg.sender` in the `storageRegistry.rent()` call so that the `storageRegistry` can refund `msg.sender` directly.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Ranges</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8d5ed73ef8b828a1e1788f9c581a837064bbc0ef</field>
+    <field name="content">
+      ## [L-3] In the `StorageRegistry` the owner can set an arbitrary `fixedEthUsdPrice`
+  
+      When calculating the price to rent storage units, the oracle price feeds are used to get the ETH price in USD. The price feed is acceptable if it is bound within the `priceFeedMinAnswer` and `priceFeedMaxAnswer`.
+  
+      However, the owner of the contract can set a non-zero value for the `fixedEthUsdPrice` to override the price feeds. But the `fixedEthUsdPrice` is not checked to be within the acceptable min/max bounds. 
+  
+      **Remediations to Consider**
+  
+      Consider checking whether the `fixedEthUsdPrice` is within the acceptable range of`priceFeedMinAnswer` and `priceFeedMaxAnswer`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Ranges</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">eac92990d440524af064f82f0858e005c8357463</field>
+    <field name="content">
+      ## [L-4] The `KeyRegistry` contract can be deployed without any constraints on the`gracePeriod`
+  
+      In the `KeyRegistry` contract, admins can make corrections to the migrated data during the `gracePeriod`.
+  
+      In the documentation, the grace period is mentioned to be `24 hours`. 
+      However,  the owner can set an arbitrarily large value for the `gracePeriod` during the deployment of the contract.
+  
+      If `gracePeriod` is arbitrarily large, the owner will be permitted to make changes well after the migration has been assumed to be completed and the hubs have switched over to this contract as the source of truth. 
+  
+      **Remediations to Consider**
+  
+      Consider setting a limit of `24 hours` on the `gracePeriod` in the constructor of the contract.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="response">
+      Since Chainlink price feeds have historically been pretty stable, we don’t want to add extra complexity to the contract to handle this unlikely edge case onchain, especially since it requires coordinating calls across multiple blocks. However, if we do take emergency action that disables and re-enables price feeds, we’ll take care to follow the suggestion here and call refreshPrice manually at least a block before calling setFixedEthUsdPrice.
+    </field>
+    <field name="content">
+      ## [L-5]  Upon resetting the `fixedEthUsdPrice` the users could potentially be charged a stale rent price
+  
+      In the `StorageRegistry` contract, if the eth/usd price feed is unavailable, it’s not possible to rent storage units. For the system to operate in such emergencies, the contract owners could set a non-zero value to the `fixedEthUsdPrice` , which then acts as a substitute for the price feed.
+  
+      When the price feed becomes operational again, depending upon the order of steps undertaken to switch back to the price feed, it’s possible that the users would be charged a stale rent price.  
+  
+      Consider the case, `fixedEthUsdPrice` is set to 0, and there was no recent calls to the `refreshPrice()`.
+  
+      If`refreshPrice()` were to be called in the block where`fixedEthUsdPrice` was reset and users  attempt to rent storage units. The users would be charged stale prices, which were valid before the feed was deactivated.
+   
+      The primary reason for this is the following code in `_ethUsdPrice()` function:
+  
+      ```solidity
+      /**
+       *  We want price changes to take effect in the first block after the price
+       *  refresh, rather than immediately, to keep the price from changing intra
+       *  block. If we update the price in this block, use the previous price
+       *  until the next block. Otherwise, use the latest price.
+       */
+  
+      return (lastPriceFeedUpdateBlock == block.number) ? prevEthUsdPrice : ethUsdPrice;
+      ```
+  
+      **Remediations to Consider**
+  
+      - Consider enforcing that a successful `refreshPrice()` call is performed at least one block before the  `fixedEthUsdPrice` is reset, which would resolve the issue of the users being charged stale prices, OR
+      - Remove the requirement that within the same block, users are charged the previously available rent prices. This requirement is not respected in the current context when switching from the price feed to a fixed price and vice versa.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="response">
+      We’d like to keep the Bundler as simple as possible, and we’d rather pay L2 gas to redeploy if necessary than add complexity to the contract.
+    </field>
+    <field name="content">
+      ## [Q-1] The `Bundler` contract could be independent and reusable
+  
+      The `Bundler` contract serves as a wrapper contract to allow users and the trusted caller to register `fid`, `keys` for a specific `fid`, and rent storage in one transaction. Currently, this contract inherits from the `TrustedCaller` contract and has `immutable` variables for each of the contracts it interacts with. 
+  
+      Since the `Bundler` contract’s logic is simple and each of the counterparts performs proper access control and state sanity checks, this contract could be reusable for potential migrations and even more stateless.
+  
+      Consider:
+  
+      - Having set functions for each contract address (`IdRegistry`, `StorageRegistry`, and `KeyRegistry`), allowing to update them in case of migration and reusing a deployed `Bundler`.
+      - Not inheriting from `TrustedCaller` since each `IdRegistry` call has proper access control checks on `msg.sender` and would avoid potential different `trustedOnly` states for different contracts.
+  
+      This would save logic execution, such as setting the `trustedOnly` state differently from their counterparts and avoid subsequent redeploys of the contract with the same logic and use case.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">215cbef978731502c31f261cbd7ac84eeaf9fe44</field>
+    <field name="content">
+      ## [Q-2] `Bundler:register()` does not check for zero `storageUnits` input
+  
+      If a user attempts to `register` by passing zero `storageUnits`, the function call will revert while performing the external `StorageRegistry.rent()` call. Consider validating that the `storageUnits` input parameter is higher than `0` before making the external function call.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">2db3c18fdee0af70b6bb9e0c3c3d8b3ecd4ce1ad</field>
+    <field name="content">
+      ## [Q-3] The `StorageRegistry` contract should be able to pause and unpause external functions
+
+      During the process of upgrading the `StorageRegistry` contract, the new contract is deployed and meant to be paused so that storage cannot be rented. And is later unpaused once the various migration steps are complete. 
+  
+      However, there’s no straightforward way to pause and unpause the storage contract’s functions.
+  
+      Consider inheriting the `Pausable` contract in  `StorageRegistry` to implement pause and unpause capabilities on the external functions.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Access control</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="response">
+      Since Warpcast is the only entity interacting with trusted functions, in practice we’ll switch the IdRegistry first. 
+    </field>
+    <field name="content">
+      ## [Q-4] Contracts can be left in different inconsistent states
+  
+      We can find the `TrustedCaller` states in each of the `Bundler`, `IdRegistry`, and `KeyRegistry` contracts. Since these are independent contracts, they could have different inconsistent states for `trustedOnly` and `trustedCaller`. 
+  
+      Additionally, for the `Bundler` to interact with both `IdRegistry` and `KeyRegistry`, its address should be set as the `trustedCaller` address for both contracts.
+  
+      Consider using one source of truth for the access control restrictions, potentially in the `IdRegistry`, since both `Bundler` and `KeyRegistry` perform external calls to the `IdRegistry`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Ranges</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="response">
+      We accept the risk here. This function is only callable by a trusted role and we accept that we might waste gas if we try to withdraw a zero amount.
+    </field>
+    <field name="content">
+      ## [Q-5] `StorageRegistry:withdraw()` doesn’t revert for zero amounts
+  
+      Consider adding logic to revert the transaction if the treasurer attempts to withdraw a `zero` amount.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">NatSpec</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">b2ccafc5b2f2db27a36867947009eb5bc166b7a2</field>
+    <field name="content">
+      ## [Q-6] Improve natspec documentation
+  
+      Bundler:
+  
+      - Incorrect nat-spec comments for the `keyRegistry` variable. Replace `Address of the StorageRegistry contract` with `Address of the KeyRegistry contract`
+      - Missing natspec for `keyRegistry` param in the constructor natspec
+      - Natspec comment for the `registration` parameter of `register()` function has incorrect natspec with reference to `from`, which doesn't exist and should be replaced with `recovery`.
+      - Natspec documentation for `trustedRegister()` is missing multiple params (scheme, key, metadata)
+  
+      IdRegistry:
+  
+      - Error in natspec for Register event
+      
+          ```markdown
+          // Transfer signature below should be **Transfer(alice, bob, ...)**
+          Two Register(alice, ..., ...) cannot emit unless a **Transfer(..., alice, bob)** emits in between, where bob != alice.
+          ```
+      
+      - Missing return param natspec for multiple functions (`register`, `registerFor`, `verifyFidSignature`, etc.)
+  
+      KeyRegistry:
+  
+      - Incorrect nat-spec comments for the `removeFor()` function.
+      - Replace `Add a key on behalf of another fid owner` with `Remove a key on behalf of another fid owner`.
+      - Remove potentially obsolete part of the natspec comment for the `Migrated` event -
+      
+          ```markdown
+          Emit an event when the admin calls migrateKeys. **Used to migrate Hubs from using
+          off-chain signers to on-chain signers.**
+          ```
+      
+      - Natspec comments for the `Add`, `Remove`, and `AdminReset` events contain a typo in the `keccak` wording. The extra "c" in `kecca~~c~~k` should be removed.
+  
+      StorageRegistry:
+  
+      - Missing natspec for the return value of `rent()` function
+      - Incorrect event invariant mentioned for the `SetDeprecationTimestamp` event needs to be deleted to avoid any confusion.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">e841288a67fe01b887b4dc1ebb90ed8fdde29eda</field>
+    <field name="content">
+      ## [Q-7] Repetitive logic in the`KeyRegistry` contract could be converted to a function modifier
+  
+      This following check is performed in several functions related to adding and removing keys. 
+  
+      ```solidity
+      uint256 fid = idRegistry.idOf(fidOwner);
+      if (fid == 0) revert Unauthorized();
+      ```
+  
+      Consider moving the repetitive logic to a function modifier for better readability.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Refactor</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">b760fde92b42656c00a1c4ae33779739d8f5bbab</field>
+    <field name="content">
+      ## [Q-8] Price feed updates may require redeploying the `StorageRegistry` contract
+  
+      Consider extracting price-related functionality into a separate updatable external contract. In case the external price feed contract needs to be replaced, the `StorageRegistry` will not be affected, and costly migration would be prevented.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">64a5e92bd12df1d3e658aba63990e28bbcaa457c</field>
+    <field name="content">
+      ## [Q-9] Remove unnecessary imports
+
+      - The following imports are unnecessary in the `TrustedCaller` contract
+          - ECDSA, EIP712, Nonces, Pausable
+      - The following imports are unnecessary in the `KeyRegistry` contract
+          - ECDSA
+        </field>
+    </item>
+<item>
+    <field name="topic">Refactor</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">d34b3ff84fa05f50722c654b41cb4682dc6987c3</field>
+    <field name="content">
+      ## [Q-10] Missing event for the successful `fid` recovery
+  
+      In the `IdRegistry` contract, the `recover()` function is responsible for performing recovery on behalf of the custody address by transferring the `fid` to a new address. When this happens, a `Transfer` event is emitted. 
+  
+      However, for off-chain monitoring tools, it is not easy to differentiate a recovery versus a normal transfer event.
+  
+      Consider introducing a new event to differentiate between a fid recovery and a normal transfer.
+    </field>
+  </item>
+  

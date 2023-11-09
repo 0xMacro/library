@@ -1,0 +1,183 @@
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">383ca1f11223392b56931d7f82a8f81c2deff64d</field>
+    <field name="content">
+      ## (L-1) SessionEnded emitted with incorrect arguments
+  
+      The `SessionStrategy:endSession()` emits `SessionEnded` event with `delegate` and `vault` arguments in an incorrect order.
+
+      ```solidity
+      emit SessionEnded(delegate, _session.account, remaining);
+      ```
+      
+      In emission, a `delegate` is 1st and the `vault` is the 2nd argument. However, in the event declaration `vault` is 1st and `delegate` is 2nd argument.
+      
+      ```solidity
+      event SessionEnded(address vault, address delegate, uint256 fundingReturned);
+      ```
+      
+      **Remediations to Consider:**
+      
+      - Update event emission to be consistent with the event declaration.
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">02f5558549dcbd0be8562198d7ef09788d77a536</field>
+    <field name="content">
+      ## [L-2] endSession() won’t emit SessionEnded event if the remaining allowance is zero
+  
+      In `SessionStrategy.sol`'s, all `endSession()` calls with zero allowance won’t emit the corresponding `SessionEnded` event.
+
+      ```solidity
+      **if** (remaining == 0) **return**;
+      
+      ...
+      
+      emit SessionEnded(delegate, _session.account, remaining);
+      ```
+      
+      `remaining` could be zero if:
+      
+      - The `delegate` spends all the allowed wrapped MATIC.
+      - The session started without any remaining value.
+      - The `delegate` did not have any registered session.
+      
+      **Remediations to Consider:**
+      
+      - Emitting the event even if there is no remaining allowance in the case when the id of the session is not zero.
+    </field>
+  </item>
+
+
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">f507fd6b07a0e8f8e0738542238cb4c1d0cc61dc</field>
+    <field name="content">
+        ## [Q-1] Event emitted even if no calls were executed
+        If no targets/calldatas parameters are sent into the sendCalls function call, the transaction will still succeed and emit CallsSent event, even if no calls were executed. Consider checking whether at least one function input (targets.length and calldatas.length) is provided.
+    </field>
+  </item>
+  
+
+
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5281607d1eb7d73e6eeab7e8c89f3a460ca60931</field>
+    <field name="content">
+        ## [Q-2] Missing indexed parameter in events
+
+        - `BeltPublished` event should have `beltId` indexed.
+        - `CallsSent` event should have `strategy`, `vault`, `delegate` indexed.
+        - `SessionStarted` and `SessionEnded` events should have `vault` and `delegate` indexed.
+     </field>
+  </item>
+  
+
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">568df0fc1a9286a1d30056413c1a34075608053c</field>
+    <field name="content">
+        ## [Q-3] Improve Natspec documentation
+
+        - Natspec comments missing for strategy param in `CallsSent` event declaration in `IAuthManager`
+        - Missing Natspec comments on state variables in the interface `ISessionStrategy`
+            - In `ISessionStrategy.sol` the following structs do not have any natspec comments. Consider adding natspec comments so it’s clear what these structs are meant to track.
+                
+                ```markdown
+                struct TargetPair {
+                  address target;
+                  bytes4 selector;
+                }
+                
+                struct Session {
+                  address account;
+                  uint32 endTime;
+                }
+                ```
+                
+        - Typo in the `IAuthStrategy.isAllowed()` Natspec comment
+            - There’s a typo in the `@notice` tag, where `vault` is typed as `value`
+        - Missing Natspec for `IERC721C:addressInfoOf()` function.
+        - Missing Natspec comments for `safeMintBatch()` in the interface `IShips`.
+     </field>
+  </item>
+  
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5c575bbf1168771946334ae93db166ba2bc1eeb2</field>
+    <field name="content">
+        ## [Q-4] startSession() executes unnecessary external calls with zero values
+
+        In SessionStrategy, startSession() will approve and deposit the difference between the msg.value and the input parameter sessionGasFunding. However, if only the sessionGasFunding value was provided in the call, the logic will still execute the external calls to the wrapped MATIC contract will zero values. To avoid unnecessary external calls, consider only calling the wrapped external contract if msg.value - sessionGasFunding > 0.    </field>
+  </item>
+  
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">65814ab57dcdd06829675b695a9e43268592f931</field>
+    <field name="content">
+        ## [Q-5] Missing initialization of ReentrancyGuardUpgradeable contract in DutchAuctionSale
+
+        In DutchAuctionSale:initialization() function, there is no call to __ReentrancyGuard_init(). While this does not affect system operation, when inheriting from upgradable contracts such asReentrancyGuardUpgradeable, consider calling appropriate initializers to set their corresponding state.   </field>
+  </item>
+
+
+
+  <item>
+    <field name="topic">Gas Optimisation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">7b6501a58e6f54a7164281e9d9d54d33ba799e64</field>
+    <field name="content">
+      ## [G-1] Consider caching the result of checkDelegateForContract() call
+  
+      In `DelegateCashRegistry`, `isAllowed()` has following implementation:
+
+      ```solidity
+      function isAllowed(
+          address delegate,
+          address vault,
+          address[] memory targets,
+          bytes[] memory
+        ) external view returns (bool) {
+          for (uint256 i = 0; i < targets.length; i++) {
+            if (
+              !delegationRegistry.checkDelegateForContract(
+                delegate,
+                vault,
+                targets[i]
+              )
+            ) return false;
+          }
+      
+          return true;
+        }
+      ```
+      
+      Since the result of the call doesn’t depend on the calldata but only on the address of the target contract, due to batching use case, it is probable that many targets will be the same contract address. In that case, an external call for each is unnecessary and can be avoided with function-level caching.
+    </field>
+  </item>
+  

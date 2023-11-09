@@ -1,0 +1,292 @@
+<item>
+    <field name="topic">Griefing</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">9a60ac620cffab714e8d9fd8980931e4a47af8d3</field>
+    <field name="content">
+      ## [H-1] Conditional orders can be blocked
+  
+      In `Engine.sol`’s `execute()` function takes in signed conditional orders and executes them if set conditions are satisfied, and if the nonce the order was signed with has yet to be used. 
+      However, the nonce used in the conditional order is not tied to anything, and a conditional order can execute with any nonce which can conflict with any other order that was signed with same nonce, preventing its execution.
+  
+      This can be used maliciously, where someone can front-run a conditional order execution by signing a minimal order with the same nonce and executing the order before the other goes through. This is especially concerning in cases where conditional orders are setup to prevent position liquidation, as an attacker can prevent the order from executing, and setup a position to benefit from the liquidation if the account owner does not realize the order is unable to execute in time. 
+  
+      **Remediations to Consider**
+  
+      Instead of mapping the `executedOrders` from a nonce to a bool, map it from accountId → nonce → bool. Since the signer of the order has to be the owner or admin of the account that is being executed on, the nonce cannot be griefed by any non permissioned source.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+     <field name="status">fixed</field>
+    <field name="commit">711b7950d3cc196fc71241e07c3407e463d090ef</field>
+    <field name="content">
+      ## [H-2] Delegates are granted too high permissions
+  
+      In `Engine.sol`, delegates setup by the owner of an account are allowed to execute orders on behalf of the owner of the account. However, the permission `Engine.sol` requires to execute these orders is the highest permission available via Synthetix, the `_ADMIN_PERMISSION`. The admin permission allows the delegate to do anything the owner of the account can do other than transfer the account, including withdrawing collateral from the account to themselves. Since the only thing `Engine.sol` allows delegates to do is commit orders and sign conditional orders, the permission required should be limited to that, so that users don't give too high permissions to delegates.
+  
+      **Remediations to Consider**
+      In `isAccountDelegate()` return use the `PERPS_MARKET_PROXY.isAuthorised()` function using the permission `_PERPS_COMMIT_ASYNC_ORDER_PERMISSION` which is a permission limited to committing orders for the account, while this also allows users with admin permissions to perform the task as well.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Data Consistency</field>
+    <field name="impact">medium</field>
+     <field name="chance">medium</field>
+     <field name="status">fixed</field>
+    <field name="commit">9a60ac620cffab714e8d9fd8980931e4a47af8d3</field>
+    <field name="content">
+      ## [M-1] `accountStats` can be inaccurate
+  
+      Whenever a order is committed to Synthetix either directly via `commitOrder()` or by a conditional order via `execute()`, `_commitOrder()` is called that updates the `accountId`’s `accountStats` by the `_sizeDelta` and the `fees` returned by committing the order to Synthetix.
+  
+      ```solidity
+      function _commitOrder(
+          uint128 _perpsMarketId,
+          uint128 _accountId,
+          int128 _sizeDelta,
+          uint128 _settlementStrategyId,
+          uint256 _acceptablePrice,
+          bytes32 _trackingCode,
+          address _referrer
+      ) internal returns (IPerpsMarketProxy.Data memory retOrder, uint256 fees) {
+          (retOrder, fees) = PERPS_MARKET_PROXY.commitOrder(
+              IPerpsMarketProxy.OrderCommitmentRequest({
+                  marketId: _perpsMarketId,
+                  accountId: _accountId,
+                  sizeDelta: _sizeDelta,
+                  settlementStrategyId: _settlementStrategyId,
+                  acceptablePrice: _acceptablePrice,
+                  trackingCode: _trackingCode,
+                  referrer: _referrer
+              })
+          );
+  
+          _updateAccountStats(_accountId, fees.castU128(), _sizeDelta.abs128());
+      }
+      ```
+      Reference: [Engine.sol#L279-L297](https://github.com/Kwenta/smart-margin-v3/blob/e5fd59d5b5f4b2462d9cc09468ddbcfdc5b6843a/src/Engine.sol#L275-L297)
+  
+      However, orders do not get executed when they are committed, and pricing values are pulled off-chain, delaying the execution. When the order is attempted to be executed later, it can revert for multiple reasons. If the price is no longer a `_acceptablePrice` that is set by the user, or if the value of collateral the `accountId` holds is no longer within acceptable bounds, or even if the order does not settle within a settlement window. This means that an order is not guaranteed to execute after it is committed, but the `accountStats` are updated with the assumption that the order will execute. The fees returned when committing an order to Synthetix may also not be accurate, as they are calculated again when the the order is executed based on the price of the assets and state of the market.
+  
+      If the `accountStats` are used to determine a users rewards, or there is any value tied to having high `accountStats`, there may be an incentive to commit orders via the engine that are unlikely to execute, potentially by setting the `_acceptablePrice` of the order to be just valid on commit, but could be outside the price range once the order attempts to execute as the price may change.
+  
+      **Remediations to Consider**
+  
+      Since there is no way to determine if an order committed via the Engine gets executed, it may make sense to keep track of orders off-chain, ideally emitting an event when an order is committed via the engine, and listen to Synthetix events for `OrderSettled`, `OrderCommitted` and `OrderCanceled`. Doing so can allow the accurate values fees and sizeDelta of executed orders to be determined.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">927bdd715e97a31594a7411286879422de4625ce</field>
+    <field name="content">
+      ## [M-2] `verifyConditions()` can cause infinite loop consuming gas
+  
+      `verifyConditions()` takes in a `ConditionalOrder`’s array of conditions and executes a static call to itself with the payload defined by the condition `bytes`. This allows any external function in the contract to be called, with any payload. Since `verifyConditions()` is public, it can end up calling itself, with another `ConditionalOrder`'s array of conditions, each of which can call `verifyConditions()` again, with more calls, eventually terminating or running out of gas. This can allow someone to grief order executors that don’t restrict gas consumption of conditional orders.  
+  
+      **Remediations to Consider**
+  
+      Either
+  
+      - Limit the calls to only desired conditional functions
+      - Ensure that all executors are aware of this and check the gas cost of the simulation before executing, or ensure only accepted condition calls are made
+     
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+     <field name="chance">low</field>
+      <field name="status">fixed</field>
+    <field name="commit">9a60ac620cffab714e8d9fd8980931e4a47af8d3</field>
+    <field name="content">
+      ## [M-3] Users cannot cancel signed conditional orders
+  
+      Once a conditional order is signed, anyone allowed to execute the order that knows about it can execute it as long as the set conditions are met. However, there is the possibility where an account owner or delegate no longer wants a conditional order to execute. Currently there is no on-chain way to ensure that a signed order won’t execute in the future, which may cause unwanted orders to be committed, effecting the desired state or strategy of the account.
+  
+      **Remediations to Consider**
+  
+      Add a function that allows the owner or delegate of an account to cancel a previously signed order.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+     <field name="chance">low</field>
+      <field name="status">fixed</field>
+    <field name="commit">a1cd2434482c46a924b0d14f16061e95e5d137fc</field>
+    <field name="content">
+      ## [L-1] Invalid `_CONDITIONAL_ORDER_TYPEHASH`
+  
+      `ConditionalOrderHashLib.sol` follows [EIP712](https://eips.ethereum.org/EIPS/eip-712) and generates type hashes for the `OrderDetails` and `ConditionalOrder` structs. In the case of the `_CONDITIONAL_ORDER_TYPEHASH` it includes the struct info of `ConditionalOrder`, and includes the values of `OrderDetails` at the end, as defined in [EIP712](https://eips.ethereum.org/EIPS/eip-712) since a `ConditionalOrder` it contains the `OrderDetails` struct as a parameter. 
+  
+      As defined in [EIP712](https://eips.ethereum.org/EIPS/eip-712) “If the struct type references other struct types (and these in turn reference even more struct types), then the set of referenced struct types is collected, sorted by name and appended to the encoding. An example encoding is `Transaction(Person from,Person to,Asset tx)Asset(address token,uint256 amount)Person(address wallet,string name)`.”
+  
+      However, the reference to the `OrderDetails` struct type differs to its actual definition:
+  
+      ```solidity
+      /// @notice pre-computed keccak256(OrderDetails struct)
+      bytes32 public constant _ORDER_DETAILS_TYPEHASH = keccak256(
+          "OrderDetails(uint128 marketId,uint128 accountId,int128 sizeDelta,uint128 settlementStrategyId,uint256 acceptablePrice,bool isReduceOnly,bytes32 trackingCode,address referrer)"
+      );
+  
+      /// @notice pre-computed keccak256(ConditionalOrder struct)
+      bytes32 public constant _CONDITIONAL_ORDER_TYPEHASH = keccak256(
+          "ConditionalOrder(OrderDetails orderDetails,address signer,uint128 nonce,bool requireVerified,address trustedExecutor,bytes[] conditions)OrderDetails(uint128 marketId,uint128 accountId,int128 sizeDelta,uint128 settlementStrategyId,uint256 acceptablePrice)"
+      );
+      ```
+      Reference: [ConditionalOrderHashLib.sol#L10-L18](https://github.com/Kwenta/smart-margin-v3/blob/e5fd59d5b5f4b2462d9cc09468ddbcfdc5b6843a/src/libraries/ConditionalOrderHashLib.sol#L10-L18)
+  
+      The `_CONDITIONAL_ORDER_TYPEHASH` is missing the `isReduceOnly`, `trackingCode` and `referrer` parameters.
+  
+      **Remediations to Consider**
+  
+      Add `isReduceOnly`, `trackingCode` and `referrer` parameters to the `OrderDetails` section of the `_CONDITIONAL_ORDER_TYPEHASH` to properly follow [EIP712](https://eips.ethereum.org/EIPS/eip-712).
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">low</field>
+      <field name="chance">low</field>
+     <field name="status">fixed</field>
+    <field name="commit">927bdd715e97a31594a7411286879422de4625ce</field>
+    <field name="content">
+      ## [L-2] Static calls can consume all gas
+  
+      In `Engine.sol`’s `verifyConditions()` function, a static call is made on all conditions, requiring each to return true.
+  
+      ```solidity
+      (success, response) = address(this).staticcall(_co.conditions[i]);
+  
+      if (!success || !abi.decode(response, (bool))) return false;
+      ```
+      Reference: [Engine.sol#L463-L465](https://github.com/Kwenta/smart-margin-v3/blob/e5fd59d5b5f4b2462d9cc09468ddbcfdc5b6843a/src/Engine.sol#L463-L465)
+  
+      Static calls ensure that there is no state change made in the call, however if there is a state change all gas provided to the call is consumed. By default static calls send 63/64 of the remaining gas, and if that is consumed then there is little gas remaining to execute the rest of the transaction, typically leading to the transaction running out of gas, consuming all gas provided.
+  
+      Since a condition can make any provided static call to the engine, a call to `createAccount()` can be made, which will revert due to state change, consuming all gas provided. This allows a user to sign a conditional order with the intent of griefing a order executor.
+  
+      **Remediations to Consider**
+  
+      Consider any of the following remediations
+  
+      - Explicitly set the amount of gas to send into the static call, to reduce gas consumption of state change, ensuring that the gas sent in can execute all proper condition calls.
+      - Simulate all calls off-chain and verify they execute without reverting
+      - Limit the calls to the specific condition checking functions, rather than allowing calls function.
+    
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a1cd2434482c46a924b0d14f16061e95e5d137fc</field>
+    <field name="content">
+      ## [Q-1] Inaccurate comments
+  
+      In MathLib.sol’s `abs128()` there are comments referencing operations with a variable `x` however the code is operating on `y`.
+  
+      ```solidity
+      /// shr(255, x):
+      /// shifts the number x to the right by 255 bits:
+      /// IF the number is negative, the leftmost bit (bit 255) will be 1
+      /// IF the number is positive,the leftmost bit (bit 255) will be 0
+  
+      /// sub(0, shr(255, x)):
+      /// creates a mask of all 1s if x is negative
+      /// creates a mask of all 0s if x is positive
+      let mask := sub(0, shr(255, y))
+  
+      /// If x is negative, this effectively negates the number
+      // if x is positive, it leaves the number unchanged, thereby computing the absolute value
+      z := xor(mask, add(mask, y))
+      ```
+      Reference: [MathLib.sol#L18-L30](https://github.com/Kwenta/smart-margin-v3/blob/e5fd59d5b5f4b2462d9cc09468ddbcfdc5b6843a/src/libraries/MathLib.sol#L18-L30)
+  
+      **Remediations to Consider**
+  
+      Replace references to `x` with `y` where applicable. 
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2718eab6dfbb20f14bac6ff8a0eeeb4df0c11cfc</field>
+    <field name="content">
+      ## [Q-2] `ConditionalOrderHashLib` not used with `OrderDetails`
+  
+      In Engine.sol `ConditionalOrderHashLib` is set to be used with the `OrderDetails` struct, but there are no functions in `ConditionalOrderHashLib` that are directly used with `OrderDetails`
+  
+      ```solidity
+      using ConditionalOrderHashLib for OrderDetails;
+      ```
+      Reference: [Engine.sol#L25](https://github.com/Kwenta/smart-margin-v3/blob/e5fd59d5b5f4b2462d9cc09468ddbcfdc5b6843a/src/Engine.sol#L25)
+  
+      **Remediations to Consider**
+  
+      Remove this line as it is not used.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimizationcd content/collections/private</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">9a60ac620cffab714e8d9fd8980931e4a47af8d3</field>
+    <field name="content">
+      ## [G-1] Use bits to represent nonces
+  
+      When a conditional order is executed its a mapping of nonce to bool is set to true. However, although a bool is only 1 bit of information it takes up a whole storage slot of 256 bits. If instead of writing to a bool, a bit is flipped from a uint256 or bytes32 value, where the bit position represents the nonce. Doing so allows 256 nonces to be used before writing to a new storage slot, which after the first write reduces gas costs on the subsequent 255 nonce writes, at the cost of additional operations required to read and write the specific bits. This will benefit users that use conditional orders multiple times, but adds additional gas cost for the first conditional order, assuming the nonces are mapped by `accountId` as mentioned in the solution to `H-1`
+  
+      **Remediations to Consider**
+  
+      Use bits to represent nonces rather than using a `bool` in order to save gas on most conditional order executions.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="status">ack</field>
+    <field name="content">
+        
+      ## [I-1] Conditional Orders may not execute, even if conditions are met
+  
+      In order for a conditional order to be committed and then executed there are a number of requirements that need to be met. 
+  
+      - The account must have sufficient collateral to handle the order.
+      - The account must not have another order committed
+      - The order’s set `acceptablePrice` needs to be met both on committing the order and when it gets executed, users should choose a value for this that is likely to execute based on the conditions set.
+      - The order may not execute within Synthetix’s set settlement window.
+      - There may be no-one that executes a conditional order.
+  
+      For these reasons users of conditional orders should make sure they have enough collateral, set a reasonable `acceptablePrice` for the order, and have no active orders. They must also be aware that there is no guarantee it will be executed.
+  
+    </field>
+    <field name="response">
+        Added documentation
+    </field>
+  </item>
+  
