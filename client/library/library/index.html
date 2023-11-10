@@ -15,7 +15,7 @@
     <p class="mt-4">Check them out below.</p>
   </div>
 
-  <section class="mt-12 max-w-2xl">
+  <section class="mt-12 max-w-2xl px-2">
     <h2 class="text-2xl font-bold">Public Audits</h2>
     <p class="mt-2">A curated list of audits  we have worked with in the past, available to the community.</p>
 
@@ -30,19 +30,16 @@
                   <img class="h-5" src="/library/vendor/{{audit.logo}}" />
                 </if>
               </span>
-              <h3 class="flex-1 text-lg font-medium leading-6 text-gray-900 dark:text-white">
-                {{audit.title}}
+              <h3 class="flex-1">
+                <span class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{{audit.title}}</span> <span class="text-sm text-gray-500 dark:text-gray-400"> | {{audit.date}}</span>
               </h3>
-              <p class="flex-1  text-center text-sm text-gray-900 dark:text-gray-100">
-                {{audit.date}}
-              </p>
               <p class="Copy --sm flex-1 text-right text-sm text-gray-900 dark:text-gray-100">
                 <a href="{{audit.report}}" target="_blank">Report</a>
                 | <a href="{{audit.attachments}}" target="_blank">Repository</a>
               </p>
 
             </div>
-            <p class="mt-1 text-center text-sm text-gray-500 dark:text-gray-400">
+            <p class="mt-1 text-left text-sm text-gray-500 dark:text-gray-400">
               {{audit.about}}
             </p>
           </div>
@@ -51,8 +48,8 @@
               {{var match = audit.report.match('/library/audits/([^)]+)')}}
               <if cond="match">
                 {{var issues = collection(`public/${match[1]}-issues`).map(Issues.normalize)}}
-                <div class="sm:gap-4 px-4 pb-4 sm:px-6">
-                  <div class="text-sm text-gray-900 dark:text-gray-100 grid grid-cols-2 sm:grid-cols-4 grid-flow-row gap-4">
+                <div class="sm:gap-4 px-4 py-4 sm:px-6">
+                  <div class="text-sm text-gray-900 dark:text-gray-100 grid grid-cols-2 sm:grid-cols-4 grid-flow-row gap-2 sm:gap-4">
                       {{var totalShown = 0}}
                       <for let="severity of 'CHMLQGI'.split('')">
                         {{var subset = issues.filter(i => i.severity === severity)}}
