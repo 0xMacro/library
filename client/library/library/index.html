@@ -25,7 +25,7 @@
         b = Date.parse(b.date);
         return b - a;
       }).map(audit => {
-        audit.date = new Date(audit.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        audit.date = new Date(audit.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
         return audit;
       })}}
       <for let="audit of sortedAudits">
