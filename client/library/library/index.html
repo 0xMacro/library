@@ -27,8 +27,7 @@
       }).map(audit => {
         audit.date = new Date(audit.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
         return audit;
-      })
-    }}
+      })}}
       <for let="audit of sortedAudits">
         <div class="overflow-hidden border dark:border-0">
           <div class="px-4 py-4 sm:px-6 bg-white dark:bg-gray-900">
@@ -56,9 +55,9 @@
           </div>
           <div class="border-t dark:bg-gray-900 border-gray-200 dark:border-gray-800 sm:divide-y sm:divide-gray-200 sm:dark:divide-gray-800">
 
-              {{var match = audit.report.match('/library/audits/([^)]+)') }}
+              {{var match = audit.report.match('/library/audits/([^)]+)')}}
               <if cond="match">
-                {{var issues = collection(`public/${match[1]}-issues`).map(Issues.normalize)}}}}
+                {{var issues = collection(`public/${match[1]}-issues`).map(Issues.normalize)}}
                 <div class="sm:gap-4 px-4 pb-4 sm:px-6">
                   <div class="text-sm text-gray-900 dark:text-gray-100 grid grid-cols-2 sm:grid-cols-4 grid-flow-row gap-4">
                       {{var totalShown = 0}}
