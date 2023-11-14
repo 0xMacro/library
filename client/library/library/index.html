@@ -21,7 +21,8 @@
 
     <div class="mt-4 space-y-8">
 
-      <for let="audit of collection('audit-works')">
+      {{var sortedAudits = AuditMarkdown.sortByAndTransformDate(collection('audit-works'))}}
+      <for let="audit of sortedAudits">
 
         <div class="overflow-hidden border dark:border-0">
           <div class="px-4 py-5 sm:px-6 bg-white dark:bg-gray-900">
