@@ -1,0 +1,275 @@
+<item>
+    <field name="topic">Improper Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">addressed</field>
+    <field name="commit">11e27223625e4c6b5f929398e015ccda740c1593</field>
+    <field name="content">
+      ## [L-1] `KeyManager` price logic is not consistent with other modules
+  
+      ***Note: This issue was initially discovered by the Farcaster team within the scoped PR.***
+  
+      **Reference:** [KeyManager.sol#L134](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/KeyManager.sol#L134), [StorageRegistry.sol#L504](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/StorageRegistry.sol#L504)
+  
+      The `StorageRegistry` price logic has a differentiated price use for the cases where there is a price change triggered in the same block. This allows to keep the price consistent across all transactions within that block since the price update will take effect in the following block and the `prevEthUsdPrice` value will be used.
+  
+      However, the `KeyManager` price uses the `StorageRegistry:ethUsdPrice` variable, making the price for this potential edge case different from that it would be for the other fee calculations.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Improper Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ef5d45e9131e0074c244f337e92aadb4e5ca64b3</field>
+    <field name="content">
+      ## [L-2] Validation of `deadline` property for Signature is inaccurate
+  
+      **Reference**: [Signatures.sol#L22](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/lib/Signatures.sol#L22)
+  
+      `Signatures._verifySig` performs the following expiration check:
+  
+      ```jsx
+      if (block.timestamp >= deadline) revert SignatureExpired();
+      ```
+  
+      At the same time, the comment for `error InvalidSignature()` says:
+  
+      ```jsx
+      /// @dev Revert when the block.timestamp is ahead of the signature deadline.
+      error SignatureExpired();
+      ```
+  
+      The comment doesn’t align with the actual logic, as the above check also reverts when `block.timestamp` exactly matches the `deadline`.
+  
+      **Remediations to Consider**
+  
+      Consider changing the above check to `block.timestamp > deadline` instead of `>=`.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="response">
+        We don’t intend to update the StorageRegistry as part of these changes, but will validate this in the next version. For now there is limited impact beyond callers unintentionally sending ether to the protocol.
+    </field>
+    <field name="content">
+      ## [L-3] Storage can be rented to `fid = 0`
+  
+      **Reference**: [StorageRegistry.sol#L431](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/StorageRegistry.sol#L431), [StorageRegistry.sol#L456](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/StorageRegistry.sol#L456), [StorageRegistry.sol#L645](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/StorageRegistry.sol#L645), [StorageRegistry.sol#L656](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/StorageRegistry.sol#L656)
+  
+      In `StorageRegistry.sol`, the functions `rent()`, `batchRent()`, `credit()`, and `batchCredit()` allow renting storage to `fid = 0`. However, as `fid = 0` is an invalid `fid`, it leads to sending ether to the contract without renting storage to any `fid`. 
+  
+      **Remediations to Consider**
+      Consider adding checks for the above functions to not allow `fid = 0`.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">aeb195cc77def581b7b2b5c85fa03abbc4008300</field>
+    <field name="response">
+        Note that `IdRegistry` and `KeyRegistry` now are actually deployed in a paused state. Updated the docs to reflect the latest and remove references to trusted caller.
+    </field>
+    <field name="content">
+      ## [Q-1] Inaccurate documentation
+  
+      **Reference**: [docs.md?plain=1#L192](https://github.com/farcasterxyz/farcaster-contracts-private/blob/main/docs/docs.md?plain=1#L192)
+  
+      The documentation [states](https://github.com/farcasterxyz/farcaster-contracts-private/blob/main/docs/docs.md#migration-2):
+  
+      > The KeyRegistry is deployed in the trusted state where keys may not be registered by anyone except the owner.
+      > 
+  
+      However, this is not the case since adding keys via `KeyManager.add` and `KeyManager.addFor` is not restricted and can be called by anybody even in the trusted state.
+  
+      Consider updating documentation to properly reflect behavior.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">aeb195cc77def581b7b2b5c85fa03abbc4008300</field>
+    <field name="content">
+      ## [Q-2] Guardians not mentioned in the documentation
+  
+      **Reference**: [docs.md](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/docs/docs.md)
+  
+      The documentation well explains the different roles of the system and also mentions under which assumptions they are acting. Since the recent changes, the protocol supports an additional role called “Guardians”, who have the privilege to pause contracts and can only be added by the contract owner. 
+  
+      Consider adapting the documentation to also mention the Guardian role (this is especially relevant for the “Assumption” section)
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unused Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">82c4dd0225c85b6c88cb1a4d25f08402272e0466</field>
+    <field name="content">
+      ## [Q-3] Unused imports
+
+      **Reference**: [IdRegistry.sol#L6](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/IdRegistry.sol#L6), [KeyRegistry.sol#L5](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/KeyRegistry.sol#L5)
+  
+      The following import is not required and can be removed from `IdRegistry.sol` and `KeyRegistry.sol`:
+  
+      ```jsx
+      import {Pausable} from "openzeppelin/contracts/security/Pausable.sol";
+      ```
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Signature Validation</field>
+    <field name="impact">medium</field>
+    <field name="status">addressed</field>
+    <field name="response">
+        This is an intentional design tradeoff that makes it possible to register an FID and add a key in a single transaction, without first knowing a user’s FID. We accept that this has the consequence described in the finding, and users should interpret these actions as “add key to current FID.”
+
+        We added a partial mitigation by exposing a public `useNonce` function on all contracts that use nonce-protected EIP712 signatures. Users who want to protect against this scenario can bump their nonce to invalidate previous signatures.
+    </field>
+    <field name="content">
+      ## [Q-4] Signature for `addFor` is not bound to a specific `fid`
+
+      **Reference**: [KeyManager.sol#L239](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/KeyManager.sol#L239)
+  
+      The `TYPEHASH` used by the `KeyManager.addFor` function is defined as follows:
+  
+      ```jsx
+      bytes32 public constant ADD_TYPEHASH = keccak256(
+          "Add(address owner,uint32 keyType,bytes key,uint8 metadataType,bytes metadata,uint256 nonce,uint256 deadline)"
+      );
+      ```
+  
+      Since there is no `fid` encoded in the TYPEHASH, the signature is not bound to a certain fid. This opens up the possibility for the following edge case:
+  
+      1. Alice owns `fid_123`
+      2. She creates a signature `sig1`, allowing someone else to add a key on her behalf.
+      3. Later, Alice swaps her fid with Bob and she now owns `fid_456`. Until this point, `sig1` has not been executed.
+      4. Since `sig1` is not bound to a certain fid, the signature can still be used via `KeyManager.addFor` to add a key to `fid_456`. 
+  
+      The above scenario allows for adding a key to `fid_456`. However, Alice created a signature with the intention to authorize adding a key to `fid_123`. 
+  
+      Consider adding the fid to the `TYPEHASH` to prevent the above scenario.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Design</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">36018a65345a3d50d8679eb9196a89bc3c8a8ef5</field>
+    <field name="content">
+      ## [Q-5] `extraStorage` could be implemented in the `IdManager`
+  
+      **Reference:** [Bundler.sol#L97](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/Bundler.sol#L97), [IdManager.sol#L109](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/IdManager.sol#L109)
+  
+      The current function flow for a `Bundler:register()` call, goes through the following steps:
+  
+      1. `register` in the `IdManager` to register a new `fid` and `rent` one unit of storage, required for registration.
+      2. `add` in the `KeyManager` to add the signers passed in the call.
+      3. `rent` in the `StorageRegistry` to rent any additional storage needed, passed in the `extraStorage` input parameter.
+  
+      This could be improved by passing additional storage into the `IdManager` and adding it to the required initial unit of storage since the `IdManager` already interacts with the `StorageRegistry` contract to rent storage, simplifying the interactions of the `Bundler`.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Design</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="response">
+        We’re OK redeploying Bundler contracts if necessary, since it’s cheap to do so on Optimism, and prefer to minimize our own control over the contract dependencies.
+    </field>
+    <field name="content">
+      ## [Q-6] `Bundler` would need to be redeployed even if only one manager gets changed
+  
+      **Reference:** [Bundler.sol#L47](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/Bundler.sol#L47) , [Bundler.sol#L52](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/Bundler.sol#L52) 
+  
+      The v3.1.0 update aims to create a more flexible system that enables the registry `owner` to safely update the `manager` modules. However, due to the immutability of the `Bundler`'s `idManager` and `keyManager` variables, any changes made to the managers in the registry would require the bundler to be redeployed.
+  
+      Consider having setter functions inside the `Bundler` contract to allow updating these modules easily.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Design</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="response">
+        We don’t want to do this onchain, because it introduces an additional dependency on the old contract, but we will include validation against the previous contract state in our offchain migration scripts.
+    </field>
+    <field name="content">
+      ## [Q-7] Add `fid` validation to the migration process
+  
+      **Reference:** [Bundler.sol#L144](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/Bundler.sol#L144) 
+  
+      It is paramount, that users being migrated have the same `fid` on the new contracts. The migration on-chain logic doesn’t ensure this and solely relies on passing the `UserData[]` array in correct order to the `Bundler.trustedBatchRegister` function so that `fid` matches with the migrated contract.
+  
+      Consider adding the corresponding `fid`s to `UserData` struct so that during migration the correct `fid` can be validated against the current contract in `Bundler.trustedBatchRegister`.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Duplicate validation</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        Pausing the IdRegistry pauses registration, transfers, and recovery, but pausing the IdGateway only pauses registrations. In the event of an change to the IdGateway, we want the ability to pause the old gateway contract without having to pause the IdRegistry.
+    </field>
+    <field name="content">
+      ## [G-1] `whenNotPaused` modifier can be removed from `IdManager` functions
+  
+      **Reference**: [IdManager.sol#L104](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/IdManager.sol#L104), [IdManager.sol#L120](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/IdManager.sol#L120), [IdManager.sol#L134](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/IdManager.sol#L134)
+  
+      In `IdManager.sol`, the functions `register()`, `registerFor()`, and `trustedRegister()` utilize the `whenNotPaused` modifier, but also internally call `idRegistry.register` which by itself uses its corresponding internal `whenNotPaused` modifier. This leads to unnecessary gas consumption as the same modifier logic is evaluated twice. 
+  
+      Consider removing the `whenNotPaused` modifier from above functions.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant execution</field>
+    <field name="impact">medium</field>
+    <field name="status">addressed</field>
+    <field name="response">
+        Implemented as part of Q-5.
+    </field>
+    <field name="content">
+      ## [G-2] `Bundler` performs redundant logic for registers without `extraStorage`
+  
+      **Reference**: [Bundler.sol#L97](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/Bundler.sol#L97), [Bundler.sol#L104](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/Bundler.sol#L104), [StorageRegistry.sol#L504](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/src/StorageRegistry.sol#L504)
+  
+      For users that register their `fid` through the `Bundler` but do not want additional storage than the required for registration, the logic will still perform price checks and additional calls to the `StorageRegistry`. 
+  
+      Consider adding a differentiated logic when `extraStorage == 0` to avoid unnecessary logic execution, which users will pay.
+    </field>
+  </item>
+  
