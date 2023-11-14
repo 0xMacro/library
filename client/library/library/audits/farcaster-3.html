@@ -1,0 +1,55 @@
+<page
+  clientName="Farcaster"
+  reportDate="November 2nd, 2023"
+  auditTitle="Farcaster A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/farcasterxyz/farcaster-contracts-private"
+  repoCommitHash="d82a095085e92baea7f6c1c760be8c5ea36c3b57"
+  layout="/library/audits/_layout.html"
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from
+    October 23, 2023 to October 27, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Provided audit handoff documentation.</li>
+      <li>Internal discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    The Farcaster protocol utilizes various privileged actors:
+          <ul>
+              <li>owner: can pause/unpause contracts and can modify many configuration parameters. </li>
+              <li>guardian: can pause contracts. </li>
+              <li>operator role: used in StorageRegistry to credit storage to fids without paying any fee. </li>
+              <li>treasurer role: used in StorageRegistry to refresh oracle price and withdraw funds. </li>
+          </ul>    
+    All roles are assumed to be trusted and to act in a reliable and good manner. A more detailed description of the different actors and their assumptions can be found in the [documentation](https://github.com/farcasterxyz/farcaster-contracts-private/blob/d82a095085e92baea7f6c1c760be8c5ea36c3b57/docs/docs.md).
+  </template>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+      5a08eaf5d1948901a1f9edb29e9b9330f8f35cd4c6744a3ec514950d7d1480ab  ./src/Bundler.sol
+      8de857fc3d286538c896ff584f3ca09dcbc73c8ff1a1e4447ca1168c34533e7a  ./src/IdManager.sol
+      21bdaf29d0a04be726bf62cb558d636d08b0dfeb490927d27dd3e6f6fa59951c  ./src/IdRegistry.sol
+      e1f63b135890888e57cd7f583801e686e32feccb73d6a46f4889a2ff146c19c0  ./src/KeyManager.sol
+      4dfb929e519a5544196617acae5a04a4ace13b6ce7046c9d1fa4e69e3bb4b84e  ./src/KeyRegistry.sol
+      f3bf4e7b4db850376616b206df1118bfadb4fb8240823b82db6c6637a2214a14  ./src/RecoveryProxy.sol
+      a2f3eea1d11e039386ebe4455773d639274d006ade2697155f30d560cee2852d  ./src/StorageRegistry.sol
+      76c4e2e407258a7e6421e08d6aea10088233fde099613d255b4a57cfa5d280b5  ./src/interfaces/IBundler.sol
+      290597dbd4177e6fc9b6691e04364fb1b18735d5306bae3fb56b68a33d0fe6da  ./src/interfaces/IIdManager.sol
+      acd0bb92da459db17eaf819a222d91d09f38cf02ea647db78a93915e253db314  ./src/interfaces/IIdRegistry.sol
+      4e2bf273892b79f274954fa3cac38b0d6edc6637bc7c4e26ddc5f7adcc46804b  ./src/interfaces/IKeyManager.sol
+      ee91997aa3c84a26645377c211e6e6bf42ca9d41cea74e5b6771073e9292066a  ./src/interfaces/IKeyRegistry.sol
+      6a5e97ea59ad9f16a5962da89342add2f2215d9d772cd73fac27121f88819d20  ./src/lib/Guardians.sol
+    </template>
+
+</content-for>

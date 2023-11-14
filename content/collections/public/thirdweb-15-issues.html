@@ -1,0 +1,342 @@
+<item>
+    <field name="topic">Locked Funds</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">04226007c9079f0fa85d848d46d2ed027e021695</field>
+    <field name="content">
+        ## [M-1] Native tokens can get locked when bidding or buying from the marketplace
+        
+        `EnglishAuctionsLogic`’s `bidInAuction` function is marked as `payable` to accept native tokens for bids. However, for auctions using ERC20 as currency, when a user unintentionally sends `msg.value > 0` when calling `bidInAuction`, the transaction will succeed and the native tokens will be locked in the contract.
+
+        The tokens will be locked in the contract, unless a permissioned user adds an extension to enable withdrawing these tokens. In cases where extension permissions have been revoked, there would be no way to withdraw these tokens. 
+
+        Note that the issue also applies to `DirectListingsLogic’s` `buyFromListing` function.
+
+        **Remediations to Consider**
+
+        Consider adding a check to verify that `msg.value == 0` when currency is set to ERC20.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Locked Funds</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts/commit/c256b777a6226de5d35a48f5f009897e46aac48b,https://github.com/thirdweb-dev/contracts/commit/fd1be981cce01149855ecf3595a1ca6d4f8ad31e</field>
+    <field name="content">
+        ## [L-1] Everyone can send native tokens directly to the marketplace
+
+        `MarketplaceV3` supports sending native tokens directly to the contract via the `receive()` function. It is understood that this is needed in order to support WETH for listings. 
+
+        Since there is no restriction on who can call `receive()`, native tokens can get locked when users accidentally send them to the contract. 
+
+        **Remediations to Consider**
+
+        Consider adding a restriction to the `receive()` function so that it is callable only from the `nativeTokenWrapper` address. An example of restricting the `receive()` function to the WETH address can be found in the [UniswapRouter contract](https://github.com/Uniswap/v2-periphery/blob/master/contracts/UniswapV2Router02.sol#L29).
+    </field>
+</item>
+
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts/commit/97949b831b773064b241e60101c4d8041379fd07,https://github.com/thirdweb-dev/contracts/commit/e994c836ab4654669816ab155061f9aba40c3b98</field>
+    <field name="content">
+        ## [L-2] Missing sanity checks for `PrimarySale` and `PlatformFee` recipients
+
+        `PrimarySale` and `PlatformFee` recipients can be set to 0x0 during initialization via `BurntToClaimDropERC721.initialize` or via `setPrimarySaleRecipient` and `setPlatformFeeInfo` respectively.
+
+        If one of those recipients is set to a 0x0 and corresponding fee > 0 this can result in the following behavior: 
+
+        - For claims using ERC20 as currency, claiming a token will revert in `_collectPriceOnClaim` with *“ERC20: transfer to the zero address”*
+        - For claims using native token as currency, tokens will be lost as they are transferred to the 0x0 address.
+
+        Note that this issue applies to all contracts supporting `PrimarySale` and `PlatformFee`.
+
+        **Remediations to Consider**
+
+        Consider adding checks to prevent setting `address(0)` for both `PrimarySale` and `PlatformFee` recipients.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Upgradability</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6ab04e3228947878f5d4c3c64a6949a7c7ad9a01</field>
+    <field name="content">
+        ## [L-3] Cannot remove upgradability without revoking all default admins
+
+        In `MarketplaceV3` the ability to add or update extensions to the contract can be done by an account with the `EXTENSION_ROLE`. This role can only be granted and revoked by any account with the `DEFAULT_ADMIN_ROLE`, since there is no role admin set for the `EXTENSION_ROLE`. In the case where a project using these contracts wants to turn off the ability to add/update extensions, they would have to revoke all users with the `EXTENSION_ROLE` as well as users with the `DEFAULT_ADMIN_ROLE`, since they can grant the `EXTENSION_ROLE` to another user at a later time.
+
+        Revoking all accounts with the `DEFAULT_ADMIN_ROLE` may be undesirable as it also manages other roles like the `LISTER_ROLE` and `ASSET_ROLE`.
+
+        **Remediations to Consider**
+
+        Set the `EXTENSION_ROLE` as its own role admin in the initializer and set an initial account with the `EXTENSION_ROLE`, this will allow it so the contract can no longer be upgraded when there are no accounts with the `EXTENSION_ROLE`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts/commit/f333a5d8deaa1401170cf5fc80181d873b7925c7,https://github.com/thirdweb-dev/contracts/commit/48297f693cf8172005161945501e3863c37f1d12,https://github.com/thirdweb-dev/contracts/commit/a63939c31af67bc116ac494dc1098ec8f4c81798</field>
+    <field name="content">
+        ## [Q-1] Misleading function name for `setMaxTotalSupply`
+
+        The intention of `BurnToClaimDrop721Logic’s` `setMaxTotalSupply` function is to set the **maximum number of tokens to be minted** rather than - as the name implies - setting the maximum number of token supply. 
+        
+        **Remediations to Consider**
+        
+        Consider renaming the function `setMaxTotalSupply` and the state var `maxTotalSupply` to something more appropriate such as `setMaxTotalMinted` and `maxTotalMinted`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts/commit/5fd8a49a5c3867e6ec710987f6a59e002f637673,https://github.com/thirdweb-dev/contracts/commit/721fcc9b31ff5792ec73477fa571cfbb671f0de9</field>
+    <field name="content">
+        ## [Q-2] Missing sanity check when setting `BurnToClaimInfo`
+
+        In BurnToClaim.sol, an admin can set `BurnToClaimInfo` via `setBurnToClaimInfo(..)`. However, both `originContractAddress` and `currency` parameter can be set to `0x0` as there is no check preventing this. As a result, subsequent calls to `burnAndClaim` would revert inside the `verifyBurnToClaim` function. 
+        
+        **Remediations to Consider**
+        
+        It is recommended to prevent setting invalid config in the first place, thus consider adding `!= address(0)` checks to the `setBurnToClaimInfo` function and remove the check in the `verifyBurnToClaim` function.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">e494bf9d72dd32b8267a9ff8a87bee300ccdad9c</field>
+    <field name="content">
+        ## [Q-3] `OPERATOR_ROLE` is not used
+
+        In `BurnToClaimDropERC721` and `BurnToClaimDrop721Logic`, the `OPERATOR_ROLE` is defined but not used anywhere in the code. 
+        
+        **Remediations to Consider**
+        
+        Consider removing `OPERATOR_ROLE` definitions and corresponding `_setupRole` logic from above contracts.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">37d2689f5380879c3d009393c882d454416125df</field>
+    <field name="content">
+        ## [Q-4] Missing `natspec` documentation
+        
+        `BurnToClaim.sol` misses proper `natspec` documentation for most of the functions. In some of the other contracts such as `BurnToClaimDropERC721.sol`, `BurnToClaimDrop721Logic.sol`, and `BurnToClaimDrop721Storage.sol`, most of the functions take use of the `@dev` tag, but they tend to not include `@param` and `@return` tags.
+        
+        **Remediations to Consider**
+        
+        Add missing `natspec` documentation. Follow [natspec guidelines](https://docs.soliditylang.org/en/latest/natspec-format.html) to provide proper documentation of the code.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Readability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1b457879b86bdb282f1ecba09ff94391bcf42651</field>
+    <field name="content">
+        ## [Q-5] Named returns are not assigned
+
+        In `BurnToClaimDrop721Logic`, there are two ocurrences where named returns are defined but not assigned:
+        
+        1. The function `lazyMint` defines a named return variable `batchId`, but the value is returned directly instead of assigning it to the variable.
+        2. The function `_msgSender` defines a named return variable `sender`, but the value is returned directly instead of assigning it to the variable.
+        
+        **Remediations to Consider**
+        
+        Consider either assigning the return value to the defined return variable or remove the variable at all.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Readability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1e532c045752eefb9e83bfa4edfd8e7bff4b6f08</field>
+    <field name="content">
+        ## [Q-6] Avoid code duplication by using `maxTotalSupply()`
+
+        In `BurnToClaimDrop721Logic`, the function `_checkTokenSupply` retrieves the state var via data storage but could use `maxTotalSupply()` instead to improve code readability. 
+        
+        **Remediations to Consider**
+        
+        Consider using `maxTotalSupply()` to reduce code size and improve readability.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts/commit/a99818712744fdeecdc86b1c0aff97a071b2faeb,https://github.com/thirdweb-dev/contracts/commit/86abf3698fb0fee669a0a7531907f0e94ddef02a</field>
+    <field name="content">
+        ## [Q-7] Adhere to naming convention for internal function
+
+        In `BurnToClaimDropERC721`, the function `isAuthorizedCallToUpgrade` is an internal function but not prefixed with an underscore.
+        
+        According to [Solidity naming conventions](https://docs.soliditylang.org/en/latest/style-guide.html#underscore-prefix-for-non-external-functions-and-variables) - and as applied everywhere else in the code - private and internal functions should be prefixed with an underscore. 
+        
+        **Remediations to Consider**
+        
+        Consider  renaming the function from `isAuthorizedCallToUpgrade` to `_isAuthorizedCallToUpgrade`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Upgradability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1a9fffc116a6982dd645af8eaa298cf88d3b0b60</field>
+    <field name="content">
+        ## [Q-8] Incorrect `VERSION` used
+
+        In `MarketplaceV3.sol` the constant `VERSION` is set to `1`, but version `2` was already used in a previous version of the Marketplace contracts.
+        
+        **Remediations to Consider**
+        
+        Consider increasing the `VERSION` to `3`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">17b37be3e9ee002551068d1a450dd4dc6cfc4602</field>
+    <field name="content">
+        ## [Q-9] Document behavior of `tokenURI`
+  
+        `BurnToClaimDrop721Logic’s` `tokenURI` function returns a valid URI once the tokenId is lazy minted. However, the tokens are technically not minted until they are claimed. Also for burned tokens the function will return a valid URI. 
+        
+        Although above behavior is as designed, it doesn’t fully comply to the [ERC721 standard](https://eips.ethereum.org/EIPS/eip-721), which says that tokenURI should throw an exception for invalid tokenIds.
+        
+        **Remediations to Consider**
+        
+        Consider adding documentation to make users aware that above behavior slightly deviates from ERC721 standard.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Readability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c57c3c4b1bcc5af9ecf150ad0d4c6769d2d6d7df</field>
+    <field name="content">
+        ## [Q-10] Use `ERC721Holder` and `ERC1155Holder`
+
+        In `MarketplaceV3`, the functions `onERC721Received`, `onERC1155Received`, and `onERC1155BatchReceived` are implemented to indicate support of retrieving ERC721 and ERC1155 tokens. 
+        
+        **Remediations to Consider**
+        
+        Consider deriving from OpenZeppelin’s [ERC721Holder](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/utils/ERC721Holder.sol) and [ERC1155Holder](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC1155/utils/ERC1155Holder.sol) instead to improve readability.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Code Readability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">edc8487b4ef5b33f47f4ef997d9504e266a9ad77</field>
+    <field name="content">
+        ## [Q-11] Avoid code duplication by using `_msgSender` and `_msgData`
+
+        In `MarketplaceV3`, `_msgSender` and `_msgData` are overridden from `ERC2771ContextUpgradable` and `Permission` and the ident function logic as from `ERC2771ContextUpgradable` is reimplemented again. 
+        
+        **Remediations to Consider**
+        
+        Consider re-using the logic from `ERC2771ContextUpgradable` by calling `ERC2771ContextUpgradeable._msgSender()` and `ERC2771ContextUpgradeable._msgData()` respectively to improve readability and reduce code size.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Upgradability</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts/commit/c38d61c07b41f0804596fe0c15166d5df2206a02,https://github.com/thirdweb-dev/contracts/commit/72edf4586952dccfd05e2415f7cfaa6f191474b0</field>
+    <field name="content">
+        ## [Q-12] Comply with `ERC7201` standard
+        
+        Thirdweb uses the “namespaced storage” (aka “storage struct”) pattern for all upgradable contracts. However, those upgradable contracts are currently not adhering to the [ERC7201 standard](https://eips.ethereum.org/EIPS/eip-7201), which standardizes the storage location used for the “namespace”. 
+        
+        According to ERC7201, this is important because:
+        
+        > *These storage usage patterns are invisible to the Solidity and Vyper compilers because they are not represented as Solidity state variables. Smart contract tools like static analyzers or blockchain explorers often need to know the storage location of contract data. Standardizing the location for storage layouts will allow these tools to correctly interpret contracts where these design patterns are used.*
+        > 
+        
+        A great example of adhering to the ERC7201 standard can be seen in the recently released [OpenZeppelin’s v5 pre-release contracts](https://github.com/OpenZeppelin/openzeppelin-contracts/releases/tag/v5.0.0-rc.0), e.g. see [Initializable.sol](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/proxy/utils/Initializable.sol).
+        
+        **Remediations to Consider**
+        
+        Consider changing the upgradable contracts to adhere to the ERC7201 standard.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Gas Optimizations</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">ec6980b8c5d6bc961a6c470fc46604a7cd762224</field>
+    <field name="content">
+        ## [G-1] Reorder struct members to save storage slots
+        
+        In `IMarketplace.sol`, the struct members of `Listing`, `Auction`, and `Offer` can be reordered to save storage slots.
+        
+        In particular, when the struct members `TokenType` (1 Byte), `Status` (1 Byte), and one of the `address` members (20 Bytes) are placed next to each other, they only take 1 storage slot.
+        
+        Consider reordering the `Listing` struct from:
+        
+        ```tsx
+        struct Listing {
+            uint256 listingId;
+            address listingCreator;
+            address assetContract;
+            uint256 tokenId;
+            uint256 quantity;
+            address currency;
+            uint256 pricePerToken;
+            uint128 startTimestamp;
+            uint128 endTimestamp;
+            bool reserved;
+            TokenType tokenType;
+            Status status;
+        }
+        ```
+        
+        to:
+        
+        ```tsx
+        struct Listing {
+            uint256 listingId;
+            uint256 tokenId;
+            uint256 quantity;
+            uint256 pricePerToken;
+            uint128 startTimestamp;
+            uint128 endTimestamp;
+            address listingCreator;
+            address assetContract;
+            address currency;
+            TokenType tokenType;
+            Status status;
+            bool reserved;
+        }
+        ```
+        
+        The same rules apply to the `Auction` and `Offer` struct.
+    </field>
+  </item>

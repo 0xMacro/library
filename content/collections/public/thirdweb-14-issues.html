@@ -1,0 +1,568 @@
+<item>
+    <field name="topic">Upgradability</field>
+    <field name="impact">critical</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">c5033936518a089e209ed825818215b0bf21457b</field>
+    <field name="content">
+      ## [C-1] Uninitialized `EvolvingNFT` implementation contract can `selfdestruct` and brick delegated proxies
+  
+      `EvolvingNFT.sol` inherits from `BaseRouter.sol`, which allows extensions to be added by a permissioned account, which allows the contract to `delegatecall` to these set contracts, extending its functionality. `EvolvingNFT` is also intended to be a implementation contract that proxy contracts delegate to in order to save on deployment costs.
+      The state of a implementation contract usually doesn’t matter, however if there is any way to cause it to `selfdestruct`, it would destroy the contract, and cause any proxies delegating to it to lose all of their functionality.
+  
+      In the case of `EvolvingNFT`, it’s initializers are not disabled in its constructor, allowing anyone to call its `initialize()` function and set themselves as the implementation contract’s `defaultAdmin`.
+  
+      ```solidity
+      constructor(Extension[] memory _extensions) BaseRouter(_extensions) {}
+  
+      /// @dev Initiliazes the contract, like a constructor.
+      function initialize(
+          address _defaultAdmin,
+          string memory _name,
+          string memory _symbol,
+          string memory _contractURI,
+          address[] memory _trustedForwarders,
+          address _saleRecipient,
+          address _royaltyRecipient,
+          uint128 _royaltyBps
+      ) external initializer initializerERC721A {
+          bytes32 _transferRole = keccak256("TRANSFER_ROLE");
+  
+          // Initialize inherited contracts, most base-like -> most derived.
+          __ERC2771Context_init(_trustedForwarders);
+          __ERC721A_init(_name, _symbol);
+  
+          _setupContractURI(_contractURI);
+          _setupOwner(_defaultAdmin);
+          _setupOperatorFilterer();
+  
+          _setupRole(DEFAULT_ADMIN_ROLE, _defaultAdmin);
+          _setupRole(keccak256("MINTER_ROLE"), _defaultAdmin);
+          _setupRole(_transferRole, _defaultAdmin);
+          _setupRole(_transferRole, address(0));
+  
+          _setupDefaultRoyaltyInfo(_royaltyRecipient, _royaltyBps);
+          _setupPrimarySaleRecipient(_saleRecipient);
+      }
+      ```
+      Reference: [EvolvingNFT.sol#L44-L74](https://github.com/thirdweb-dev/contracts/blob/2bb75ada065b2a301149a859bb1f807b0c99fe71/contracts/unaudited/evolving-nfts/EvolvingNFT.sol#L44-L74)
+  
+      This allows them to set themselves as the `EXTENSION_ROLE`, which they then can make calls to `BaseRouter`'s `addExtension()`. Doing so can allow an extension to be added that calls `selfdestruct`, which would cause the implementation contact to be destroyed.
+  
+      This issue is also present in `BurnToClaimDropERC721.sol`
+  
+      **Remediations to Consider**
+  
+      Add a call to `_disableInitializers()` in `EvolvingNFT.sol` and `BurnToClaimDropERC721`'s constructor to prevent a malicious user from taking control of the implementation contract and potentially causing it to `selfdestruct`. 
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Loss of Funds</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">8f35cb2f8aa770f961d0a1a1cefe7f209bdda285</field>
+    <field name="content">
+      ## [H-1] `isValidSignature` accepts signatures all active signers, potentially allowing funds to be lost
+  
+      As found initially and described in their [report](https://gist.github.com/abhishekvispute/a47472a1107384cf5db1470dc8a6d2cb), signers set by the account admin can sign valid signatures for target contracts that they are not authorized to interact with. Signers should be restricted to only interact with contracts that have been explicitly set as a `approvedTarget` by a admin of the wallet. However in `isValidSignature()`, it is only checked if the signer of the signature is active, and not if the sender is an `approvedTarget` of the signer.
+  
+      ```solidity
+      /// @notice See EIP-1271
+      function isValidSignature(bytes32 _hash, bytes memory _signature)
+          public
+          view
+          virtual
+          override
+          returns (bytes4 magicValue)
+      {
+          address signer = _hash.recover(_signature);
+  
+          if (isAdmin(signer) || isActiveSigner(signer)) {
+              magicValue = MAGICVALUE;
+          }
+      }
+      ```
+  
+      Reference: [AccountCore.sol#L136-L149](https://github.com/thirdweb-dev/contracts/blob/c3451e84a81522171c7d7a556c49e651ea2df990/contracts/smart-wallet/utils/AccountCore.sol#L136-L149) and [Account.sol#L158-L171](https://github.com/thirdweb-dev/contracts/blob/c3451e84a81522171c7d7a556c49e651ea2df990/contracts/smart-wallet/non-upgradeable/Account.sol#L158-L171)
+  
+      This can allow signers set by the wallet admin to interact with protocols that validate signatures with contracts using `isValidSignature()`, like contracts that uses permit, permit2, or any protocol that follows [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) for handling contract signatures. This can allow set signers to interact with contracts that the wallet admin may not have intended them to be able to, potentially allowing assets within the wallet to be drained.
+  
+      **Remediations to Consider**
+  
+      Check to ensure that the caller is an `approvedTarget` for the signer, if the signature doesn’t belong to an admin.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+     <field name="status">fixed</field>
+    <field name="commit">b958a3b2b0ed25c98a42342fb730da6d7d9789d3</field>
+    <field name="content">
+      ## [M-1] `EntryPoint` contract can change
+
+      The smart wallet contracts currently set an immutable value for the `entrypointContract`. However as expressed in the [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337), it is possible that the entryPoint contract could change “to add new functionality, improve gas efficiency, or fix a critical security bug”. Since there is no way currently to set a new entryPoint contract, it would require a new wallet to be deployed and assets to be migrated in order to use the updated entryPoint.
+  
+      **Remediations to Consider**
+  
+      Add a function that allows the admin to update the entryPoint contract, allowing users to adapt to a changing entryPoint, and continue to utilize the full functionality of ERC-4337.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3266e52d0bd71a021e100b96b1f0703fa73c0f98</field>
+    <field name="content">
+      ## [M-2] Use of forbidden `TIMESTAMP` op-code
+  
+      As described in [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337), the block.timestamp opcode is forbidden when validating user operations, such as with the `validateUserOp` function. However, in each smart wallet contract, in order to validate if a signer is valid, block.timestamp is used to check if the current time fits the time range set by the admin for the signer. This can cause opperations to be valid when simulated, but when executed at a later time could become invalidated and revert. Having wallets revert this way can effect bundlers reputation and potentially cause bundlers to not include operations from these wallets. 
+  
+      **Remediations to Consider**
+  
+      As mentioned in the ERC, pack the timestamps `validUntil` and `validAfter` into the returned `validationData` of `validateUserOp()`, this can be done using `Helpers.sol`’s `packValidationData()` function. This allows a bundler to simulate an operation and check if it would expire before it would likely execute, allowing them to reject these nearly expired operations.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">7de8d85948bf2cb1d5c3bab4ee96bae4a6120955</field>
+    <field name="content">
+      ## [M-3] Scores using multiplicative rules for ERC20s can be inflated
+  
+      In `RulesEngine.sol` scores are calculated for users that have balances that meet the sets rules criteria, and are either calculated as a flat score for `Threshold` rules, or the score is multiplied by the users balance for `Multiplicative` rules.
+      However,  `ERC20` tokens balance is returned as a large number with a set `Decimals`, unlike `ERC721` or `ERC1155` tokens. This can lead to scores being multiplied by large values that may be unintended. 
+  
+      **Remediations to Consider**
+  
+      Consider using the ERC20 tokens `decimals()` and converting the balance in terms of full tokens before multiplying by the score to receive a score more in line with the scores returned from `ERC721` and `ERC1155`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">411d47c07d9168ca3e478fefb7eb9ba75d5b8fc1</field>
+    <field name="content">
+      ## [M-4] Shared metadata will get out of order when deleting metadata
+  
+      The shared metadata is stored as an `EnumerableSet`, meaning the order of metadata is not guaranteed, as described in the [OpenZeppelin documentation](https://docs.openzeppelin.com/contracts/4.x/api/utils#EnumerableSet-at-struct-EnumerableSet-Bytes32Set-uint256-). This means that when adding or removing the metadata, its order will sometimes be altered.
+  
+      For example, take the following scenario:
+  
+      - Shared metadata is set sequentially for 0, 10, 50, and 150 target scores.
+      - The user score is 150, and the correct token URI is returned.
+      - The metadata for a target score of 10 is removed.
+      - Now the order of shared metadata is 0, 150, and 50.
+      - The user scores the same at 150, yet the token URI that gets returned is 50.
+  
+      The above happens due to the efficient implementation of `remove()` in the `EnumerableSet`. However, it also disrupts the shared metadata order. As a result, the `tokenUri()` in EvolvingNFTLogic.sol returns an incorrect token URI due to how the iteration is performed until the `uint256(ids[i]) <= score` condition is satisfied, as shown below, and it expects the shared metadata to be stored in sequential order:
+  
+      ```solidity
+      function tokenURI(...) {
+          // ...
+  
+          for (uint256 i = 0; i < ids.length; i += 1) {
+              if (uint256(ids[i]) <= score) {
+                  targetId = ids[i];
+              } else {
+                  break;
+              }
+          }
+  
+          // ...
+      }
+      ```
+      Reference: [EvolvingNFTLogic.sol#L75-L99](https://github.com/thirdweb-dev/contracts/blob/macro-audit-loyalty-points-1/contracts/unaudited/evolving-nfts/EvolvingNFTLogic.sol#L75-L99)
+  
+      **Remediations to Consider**
+  
+      - Do not assume shared metadata order, and set `targetId` by identifying the shared metadata with the largest target score. Then use that as the final result to be used for displaying the token URI.
+      - Add a way to alter the existing shared metadata so that the ordering of shared metadata is kept intact.
+      - Use another mechanism for storing shared mechanism such as a custom implementation of `EnumerableSet` which does not alter the ordering.
+     
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Feature</field>
+    <field name="impact">low</field>
+     <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">211dfdc043f66be8a9cd1c2974721df3c5813cac</field>
+    <field name="content">
+      ## [L-1] Unable to upgrade `receive()`
+  
+      One interesting aspect of a ERC-4337 wallet, or smart contract wallets in general, is the ability to react to receiving native tokens, like ETH. For `ManagedAccount.sol` and `DynamicAccount.sol` adding the ability to update the `receive()` function may be desired for user.
+  
+      **Remediations to Consider**
+  
+      Refactor the code to allow the `receive()` function to be set in an extension, allowing custom receive fallbacks.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Upgradability</field>
+    <field name="impact">low</field>
+     <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b99aff23fde9e223334ef98dff0eebf3d20dcb4e</field>
+    <field name="content">
+      ## [L-2] Cannot remove upgradability without revoking all default admins
+  
+      In `EvolvingNFT.sol` the ability to add or update extensions to the contract can be called by an account with the `EXTENSION_ROLE`. This role can only be granted and revoked  by any account with the `DEFAULT_ADMIN_ROLE`, since there is no role admin set for the `EXTENSION_ROLE`. In the case where a project using these contracts wants to turn off the ability to add/update extensions, they would have to revoke all users with the `EXTENSION_ROLE` as well as users with the `DEFAULT_ADMIN_ROLE`, since they can grant the `EXTENSION_ROLE` to another user at a later time.
+  
+      Revoking all accounts with the `DEFAULT_ADMIN_ROLE` may be undesirable as it also manages other roles like the `TRANSFER_ROLE` and `MINTER_ROLE`, as well as setting multiple other values defined in `EvolvingNFTLogic.sol`, all of which may be needed by the protocol.
+  
+      **Remediations to Consider**
+  
+      Set the `EXTENSION_ROLE` as it’s own role admin in the initializer and set an initial account with the `EXTENSION_ROLE`, this will allow it so the contract can no longer be upgraded when there are no account with the `EXTENSION_ROLE`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Upgradability</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">17483d33c5c8c614dc36bad07521273b9a3297f9</field>
+    <field name="content">
+      ## [L-3] `isValidSignature` should be upgradable
+  
+      `DynamicAccount.sol` and `ManagedAccount.sol` are upgradable [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) wallets that inherit base immutable functionality from `AccountCore.sol`, and functions like those found in `AccountExtension.sol` can be added or updated as extensions. Since `isValidSignature()` isn’t necessary for the spec of ERC-4337, and there is the possibility that users may want custom functionality for verifying valid signatures, it could be added to `AccountExtension.sol` to allow users to update it as desired.
+  
+      **Remediations to Consider**
+  
+      Move `isValidSignature()` to `AccountExtension.sol` to allow users to have the ability to customize how the contract validates signatures.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b4e272974362e768c8498c5070cef2454fbfa9ac</field>
+    <field name="content">
+      ## [L-4] Invalid accounts can register with Account factories
+  
+      In `BaseAccountFactory.sol`, accounts are allowed to be registered to the factory by calling `onRegister()`.
+  
+      ```solidity
+      /// @notice Callback function for an Account to register itself on the factory.
+      function onRegister() external {
+          address account = msg.sender;
+          require(_isAccountOfFactory(account), "AccountFactory: not an account.");
+  
+          require(allAccounts.add(account), "AccountFactory: account already registered");
+      }
+      ```
+      Reference: [BaseAccountFactory.sol#L74-L80](https://github.com/thirdweb-dev/contracts/blob/main/contracts/smart-wallet/utils/BaseAccountFactory.sol#L74-L80)
+  
+      However, there are no checks to ensure the caller is an account created by this factory. A contract could potentially call `onRegister()` and become registered with this factory, if it passes the checks of `_isAccountOfFactory`, which does not guarantee the account was created by the factory, as it only checks if the factory’s implementation address is in the bytecode of the calling contract at the expected location.
+  
+      ```solidity
+      /// @dev Returns whether the caller is an account deployed by this factory.
+      function _isAccountOfFactory(address _account) internal view virtual returns (bool) {
+          address impl = _getImplementation(_account);
+          return _account.code.length > 0 && impl == accountImplementation;
+      }
+  
+      function _getImplementation(address cloneAddress) internal view returns (address) {
+          bytes memory code = cloneAddress.code;
+          return BytesLib.toAddress(code, 10);
+      }
+      ```
+      Reference: [BaseAccountFactory.sol#L134-143](https://github.com/thirdweb-dev/contracts/blob/c3451e84a81522171c7d7a556c49e651ea2df990/contracts/smart-wallet/utils/BaseAccountFactory.sol#L134-L143)
+  
+      Setting an invalid address for an account can lead to inaccurate book keeping, and if any contract  or protocol were to query the factory to check if an address is a account created by the factory, it may not be accurate.
+  
+      Since these contracts are generated using `create2`, if the initial seed to generate the account is provided, the generated address that the factory would have deployed can be predicted using `Clones.predictDeterministicAddress()` and checked with the calling contract to verify the account was created by the factory.
+  
+      **Remediations to Consider**
+  
+      When registering an account with a factory, accept the initial admin and data parameter used to generate the account address and verify that the caller is the same as the predicted address generated by those values. This will ensure only accounts created by the factory can be registered. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Error Recovery</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-5] Payable transfer and approvals can lead to native tokens stuck in contract
+
+      `EvolvingNFTLogic.sol`'s `approve()`, `transferFrom()` and `safeTransferFrom()` functions are set to `payable` which allows native tokens to be sent into the contract when making these function calls. However, native tokens sent in via these function calls are not used, and there is no way to withdraw these tokens without a permissioned user adding an extension to do so. In cases where extension permissions have been revoked, there would be no way to withdraw these sent in funds. There is a chance that funds could be sent to the contract accidentally, especially when interacting with third party protocols like etherscan to transfer tokens or set approvals as it would prompt the user to enter a value of native tokens to send, which may get confused for other function parameters. It is understood that using the `payable` keyword reduces gas costs as there is no check to ensure that `msg.value == 0`, but the added gas cost is negligible compared to the potential downsides.
+  
+      **Remediations to Consider**
+  
+      Remove the payable keywords from `EvolvingNFTLogic.sol`'s `approve()`, `transferFrom()` and both `safeTransferFrom()` functions, in order to prevent native tokens from accidentally getting stuck in the contract.
+    </field>
+    <field name="response">
+      These functions are payable since they override from the ERC721AUpgradeable contract, where these functions are payable [ref](https://github.com/chiru-labs/ERC721A-Upgradeable/blob/main/contracts/ERC721AUpgradeable.sol#L591).
+
+      We will fix this issue later on, where we do a sweep of our external dependencies.
+  </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">e40d0f009d20c16183fcb0e5563073240e0ab597</field>
+    <field name="content">
+      ## [Q-1] Duplicate code
+  
+      `Account.sol` and `AccountCore.sol` share a lot of the same functions, and the code is identical, and both inherit `BaseAccount.sol`. Duplicate code can cause errors as changes to the code has to be done in multiple places.
+  
+      **Remediations to Consider**
+  
+      Refactor Account.sol and AccountCore.sol to prevent duplicate code, and reducing the chance of errors when updating these contracts.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">151ce528f64bf2c25623d02d98a8c4fb4e56dc56</field>
+    <field name="content">
+      ## [Q-2] Duplicate comment
+  
+      In `AccountCore.sol` there is a duplicate comment.
+  
+      ```solidity
+      // We use the underlying storage instead of high level view functions to save gas.
+      // We use the underlying storage instead of high level view functions to save gas.
+      ```
+      Reference: [Account.sol#L81-L82](https://github.com/thirdweb-dev/contracts/blob/macro-audit-updated-smart-wallets-1/contracts/smart-wallet/utils/AccountCore.sol#L81-L82)
+  
+      **Remediations to Consider**
+  
+      Remove the duplicate comment.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">f68dd8f085d28bd674cf237b02f4f71ab2b4b34a</field>
+    <field name="content">
+      ## [Q-3] Constant `MAX_BPS` is not used
+  
+      Constant `MAX_BPS` is declared in EvolvingNFTLogic.sol, yet it’s not used in the contract. 
+  
+      **Remediations to Consider**
+  
+      Remove `MAX_BPS`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">742a53dd727486e17e5d70afd12ca7a2fa2aecf9</field>
+    <field name="content">
+      ## [Q-4] Mistyped functions
+  
+      `RulesEngine.sol` contains mistyped functions which can be corrected as follows:
+  
+      - `_canOverrieRulesEngine()` → `_canOverrideRulesEngine()`
+      - `createRuleMulitiplicative*()` →* `createRuleMultiplicative()`
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-5] Missing NatSpec documentation
+  
+      Functions in these contracts use NatSpec documentation, but they tend to not include the `@param` and `@return` tags, which give more information about the intent of the function, and is used by some protocols like etherscan to make improve the user experience when making these calls. Additionally `RulesEngine.sol` does not have any NatSpec documentation. 
+  
+      **Remediations to Consider**
+  
+      Add missing NatSpec documentation.
+    </field>
+
+    <field name="response">
+      We’re planning a sweep of the repository to add proper Natspec documentation across all Solidity files.
+  </field>
+
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7e67729c05a0478523b5a0867819e9535c7bc911</field>
+    <field name="content">
+      ## [Q-6] Inaccurate comment
+  
+      In `EvolvingNFT.sol` there is a comment above the `EXTENSION_ROLE` that mentions the `MINTER_ROLE`.
+  
+      ```solidity
+      /// @dev Only MINTER_ROLE holders can sign off on `MintRequest`s.
+      bytes32 private constant EXTENSION_ROLE = keccak256("EXTENSION_ROLE");
+      ```
+  
+      Reference: [EvolvingNFT.sol#L41-L42](https://github.com/thirdweb-dev/contracts/blob/main/contracts/unaudited/evolving-nfts/EvolvingNFT.sol#L41-L42)
+  
+      **Remediations to Consider**
+  
+      Update the comment to accurately describe the `EXTENSION_ROLE`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ab607cb579939a5a16600d8d3b42b37184077743</field>
+    <field name="content">
+      ## [Q-7] `_setPlatformFeeType()` is not used
+  
+      In `PlatformFee.sol`, the internal function `_setPlatformFeeType()` is not used, and similar logic is found in the external function `setPlatformFeeType()`. Other functions within this contract have a pattern of an external call with checks, to a internal call that changes state and emits the event, but these functions break that pattern.
+  
+      ```solidity
+      /// @notice Lets a module admin set platform fee type.
+      function setPlatformFeeType(PlatformFeeType _feeType) external {
+          if (!_canSetPlatformFeeInfo()) {
+              revert("Not authorized");
+          }
+          platformFeeType = _feeType;
+  
+          emit PlatformFeeTypeUpdated(_feeType);
+      }
+  
+      /// @dev Sets platform fee type.
+      function _setupPlatformFeeType(PlatformFeeType _feeType) internal {
+          platformFeeType = _feeType;
+  
+          emit PlatformFeeTypeUpdated(_feeType);
+      }
+      ```
+      Reference: [PlatformFee.sol#L88-L103](https://github.com/thirdweb-dev/contracts/blob/c3451e84a81522171c7d7a556c49e651ea2df990/contracts/extension/PlatformFee.sol#L88-L103)
+  
+      **Remediations to Consider**
+  
+      Consider having `setPlatformFeeType()` call `_setPlatformFeeType()` after the checks to prevent duplicate code and follow to the set style pattern.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">28eaed18e136c23c7ac32840d18cba8d426c290e</field>
+    <field name="content">
+      ## [Q-8] Spelling mistakes
+  
+      In `LoyaltyPoints.sol`, in the comment above `mintWithSignature()`, "recipient" is spelled incorrectly
+  
+      ```solidity
+      /// @notice Mints tokens to a recipeint using a signature from an authorized party.
+      ```
+      Reference: [LoyaltyPoints.sol#L119](https://github.com/thirdweb-dev/contracts/blob/5bd29c0e277193d4a73239efb65cb2f91eccb26c/contracts/unaudited/LoyaltyPoints.sol#L119)
+  
+      Additionally, in most contracts with an initializer, there is a comment that misspells the word “initializes”.
+  
+      ```solidity
+      /// @dev Initiliazes the contract, like a constructor.
+      ```
+      Reference: [EvolvingNFT.sol#L48](https://github.com/thirdweb-dev/contracts/blob/main/contracts/unaudited/evolving-nfts/EvolvingNFT.sol#L48)
+  
+      **Remediations to Consider**
+  
+      Fix these spelling mistakes.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8f098e2c50598405c86b36583b7ad226528ad218</field>
+    <field name="content">
+      ## [Q-9] Duplicate Import
+  
+      In LoyaltyPoints.sol, PrimarySale.sol is imported twice.
+  
+      ```solidity
+      import "./extension/PrimarySale.sol";
+      import "./extension/PrimarySale.sol";
+      ```
+      Reference: [LoyaltyPoints.sol#L27-L28](https://github.com/thirdweb-dev/contracts/blob/c3451e84a81522171c7d7a556c49e651ea2df990/contracts/LoyaltyPoints.sol#L27-L28)
+  
+      **Remediations to Consider**
+  
+      Remove the duplicate import.
+  
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c840fd5b9a7b57f670ea4daebbe59c0e8113310a</field>
+    <field name="content">
+
+        ## [Q-10] Unused contract
+  
+        In the utils directory of smartWallet, there is a `BaseRouter.sol` contract that is not used or referenced. 
+    
+        **Remediations to Consider**
+    
+        Remove `BaseRouter.sol`.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b7c454071a86d662283ee3db0762f97f44d04b60</field>
+    <field name="content">
+      ## [G-1] `platformFeeType` can share a storage slot
+  
+      In `PrimarySale.sol`, the storage values `platformFeeRecipient` and `platformFeeBps` are defined next to each other, and since `platformFeeRecipient` is an `address`, taking 20 bytes of space, and `platformFeeBps` is a `uint16` taking 2 bytes of space, there is 10 bytes left over in the first storage slot. The next defined value is `flatPlatformFee`, a `uint256` which needs its own storage slot, and `platformFeeType` is defined after, and is a `PlatformFeeType` `enum` which takes up 1 byte of space, and since the second slot above it is full, it will take up a the 3rd storage slot on its own. If `platformFeeType` is defined before `flatPlatformFee`, it will share the first storage slot with `platformFeeRecipient` and `platformFeeBps`, saving a new storage write when set, and since these values are typically read together it would benefit from warm `SLOAD` ’s whenever they are read together. 
+  
+      ```solidity
+      /// @dev The address that receives all platform fees from all sales.
+      address private platformFeeRecipient;
+  
+      /// @dev The % of primary sales collected as platform fees.
+      uint16 private platformFeeBps;
+  
+      /// @dev The flat amount collected by the contract as fees on primary sales.
+      uint256 private flatPlatformFee;
+  
+      /// @dev Fee type variants: percentage fee and flat fee
+      PlatformFeeType private platformFeeType;
+      ```
+      Reference: [PrimarySale.sol#L16-L26](https://github.com/thirdweb-dev/contracts/blob/c3451e84a81522171c7d7a556c49e651ea2df990/contracts/extension/PlatformFee.sol#L16-L26)
+  
+      **Remediations to Consider**
+  
+      Swap the positions of `platformFeeType` and `flatPlatformFee` to save users gas on storage reads and writes.
+  
+    </field>
+  </item>
+  

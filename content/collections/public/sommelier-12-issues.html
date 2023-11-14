@@ -1,0 +1,125 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">b628c8e01d66bdbf353f494ba63c0526a9800c5d</field>
+    <field name="content">
+      ## [M-1] Incorrect price calculation for `CurveEmaExtension`
+  
+      In `CurveEmaExtension.sol`’s `getPriceInUSD()`, the price is pulled from the pool in terms of the first asset in the pools `coins` array. When the price is converted to `USD`, the price’s decimals are assumed to be using the `coins0`'s decimals.
+  
+      ```solidity
+      function getPriceInUSD(ERC20 asset) external view override returns (uint256 price) {
+          ExtensionStorage memory stor = extensionStorage[asset];
+          CurvePool pool = CurvePool(stor.pool);
+  
+          ERC20 coins0 = getCoinsZero(pool);
+          uint256 priceInAsset = getPriceFromCurvePool(pool, stor.index, stor.needIndex);
+  
+          uint256 assetPrice = priceRouter.getPriceInUSD(coins0);
+          price = assetPrice.mulDivDown(priceInAsset, 10 ** coins0.decimals());
+      }
+      ```
+      Reference: [CurveEmaExtension.sol#L69-L78](https://github.com/PeggyJV/cellar-contracts/blob/4faacd442fefe1d4d2b39182ad7ed2bc67786d6b/src/modules/price-router/Extensions/Curve/CurveEMAExtension.sol#L69-L78)
+  
+      ```solidity
+      function getPriceFromCurvePool(CurvePool pool, uint8 index, bool needIndex) public view returns (uint256) {
+          return needIndex ? pool.price_oracle(index) : pool.price_oracle();
+      }
+      ```
+      Reference: [CurveEmaExtension.sol#L93-L95](https://github.com/PeggyJV/cellar-contracts/blob/4faacd442fefe1d4d2b39182ad7ed2bc67786d6b/src/modules/price-router/Extensions/Curve/CurveEMAExtension.sol#L93-L95)
+  
+      However, the price returned by a curve pool’s `price_oracle()` function is not using the base asset’s decimals, since pools using [USDT](https://etherscan.io/address/0x390f3595bca2df7d23783dfd126427cceb997bf4#readContract) or [USDC](https://etherscan.io/address/0x7f86bf177dd4f3494b841a37e810a34dd56c829b#readContract) as their base asset return a price with 18 decimals, when these tokens both have 6 decimals. This can lead to incorrect price values for pools with a base asset that doesn't use 18 decimals.
+      **Remediations to Consider**
+  
+      It seems like all prices returned from a curve pool’s `price_oracle()` function uses 18 decimals, so instead of using the base asset’s decimals, 18 could be used instead. Alternatively the price’s decimals could be set as a value in the `extensionStorage` struct for each asset.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Error Recovery</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4ee541dfd3b494c7eaabd047c73750242f27fe09</field>
+    <field name="content">
+      ## [M-2] Share Price Oracles may not be properly initialized
+  
+      The `ERC4626SharePriceOracle.sol`’s `initialize()` function a Chainlink `automationForwarder` is setup by registering a upkeep address for the contract by calling `registerUpkeep()` on Chainlink’s registrar. It is assumed, however, that an upkeep will be registered when that call is made, but there are cases where registration is not accepted immediately and is set to pending, awaiting approval.
+  
+      ```solidity
+      uint256 upkeepId;
+      if (_shouldAutoApprove(s_triggerRegistrations[params.triggerType], sender)) {
+        s_triggerRegistrations[params.triggerType].approvedCount++;
+        upkeepId = _approve(params, hash);
+      } else {
+        uint96 newBalance = s_pendingRequests[hash].balance + params.amount;
+        s_pendingRequests[hash] = PendingRequest({admin: params.adminAddress, balance: newBalance});
+      }
+      ```
+      Reference: [AutomationRegistrar2_1.sol#L419-L426](https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/automation/v2_1/AutomationRegistrar2_1.sol#L419-L426)
+  
+      When a registration is set to pending, it will return a value of zero for its `upkeepId` and when the forwarder is queried form the registry with that id, the zero address is returned. This means that if the registrar’s upkeep limit has been reached or if automatic upkeep approval is shut off, then share price oracles can not properly set a `automationForwarder`, as calls to the registry’s `registerUpkeep()` will be set to pending, ending up with `automationForwarder` being set to the zero address, and no way of setting it to the proper address once the registration is approved.
+  
+      Currently the upkeep auto approve limit on mainnet is 500, which can be increased or decreased, but if reached then all new registrations will have to await approval, preventing proper initialization of share price oracles.
+  
+      **Remediations to Consider**
+  
+      Add a function that can only be called if `initialize()` was called, but the `automationForwarder` address is still not set, and have this function verify a passed in upkeep id to ensure the id corresponds to the upkeep that was registered, then query the `automationForwarder` from the registry using that upkeep id. This will allow share price oracles to be setup if their upkeep isn’t immediately approved. Also consider emitting an event if the `automationForwarder` isn’t set when initialized.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">370c0b1934b5581e816722f04016631f4572ee93</field>
+    <field name="content">
+      ## [L-1] Identifiers not updated for Frax Lend adaptors
+  
+      The code was altered for the `DebtFTokenAdaptor`, `DebtFTokenAdaptorV1`, `CollateralFTokenAdaptor` and the `CollateralFTokenAdaptorV1` contracts. In order for these updated adaptors to be added to the registry they need to return a unique value from their `identifier()` function to distinguish them from the current Frax Lend adaptors.
+  
+      ```solidity
+      /**
+       * @notice Trust an adaptor to be used by cellars
+       * @param adaptor address of the adaptor to trust
+       */
+      function trustAdaptor(address adaptor) external onlyOwner {
+          if (isAdaptorTrusted[adaptor]) revert Registry__AdaptorAlreadyTrusted(adaptor);
+          bytes32 identifier = BaseAdaptor(adaptor).identifier();
+          if (isIdentifierUsed[identifier]) revert Registry__IdentifierNotUnique();
+          isAdaptorTrusted[adaptor] = true;
+          isIdentifierUsed[identifier] = true;
+      }
+      ```
+      Reference: [Registry.sol#L309-L315](https://github.com/PeggyJV/cellar-contracts/blob/b3fea6777f0c20ab5f89316708f84bc65a70e04e/src/Registry.sol#L305-L315)
+  
+      However, the `identifer()` function has not been updated along with these changes.
+  
+      **Remediations to Consider**
+  
+      Update the version number in each of the updated Frax Lend adaptor’s `identifier()` functions to allow them to be added to the registry.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">4d93fbe4f25cd1586f2b27ef4d79ad6c0c09d175</field>
+    <field name="content">
+      ## [L-2] Missing event when initializing share price oracle
+  
+      In `ERC4626SharePriceOracle.sol`’s `initialize()` function, a chainlink upkeep address is registered, and the corresponding `automationForwarder` address is set. There is no event emitted for this call, and the generated `upkeepId` returned when registering an upkeep is not emitted, and may be useful to know the `upkeepId` that corresponds to the share price oracle’s `automationForwarder`, as useful data in Chainlink’s registrar and registry is mapped to an `upkeepId`.
+  
+      **Remediations to Consider**
+  
+      Add an event that emits the `upkeepId` and `automationForwarder` address, when `initialize()` is called.
+    </field>
+  </item>
