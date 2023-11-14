@@ -1,0 +1,120 @@
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3f72cdae2d8742291bb59c239cfc8ecbaa9c97ba</field>
+    <field name="content">
+      ## [L-1] Missing sanity check for `disputeBlocks`
+  
+      In SpokeConnector’s constructor, `disputedBlocks` can be set to a value smaller than `minDisputedBlocks`, as there is no explicit check preventing this. 
+  
+      An appropriate check is done in the RootManager’s constructor, but omitted in the SpokeConnector’s constructor.
+  
+      **Remediations to Consider**
+  
+      Consider adding a check that reverts when `disputedBlocks` is smaller than `minDisputedBlocks`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ed41b1f2a996ebe09bc78914c941fcf07dca62c3</field>
+    <field name="content">
+      ## [Q-1] Some functions can be set to `external` instead of `public`
+  
+  
+      The following functions can be set to `external` instead of `public` as they are not being called within the contract: 
+  
+      In RootManager.sol:
+  
+      - `setMinDisputeBlocks`
+      - `setDisputeBlocks`
+      - `setDelayBlocks`
+      - `removeConnector`
+      - `discardRoot`
+  
+      In SpokeConnector.sol:
+  
+      - `addSender`
+      - `removeSender`
+      - `addProposer`
+      - `removeProposer`
+      - `setMinDisputeBlocks`
+      - `setDisputeBlocks`
+      - `setDelayBlocks`
+      - `setRateLimitBlocks`
+      - `removePendingAggregateRoot`
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c450171ab261252770b8e8918281c07b01cf4f8f</field>
+    <field name="content">
+      ## [Q-2] Unused events and errors
+  
+      The following events and errors are declared but not used anywhere in the code.
+  
+      In RootManager.sol:
+  
+      - `event RootPropagated`
+      - `error RootManager_slowPropagate__OldAggregateRoot()`
+  
+      In SpokeConnector.sol:
+  
+      - `error SpokeConnector_send__OptimisticModeOn()`
+  
+      Consider removing those declarations from the code.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">36f18a0b655e5ef7469227871c0f797856752681</field>
+    <field name="content">
+      ## [Q-3] Use of events could be simplified
+  
+      In `RootManager.sol`, `finalize()`, and `dequeue()` functions emit two different events with some shared arguments for the same logic execution. This could be optimized by unifying these two events from each function into one.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Comments</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8d9fe7e490db7bb9d2010dad9c9af2040351f227</field>
+    <field name="content">
+      ## [Q-4] Inaccurate comment
+
+      In `RootManager.sol` the function `dequeue()` has the following comment
+  
+      ```solidity
+      /**
+       * ...
+       * @dev Reverts if no verified inbound roots are found.
+       * ...
+       */
+      ```
+  
+      However, the function does not revert and returns the current root and count for that case.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Centralization</field>
+    <field name="content">
+      ## [I-1] Optimistic mode increases centralization risks
+  
+      By enabling the optimistic mode, the propagation of messages to domains will completely bypass the native AMBs of each domain. A unique off-chain agent will be responsible for proposing aggregate roots and propagating them to every domain, concentrating the on-chain aggregation into one centric point. 
+  
+      Watchers will still execute their duties as protection against fraudulent messages but, at the moment, all the execution and safeguard controls will be centralized in Connext’s off-chain components.
+    </field>
+  </item>
+  
