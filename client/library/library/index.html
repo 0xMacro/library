@@ -6,7 +6,7 @@
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MKM5N3F"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
-  
+
 <div class="pt-12 flex flex-col items-center">
   <img class="h-12" src="/library/logo-t.png" />
   <div class="text-center">
@@ -15,18 +15,23 @@
     <p class="mt-4">Check them out below.</p>
   </div>
 
-  <section class="mt-12 max-w-2xl">
+  <section class="mt-12 max-w-2xl px-2">
     <h2 class="text-2xl font-bold">Public Audits</h2>
     <p class="mt-2">A curated list of audits  we have worked with in the past, available to the community.</p>
 
     <div class="mt-4 space-y-8">
 
-      <for let="audit of collection('audit-works')">
+      {{var sortedAudits = AuditMarkdown.sortByAndTransformDate(collection('audit-works'))}}
+      <for let="audit of sortedAudits">
 
         <div class="overflow-hidden border dark:border-0">
           <div class="px-4 py-5 sm:px-6 bg-white dark:bg-gray-900">
             <h3 class="flex items-center text-lg font-medium leading-6 text-gray-900 dark:text-white">
-              {{audit.title}}
+              <span class="justify-center w-7">
+                <if cond="audit.logo">
+                  <img class="h-5" src="/library/vendor/{{audit.logo}}" />
+                </if>
+              </span> {{audit.title}}
             </h3>
             <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
               {{audit.subtitle}}
@@ -88,7 +93,7 @@
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
                 <dt class="text-sm font-medium text-gray-500">Report Link</dt>
                 <dd class="Copy --sm mt-1 text-sm text-gray-900 dark:text-gray-100 sm:col-span-2 sm:mt-0">
-                  {{AuditMarkdown.renderIssueContent(audit.report)}}
+                  <a href="{{audit.report}}" target="_blank">Full Report</a>
                 </dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:py-5 sm:px-6">
