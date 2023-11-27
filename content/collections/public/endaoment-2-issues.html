@@ -1,0 +1,180 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b21fc7976ba4149edac4ae0d6ead2795daa883f8</field>
+    <field name="content">
+      ## [L-1] Aave may activate the referral program
+  
+      Currently Aave’s referral program is inactive for both V2 and V3 contracts, but could be re-implemented pending a governance vote. Currently in `AaveUSDCPortfolio` and `AaveV3USDCPortfolio` the `referalCode` used is set to `0`, which indicates no referral, but in the case where the program starts back up, there may be a benefit to setup a `referalCode` for Endaoment and use on deposits.
+  
+      **Remediations to Consider**
+  
+      Add a permissioned function that allows setting the `referalCode` in case Endaoment would benefit from referring entities to use Aave.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4f1b8848d2683d81f7570c2f9f53133f579b8090</field>
+    <field name="content">
+      ## [Q-1] Repeated `asset` checks in constructor
+  
+      In each of the yield bearing portfolio contracts, in their constructor there are two checks to ensure that the `baseToken` is equal to the set `asset` and the asset returned by _getAsset.
+  
+      ```solidity
+      // The `asset` should match the base token, which means we expect it to be USDC. So we
+      // execute some checks to make sure inputs are consistent.
+      if (address(baseToken) != _getAsset(_receiptAsset)) revert AssetMismatch();
+      if (address(baseToken) != asset) revert AssetMismatch();
+      ```
+      Reference: [CompoundV3USDCPortfolio.sol#L52-L55](https://github.com/endaoment/endaoment-contracts-v2-private/blob/13b8a2405574c29bfd1a88af76cc147ace4bb8ed/src/portfolios/CompoundV3USDCPortfolio.sol#L52-L55)
+  
+      However, both are equivalent checks, as the value of `asset` is set in the constructor of Portfolio.sol using the `_getAsset()` function.
+  
+      ```solidity
+      asset = _getAsset(_receiptAsset);
+      ```
+      Reference: [Portfolio.sol#L120](https://github.com/endaoment/endaoment-contracts-v2-private/blob/13b8a2405574c29bfd1a88af76cc147ace4bb8ed/src/Portfolio.sol#L120)
+  
+      **Remediations to Consider**
+  
+      In each of the yield bearing portfolio contracts, remove one of these checks, as they are duplicates.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-2] Use `baseToken` rather than casting `asset` to an `ERC20`
+  
+      Since there is a constraint for each of the yield bearing portfolio contracts that the `asset` equals the `baseToken` in their constructors, any call to transfer the `asset` tokens can directly be called on `baseToken` instead of casting `asset` to an `ERC20`.
+  
+      **Remediations to Consider**
+  
+      Replace casting `asset` to an `ERC20` and use `baseToken` instead.
+  
+    </field>
+    <field name="response">
+        Casting `asset` is more idiomatic than using `baseToken` directly
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6a9e1ff7f21c4fb6fe27742878e0dd186db6f2eb</field>
+    <field name="content">
+      ## [Q-3] Portfolio contracts are limited to Ethereum
+  
+      Endaoment is deployed on both Ethereum and Base, however the yield bearing portfolios use constant address values for the protocols they interact with that are deployed on Ethereum. In the case where a portfolio would want to be deployed on another chain, like Base, it would require a duplicate contract to be added to the repo with a differing protocol address, if the address of the protocol varies from the Ethereum version. If these addresses were immutable and initialized in the constructor, then these portfolio contracts could be deployed on any desired chain that the portfolio’s protocol supports.
+  
+      **Remediations to Consider**
+  
+      Replace constant protocol addresses with immutable values and initialize the values in their constructors.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2a817a46b3c52ecc3cac04fd5dfd91ee8ea530f1</field>
+    <field name="content">
+      ## [Q-4]  Incomplete NatSpec documentation
+
+      In the following instances, the NatSpec documentation is incomplete:
+  
+      1. In `YearnUSDCPortfolio`, `convertToUsdc()` and `convertToYvUsdc()` are missing `@param` and `@return` fields
+      2. In `CompoundUSDCPortfolio`, `compoundExchangeRateCurrent()` is missing the `@return` field
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [G-1] Can reduce the number of ERC20 transfer calls
+  
+      Whenever a entity either deposits or redeems, it invokes  multiple ERC20 transfers to the treasury due to AUM fees as well as deposit/redemption fees. Each of these costs the entity extra gas to execute, and could be reduced.
+  
+      **Remediations to Consider**
+  
+      Portfolio could be reworked to transfer the sum of the AUM fees and the deposit/redeem fees to reduce the number of external transfer calls. Alternatively instead of transferring fees immediately, keep track of fees owed and allow a permissioned function to take the owed fees and reset the tracked value, while making sure to subtract the fees owed from any calculations relating to the total supply of funds in the portfolio, while ensuring rebasing tokens are handled appropriately. Doing either would reduce the gas cost for users interacting with the protocol.
+  
+    </field>
+    <field name="response">
+        Prefer separation of AUM and deposit/redemption code and fee assessment
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [G-2] Unnecessary asset check in `_maxCap()`
+  
+      In `Portfolio.sol`, the function `_maxCap()` checks the registry to ensure the asset is the same as the registry’s baseToken.
+  
+      ```solidity
+      function _checkCap() internal virtual {
+          if (asset != address(registry.baseToken())) revert BadCheckCapImplementation();
+          if (totalAssets() > cap) revert ExceedsCap();
+      }
+      ```
+      Reference: [Portfolio.sol#L295-L298](https://github.com/endaoment/endaoment-contracts-v2-private/blob/13b8a2405574c29bfd1a88af76cc147ace4bb8ed/src/Portfolio.sol#L295-L298)
+  
+      However, in each of the 5 portfolio contracts in scope, it is ensured in the constructor that the `asset` is the same as the registry’s `baseToken`, since both of which are `immutable`, the check is unnecessary.
+  
+      ```solidity
+      if (address(baseToken) != asset) revert AssetMismatch();
+      ```
+      Reference: [AaveUSDCPortfolio.sol#L56](https://github.com/endaoment/endaoment-contracts-v2-private/blob/13b8a2405574c29bfd1a88af76cc147ace4bb8ed/src/portfolios/AaveUSDCPortfolio.sol#L56)
+  
+      **Remediations to Consider**
+  
+      In each of the portfolio contracts in scope, override the `_checkCap()` function, removing the unnecessary check, reducing gas costs.
+
+    </field>
+    <field name="response">
+        Check was recommended in last audit, so we’ll leave it in place
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">30c48fe4c1c0e16c83156f9e45f422c106dc02d5</field>
+    <field name="content">
+      ## [G-3] Use `baseToken` value in `_checkCap()`
+  
+      In `Portfolio.sol`, the `_checkCap()` function queries the registry for the `baseToken` and checks to see if the portfolios `asset` is the same.
+  
+      ```solidity
+      function _checkCap() internal virtual {
+          if (asset != address(registry.baseToken())) revert BadCheckCapImplementation();
+          if (totalAssets() > cap) revert ExceedsCap();
+      }
+      ```
+      Reference: [Portfolio.sol#L295-L298](https://github.com/endaoment/endaoment-contracts-v2-private/blob/13b8a2405574c29bfd1a88af76cc147ace4bb8ed/src/Portfolio.sol#L295-L298)
+  
+      However, the `baseToken` value in the registry is immutable, so it cannot change, and in `Portfolio.sol`’s constructor it sets the value of `baseToken` by querying it from the registry, so the value of `baseToken` will be the same as the value queried from the registry, but costs less gas to use as it isn’t an external call.
+  
+      **Remediations to Consider**
+  
+      Use `baseToken` instead of `registry.baseToken()`  in `_checkCap()` to prevent an external call, and reduce gas cost.
+    </field>
+  </item>
+  
