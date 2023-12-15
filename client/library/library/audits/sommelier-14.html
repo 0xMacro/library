@@ -1,0 +1,65 @@
+<page
+  clientName="Sommelier"
+  reportDate="Dec 15, 2023"
+  auditTitle="Sommelier A-14"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="f8f4b51e9d2bfa5c2b4627b031ecc28f47ccf0a4"
+  repoCommitHashFinal="5be96d5e226ac693b29a04912e8511a1356564e9"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team periodically between November 23, 2023 to December 13, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      ### Trusted entities:
+
+      - Strategists:
+          - User that can manage positions in the cellar. Is trusted to act in the benefit of the cellars shareholders, and earns a portion of the cellars profits. All actions made by the strategist are approved by Sommelier governance. Has the ability to shutdown the cellar in case of an emergency.
+      - Governance:
+          - Sommelier governance responsible for approving strategist actions, as well as adding or removing trusted positions for cellars.
+      - Multisig:
+          - Approves adaptors and positions in the registry as well as adding and updating price feeds for assets in the priceRouter. Can pause cellars, which can be unpaused by governance.
+      - Chainlink:
+          - Responsible for a majority of pricing, as well as running automated tasks for share price oracles. It is trusted that the data it provides is correct.
+
+      The goal of the system is to to have checks and balances for each permissioned action, where if any one permissioned entity acts malicious, the others can remedy the situation, requiring multiple points failure before it can negatively impact users.
+
+      ### Assumptions:
+
+      - There is an assumption that permissioned entities will not act maliciously.
+      - It is assumed that the protocols that a cellar interacts with wont act maliciously, and will operate as intended.
+
+      ### Accepted Risks:
+
+      - Share price varies based on market conditions, and there is no guarantee share price will increase.
+      - Protocols that a cellar interacts with could be exploited. There are ways trusted entities can help mitigate the effect of such exploits, but there may be a negative effect on share price and a loss of funds for users.
+  </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+      7007ed798f720c912d6dac25a5d57ce56d7db0fa8e36859a4ad5ca3afd03c4af  src/modules/adaptors/Curve/CurveAdaptor.sol
+      555a9ca4cfc7e5c2ab482c40dac50f055240f31e087e4588055fcc5f96164142  src/modules/adaptors/Curve/CurveHelper.sol
+      4f3627e4a6db9af71bafc38aca6c0e6b6b2f5912e0895cf625da036d77d1a9fa  src/modules/price-router/Extensions/Curve/Curve2PoolExtension.sol
+      c231a1e23bdb5ad52bec7a45c3556e34c843ab81a19ff222b6be6b13c0165654  src/modules/price-router/Extensions/Curve/CurveEMAExtension.sol
+      93591aee6545b25971deb581f00437da66c85e96c7a517125f0865a3dc6638f7  src/modules/adaptors/Convex/ConvexCurveAdaptor.sol
+      6e349d899bda75d2488b610477df5275fd1f1bffaf8325b5df915984e7c8feb8  src/modules/withdraw-queue/SimpleSolver.sol
+      82ecc2848af2427f9565ae90bce9ff346ef620a148259246be6f9c035dd66b81  src/modules/withdraw-queue/WithdrawQueue.sol
+      32a435b666990d0363ad4f088593b478e1a865e1eeb458d44cd083ef32e17472  src/modules/adaptors/ERC20Adaptor.sol
+      efd65b3d4edbea6100bb5b183d660e5f0cf53939e936785f8f7f39af59f1ca3b  src/modules/SimpleSlippageRouter.sol
+    </template>
+
+  </content-for>
+</page>
