@@ -1,0 +1,204 @@
+<page title="Working with Contract Storage" layout="/chapters/_layout.html">
+
+<div class="prose">
+<template type="learn-evm-markdown">
+
+# Working with Contract Storage
+
+In the previous chapters we learned how to work with the <chapter href="evm/stack">stack</chapter> and how to work with <chapter href="evm/memory">memory</chapter>.
+
+In this chapter, we finally introduce the most fun and useful one of all: **storage**.
+
+We will cover:
+
+- How storage works
+- Storage use cases
+- How Solidity uses storage
+- Storage gas costs
+
+## How storage works
+
+Unlike the stack and memory, **contract storage** is data that persists beyond the execution of a single EVM function call and parent transaction.
+
+SLOAD and SSTORE are the only opcodes that interact with storage. They do what we’d expect: load the value for a given key, and write a value to a given key, respectively.
+
+### Storage layout
+
+Storage is structured differently than memory or the stack. While memory is like an infinitely long string, storage is like a *key-value database*, where:
+
+- A storage **key** is a 32 byte (256-bit) value.
+- A storage **value** is also a 32 byte (256-bit) value.
+
+A **storage key** can be *any* 256-bit value. Unlike memory’s <chapter href=”evm/memory#accessing-memory”>practical limitations</chapter>, storage does not have *any* limitations on what keys you can use.
+
+A **storage value** can only ever be exactly 32 bytes (256 bits).
+
+- If you want to store a *smaller* value, then you may have to waste some space. This is the reason [Solidity implements storage compaction](https://docs.soliditylang.org/en/v0.8.17/internals/layout_in_storage.html#layout-of-state-variables-in-storage), to allow your contracts to use the same storage slot for multiple smaller values, saving gas.
+- If you want to store a *larger* value, then you will need to use more than one storage slot. This is what Solidity does for arrays and for strings longer than 32 bytes.
+
+The combination of a key and value is often referred to as a **storage slot**.
+
+### Access
+
+Each contract has its own **isolated storage key namespace**. This means two contracts can use the same storage key without conflict.
+
+When running code on chain, **nothing else can access a contract’s storage other than the contract itself**. Specifically, *other* contracts **cannot** access a contract’s storage slots directly.
+
+If you want your contract’s storage to be readable or writeable by other contracts, your contract will need to expose functions to do so. While it’s common to give external contracts ways to read and potentially modify your contract’s storage, it also introduces security risks, and should be done thoughtfully and carefully.
+
+### Types
+
+Like most of the EVM, storage keys and values do not have “types”; the EVM treats them as raw 32-byte values of zeroes and ones. It’s up to *your contract* to assign meaning to them.
+
+## Storage use cases
+
+Storage is used for data that we want to persist across multiple transactions, since the contents of the stack and memory are lost at the end of a transaction. Below are some common use cases.
+
+- **Numbers**
+    - We’ll often put numbers into storage that represent things like account balances and counters.
+    - The max numerical value of a uint256 is astronomically large, so almost any use cases for numbers we have will fit in a single uint256.
+    - Sometimes we can use a smaller unsigned integer, like using a `uint32` for a situation where we know our value won’t overflow the type.
+- **Timestamps**
+    - Time in blocks is measured by seconds, so Unix timestamps are a natural use case.
+    - Solidity’s `block.timestamp` (or equivalently, the TIMESTAMP EVM opcode) is a Unix timestamp, so we can store timestamps as numbers
+    - We regularly need to persist timestamps in storage. For example, we may want to enforce that a user can only withdraw once per 24 hours, in which case we would record their last withdrawal time on every withdrawal.
+    - When choosing what size of unsigned integer to use for storing your timestamp, here are some considerations to keep in mind:
+        - Unless you’re doing bit packing, using a `uint256` will result in the [lowest gas costs](https://ethereum.stackexchange.com/questions/3067/why-does-uint8-cost-more-gas-than-uint256).
+        - If you *are* bit packing and want to use a `uint32`, be aware that **a uint32 timestamp only supports time up to February 7, 2106**. Once this date is reached, the uint32 will overflow. You should either use a larger value, or write extra logic to take this case into account, or ensure your project won’t live beyond that time.
+- **Addresses**
+    - We’ll frequently want to use storage for things like the contract owner’s address or the address of another token
+    - Since an address is 20 bytes, storing an address will leave 12 bytes leftover. This allows us to pack other data into a slot along with an address, such as a timestamp or boolean flags.
+
+## How Solidity uses storage
+
+Most Solidity contracts will have storage variables defined at the top level. These will be put into slots, starting from slot `0`. Consecutive items will generally be packed as efficiently as possible. For example:
+
+```jsx
+uint32 a;
+uint64 b;
+uint128 c;
+uint64 d;
+uint256 e;
+```
+As shown in the animation below, `a`, `b`, and `c` fit together in a single slot. `d` does not fit, and so it starts a new slot. `e` does not fit, so it starts a new slot.
+
+<video controls>
+    <source src="/vid/storage/Diagram1.mp4" type="video/mp4">
+</video>
+
+As mentioned above, we can often pack additional data into a slot with an address. The first three storage variables would fit into a single slot. Since an address takes more than half a slot, we can’t fit two addresses in one slot.
+
+```jsx
+address a;
+uint32 b;
+uint32 c;
+address d;
+address e;
+```
+
+<video controls>
+    <source src="/vid/storage/Diagram2.mp4" type="video/mp4">
+</video>
+
+Some familiar programming constructs, like strings and arrays, exist in languages that compile to EVM (such as Solidity and Vyper), but these constructs are not native to the EVM itself. Below, we’ll talk about how Solidity implements them.
+
+- **Structs**
+    - Since the fields of a struct are defined in advance and fixed, the Solidity compiler can write logic to pack and extract multiple struct fields from a single storage slot
+    - The rules for how Solidity packs struct fields are the same as how Solidity packs top-level storage variables, with the exception that a struct always starts in a new slot and the data after the struct always starts in a new slot.
+- **Strings**
+    - Storing large chunks of data on-chain is prohibitively expensive, but for small strings, using storage is sometimes appropriate. A single storage slot, which we know has 32 bytes, can hold 8 to 32 characters of UTF-8 encoded text.
+    - We’ll learn more about how Solidity implements Strings in a later chapter.
+- **Arrays**
+    - Solidity handles storage management very differently depending on whether the array is fixed or dynamic length, so we discuss those cases separately
+    - Fixed-length arrays (also called “static arrays”)
+        - If your array items are smaller than 16 bytes, the Solidity compiler will accomplish gas savings by packing multiple items into one slot.
+        - Accounting for packing, we can calculate at compile time how many slots the array will take up. Therefore, storage slots are allocated consecutively.
+    - Dynamic arrays
+        - For a dynamic array, Solidity can’t store the data starting at the next available storage slot, because we don’t know the size of the array and need to put other storage data after it
+        - Instead, Solidity stores the array size in the next available storage slot, and stores the array contents starting at `slot(p)`. From here, items are packed according to the same rules as for fixed length arrays.
+    - We’ll learn more about how Solidity implements arrays in a later chapter.
+- **Mappings**
+    - Similar to dynamic arrays, the length of the mapping is not known at compile time, so the data can’t be stored “in-sequence”
+    - The data for mapping at slot `p` at the key `key` can be found at `slot[keccak256(H(k, p)]` where `H` is a function that pads `k` and then concatenates with `p`.
+    - An important thing to note about Solidity’s mappings is that there is no way in the language to access all the keys. Other languages (e.g. Java, Python) store a mapping’s keys in memory, making them easy and cheap to access. In Solidity, preserving the list of keys would require writing them to storage, which is costly in terms of gas as we’ll learn below.
+    - We’ll learn more about how Solidity implements mappings in a later chapter.
+
+## Storage Gas Costs
+
+The gas costs of operating on storage are much higher than operations on storage and memory. This makes sense, because changes to storage need to be persisted to disk by *all* nodes in the network after the transaction completes. In general, gas costs are higher for operations that require nodes to do more computation or use more resources.
+
+<aside>
+
+Note: we are highlighting the important bits, to give insight into the EVM and help you write more gas efficient code, but this is not intended to be a comprehensive reference.
+
+The full details are in the [Ethereum Yellowpaper](https://ethereum.github.io/yellowpaper/paper.pdf), which is kept up to date but is also very dense. You can find a more comprehensible breakdown [here](https://github.com/wolflo/evm-opcodes/blob/main/gas.md#a7-sstore).
+
+</aside>
+
+To give a sense of how expensive the storage operations are:
+
+- `SSTORE` operations can be up to 7,000 times more expensive than commonly used opcodes like `ADD` or `PUSH1`, and
+- `SLOAD` operations can be up to 700 times more expensive.
+
+Storage operations are more expensive than stack and memory operations because changes to storage need to be persisted on disk by all nodes in the network. While not the only factor, real-world cost to node operators is one of the primary factors used when deciding gas costs.
+
+Note that to save space, node implementations of the storage data structure don’t retain keys when the value is 0. If the node’s storage data structure has no entry for a given key in a mapping, then the value is assumed to be 0. 
+
+### Gas Cost Terms
+
+The EVM’s rules for gas costs of storage operations are fairly involved, so let’s first define some relevant terms:
+
+- **Touch:** After a storage slot is written to (via `SSTORE`) or read from (via `SLOAD`), that slot is considered “touched” for the rest of the transaction. Note that here and throughout this chapter, “transaction” refers to the full external transaction initiated by an EOA.
+- **Empty slot**: A storage slot with zero as its value at the start of the transaction.
+- **Cold slot:** A storage slot that has not been touched yet *in the current transaction*.
+- **Warm slot:** A storage slot that has been touched within the current transaction.
+- **Cold touch cost:** The `2100` gas cost when touching a storage slot for the first time in a transaction
+- **Clean slot:** A slot whose current value matches the slot’s value at the start of the transaction. In other words, this slot either (a) has not been written to in this transaction, or (b) the last value written to the slot matches the value it originally had at the start of the transaction.
+- **Dirty slot:** A slot whose current value differs from the slot’s value at the start of the transaction.
+- **Static / Dynamic cost:** All opcodes have a fixed static cost that is charged any time they are used, and *some* opcodes have a dynamic cost.
+    - Example: `ADD` has a fixed cost of 3. It has no dynamic cost.
+    - Example: `MSTORE` has a static cost of 3, and a dynamic cost based on how much **memory expansion** (TODO: Link to chapter section) is necessary.
+    - Example: `SSTORE` has a fixed cost of 0, and a dynamic cost based on context, such as whether the slot is warm/cold, whether it’s clean/dirty, etc.
+- **Gas refund:** In some cases, an SSTORE operation has an associated refund (usually, there is a refund when the operation reduces the work required of nodes). Note that, as of the London hard fork, `SSTORE` is the only opcode that can have a nonzero gas refund.
+
+The total cost of the instruction is: `static_cost + dynamic_cost - gas_refund`. As mentioned above, the `static_cost` is always 0 for the two storage-related opcodes, so we omit `static_cost` in the discussion below.
+
+---
+
+Now that we have some terms defined, let’s cover some useful, common gas cost scenarios.
+
+### Highest Cost: Writing a non-zero value to an empty slot
+
+Writing a non-zero value to a key that previously had a 0 value is the most expensive operation. The total cost is `22,100` gas, which includes the 2100 cold touch cost.
+
+This gas cost of this operation is high because nodes now have to allocate space on disk for the key-value pair.
+
+### High Cost: Writing a new, non-zero value to a non-empty slot
+
+When writing to a non-empty slot, the gas cost is lower, because the node running your code has already allocated space on disk for the slot.
+
+If the slot is “clean”, writing a non-zero value costs `2900` gas if the slot is warm, and `5000` if it’s cold.
+
+### Medium Cost: Reading from cold slots
+
+Reading from a cold storage slot costs 2100 gas. Interestingly, this cost is the same even if that key has *never* been written to.
+
+### Medium Cost: Updating a value to zero
+
+When we change a non-zero value to zero for a clean slot, the `dynamic_cost` is the same as when writing a new non-zero value to a non-empty slot (`2900` if the slot is warm, `5000` if cold). ***However***, in this case there is also a `gas_refund` of `4800`. If the slot is cold, the gas cost of the SSTORE will be `5000 - 4800 = 200`. If the slot is warm, the gas cost of the SSTORE actually ends up being negative, but since the slot is warm, there must have been an earlier SSTORE whose cost will more than outweigh the negative value.
+
+### Low Cost: Reading from a warm slot
+
+If a storage slot is “warm”, i.e. has already been read or written to in the current transaction, the cost of reading from it is only 100 gas.
+
+### Low Cost: Writing the same value to a slot
+
+If a slot is “warm” and the value we’re writing to the slot matches what’s currently there, the gas cost is 100. Note that since the cost to *read* from a warm slot is also 100, reading a slot to check that the value is different before writing to it will not result in any gas savings.
+
+### Low Cost: Changing a value back to its original value
+
+Another scenario that results in a gas refund is when we change a storage value back to its original value from the start of the transaction.
+
+Suppose the value in our slot at the start of the transaction is 17. We use an `SSTORE` to change the value to 18 - as discussed above, the cost of this `SSTORE` is `5000`, because the slot is cold. Now suppose we use another `SSTORE` to change the value *back* to 17 - the `dynamic_cost` is 100, and there is a `gas_refund` of `4800`, which almost entirely cancels out the cost of the first `SSTORE`.
+</template>
+</div>
