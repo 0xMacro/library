@@ -11,10 +11,11 @@ In this chapter, we finally introduce the most fun and useful one of all: **stor
 
 We will cover:
 
-- How storage works
-- Storage use cases
-- How Solidity uses storage
-- Storage gas costs
+1. <toc>How storage works</toc>
+2. <toc>Simple use cases for storage</toc>
+3. <toc>Struct Packing in Solidity</toc>
+4. <toc>Advanced use cases for storage in Solidity</toc>
+5. <toc>Storage gas costs</toc>
 
 ## How storage works
 
@@ -50,9 +51,9 @@ If you want your contract’s storage to be readable or writeable by other contr
 
 Like most of the EVM, storage keys and values do not have “types”; the EVM treats them as raw 32-byte values of zeroes and ones. It’s up to *your contract* to assign meaning to them.
 
-## Storage use cases
+## Simple use cases for storage
 
-Storage is used for data that we want to persist across multiple transactions, since the contents of the stack and memory are lost at the end of a transaction. Below are some common use cases.
+Storage is used for data that we want to persist across multiple transactions, since the contents of the stack and memory are lost at the end of a transaction. Below are some common use cases for simple types.
 
 - **Numbers**
     - We’ll often put numbers into storage that represent things like account balances and counters.
@@ -69,16 +70,18 @@ Storage is used for data that we want to persist across multiple transactions, s
     - We’ll frequently want to use storage for things like the contract owner’s address or the address of another token
     - Since an address is 20 bytes, storing an address will leave 12 bytes leftover. This allows us to pack other data into a slot along with an address, such as a timestamp or boolean flags.
 
-## How Solidity uses storage
+## Struct Packing in Solidity
 
 Most Solidity contracts will have storage variables defined at the top level. These will be put into slots, starting from slot `0`. Consecutive items will generally be packed as efficiently as possible. For example:
 
 ```jsx
-uint32 a;
-uint64 b;
-uint128 c;
-uint64 d;
-uint256 e;
+contract MyContract {
+    uint32 a;  // First slot
+    uint64 b;  // First slot
+    uint128 c; // First slot
+    uint64 d;  // Second slot
+    uint256 e; // Third slot
+}
 ```
 As shown in the animation below, `a`, `b`, and `c` fit together in a single slot. `d` does not fit, and so it starts a new slot. `e` does not fit, so it starts a new slot.
 
@@ -86,27 +89,31 @@ As shown in the animation below, `a`, `b`, and `c` fit together in a single slot
     <source src="/vid/storage/Diagram1.mp4" type="video/mp4">
 </video>
 
-As mentioned above, we can often pack additional data into a slot with an address. The first three storage variables would fit into a single slot. Since an address takes more than half a slot, we can’t fit two addresses in one slot.
+We can often pack additional data into a slot alongside an address. The first three storage variables would fit into a single slot. Since an address takes more than half a slot, we can’t fit two addresses in one slot.
 
 ```jsx
-address a;
-uint32 b;
-uint32 c;
-address d;
-address e;
+contract MyContract {
+    address a; // First slot
+    uint32 b;  // First slot
+    uint32 c;  // First slot
+    address d; // Second slot
+    address e; // Third slot
+}
 ```
 
 <video controls>
     <source src="/vid/storage/Diagram2.mp4" type="video/mp4">
 </video>
 
-Some familiar programming constructs, like strings and arrays, exist in languages that compile to EVM (such as Solidity and Vyper), but these constructs are not native to the EVM itself. Below, we’ll talk about how Solidity implements them.
+## Advanced use cases for storage in Solidity
+
+Some familiar programming constructs, like strings and arrays, exist in languages that compile to EVM (such as Solidity and Vyper), but these constructs are not native to the EVM itself. Below is a brief introduction into how Solidity implements them.
 
 - **Structs**
     - Since the fields of a struct are defined in advance and fixed, the Solidity compiler can write logic to pack and extract multiple struct fields from a single storage slot
     - The rules for how Solidity packs struct fields are the same as how Solidity packs top-level storage variables, with the exception that a struct always starts in a new slot and the data after the struct always starts in a new slot.
 - **Strings**
-    - Storing large chunks of data on-chain is prohibitively expensive, but for small strings, using storage is sometimes appropriate. A single storage slot, which we know has 32 bytes, can hold 8 to 32 characters of UTF-8 encoded text.
+    - Storing large chunks of data on-chain can be prohibitively expensive, but for small strings, using storage is sometimes appropriate. A single storage slot, which we know has 32 bytes, can hold 8 to 32 characters of UTF-8 encoded text.
     - We’ll learn more about how Solidity implements Strings in a later chapter.
 - **Arrays**
     - Solidity handles storage management very differently depending on whether the array is fixed or dynamic length, so we discuss those cases separately
