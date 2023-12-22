@@ -1,15 +1,44 @@
 <page
   clientName="Infinex"
-  reportDate="October 27, 2023"
+  reportDate="December 22, 2023"
   auditTitle="Infinex A-1"
   auditVersion="1.0.0"
-  repoUrl="https://github.com/infinex-io/infinex-contracts"
+  repoUrl="https://github.com/infinex-io/infinex-platform-testnet"
+  repoUrl2="https://github.com/infinex-io/infinex-contracts"
   layout="/library/audits/_layout.html" 
-  repoCommitHash="c80660d5ff16f92ebfa9815c1100707c78643672"
-  repoCommitHashFinal="4af67b895031fac265fa27d58366bf3d024bf218"
+  customRepoInfo
+  customReviewInfo
+  passwordEncrypt="env:PAGE_PASS_INFINEX"
 >
   <content-for name="schedule">
     The security audit was performed by the Macro security team from December 11, 2023 to December 20, 2023.
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Initial Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>c80660d5ff16f92ebfa9815c1100707c78643672</code>
+      </li>
+      
+      <li>
+        <b>Final Repository:</b>
+        <a href="{{page.repoUrl2}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>4af67b895031fac265fa27d58366bf3d024bf218</code>
+      </li>
+     
+    </ul>
   </content-for>
 
   <content-for name="spec">
