@@ -1,0 +1,115 @@
+<page
+  clientName="Infinex"
+  reportDate="October 27, 2023"
+  auditTitle="Infinex A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-io/infinex-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="c80660d5ff16f92ebfa9815c1100707c78643672"
+  repoCommitHashFinal="4af67b895031fac265fa27d58366bf3d024bf218"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from December 11, 2023 to December 20, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      ### Actors
+
+    - Infinex Governance:
+        
+        Is a DAO that has control over upgrading the factory contract, setting the opt-in implementation upgrades for accounts, updating to new configuration beacons that account owners can opt into, and can set the trading and withdrawal fees for accounts.
+        
+    - Active Browser Keys:
+        
+        Can directly trade and modify collateral on accounts, initiate withdrawals to whitelisted addresses, remove active browser keys, and reject inactive browser keys. It can also upgrade the account to the value set in the `ProtocolConfigBeacon` by Infinex Governance and opt-in to update the values related to the circle bridge parameters to the values set by governance in the same beacon contract. 
+        
+        Along with an MFA key signature: can set and remove MFA and recovery keys, set an emergency withdrawal address, set allowlisted withdrawal addresses, as well as withdraw assets to any L2 address, or bridge over to any L1 address.
+        
+        Along with a Recovery key signature: can add browser keys.
+        
+    - Inactive Browser Keys:
+        
+        Can directly trade and modify collateral on accounts, and can be made into an active browser key either by another active browser key or after a 1-week delay period with a recovery key. 
+        
+    - MFA Keys:
+        
+        All actions require an active browser key as mentioned above.
+        
+    - Recovery Keys:
+        
+        Can set an inactive browser key that will activate after a 1-week delay, as well as the actions requiring an active browser key as mentioned above.
+        
+    - Emergency withdrawal address:
+        
+        Set by an active browser key and MFA key signature. Can directly withdraw and/or bridge assets from the account at any time. This should be set with caution and only trusted addresses should be used.
+        
+    - Whitelisted Address:
+        
+        Set by an active browser key and MFA key signature. Allows an active browser key to withdraw and/or bridge assets to this address. 
+        
+
+    ### External Assumptions:
+
+    - It is assumed that Synthetix governance and market owners will not act maliciously.
+    - It is assumed that Infinex governance will set fair trading and withdrawal fees, and that all account upgrades and beacon updates that accounts can opt into will be beneficial for users.
+
+    ### Account Assumptions
+
+    - Active account keys have control over the state and funds of the deployed accounts they control aside from trading and withdrawal fees. Governance can update the upgrades to accounts, and the configuration beacons, but account owners can choose to opt into them or not.
+    - Until accounts are deployed, given that the address of the deployed accounts is fully controlled by the factory, Infinex Governance has the power to change the deployed account logic; before the full flow of an account’s creation is completed in both chains (L1 deposit account and L2 trading account), it is assumed that no account implementation or beacon configurations changes would be applied.
+    - Different key actors are designed to avoid a single point of failure if any of the keys were compromised. Users can decide how to design their account’s access control and potentially centralize all guards into a singleton key if this is added to all roles.
+    - User’s funds are safe within the account as long as keys are not compromised, however, there are guards against single failure points to remove, recover, and add keys with different restrictions as described in the *Actors section.*
+
+    ### Accepted Risks:
+
+    - Users trading with these accounts will be interacting with SynthetixV3 Perps markets. These positions can be volatile, and these accounts have no safeguard to protect against losses or collateral liquidation. Users trade at their own risk.
+    - Potential exploits in Synthetix could cause account users to lose money or have assets locked.
+
+    ### Fees
+
+    - Current account implementations have a bounded withdrawal fee of 50 token units, typically USDC. Other tokens withdrawn from the account would get a max of 50 token units fee deducted as well.
+    - Trading fees are capped at 50 bps of the trade size delta.
+  </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts.
+    </p>
+
+    <template type="file-hashes">
+      2277f530319366611d337e66756ec20b7bf4a6a56c3e9ac2f522a3c5ecb82107  src/Initialisable.sol
+      52a11388223bd670d5b75dc7380fd34105bb54217db96849d7149b272880dd6a  src/accounts/AccountFactory.sol
+      411db5525adf6bd664ffba112abbf137193bd5de7c5508238db3b71602c61328  src/accounts/implementations/AccountImplementationBase.sol
+      c2595669901651f2bae6a4c1bbf6ce3c9f98afbcca76a16b5a6e4ea6f01f6a78  src/accounts/implementations/DepositAccountImplementation.sol
+      13b67bb396ad1765867f9d967b8f86516d41c0b7f38ddbb9c8d2c938284d3940  src/accounts/implementations/TradingAccountImplementation.sol
+      4b24e55a1c48583a70c8ca0a72dc922b8c6c529b47ac9cce61c2879d05659817  src/accounts/storage/AccountFactoryStorage.sol
+      d381da3afacb35e7a388311ad179bc4f5ee5d2546c59276c88ea3d3b7371dbc3  src/accounts/storage/AccountStorage.sol
+      98ae2febf488271da9249d259914a0472c298509d3d0828d8103de087cd14ec7  src/beacons/InfinexProtocolConfigBeacon.sol
+      f6dabf1b35997f6355f652bee0e459e1f68a309fd97f969ac60c22b481e91360  src/beacons/InfinexProtocolConfigBeaconStorage.sol
+      4bb06a2bd0ddecaeae4b04fbffa8273e8ac220d74940e7b4a2290fe46d173e51  src/beacons/SynthetixInformationBeacon.sol
+      6ddd29b689874e12f4cf7cf5d77da064b7a4b33a6558701de03c14965c244e53  src/beacons/SynthetixInformationBeaconStorage.sol
+      628d93fd59b2534972976146ad0742a4b98bfb865675da99988c77b107b60ea8  src/circle-interfaces/IReceiver.sol
+      c4a8e78bc08b386da57cb245c1926aefc2c820c004a7d5760d085c691ee30b23  src/circle-interfaces/ITokenMessenger.sol
+      83feafa7eecb1d114429ac2b36ea0ba0fdc794d9b1ec079f64e677316479a008  src/interfaces/accounts/IAccountFactory.sol
+      4b23a6ea7f695d1ccf4ca70b402d7e4938d1c704f5d4cbdbb2625cf68f0eea90  src/interfaces/accounts/IAccountImplementationBase.sol
+      ec99d9936f7f516410dca6bc005c9639caa0c5561c83ead3e1eb5a16565dcd82  src/interfaces/accounts/IDepositAccountImplementation.sol
+      cc6bc64f30bbd634927cdae235cf6dca4298ad3fb685f563fccc423a28bb9f3b  src/interfaces/accounts/ITradingAccountImplementation.sol
+      8e90ac597ea1669fbccd322bcfd09fd91e48745aabefe4c8e0766c1ed6e58ffa  src/interfaces/beacons/IInfinexProtocolConfigBeacon.sol
+      e88f90acc0deb7f73ed02829f11585e553f6dcd87623e7bc9e97f6b028d38ce6  src/interfaces/beacons/ISynthetixInformationBeacon.sol
+      bade07357deecabc4af2162ce7083939a288fc1d64c71fcc8f1d6ae750187dab  src/libraries/DecimalScaling.sol
+      a87750806f5b6245abfcc31ca57522dce5e23f71145af6f3c541f531b11a1bf7  src/libraries/Error.sol
+      d285a54340b6cb3b06ebdc3296358b88d8491046e1d192d226c6bc811664229e  src/libraries/FeeCalculator.sol
+      eba26f4438bfed08734f400677c46cc3011cc2100282687370e6be445b7097cd  src/relayer/ERC2771Context.sol
+      e0dcedf381e527360829876245c60727ec6095439ef8668e331c3faa31b459e9  src/relayer/ERC2771ContextStorage.sol
+      a4630c5a99af659b9728d93cd8ad377f08aed80a752048201512810a0c88bdc7  src/relayer/ERC2771Forwarder.sol
+    </template>
+
+  </content-for>
+</page>
