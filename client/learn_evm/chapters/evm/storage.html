@@ -11,13 +11,13 @@ In this chapter, we finally introduce the most fun and useful one of all: **stor
 
 We will cover:
 
-1. <toc>How storage works</toc>
-2. <toc>Simple use cases for storage</toc>
-3. <toc>Struct Packing in Solidity</toc>
-4. <toc>Advanced use cases for storage in Solidity</toc>
-5. <toc>Storage gas costs</toc>
+1. <toc>How Storage Works</toc>
+2. <toc>Simple Use Cases for Storage</toc>
+3. <toc>Storage Slot Packing in Solidity</toc>
+4. <toc>Advanced Use Cases for Storage in Solidity</toc>
+5. <toc>Storage Gas Costs</toc>
 
-## How storage works
+## How Storage Works
 
 Unlike the stack and memory, **contract storage** is data that persists beyond the execution of a single EVM function call and parent transaction.
 
@@ -51,7 +51,7 @@ If you want your contract’s storage to be readable or writeable by other contr
 
 Like most of the EVM, storage keys and values do not have “types”; the EVM treats them as raw 32-byte values of zeroes and ones. It’s up to *your contract* to assign meaning to them.
 
-## Simple use cases for storage
+## Simple Use Cases for Storage
 
 Storage is used for data that we want to persist across multiple transactions, since the contents of the stack and memory are lost at the end of a transaction. Below are some common use cases for simple types.
 
@@ -70,7 +70,7 @@ Storage is used for data that we want to persist across multiple transactions, s
     - We’ll frequently want to use storage for things like the contract owner’s address or the address of another token
     - Since an address is 20 bytes, storing an address will leave 12 bytes leftover. This allows us to pack other data into a slot along with an address, such as a timestamp or boolean flags.
 
-## Struct Packing in Solidity
+## Storage Slot Packing in Solidity
 
 Most Solidity contracts will have storage variables defined at the top level. These will be put into slots, starting from slot `0`. Consecutive items will generally be packed as efficiently as possible. For example:
 
@@ -107,7 +107,7 @@ contract MyContract {
 
 Solidity also packs struct members in a similar way. For more details, see <chapter>solidity/storage-slots</chapter>.
 
-## Advanced use cases for storage in Solidity
+## Advanced Use Cases for Storage in Solidity
 
 Some familiar programming constructs, like strings and arrays, exist in languages that compile to EVM (such as Solidity and Vyper), but these constructs are not native to the EVM itself. Below is a brief introduction into how Solidity implements them.
 
