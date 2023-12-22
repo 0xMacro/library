@@ -3,11 +3,12 @@
   reportDate="December 22, 2023"
   auditTitle="Infinex A-1"
   auditVersion="1.0.0"
-  repoUrl="https://github.com/infinex-io/infinex-platform-testnet"
-  repoUrl2="https://github.com/infinex-io/infinex-contracts"
+  repoUrl2="https://github.com/infinex-io/infinex-platform-testnet"
+  repoUrl="https://github.com/infinex-io/infinex-contracts"
   layout="/library/audits/_layout.html" 
   customRepoInfo
   customReviewInfo
+  repoCommitHashFinal="4af67b895031fac265fa27d58366bf3d024bf218"
   passwordEncrypt="env:PAGE_PASS_INFINEX"
 >
   <content-for name="schedule">
@@ -18,8 +19,8 @@
     <ul>
       <li>
         <b>Initial Repository:</b>
-        <a href="{{page.repoUrl}}" target="_blank">
-          {{page.repoUrl.split('/').slice(-1)[0]}}
+        <a href="{{page.repoUrl2}}" target="_blank">
+          {{page.repoUrl2.split('/').slice(-1)[0]}}
         </a>
       </li>
       <li class="break-words break-all">
@@ -29,7 +30,7 @@
       
       <li>
         <b>Final Repository:</b>
-        <a href="{{page.repoUrl2}}" target="_blank">
+        <a href="{{page.repoUrl}}" target="_blank">
           {{page.repoUrl.split('/').slice(-1)[0]}}
         </a>
       </li>
