@@ -57,11 +57,11 @@ Storage is used for data that we want to persist across multiple transactions, s
 
 - **Numbers**
     - We’ll often put numbers into storage that represent things like account balances and counters.
-    - The max numerical value of a uint256 is astronomically large, so almost any use cases for numbers we have will fit in a single uint256.
+    - The max numerical value of a `uint256` is astronomically large, so almost any use cases for numbers we have will fit in a single `uint256`.
     - Sometimes we can use a smaller unsigned integer, like using a `uint32` for a situation where we know our value won’t overflow the type.
 - **Timestamps**
     - Time in blocks is measured by seconds, so Unix timestamps are a natural use case.
-    - Solidity’s `block.timestamp` (or equivalently, the TIMESTAMP EVM opcode) is a Unix timestamp, so we can store timestamps as numbers
+    - Solidity’s `block.timestamp` (or equivalently, the `TIMESTAMP` EVM opcode) is a Unix timestamp, so we can store timestamps as numbers
     - We regularly need to persist timestamps in storage. For example, we may want to enforce that a user can only withdraw once per 24 hours, in which case we would record their last withdrawal time on every withdrawal.
     - When choosing what size of unsigned integer to use for storing your timestamp, here are some considerations to keep in mind:
         - Unless you’re doing bit packing, using a `uint256` will result in the [lowest gas costs](https://ethereum.stackexchange.com/questions/3067/why-does-uint8-cost-more-gas-than-uint256).
@@ -166,7 +166,7 @@ The EVM’s rules for gas costs of storage operations are fairly involved, so le
     - Example: `ADD` has a fixed cost of 3. It has no dynamic cost.
     - Example: `MSTORE` has a static cost of 3, and a dynamic cost based on how much **memory expansion** (TODO: Link to chapter section) is necessary.
     - Example: `SSTORE` has a fixed cost of 0, and a dynamic cost based on context, such as whether the slot is warm/cold, whether it’s clean/dirty, etc.
-- **Gas refund:** In some cases, an SSTORE operation has an associated refund (usually, there is a refund when the operation reduces the work required of nodes). Note that, as of the London hard fork, `SSTORE` is the only opcode that can have a nonzero gas refund.
+- **Gas refund:** In some cases, an `SSTORE` operation has an associated refund (usually, there is a refund when the operation reduces the work required of nodes). Note that, as of the London hard fork, `SSTORE` is the only opcode that can have a nonzero gas refund.
 
 The total cost of the instruction is: `static_cost + dynamic_cost - gas_refund`. As mentioned above, the `static_cost` is always 0 for the two storage-related opcodes, so we omit `static_cost` in the discussion below.
 
@@ -192,7 +192,7 @@ Reading from a cold storage slot costs 2100 gas. Interestingly, this cost is the
 
 ### Medium Cost: Updating a value to zero
 
-When we change a non-zero value to zero for a clean slot, the `dynamic_cost` is the same as when writing a new non-zero value to a non-empty slot (`2900` if the slot is warm, `5000` if cold). ***However***, in this case there is also a `gas_refund` of `4800`. If the slot is cold, the gas cost of the SSTORE will be `5000 - 4800 = 200`. If the slot is warm, the gas cost of the SSTORE actually ends up being negative, but since the slot is warm, there must have been an earlier SSTORE whose cost will more than outweigh the negative value.
+When we change a non-zero value to zero for a clean slot, the `dynamic_cost` is the same as when writing a new non-zero value to a non-empty slot (`2900` if the slot is warm, `5000` if cold). ***However***, in this case there is also a `gas_refund` of `4800`. If the slot is cold, the gas cost of the `SSTORE` will be `5000 - 4800 = 200`. If the slot is warm, the gas cost of the `SSTORE` actually ends up being negative, but since the slot is warm, there must have been an earlier `SSTORE` whose cost will more than outweigh the negative value.
 
 ### Low Cost: Reading from a warm slot
 
