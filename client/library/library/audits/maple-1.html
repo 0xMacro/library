@@ -1,0 +1,51 @@
+<page
+  clientName="Maple Finance"
+  reportDate="December 15, 2023"
+  auditTitle="Maple Finance A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/maple-labs/maple-core-v2-private"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="a2cf31c51e3efa44ae17ef5ab4bfc1ea2581c112"
+  repoCommitHashFinal=""
+  passwordEncrypt="env:PAGE_PASS_MAPLE_1"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from November 27, 2023 to December 11, 2023.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available public documentation and provided docs for the specific release.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts.
+    </p>
+
+    <template type="file-hashes">
+        449d783d0e35f05eb0632dcb5f5a4c84ed0178de79fd5878ddb40dcd1754f5a4  modules/globals/contracts/MapleGlobals.sol
+        9e41c80e34c9654f9c36b73d64019e14310dc5b8cd8dc9056447cde37a79c814  modules/fixed-term-loan/contracts/MapleLoan.sol
+        e9958312abff174b3a66d88d75d1eb2fdae8d1764fd6ec8d4d10ec2e9e03922c  modules/fixed-term-loan/contracts/MapleLoanFactory.sol
+        6aeb640d1596775b3d20df42b7418fb74cdcb850b8c1e6ec4774bcb2f5a1ad0b  modules/fixed-term-loan/contracts/MapleLoanV502Migrator.sol
+        7a9429ae3022113e27250216a6a73ff85de66ca1bb18979393ce2ecd1854ea25  modules/withdrawal-manager-cyclical/contracts/MapleWithdrawalManager.sol
+        40692debf738632d8fc67cb3ee4f2fcfd21477a63e38715b7fb45d4728153ac6  modules/withdrawal-manager-cyclical/contracts/MapleWithdrawalManagerInitializer.sol
+        917e6bab44c1d62202c62a23932fd31cad8c75a441bec9b598b67a87c3629f60  modules/pool/contracts/MaplePoolManager.sol
+        d3ed4259a4fe93c1d3a0c30dfc782f51767164fd4c4ce86da2893e88079cde0b  modules/pool/contracts/MaplePoolDeployer.sol
+        bc2ce955a74c77841b6518a1e3edf8401f4eb3aee2d987e52d45bb220122c970  modules/pool/contracts/proxy/MaplePoolManagerInitializer.sol
+        515ac543af75401de5b2eb892dba497c87d2772b2a53994e97d1ab704934f8b3  modules/pool/contracts/proxy/MaplePoolManagerMigrator.sol
+        9a9b420c5e9d1945f4a357a4040c00085cd210db44e10cd4a4a486f1e6130123  modules/pool/contracts/proxy/MaplePoolManagerStorage.sol
+        80c550a681809f19e55563dda05c33bc61124ba7d1d56440d298166d434db461  modules/pool/contracts/proxy/MaplePoolManagerWMMigrator.sol
+        6a20e9a8a59fe6e7f6d0698bc99e5d8db00132360ddfd29693feb462e6ddf095  modules/pool-permission-manager/contracts/MaplePoolPermissionManager.sol
+        48e1bc5cbf2e5bbac9bb46ce120d99219833d4c578394a2b72b2cb27127c1d29  modules/pool-permission-manager/contracts/proxy/MaplePoolPermissionManagerInitializer.sol
+        f6170f0d8e0f749c7342347b35474295ae199ce504992e896cf69796cae65bb0  modules/pool-permission-manager/contracts/proxy/MaplePoolPermissionManagerStorage.sol
+        553db6caa8fe3ed727e53aecdc204e37f589241c6e840304cca34f7fe7a1acfa  modules/withdrawal-manager-queue/contracts/proxy/MapleWithdrawalManagerFactory.sol
+        48ff3f48b01ff3b9b40f80b55b9f817b4715452a456cf0658507a16ee6d0150f  modules/withdrawal-manager-queue/contracts/proxy/MapleWithdrawalManagerInitializer.sol
+        d24307f9400c8208247915c0753b06b29c34bb43911b8ad3c893f95be6630720  modules/withdrawal-manager-queue/contracts/proxy/MapleWithdrawalManagerStorage.sol
+        68b73210a1b7d82629f9f5ca28b9fabb7e383616329140acd86181720d08e1c5  modules/withdrawal-manager-queue/contracts/MapleWithdrawalManager.sol
+    </template>
+
+  </content-for>
+</page>
