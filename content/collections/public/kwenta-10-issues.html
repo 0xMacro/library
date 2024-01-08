@@ -1,0 +1,134 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">959d1fbc35cc6a8dee15d7e2ba0e131d1791dae8</field>
+    <field name="content">
+      ## [M-1] `fulfillOracleQuery` does not send value to update the oracle
+
+      `Engine.sol` inherits [EIP7412](https://eips.ethereum.org/EIPS/eip-7412), which allows for on-demand, off-chain data retrieval, allowing a caller to provide pricing data to update an oracle using an off-chain verified source in order to deal with pricing as required.
+  
+      ```jsx
+      function fulfillOracleQuery(
+          address EIP7412Implementer,
+          bytes calldata signedOffchainData
+      ) external payable {
+          IERC7412(EIP7412Implementer).fulfillOracleQuery(signedOffchainData);
+      }
+      ```
+      Reference: [EIP7412.sol#L14-L22](https://github.com/Kwenta/smart-margin-v3/blob/788e26369d872c0747b572dfef35efdc0561f21e/src/utils/EIP7412.sol#L14-L22)
+  
+      However, EIP7412 implementations can expect a native token fee to be paid with the call to `fulfillOracleQuery()`, and would otherwise revert with `error FeeRequired(**uint** amount)` if the required fee isn’t provided with the call.
+  
+      Since `EIP7412.sol`’s `fulfillOracleQuery()` is `payable` but does not pass on the calls `msg.value`, it would not be able to call any EIP7412 implementation that expects a fee.
+  
+      **Remediations to Consider**
+  
+      Send `msg.value` along with the call to `EIP7412Implementer:fulfillOracleQuery()`.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1b20f3b916884854b7fcb3236b08b1a99917ec62</field>
+    <field name="content">
+      ## [L-1] Can deposit ETH to non-existent account
+  
+      In `Engine.sol`’s `depositEth()` function, it takes an `_accountId` and updates the deposited balance associated with the account with the value sent into the call. This deposited ETH is used to pay for the execution of conditional orders. There is, however, no check to ensure the `_accountId` passed in exists or is owned by the sender, which could potentially lead to balances sent to the wrong `_accountId`. This could lead to the ETH sent in being taken by someone that creates an account with that id, since `_accountId`’s that are greater than or equal to `type(uint128).max/2` anyone can create an account with that id and withdraw the ETH accidentally deposited to that account.
+  
+      ```solidity
+      function createAccount(uint128 requestedAccountId) external override {
+          FeatureFlag.ensureAccessToFeature(_CREATE_ACCOUNT_FEATURE_FLAG);
+  
+          if (requestedAccountId >= type(uint128).max / 2) {
+              revert InvalidAccountId(requestedAccountId);
+          }
+  
+          IAccountTokenModule accountTokenModule = IAccountTokenModule(getAccountTokenAddress());
+          accountTokenModule.safeMint(ERC2771Context._msgSender(), requestedAccountId, "");
+  
+          Account.create(requestedAccountId, ERC2771Context._msgSender());
+  
+          emit AccountCreated(requestedAccountId, ERC2771Context._msgSender());
+      }
+      ```
+      Reference: [AccountModule.sol#L57-L70](https://github.com/Synthetixio/synthetix-v3/blob/main/protocol/synthetix/contracts/modules/core/AccountModule.sol#L57-L70)
+  
+      **Remediations to Consider**
+  
+      Ensure an account exists before depositing ETH for that account. This prevent ETH being accidentally being lost or stolen in case of a mistake. 
+      Also consider limiting deposits to owners or permissioned users of the account to further ensure the ETH deposited is going to the correct account.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">43116650b4d7958b243dcb8aadfb921f9c2383a3</field>
+    <field name="content">
+      ## [Q-1] Unnecessary use of `payable`
+  
+      In `Engine.sol’`s `withdrawEth()` and `_withdrawEth()` the caller address is cast as `payable`.
+  
+      ```jsx
+      address payable caller = payable(_msgSender());
+      ```
+  
+      Reference: [Engine.sol#L173](https://github.com/Kwenta/smart-margin-v3/blob/788e26369d872c0747b572dfef35efdc0561f21e/src/Engine.sol#L173)
+  
+      ```jsx
+      function _withdrawEth(
+          address payable _caller,
+          uint128 _accountId,
+          uint256 _amount
+      ) internal {
+          if (_amount > ethBalances[_accountId]) revert InsufficientEthBalance();
+  
+          // decrement the ETH balance of the account prior to transferring ETH to the caller
+          ethBalances[_accountId] -= _amount;
+  
+          (bool sent,) = _caller.call{value: _amount}("");
+  
+          if (!sent) revert EthTransferFailed();
+      }
+      ```
+      Reference: [Engine.sol#L186-L199](https://github.com/Kwenta/smart-margin-v3/blob/788e26369d872c0747b572dfef35efdc0561f21e/src/Engine.sol#L186-L199)
+  
+      However, the transfer of native tokens uses a low level call rather than the functions casting an address to payable provides.
+  
+      **Remediations to Consider**
+  
+      Don’t cast the address as payable as it is not required.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      ## [I-1] The `maxExecutorFee` fee will likely be consumed when not using a trusted executor
+  
+      In `Engine.sol’`s `execute()` function, the caller can set the `_fee` they would like to receive for executing the conditional order. This set `_fee` is only limited by the users `maxExecutorFee` that was signed with the conditional order, when verifying if the order can execute.
+  
+      ```solidity
+      // verify fee does not exceed the max fee set by the conditional order
+      if (_fee > _co.maxExecutorFee) return false;
+      ```
+      Reference: [Engine.sol#L527-L528](https://github.com/Kwenta/smart-margin-v3/blob/788e26369d872c0747b572dfef35efdc0561f21e/src/Engine.sol#L527-L528)
+  
+      This means that as long as conditions to execute the order are met, the fee paid to the executor can, and will likely, be set to equal the `maxExecutorFee`. In the case where the order requires a `trustedExecutor`, then there may be logic setup to determine a fair `_fee` to charge, but that depends on the `trustedExecutor` set.
+  
+      This means that users may end up spending more fees than the fair execution cost when a conditional order is executed. To help remedy this, users should consider using a trusted executor that will charge a fair fee, rather than allowing anyone to execute the order and risk being charged the max amount.
+    </field>
+    <field name="response">
+        This is understood and is an acceptable trade-off for more fee accuracy when the executor is trusted: No change
+    </field>
+  </item>
+  
