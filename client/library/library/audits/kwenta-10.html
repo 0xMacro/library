@@ -1,0 +1,60 @@
+<page
+  clientName="Kwenta"
+  reportDate="December 6, 2023"
+  auditTitle="Kwenta A-10"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kwenta/smart-margin-v3"
+  repoCommitHash="e57ea5235c9f6d1fecd0017b77e54f80bf3a63af"
+  repoCommitHashFinal="43116650b4d7958b243dcb8aadfb921f9c2383a3"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from November 20, 2023 to November 22, 2023.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    ### Entities
+
+    - Users: Owners of a SynthetixV3 PerpsMarket account NFT, which give ownership and control of positions and collateral, as well as ability set specific permissions to other addresses for the account.
+    - Delegates: Addresses that are given permission by an account owner to execute orders or sign conditional orders on behalf of the account owner.
+    - Executors: Execute signed conditional orders once conditions are met and receive a conditional order fee. There are two types of executor
+        - TrustedExecutor: This is an executor that is trusted to only execute a conditional order if conditions are met. Conditions are likely verified off-chain, so there is no guarantee all conditions are met when an order is attempting to be executed.
+        - Normal Executor: Can be anyone, but the conditions set by the order are verified on-chain before execution of the order.
+
+    ### Trust Model
+
+    - Users that sign conditional orders trust that the order will be executed reasonably soon after the conditions are met, this may not be the case as there may not be executors taking orders at any given time, or gas costs could theoretically exceed conditional order fees.
+    - If a trusted executor is used, there is trust that they only execute the order when conditions are met.
+    - Any delegates given permission to execute conditional orders are trusted to act in the interest of the account owner.
+
+    ### Accepted Risks
+
+    - Synthetix could be exploited, potentially causing users funds to be lost.
+    </template>
+  
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    a366633aef8723cc5d29751155b61d31abbad1a7bf45a2c1325e3f8d5464d561  src/Engine.sol
+    97c6c9699361566d9e1674afca93c25a8cd169b2e4f2e588094efbcc8928b5e9  src/interfaces/IEngine.sol
+    93db551010ae28d88eef34edf7722e381e6c32c696346a312259d2037938b930  src/libraries/ConditionalOrderHashLib.sol
+    e0f0f2c5dbb73ece7cc7eb634040b75a5c20863afe0b9b103bedf745f5827829  src/libraries/SignatureCheckerLib.sol
+    b8f38b8dde803484e8d424c8a4b823abe65fab5acf7b2d394f54e9b9232225ea  src/utils/EIP712.sol
+    bd905a2bfa4aa3b497423b484fbeafc17b56b2db1ca483f0eb4a3735e635c47e  src/utils/EIP7412.sol
+      </template>
+</content-for>
+
+</page>
