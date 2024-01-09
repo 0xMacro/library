@@ -1,0 +1,64 @@
+<page
+  clientName="towns"
+  reportDate="November 28, 2023"
+  auditTitle="Towns A-5"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/HereNotThere/harmony"
+  repoCommitHash=" "
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_TOWNS"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from August 28, 2023 to September 6, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the HNT team.</li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within <i>contracts/src/diamond/</i> repository directory:</p>
+
+  <template type="file-hashes">
+  387da5bc236b0e8fd58a49f4a9719616684518b5161245165e730650db480e9d  ./src/towns/entitlements/IEntitlement.sol
+  228f64ca66cae4d35bb4d73df83c34a8013226efb05253d26a2af69a35436201  ./src/towns/entitlements/token/ITokenEntitlement.sol
+  73a8f7398b37f6d65e03e0406720c314822eeb9275b50c438ba3400f7108bf52  ./src/towns/entitlements/token/TokenEntitlement.sol
+  2399008d4d4bc921facb9e6f0999c1fcbbfe1e74bf98909797d90fbc920b19c4  ./src/towns/entitlements/user/UserEntitlement.sol
+  309d9ed17b7251c4b010335740f2313136bf07b47c9146769f816fdf2451ba9d  ./src/towns/facets/Entitled.sol
+  b58597abc6a12a18dcdc6d350c94d5c3189efa3dff28a3235c10ac0f0818e28d  ./src/towns/facets/Permissions.sol
+  cbfd14996214a67965124b6ba5919249f6ddd839163d859d82af96929fcf484a  ./src/towns/facets/architect/ITownArchitect.sol
+  3896222e07908f5997c9dafc44639a135cbf8f6c34ce4dc22928e6de1efc0960  ./src/towns/facets/architect/TownArchitect.sol
+  e49d2de80ee55ae09d96ba39b636fe2650a3d7e5de63fb1c545b42e5abdd0163  ./src/towns/facets/architect/TownArchitectBase.sol
+  5b92f3ee5a01e34b6247c5fdc25a72ddfb096c723fa84a0a5bd925c459d5bddf  ./src/towns/facets/architect/TownArchitectService.sol
+  7c1fe68453e8950ccee6da11abc5ffd5489315c94111107e7fdcdbb291ac2a24  ./src/towns/facets/architect/TownArchitectStorage.sol
+  93f594f0f0e35154cbf1f838e361030722a5c6614e9e75c1a676c5ade399f396  ./src/towns/facets/channels/ChannelBase.sol
+  9fdeb958e9b5eb98258277749a8a66d12dcf3024186a32b709877edbd409fa8b  ./src/towns/facets/channels/ChannelService.sol
+  4855142c3f3f7a9c3fcac48ba46d33472a320320cf4095e71a28e496e57df9a4  ./src/towns/facets/channels/ChannelStorage.sol
+  e62373b8f33f3fef5f21c8c812b17db9b6427edf25647ca8b88a7f5b856d1c79  ./src/towns/facets/channels/Channels.sol
+  0039f8a1e38eedb6a1df1a33f261eb1929000267a2ee51dde0e0b6dfb1cc926d  ./src/towns/facets/channels/IChannel.sol
+  c3b76671c4c7f698affb77a96be00c618a9e9346f8a0093190596b43dcfb4e1b  ./src/towns/facets/entitlements/Entitlements.sol
+  433f37e8186dcfe34c058a65d52856ce23c148d99a38dccdc1d2e41e1d3ec018  ./src/towns/facets/entitlements/EntitlementsBase.sol
+  17e3677de82c245d0db7aadafccf5de25ebb00ef50b657af84a12098cea5e43d  ./src/towns/facets/entitlements/EntitlementsService.sol
+  1490847e45a22d692f34828ee0d9bd381d415dcab9e334c34f2d9b80cf1a38cd  ./src/towns/facets/entitlements/EntitlementsStorage.sol
+  af9048b505231d0b6151cc2dd1db779d900740ef0f8d7ea26b1d5fe09225a066  ./src/towns/facets/entitlements/IEntitlements.sol
+  b797bbb97a67d08b3ad24c81ae998395f8abdde8869aeee1a0165a2fa40e8f46  ./src/towns/facets/gate/GateBase.sol
+  0413013112472782b3c144ecff4191f18e2563e7a5c3dbf3babd7f3db978d95b  ./src/towns/facets/gate/GateService.sol
+  6b6ac7bd42b75485812b27a7fdfabd0875fa8bf97399c930db195d7dfc1fba58  ./src/towns/facets/gate/GateStorage.sol
+  694e09b3879b75ad2afd77082188179dd3089d48cf927eb3d633b06fa20fc5bc  ./src/towns/facets/owner/ITownOwner.sol
+  fc3d12ca9217abb341b436f81f3b7e140373a1f77ce0715fd35deeabd1cab281  ./src/towns/facets/owner/TownOwner.sol
+  aa3d6a728aa53de83a7373a9b5554268048252f9a171a56429e7599a5945bef9  ./src/towns/facets/owner/TownOwnerBase.sol
+  e9c4f047d046bae56f3d4bd5a480d295bb0d857178ffa073f0acf72238be32c1  ./src/towns/facets/owner/TownOwnerStorage.sol
+  3804a2c778561f23f15c91098683ecc2930f2e6aaa3ded9985c478674ca41a91  ./src/towns/facets/proxy/TownProxy.sol
+  0724b4745c9f2456155ee7af55188511609a7dca35675147a7428e7f0e666daf  ./src/towns/facets/roles/IRoles.sol
+  136591e4b209128c260a6e71489040542343fbbf44a6a558bce97b3ecee13387  ./src/towns/facets/roles/Roles.sol
+  aeeff811f31ee1a40e27e33838d7d6c9b4158d018d7d0fa382943b9e92fa948c  ./src/towns/facets/roles/RolesBase.sol
+  7b057fe526c5c020d8d709972a7d6805fd8df72d706cb3a5bfd300fe8c0175b7  ./src/towns/facets/roles/RolesService.sol
+  17c6fbae87097f1f7983bd2224fc094f0af631fb4e5d964dfd22a4addb8cf910  ./src/towns/facets/roles/RolesStorage.sol
+  </template>
+
+</content-for>
+
