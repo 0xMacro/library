@@ -1,0 +1,37 @@
+<page
+  clientName="Endaoment"
+  reportDate="Nov 28, 2023"
+  auditTitle="Endaoment A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/endaoment/endaoment-contracts-v2-private"
+  repoCommitHash="fd2bd1a65925a5b63eb380faf7fa40917da52349"
+  passwordEncrypt="env:PAGE_PASS_ENDAOMENT_1"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from July 31, 2023 to Aug 2, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+    <li>Description of the system in operation.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    Endaoment is a nonprofit 501c3 and, as such, is legally required (through the Pension Protection Act of 2006) to have exclusive legal control over all contributions made to the system at any moment. Due to this, the contracts pose a centralization risk whereby the contract owner can shut down the portfolio; withdraw all assets; change the redemption, deposit, and AUM fees; and arbitrarily execute any function at any time. It is trusted that the owner will not abuse this power.
+  </template>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    0a77ca5578542d30c8da9733d77eb8f474975c3f8ef693dc4081cc81a5b28a63  src/portfolios/SingleTokenPortfolio.sol
+    ef349eb1f573ec7a8dae03abf53f4b80b4420a84e8da46a1772d9017c75e6f3e  src/Portfolio2.sol
+  </template>
+</content-for>
