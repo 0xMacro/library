@@ -1,0 +1,94 @@
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">afb6cfc0837e47e9e4fcb2732ab2ffe5b703e662</field>
+  <field name="content">
+    ## [Q-1] Follow Checks Effects and Interactions pattern
+
+    In `Zap.sol`’s `_zapOut()` function, there is a check to ensure the `_amount` is greater than the `_DECIMALS_FACTOR` to prevent all of _amount to be lost to precision when converting from `sUSDC`’s 18 decimals to `USDC`’s 6 decimals. However, this check is made after external calls are made and state has been changed, without mutating `_amount` in the process.
+
+    ```solidity
+    /// @notice prior to unwrapping, ensure that there
+    /// is enough $sUSDC to unwrap
+    /// @custom:example if $USDC has 6 decimals, and
+    /// $sUSDC has greater than 6 decimals,
+    /// then it is possible that the amount of
+    /// $sUSDC to unwrap is less than 1 $USDC;
+    /// this contract will prevent such cases
+    /// @dev if $USDC has 6 decimals, and $sUSDC has 18 decimals,
+    /// precision may be lost
+    if (_amount < _DECIMALS_FACTOR) {
+        revert InsufficientAmount(_amount);
+    }
+    ```
+
+    Reference: [Zap.sol#L212-L223](https://github.com/JaredBorders/zap/blob/dbc1978719b2859edd3597efbae555629b61d021/src/Zap.sol#L212-L223)
+
+    **Remediations to Consider**
+
+    Move this check to the top of the function to more closely follow the Checks, Effects, and Interactions pattern, and refund users more gas if this check fails during execution.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">d3daab2c8a4ed4c5f0c2bf491b8f23d6a0d13020</field>
+  <field name="content">
+    ## [G-1] Unnecessary referrer for zap buys or sales
+
+    In `Zap.sol`’s `_zapIn()` and `_zapOut()`, a referrer is passed in as a parameter and used in when either buying or selling `sUSDC` for `sUSD`. The intention of the referrer is to receive a portion of the fees of the spot market sale. However, in this case the assumption is that there will be no fees for this market, since the `minimumAmountReceived` is equal to the amount put in, meaning the sale will not execute unless there is a 1:1 exchange of `sUSD` and s`USDC`, and no fees are taken.
+
+    ```solidity
+    /// @notice buy $sUSDC with $sUSD
+    /// @dev call will result in $sUSDC minted/transferred
+    /// to the Zap contract
+    _SPOT_MARKET_PROXY.buy({
+        marketId: _SUSDC_SPOT_MARKET_ID,
+        usdAmount: _amount,
+        minAmountReceived: _amount,
+        referrer: _referrer
+    });
+    ```
+
+    Reference: [Zap.sol#L192-L200](https://github.com/JaredBorders/zap/blob/dbc1978719b2859edd3597efbae555629b61d021/src/Zap.sol#L192-L200)
+
+    When executing a SynthetixV3 spot market buy/sell, additional logic is executed if the passed in referrer is non-zero:
+
+    ```solidity
+    function _collectReferrerFees(
+        Data storage self,
+        uint128 marketId,
+        OrderFees.Data memory fees,
+        address referrer,
+        SpotMarketFactory.Data storage factory,
+        Transaction.Type transactionType
+    ) private returns (uint256 referrerFeesCollected) {
+        if (referrer == address(0)) {
+            return 0;
+        }
+
+        uint256 referrerPercentage = self.referrerShare[referrer];
+        referrerFeesCollected = fees.fixedFees.mulDecimal(referrerPercentage);
+
+        if (referrerFeesCollected > 0) {
+            if (Transaction.isSell(transactionType)) {
+                factory.synthetix.withdrawMarketUsd(marketId, referrer, referrerFeesCollected);
+            } else {
+                factory.usdToken.transfer(referrer, referrerFeesCollected);
+            }
+        }
+    }
+    ```
+
+    Reference: MarketConfiguration.sol#L520-L542
+
+    Since the fees will be zero, passing in `address(0)` as the referrer saves an unnecessary `SLOAD`, and some execution totalling to roughly 2400 gas.
+
+    **Remediations to Consider**
+
+    Do not accept a referrer, or use `address(0)` in `_zapIn()` and `_zapOut()` to save users a bit of gas. It is important to note that the referrer is also logged in the `SynthBought` event, which may be desired for referrers despite the additional gas cost.
+  </field>
+</item>
