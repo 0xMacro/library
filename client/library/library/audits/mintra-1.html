@@ -6,7 +6,6 @@
   repoUrl="https://github.com/mintra-marketplace/thirdweb_contracts"
   repoCommitHash="96f014facd5e236806611bfe45ace9cb9baa7038"
   layout="/library/audits/_layout.html"
-  passwordEncrypt="env:PAGE_PASS_MINTRA_1"
 >
 
 <content-for name="schedule">
@@ -21,7 +20,7 @@
 
   <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
   <template type="audit-markdown">
-    The Mintra marketpalce utilizes the following actors:
+    The Mintra marketplace utilizes the following actors:
     <ul>
         <li>Wizard: The wizard address is set in the constructor and is allowed to set the platform fee. The platform fee is capped at 3,69%</li>
         <li>Listing creators: Can update and cancel their listings. In addition, they can restrict their listings to approved buyers and can support different currencies for their listings.</li>
