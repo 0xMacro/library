@@ -1,0 +1,283 @@
+<item>
+    <field name="topic">Readability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">226d8dd829aa4336b967f35a29ba64400fd10e74</field>
+    <field name="content">
+        ## [Q-1] Rename contract to a more accurate name
+
+        **Reference**: [#L23](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L23)
+
+        The current contract name `MintraDirectListingsLogicStandalone` is quite long and can be shortened. In addition, the term `Logic` could imply the use of a Proxy, which is not the case for the current implementation. 
+
+        **Remediations to Consider**
+
+        Consider renaming the contract to a shorter name and remove the term `Logic`, e.g. rename to `MintraDirectListings`
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">4e8834319a64a50b4e2d130e0157c272f5c40bc3</field>
+    <field name="content">
+        ## [Q-2] Missing event for important state change
+        
+        **Reference**: [#L678](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L678)
+        
+        The function `setPlatformFeeBps` doesn’t emit an event, but it is recommended to emit an event for every state-changing function.
+        
+        **Remediations to Consider**
+        
+        Consider adding an appropriate event for above function.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="response">
+        Indexes are not needed for off-chain components.
+    </field>
+    <field name="content">
+        ## [Q-3] Not all events use `indexed` fields
+        
+        **Reference**: [#L32](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L32), [#L40](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L40), [#L51](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L51)
+        
+        Indexed fields allow off-chain components to quicker accessing them. The following events don’t use indexed fields:
+        
+        - `MintraNewSale`
+        - `MintraRoyaltyTransfered`
+        - `RoyaltyUpdated`
+        
+        **Remediations to Consider**
+        
+        Consider adding `indexed` keywords to above events where needed.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/mintra-marketplace/thirdweb_contracts/commit/8bab505e5d53e9c62ec9ed45327af3231185d232,https://github.com/mintra-marketplace/thirdweb_contracts/commit/a36862f0f295de34f245745edb144d2db43089bb</field>
+    <field name="content">
+        ## [Q-4] Refactor `RoyaltyUpdated` event
+        
+        **Reference**: [#L51](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L51)
+        
+        The `RoyaltyUpdated` event is declared as follows:
+        
+        ```jsx
+        event RoyaltyUpdated(address assetContract, uint256 royaltyAmount, address royaltyRecipient);   // @audit not royaltyAmount but royaltyBps
+        ```
+        
+        The event is lacking a `msg.sender` value which could be helpful to properly track the address of who updated the royalty. In addition, one of the arguments is named `royaltyAmount`, where e.g. `royaltyBps` is more appropriate, as the argument is referring to the bps rather than the actual calculated royalty amount.
+        
+        **Remediations to Consider**
+        
+        Consider refactoring the `RoyaltyUpdated` event to include above recommendations.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a8857d0109b0c63848c59dface5be9e6de3b1c59</field>
+    <field name="content">
+        ## [Q-5] Declare `platformFeeBpsMint` as a `constant`
+        
+        **Reference**: [#L57](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L57)
+        
+        It is recommended to declare variables that cannot be changed as constants. In addition, this saves gas as the variable is stored in the contract’s bytecode. 
+        
+        **Remediations to Consider**
+        
+        Consider adding the `constant` keyword to the `platformFeeBpsMint` variable declaration.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Readability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/mintra-marketplace/thirdweb_contracts/commit/89cb81b7d32104886fb2c84409b0e3bb47c684a7,https://github.com/mintra-marketplace/thirdweb_contracts/commit/27ec35ba44e40bcb41b2a182394413895c995235</field>
+    <field name="content">
+        ## [Q-6] Use constants instead of magic numbers
+        
+        **Reference**: [#L457](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L457), [#L647](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L647), [#L679](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L679)
+        
+        The following lines use the number `10000` instead of the declared constant `MAX_BPS`
+        
+        ```jsx
+        457:     require(_royaltyInBasisPoints >= 0 && _royaltyInBasisPoints <= **10000**, "Royalty not in range");
+        647:     royaltyAmount = (_price * royalties[_tokenAddress].basisPoints) / **10000**;
+        ```
+        
+        Consider using `MAX_BPS` instead.
+        
+        In addition, the following line uses `369` to define the upper limit for the platform fee:
+        
+        ```jsx
+        require(_platformFeeBps <= 369, "Fee not in range");
+        ```
+        
+        Consider using a more descriptive constant variable for this value.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Readability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">e068fac4036133ca4b2b6360a67994d83a6655af</field>
+    <field name="content">
+        ## [Q-7] `nativeTokenWrapper` is not used
+        
+        **Reference**: [#L68](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L68), [#L102](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L102)
+        
+        `nativeTokenWrapper` is declared and has a value assigned in the constructor, but the value is not used anywhere in the code.
+        
+        **Remediations to Consider**
+        
+        Consider removing all occurrences of `nativeTokenWrapper` from the code.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-8] Named return variables don’t need to be explicitly returned
+        
+        **Reference**: [#L118](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L118), [#L638](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L638)
+        
+        When using named return variables as in the following function, values need to be assigned to the return variable but there is no need to explicitly return the variable itself.
+        
+        ```jsx
+        function createListing(ListingParameters calldata _params) external returns (uint256 **listingId**) {
+        ```
+        
+        Above function declares a return variable `listingId` and a value is correctly assigned on [#L119](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L119), thus there is no need to return the variable at the end of the function on [#L156](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L156).
+        
+        The same applies to the `processRoyalty` function.
+        
+        **Remediations to Consider**
+        
+        Consider removing the lines that return values in `createListing` and `processRoyalty` functions.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Readability</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/mintra-marketplace/thirdweb_contracts/commit/21668cde1d3cc11516c457e38f91bc1c952a65c1,https://github.com/mintra-marketplace/thirdweb_contracts/commit/69cfe018dbf7a48816d61e3c09d97cbcb8fcd815</field>
+    <field name="content">
+        ## [Q-9] Improve `bulkBuyFromListing`
+        
+        **Reference**: [#L265C2-L302](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L265C2-L302)
+        
+        The function `bulkBuyFromListing` can be improved as follows: 
+        
+        1. The function performs the following logic for buys with currency specified as `NATIVE_TOKEN`:
+        
+        ```jsx
+        282:   if (_currency[i] == CurrencyTransferLib.NATIVE_TOKEN) {
+        283:       //calculate total amount for items being sold for PLS
+        284:       if (_directListingsStorage().currencyPriceForListing[_listingId[i]][_currency[i]] > 0) {
+        285:           price =
+        286:               _quantity[i] *
+        287:               _directListingsStorage().currencyPriceForListing[_listingId[i]][_currency[i]];
+        288:       } else {
+        289:           require(_currency[i] == listing.currency, "Paying in invalid currency.");
+        290:           price = _quantity[i] * listing.pricePerToken;
+        291:       }
+        292:
+        293:       totalAmountPls += price;
+        294:   }
+        ```
+        
+        The above logic can be simplified by removing  `#283-#291` entirely and replacing the calculated `price` with `_expectedTotalPrice[i]` on line 293, leading to:
+        
+        ```jsx
+        if (_currency[i] == CurrencyTransferLib.NATIVE_TOKEN) {
+           totalAmountPls += _expectedTotalPrice[i];
+        }
+        ```
+        
+        Removing #283-#291 works as the logic is redundant and the same check is done in the internal `_buyFromListing` function which is called subsequently. In addition, the check on line [#L349](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L349) ensures that the calculated price must be equal to the `_expectedTotalPrice`.
+        
+        Consider refactoring `bulkBuyFromListing` function as shown above.
+        
+        1. Line [#L301](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L301) ensures that the correct amount for msg.value was sent:
+        
+        ```jsx
+        require(msg.value == totalAmountPls || (totalAmountPls == 0 && msg.value == 0), "Incorrect PLS amount sent");
+        ```
+        
+        However, the right branch of the OR operator is redundant as the case of `totalAmountPls == 0 && msg.value == 0` is already covered on the left check.
+        
+        Consider removing the right branch from the `require` statement.
+        
+        Above recommendations increase the code readability and above that, also reduce the gas costs.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Readability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6fb399f6863f78302abd292969ac2b436029e646</field>
+    <field name="content">
+        ## [Q-10] Follow Solidity naming convention for function
+        
+        **Reference**: [#L638](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L638), [#L660](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L660)
+        
+        Functions:
+        
+        According to [Solidity naming conventions](https://docs.soliditylang.org/en/latest/style-guide.html#underscore-prefix-for-non-external-functions-and-variables), `private` and `internal` functions should be prefixed using an underscore. This is not the case for the `processRoyalty` and `isERC2981` functions.
+        
+        **Remediations to Consider**
+        
+        Consider renaming `processRoyalty` and `isERC2981` functions to `_processRoyalty` and `_isERC2981` respectively.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">f5d506590d3436ee735e9febe3fcb15104bddce3</field>
+    <field name="content">
+        ## [G-1] Public functions not called internally
+        **Reference**: [#L451](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L451), [#L678](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L678)
+
+        The following functions can be declared as `external` instead of `public`, as they are not called internally by any other function:
+
+        - `createOrUpdateRoyalty`
+        - `setPlatformFeeBps`
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">581edb7302c4a4057f5d337e087ab117a453b8fa</field>
+    <field name="content">
+        ## [G-2] Use `calldata` instead of `memory` for function arguments
+        
+        **Reference**:  [#L265](https://github.com/mintra-marketplace/thirdweb_contracts/blob/96f014facd5e236806611bfe45ace9cb9baa7038/contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol#L265)
+        
+        `bulkBuyFromListing` function uses `memory` allocation for its function arguments.
+        
+        **Remediations to Consider**
+        
+        Consider using `calldata` instead to save gas costs.
+    </field>
+  </item>
