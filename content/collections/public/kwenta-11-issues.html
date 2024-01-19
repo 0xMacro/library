@@ -1,0 +1,19 @@
+<item>
+    <field name="topic">Code quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c043e9c8bf6f1a2730ca4786f2e28ceca0ae6b52</field>
+    <field name="content">
+      ## [Q-1] Storage gaps can be added
+
+      `Engine.sol` is now upgradeable to allow it to adapt to changes in SynthetixV3, and potentially add functionality, like is done by inheriting the `Zap.sol` contract. In future upgrades, if storage slots are required for additional functionality it may require restructuring Engine.sol to be a base contract rather than the child-most, since storage slots are directly used. 
+  
+      If `Engine.sol` is desired to inherit all new functionality, it may be wise to add a storage gap before the current storage variables to allow more flexibility to inherit functionality that requires storage slots without requiring `Engine.sol` to be restructured.
+      `Zap.sol` could also require storage slots in the future if additional functionality is required, and could benefit from adding a storage gap as well.
+  
+      **Remediations to Consider**
+  
+      Add storage gaps to either `Zap.sol` or `Engine.sol` to allow more flexibility in developing future upgrades.
+    </field>
+  </item>
+  

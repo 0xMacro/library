@@ -1,0 +1,461 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-1] Actors in manual redeem mode may remain in processed but not redeemed state for a long time
+  
+      Actors for which manual redeem mode is enabled may go against the purpose of the withdrawal queue mechanism by performing step 1 of the redeem flow (getting their request processed) but delaying step 2, exchanging shares for the available assets indefinitely until an appropriate time. 
+  
+      As a result, they may have an advantage in certain market conditions when an unrealized loss is about to increase, which they may front-run as they can perform exchange instantly while others would need to go through the withdrawal manager queue.
+    </field>
+    <field name="response">
+      We will consider this for the version 2 of the withdrawal mechanism design.
+      
+      Currently, we do not believe this to be a concern, as the manual flow can only be enabled for LPs by the Pool Delegate or Protocol Admins. This will be done only for over-collateralized pools, such as our cash management product where the incentive for parking funds is lower.
+      
+      This flow is also designed for smart contract integrators, so we will ensure that we review the smart contracts ahead of time to see if this would be an issue. As an added precaution, we will ask our Pool Delegates and Protocol Admins to use private RPCs like Flashbots to send any transactions that would reduce the share token exchange rate, to further discourage this issue.
+      
+      If an LP is seen abusing this, we can also revoke their permissions to interact with the share token or not process any future redemption requests.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/maple-labs/withdrawal-manager-cyclical-private/commit/7219811ad66c6866de2e244e223b82f53c27222e</field>
+    <field name="content">
+      ## [M-2] Maple Withdrawal Manager may be created with values that break invariant
+
+      In the withdrawal-manager-cyclical module, `MapleWithdrawalManagerInitializer._initialize()` does not perform safe downcasting of provided inputs, such as `startTime_`, `cycleDuration_`, and `windowDuration_`. As a result, the provided system invariant may be broken.
+  
+      > The system is designed to reject any attempts to set a start time that falls in the past.
+  
+      If provided `startTime_`, `cycleDuration_`, and `windowDuration_` are greater than uint64, their values will pass initial checks such as `startTime_ >= block.timestamp`, but these values will get truncated on assignment, and incorrect values will be set in cycleConfigs[0]. Allowing even startTime to be 0.
+  
+      ```solidity
+      function _initialize(address pool_, uint256 startTime_, uint256 cycleDuration_, uint256 windowDuration_) internal {
+              require(pool_           != address(0),      "WMI:ZERO_POOL");
+              require(startTime_      >= block.timestamp, "WMI:INVALID_START");
+              require(windowDuration_ != 0,               "WMI:ZERO_WINDOW");
+              require(windowDuration_ <= cycleDuration_,  "WMI:WINDOW_OOB");
+  
+              pool        = pool_;
+              poolManager = IPoolLike(pool_).manager();
+  
+              cycleConfigs[0] = CycleConfig({
+                  initialCycleId:   1,
+                  initialCycleTime: uint64(startTime_),
+                  cycleDuration:    uint64(cycleDuration_),
+                  windowDuration:   uint64(windowDuration_)
+              });
+  
+              emit Initialized(pool_, cycleDuration_, windowDuration_);
+              emit ConfigurationUpdated({
+                  configId_:         0,
+                  initialCycleId_:   1,
+                  initialCycleTime_: uint64(startTime_),
+                  cycleDuration_:    uint64(cycleDuration_),
+                  windowDuration_:   uint64(windowDuration_)
+              });
+          }
+      ```
+  
+      Proof of concept:
+  
+      ```solidity
+      function test_createInstance_success() external {
+         // @audit - startTime set to large value 
+         bytes memory calldata_ = abi.encode(address(pool), uint256(type(uint64).max) + 1, 7 days, 2 days);
+  
+          MapleWithdrawalManager withdrawalManager_ = MapleWithdrawalManager(factory.createInstance(calldata_, "SALT"));
+  
+          (
+              uint64 initialCycleId_,
+              uint64 initialCycleTime_,
+              uint64 cycleDuration_,
+              uint64 windowDuration_
+          ) = withdrawalManager_.cycleConfigs(0);
+  
+          assertEq(withdrawalManager_.pool(),           address(pool));
+          assertEq(withdrawalManager_.latestConfigId(), 0);
+  
+          assertEq(initialCycleId_,   1);
+          // @audit - initialCycleTime should never be smaller than block.timestamp
+          // but because of truncation of values larger than type(uint64).max it ends up being 0
+          assertEq(initialCycleTime_, 0);
+          assertEq(cycleDuration_,    7 days);
+          assertEq(windowDuration_,   2 days);
+      }
+      ```
+  
+      **Remediations to consider:**
+  
+      - Update implementation to perform safe downcasting and revert in case of out-of-range values.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Access control</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/maple-labs/pool-permission-manager-private/commit/d68e9d33a998f51edc6545856776312d1241e43f</field>
+    <field name="content">
+      ## [L-1] `hasPermissions()` will return true if there are no lenders passed
+  
+      `MaplePoolPermissionManager`'s `hasPermission` function accepts an arbitrary length array for `lenders_` and loops through all addresses passed to check the corresponding pool permission level and bitmap. However, if no lenders are passed to this function, the returned value will be `true`, potentially allowing access to gated functions without permission. 
+  
+      It is worth mentioning that this is not possible in the current codebase, as it’s impossible to provide arbitrary values to this function outside of external off-chain calls to the view function. 
+  
+      Consider returning `false` if no lenders are provided. Alternatively, document this behavior to avoid pitfalls.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/maple-labs/pool-permission-manager-private/commit/e97138e11493836fc64650b5b614534538893d95</field>
+    <field name="content">
+      ## [Q-1] MaplePoolPermissionManager’s onlyGovernor modifier is unused
+  
+      Consider removing `onlyGovernor` modifier from the `MaplePoolPermissionManager` contract since it is not used.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/maple-labs/pool-permission-manager-private/commit/e97138e11493836fc64650b5b614534538893d95</field>
+    <field name="content">
+      ## [Q-2] Missing indexed attributes for multiple events
+  
+      For the following events, consider using an indexed attribute for one or more parameters:
+  
+      - IMaplePoolPermissionManager
+          - LenderAllowlistSet
+          - PermissionAdminSet
+          - PoolBitmapsSet
+          - PoolPermissionLevelSet
+      - IMapleWithdrawalManagerInitializer
+          - Initialized
+      - IMapleWithdrawalManager
+          - RequestCreated (for the owner parameter)
+    </field>
+    <field name="response">
+        Additional changes in https://github.com/maple-labs/withdrawal-manager-queue-private/commit/9822b7551a11aab5f97be761df34d08f69973fdd.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-3] Redundant assignments in the MapleWithdrawalManagerFactory
+  
+      In both withdrawal-manager-cyclical and withdrawal-manager-queue modules, the implementation of `MapleWithdrawalManagerFactory.createInstance()` function contains redundant and unnecessary assignment.
+  
+      ```solidity
+      isInstance[instance_ = super.createInstance(arguments_, salt_)] = true;
+      ```
+  
+      Consider removing the mentioned assignment since `super.createInstance()` performs the same in the parent function implementation.
+  
+      ```solidity
+      isInstance[instance_] = true;
+      ```
+    </field>
+    <field name="response">
+        We won’t be redeploying the cyclical withdrawal manager factory. For ease of maintainability we’ll keep the same assignment in the new queue withdrawal manager factory.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Access control</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-4] Inconsistent whenProtocolNotPaused behavior between Withdrawal Managers
+  
+      Across the two withdrawal manager contract types (queue and cyclical) there are logic inconsistencies in implementing pausable functionality.
+  
+      The `whenProtocolNotPaused` modifier checks for `isFunctionPaused` in the queue withdrawal manager.
+  
+      ```solidity
+      modifier whenProtocolNotPaused() {
+          require(!IGlobalsLike(globals()).isFunctionPaused(msg.sig), "WM:PAUSED");
+          _;
+      }
+      ```
+  
+      However, the `whenProtocolNotPaused` modifier in the cyclical manager checks `protocolPaused` which is less flexible and does not allow fine-grained control.
+  
+      ```solidity
+      modifier whenProtocolNotPaused() {
+          require(!IGlobalsLike(globals()).protocolPaused(), "WM:PROTOCOL_PAUSED");
+          _;
+      }
+      ```
+  
+      Consider updating implementation to provide consistent behavior between Withdrawal Managers of different types to reduce maintenance impact and prevent operational issues.
+    </field>
+    <field name="response">
+        Currently the protocol pause is only used for one function setExitCycleConfig() in the cyclical withdrawal manager. We will consider update in the future release.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/maple-labs/withdrawal-manager-queue-private/commit/02f7bbd5ab98e86ab023787643bafb32d6b2ed14</field>
+    <field name="content">
+      ## [Q-5] Improper condition in _processManualExit()
+  
+      In the `MapleWithdrawalManager`, `_processManualExit()` has the following implementation.
+  
+      ```solidity
+      function _processManualExit( uint256 shares_, address owner_)
+          internal returns ( uint256 redeemableShares_, uint256 resultingAssets_)
+      {
+          require(shares_ > 0,                              "WM:PE:NO_SHARES");
+          require(shares_ <= manualSharesAvailable[owner_], "WM:PE:TOO_MANY_SHARES");
+  
+          ( redeemableShares_ , resultingAssets_ ) = _calculateRedemption(shares_);
+  
+          // @audit - case when shares_ < redeemableShares_ is not reachable
+          require(shares_ <= redeemableShares_, "WM:PE:NOT_ENOUGH_LIQUIDITY");
+          ...
+      }
+      ```
+  
+      The value of `redeemableShares_` returned from the `_calculateRedemption()` is always represented by the following relationship `redeemableShares_ <= shares_`. Therefore, `shares_` cannot ever be smaller than `redeemableShares_`.
+  
+      The same logic applies to the similar guard condition in the `processRedemptions()` function.
+  
+      ```solidity
+      require(maxSharesToProcess_ <= redeemableShares_, "WM:PR:LOW_LIQUIDITY");
+      ```
+  
+      Consider changing conditions in the implementation above to the following to indicate that only full redemption would be possible.
+  
+      In `_processManualExit()`
+  
+      ```solidity
+      require(shares_ == redeemableShares_, "WM:PE:NOT_ENOUGH_LIQUIDITY");
+      ```
+  
+      and in `processRedemptions()`
+  
+      ```solidity
+      require(maxSharesToProcess_ == redeemableShares_, "WM:PR:LOW_LIQUIDITY");
+      ```
+    </field>
+    <field name="response">
+        Additional update in https://github.com/maple-labs/withdrawal-manager-queue-private/pull/27/commits/f4c8e3b6e2fcbcb2d51e628de9606d354abcfd40.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Access control</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/maple-labs/withdrawal-manager-cyclical-private/commit/1d05b3db083a1f0c2b5bbba8f40294d77ba5c98f</field>
+    <field name="content">
+      ## [Q-6] Inconsistent access control for upgrading withdrawal managers
+  
+      Maple Finance now features two types of withdrawal managers: Cyclical and Queue withdrawal managers. Both of these withdrawal managers feature upgrade functionality, which is access-controlled. However, access control is inconsistent.
+  
+      Upgrading the cyclical withdrawal manager is allowed for the pool delegate **or governor**, while in the case of the queue withdrawal manager, upgrades are allowed to be performed by the pool delegate **or** **security admin**.
+  
+      ```solidity
+      require(msg.sender == poolDelegate_ || msg.sender == governor(), "WM:U:NOT_AUTHORIZED");
+      ```
+  
+      ```solidity
+      require(msg.sender == poolDelegate_ || msg.sender == securityAdmin(), "WM:U:NOT_AUTHORIZED");
+      ```
+  
+      Consider updating access control in the Cyclical withdrawal manager to allow `securityAdmin()` instead of the `governor()`.
+    </field>
+    <field name="response">
+        Fixed to allow security admin to upgrade.
+    </field>
+    
+  </item>
+  
+  <item>
+    <field name="topic">Access control</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-7] Inconsistent pause control for upgrades
+  
+      For the `withdrawal-manager-cyclical` module, `MapleWithdrawalManager` proxy functions do not feature pausable behavior since `whenProtocolNotPaused` modifier is missing. This contrasts the implementation of other similar contracts across modules in the Maple Finance codebase.
+  
+      Due to the above, fine-grained control over paused functionality on a specific contract instance is unavailable. However, a fallback is a pauseable functionality on the factory level. Functions missing `whenProtocolNotPaused` modifier:
+  
+      - MapleWithdrawalManager.migrate()
+      - MapleWithdrawalManager.setImplementation()
+      - MapleWithdrawalManager.upgrade()
+  
+      The same functions have the corresponding modifier in withdrawal-manager-queue:`MapleWithdrawalManager`.
+    </field>
+    <field name="response">
+        We will make this update when introducing function level granularity for pausing in this contract in a future iteration.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-8] Unnecessary event emission in cyclical MapleWithdrawalManager
+  
+      `MapleWithdrawalManager.processExit()` emits `WithdrawalCanceled` event in addition to `WithdrawalProcessed` when all lockedShares are processed, which is slightly misleading and could potentially cause errors in off-chain tracking and monitoring tools.
+  
+      Consider not emitting this event when all `lockedShares` are processed.
+    </field>
+    <field name="response">
+        This is a requirement from our team to help with the subgraph data modeling.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Access control</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-9] Inconsistent access control for MapleLoan.skim()
+
+      In the `fixed-term-loan` module `MapleLoan.skim()` is accessible to anyone, while in the `open-term-loan` module `MapleLoan.skim()` is accessible only to the borrower and governor.
+        
+      Consider updating access control for the `MapleLoan.skim()` in the `fixed-term-loan` module to prevent external parties from profiting from the mistakes of the protocol users.
+    </field>
+    <field name="response">
+        We don’t see this as an issue as there are inherit differences between open term and fixed term loans. For one, the open term loans don’t directly hold funds to be drawn down like the fixed term loan. We don’t expect the same behaviour across both loan types but this is something we will keep in mind in future iterations.
+    </field>
+  </item>
+      
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-10] Inconsistent validation in MapleLoan.skim()
+
+      In the `fixed-term-loan` module `MapleLoan.skim()` has no zero address check for the destination address, while in the `open-term-loan` module `MapleLoan.skim()` corresponding check is present.
+  
+      Consider adding a zero address check to the `MapleLoan.skim()` in the `fixed-term-loan` module to prevent assets from being inadvertently locked.
+    </field>
+    <field name="response">
+      As we are not updating the fixed term loan in this release we will defer this to a future update.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-11] Unnecessary import in MapleRefinancer
+  
+      In the open-term-loan module, `MapleRefinancer` contains unused import of IERC20. 
+  
+      Consider removing this unnecessary import.
+    </field>
+    <field name="response">
+        We will update the MapleRefinancer in a future release when we decide to re-deploy the MapleRefinancer contract.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-12] Use onlyPoolManager modifier in the cyclical withdrawal manager
+  
+      In the withdrawal-manager-cyclical module, the `MapleWithdrawalManager` contract implements pool manager access control directly in functions `addShares()`, `removeShares()`, and `processExit()`.
+  
+      ```solidity
+      require(msg.sender == poolManager, "WM:AS:NOT_POOL_MANAGER");
+      ```
+  
+      However, in the Queue withdrawal manager this access control is implemented using `onlyPoolManager()` modifier.
+  
+      Consider replacing repetitive access controls with the `onlyPoolManager()` modifier in the cyclical withdrawal manager.
+    </field>
+    <field name="response">
+        We will update in a future release when we update the cyclical withdrawal manager.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Access control</field>
+    <field name="content">
+      ## [I-1] Default bitmaps for Pool and Function level permission allow permissionless access
+
+      In the pool-permission-manager module, the `MaplePoolPermissionManager` contract implements several modes for access control. Two modes that allow function level control and higher level but less fine-grained pool level control are represented by `FUNCTION_LEVEL` and `POOL_LEVEL` constant values.
+  
+      These modes require corresponding bitmaps to be set in `poolBitmaps` mapping storage variable for each pool. When values in specific bitmap match bitmaps of lenders from respective `lenderBitmaps` mapping entries, access is allowed; otherwise is denied.
+  
+      However, **the default when corresponding bitmaps in these two modes are not set is to allow anyone access**. This default comes with a high risk of misconfiguration, and actors responsible for configuring the permission manager (pool delegate and protocol admins) must take necessary precautions.
+  
+      While this design choice is intentional, and it is meant to allow transfers to be allowed by default, Maple Finance will need to ensure that pool delegates are aware of misconfiguration risks.
+    </field>
+    <field name="response">
+        This is already in the natspec to ensure no operator error. However, we will highlight this in the docs too.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="content">
+      ## [I-2] Config change delay period may be too short
+  
+      In the cyclical withdrawal manager, the delay period when the new configuration starts to apply is +3 from the current cycle. This allows all users who have already locked their shares not to be affected during withdrawal (in case of enough liquidity during withdrawal).
+  
+      ```solidity
+      When the pool delegate changes the configuration, it will take effect only on the start of the third cycle.
+      This way all users that have already locked their shares will not have their withdrawal time affected.
+  
+          C1       C2       C3             C4
+      |===--.--|===-----|===-----|==========----------|
+            ^                     ^
+      configuration change     new configuration kicks in
+  
+      Users that request a withdrawal during C1 will withdraw during WW3 using the old configuration.
+      Users that lock their shares during and after C2 will withdraw in windows that use the new configuration.
+      ```
+  
+      However, if a delay is meant to be used as a Timelock mechanism to allow those unhappy with the new configuration to exit, the defined delay may be too short. Depending at which moment the new config is set in the current cycle, those users who haven’t locked their shares yet may have time from  `0 < time-to-decide < cycleDuration` to decide on their withdrawal. This, in extreme cases, is a too short time period for the user to react.
+  
+      Consider increasing the delay to +4, so that users who haven’t yet locked their shares have at least one full cycle to decide on their withdrawal.
+    </field>
+    <field name="response">
+        We don’t see this as an issue as the user will still be able to request to withdraw in C2 and be able to exit in C4 as the window duration will still be at the start of C4. But we will keep this in mind for future designs. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Oracles</field>
+    <field name="content">
+      ## [I-3] Not checking for L2 sequencer in Base contracts
+  
+      As suggested by [Chainlink documentation](https://docs.chain.link/data-feeds/l2-sequencer-feeds#overview), Optimistic L2 oracle implementations should check their corresponding L2 Sequencer uptime feed to ensure that the sequencer is live before trusting the data feed returned by the oracle. Even with the Oracle staleness price check, if the sequencer is down, there could be multiple price changes provided by the Oracle that won’t go through and will get queued and applied once the sequencer is up; if price changes are high, it could cause unfair conditions for users and borrowers.
+  
+      Maple **Base** Oracles are currently not being used by the protocol; if enabled checks should be added to verify that the sequencer is live and provide a grace period to react to potential high price changes (See suggested example in [Chainlink docs](https://docs.chain.link/data-feeds/l2-sequencer-feeds#example-code)).
+    </field>
+    <field name="response">
+        This is something we will keep in mind if we decide to use oracles on the BASE/L2 deployments
+    </field>
+  </item>
+  
