@@ -19,7 +19,29 @@
     </ul>
     <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
     <template type="audit-markdown">
-    
+        ### Trusted entities:
+
+        - Strategists:
+            - User that can manage positions in the cellar. Is trusted to act in the benefit of the cellars shareholders, and earns a portion of the cellars profits. All actions made by the strategist are approved by Sommelier governance. Has the ability to shutdown the cellar in case of an emergency.
+        - Governance:
+            - Sommelier governance responsible for approving strategist actions, as well as adding or removing trusted positions for cellars.
+        - Multisig:
+            - Approves adaptors and positions in the registry as well as adding and updating price feeds for assets in the priceRouter. Can pause cellars, which can be unpaused by governance.
+        - Chainlink:
+            - Responsible for a majority of pricing, as well as running automated tasks for share price oracles. It is trusted that the data it provides is correct.
+  
+        The goal of the system is to to have checks and balances for each permissioned action, where if any one permissioned entity acts malicious, the others can remedy the situation, requiring multiple points failure before it can negatively impact users.
+  
+        ### Assumptions:
+  
+        - There is an assumption that permissioned entities will not act maliciously.
+        - It is assumed that the protocols that a cellar interacts with wont act maliciously, and will operate as intended.
+  
+        ### Accepted Risks:
+  
+        - Share price varies based on market conditions, and there is no guarantee share price will increase.
+        - Protocols that a cellar interacts with could be exploited. There are ways trusted entities can help mitigate the effect of such exploits, but there may be a negative effect on share price and a loss of funds for users.
+   
     </template>
   </content-for>
 
