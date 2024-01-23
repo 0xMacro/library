@@ -1,58 +1,68 @@
-<page
-  clientName="Sommelier"
-  reportDate="January 22, 2023"
-  auditTitle="Sommelier A-15"
-  auditVersion="1.0.0"
-  repoUrl="https://github.com/PeggyJV/cellar-contracts"
-  layout="/library/audits/_layout.html" 
-  repoCommitHash="341fc1f49787de57143997da90762bbca23bd20d"
-  repoCommitHashFinal="33320d36f03e9b50732ad9e695c3acb0a49970cc"
->
-  <content-for name="schedule">
-    The security audit was performed by the Macro security team on December 22, 2023.
-  </content-for>
-
-  <content-for name="spec">
-    <ul>
-      <li>Discussions with the {{page.clientName}} team.</li>
-      <li>Available documentation in the repository.</li>
-    </ul>
-    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
-    <template type="audit-markdown">
-      ### Trusted entities:
-
-      - Strategists:
-          - User that can manage positions in the cellar. Is trusted to act in the benefit of the cellars shareholders, and earns a portion of the cellars profits. All actions made by the strategist are approved by Sommelier governance. Has the ability to shutdown the cellar in case of an emergency.
-      - Governance:
-          - Sommelier governance responsible for approving strategist actions, as well as adding or removing trusted positions for cellars.
-      - Multisig:
-          - Approves adaptors and positions in the registry as well as adding and updating price feeds for assets in the priceRouter. Can pause cellars, which can be unpaused by governance.
-      - Chainlink:
-          - Responsible for a majority of pricing, as well as running automated tasks for share price oracles. It is trusted that the data it provides is correct.
-
-      The goal of the system is to to have checks and balances for each permissioned action, where if any one permissioned entity acts malicious, the others can remedy the situation, requiring multiple points failure before it can negatively impact users.
-
-      ### Assumptions:
-
-      - There is an assumption that permissioned entities will not act maliciously.
-      - It is assumed that the protocols that a cellar interacts with wont act maliciously, and will operate as intended.
-
-      ### Accepted Risks:
-
-      - Share price varies based on market conditions, and there is no guarantee share price will increase.
-      - Protocols that a cellar interacts with could be exploited. There are ways trusted entities can help mitigate the effect of such exploits, but there may be a negative effect on share price and a loss of funds for users.
-  </template>
-  </content-for>
-
-  <content-for name="source-code">
-    <p>
-      Specifically, we audited the following contracts within this repository.
-    </p>
-
-    <template type="file-hashes">
-      d190cb417ddffbd595d377c2e686ad7bbebb42b6fe2d09f36b6d51341ac4e1a0  src/modules/price-router/PriceRouter.sol
-      05b1bea1468249a719fb1afc34f679a86be95d4a287a4a3214f90d06ee91c373  src/modules/price-router/permutations/SequencerPriceRouter.sol
-    </template>
-
-  </content-for>
-</page>
+<item>
+    <field name="topic">Arbitrage</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">33320d36f03e9b50732ad9e695c3acb0a49970cc</field>
+    <field name="content">
+      ## [M-1] Share Price Oracle missing sequencer check
+  
+      For cellars on layer 2 rollups, like Arbitrum and Optimism, a check was added to the `priceRouter.sol`, to ensure its sequencer is operational, using [Chainlink’s sequencer uptime feed](https://docs.chain.link/data-feeds/l2-sequencer-feeds). This causes pricing to revert if the feed shows that the sequencer is down.
+  
+      ```solidity
+      /**
+       * @notice Layer 2 chains that use sequencers, can have the sequencer go down. If this happens we do not want
+       *         to price assets, as the data feeds could be stale, and need to be updated.
+       */
+      function _runPreFlightCheck() internal view override {
+          (, int256 answer, uint256 startedAt, , ) = sequencerUptimeFeed.latestRoundData();
+  
+          // This check should make TXs from L1 to L2 revert if someone tried interacting with the cellar while the sequencer is down.
+          // Answer == 0: Sequencer is up
+          // Answer == 1: Sequencer is down
+          if (answer == 1) {
+              revert SequencerPriceRouter__SequencerDown();
+          }
+  
+          // Make sure the grace period has passed after the
+          // sequencer is back up.
+          uint256 timeSinceUp = block.timestamp - startedAt;
+          if (timeSinceUp <= gracePeriod) {
+              revert SequencerPriceRouter__GracePeriodNotOver();
+          }
+      }
+      ```
+      Reference: [SequencerPriceRouter.sol#L43-L63](https://github.com/PeggyJV/cellar-contracts/blob/341fc1f49787de57143997da90762bbca23bd20d/src/modules/price-router/permutations/SequencerPriceRouter.sol#L43-L63)
+  
+      However, in the case of cellars on these layer 2 chains that use an `ERC4626SharePriceOracle` contract to price its shares; when a sequencer goes down the share price oracle will not be able to update its price, since pricing will revert, but it will still return the old pricing data until after the `heartbeat + gracePeriod` has elapsed since it’s last observation.
+  
+      ```solidity
+      /**
+       * @notice Get the latest answer, and bool indicating whether answer is safe to use or not.
+       */
+      function getLatestAnswer() external view returns (uint256, bool) {
+          uint256 _answer = answer;
+          bool _killSwitch = killSwitch;
+  
+          if (_killSwitch) return (0, true);
+  
+          // Check if answer is stale, if so set notSafeToUse to true, and return.
+          uint256 timeDeltaSinceLastUpdated = block.timestamp - observations[currentIndex].timestamp;
+          // Note add in the grace period here, because it can take time for the upkeep TX to go through.
+          if (timeDeltaSinceLastUpdated > (heartbeat + gracePeriod)) return (0, true);
+  
+          return (_answer, false);
+      }
+      ```
+      Reference: [ERC4337SharePriceOracle.sol#L475-L490](https://github.com/PeggyJV/cellar-contracts/blob/341fc1f49787de57143997da90762bbca23bd20d/src/base/ERC4626SharePriceOracle.sol#L475-L490)
+  
+      This means that the share price oracle will use old pricing for a period of time that could be taken advantage of. This old share price can be taken advantage of when depositing funds into the cellar since only the value returned from the share price oracle is used to determine how many shares are minted to the user.
+  
+      In the case where the sequencer goes down, but the prices of assets held as positions in the cellar increase considerably, the share price oracle will not be updated with these values. This allows users to take advantage of difference in pricing and mint cheap shares in the cellar by depositing funds before the `heartbeat + gracePeriod` time has elapsed, or before the sequencer goes live and the Chainlink feed is updated. Then once the pricing has been updated to match the new increased value positions, the user can withdraw assets for a gain at the expense of cellar shareholders.
+  
+      **Remediations to Consider**
+  
+      Have the `ERC4626SharePriceOracle` check if the sequencer is up when returning the latest price data, and mark the data unsafe to use if the sequencer is down. This will prevent deposits while the sequencer is down, and prevent arbitrage opportunities from being taken advantage of.
+    </field>
+  </item>
+  
