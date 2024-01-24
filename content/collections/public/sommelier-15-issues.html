@@ -1,0 +1,68 @@
+<item>
+    <field name="topic">Arbitrage</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">33320d36f03e9b50732ad9e695c3acb0a49970cc</field>
+    <field name="content">
+      ## [M-1] Share Price Oracle missing sequencer check
+  
+      For cellars on layer 2 rollups, like Arbitrum and Optimism, a check was added to the `priceRouter.sol`, to ensure its sequencer is operational, using [Chainlink’s sequencer uptime feed](https://docs.chain.link/data-feeds/l2-sequencer-feeds). This causes pricing to revert if the feed shows that the sequencer is down.
+  
+      ```solidity
+      /**
+       * @notice Layer 2 chains that use sequencers, can have the sequencer go down. If this happens we do not want
+       *         to price assets, as the data feeds could be stale, and need to be updated.
+       */
+      function _runPreFlightCheck() internal view override {
+          (, int256 answer, uint256 startedAt, , ) = sequencerUptimeFeed.latestRoundData();
+  
+          // This check should make TXs from L1 to L2 revert if someone tried interacting with the cellar while the sequencer is down.
+          // Answer == 0: Sequencer is up
+          // Answer == 1: Sequencer is down
+          if (answer == 1) {
+              revert SequencerPriceRouter__SequencerDown();
+          }
+  
+          // Make sure the grace period has passed after the
+          // sequencer is back up.
+          uint256 timeSinceUp = block.timestamp - startedAt;
+          if (timeSinceUp <= gracePeriod) {
+              revert SequencerPriceRouter__GracePeriodNotOver();
+          }
+      }
+      ```
+      Reference: [SequencerPriceRouter.sol#L43-L63](https://github.com/PeggyJV/cellar-contracts/blob/341fc1f49787de57143997da90762bbca23bd20d/src/modules/price-router/permutations/SequencerPriceRouter.sol#L43-L63)
+  
+      However, in the case of cellars on these layer 2 chains that use an `ERC4626SharePriceOracle` contract to price its shares; when a sequencer goes down the share price oracle will not be able to update its price, since pricing will revert, but it will still return the old pricing data until after the `heartbeat + gracePeriod` has elapsed since it’s last observation.
+  
+      ```solidity
+      /**
+       * @notice Get the latest answer, and bool indicating whether answer is safe to use or not.
+       */
+      function getLatestAnswer() external view returns (uint256, bool) {
+          uint256 _answer = answer;
+          bool _killSwitch = killSwitch;
+  
+          if (_killSwitch) return (0, true);
+  
+          // Check if answer is stale, if so set notSafeToUse to true, and return.
+          uint256 timeDeltaSinceLastUpdated = block.timestamp - observations[currentIndex].timestamp;
+          // Note add in the grace period here, because it can take time for the upkeep TX to go through.
+          if (timeDeltaSinceLastUpdated > (heartbeat + gracePeriod)) return (0, true);
+  
+          return (_answer, false);
+      }
+      ```
+      Reference: [ERC4337SharePriceOracle.sol#L475-L490](https://github.com/PeggyJV/cellar-contracts/blob/341fc1f49787de57143997da90762bbca23bd20d/src/base/ERC4626SharePriceOracle.sol#L475-L490)
+  
+      This means that the share price oracle will use old pricing for a period of time that could be taken advantage of. This old share price can be taken advantage of when depositing funds into the cellar since only the value returned from the share price oracle is used to determine how many shares are minted to the user.
+  
+      In the case where the sequencer goes down, but the prices of assets held as positions in the cellar increase considerably, the share price oracle will not be updated with these values. This allows users to take advantage of difference in pricing and mint cheap shares in the cellar by depositing funds before the `heartbeat + gracePeriod` time has elapsed, or before the sequencer goes live and the Chainlink feed is updated. Then once the pricing has been updated to match the new increased value positions, the user can withdraw assets for a gain at the expense of cellar shareholders.
+  
+      **Remediations to Consider**
+  
+      Have the `ERC4626SharePriceOracle` check if the sequencer is up when returning the latest price data, and mark the data unsafe to use if the sequencer is down. This will prevent deposits while the sequencer is down, and prevent arbitrage opportunities from being taken advantage of.
+    </field>
+  </item>
+  
