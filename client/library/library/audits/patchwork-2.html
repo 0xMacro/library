@@ -1,0 +1,51 @@
+<page
+  clientName="Patchwork"
+  reportDate="Jan 23, 2024"
+  auditTitle="Patchwork A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/runic-inc/patchwork"
+  repoCommitHash="51648f90c65695b3d60acd96dab02041d630561a"
+  repoCommitHashFinal="c6a2cabdcc1f85644169dc1c7ad39285206c6f1f"
+  passwordEncrypt="env:PAGE_PASS_PATCHWORK_2"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from Dec 11, 2023 to Dec 19, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    <li>Description of the system in operation.</li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    625e3580554a876b4849436745315468c7d09c020791d05ced350c67c17df5d2  src/IERC4906.sol
+    b71780f2006d0766390d1017292cc1b599114bb8d17f86cc4520149b010b49f5  src/IERC5192.sol
+    415bd774b9682d2ce13fe65ba6ce2a3f3060389b1555c23b3e5be45029341d3b  src/IPatchwork1155Patch.sol
+    9833f2927ec7a69b3067f0ce968095f6d8c1b7340f269b3b4fb6d769e7e97d09  src/IPatchwork721.sol
+    8d87e3b2baf1adb2662b89520e4e24d66de7ef201022369ae5e4ba4e604cf143  src/IPatchworkAccountPatch.sol
+    ec5058ed3054e2a220ac64cfbbff2c7533782e396a943ccc79cfcdb03f118249  src/IPatchworkAssignable.sol
+    b1301a7d3459bc9c0dd7a082305330c3823d662857dcbc45d961ca322f8d4406  src/IPatchworkLiteRef.sol
+    211e3a144162440cee8f1b51852ee0bf92d38dac3522c2f629897b3288fadcfb  src/IPatchworkMintable.sol
+    1a15dc9b73fa24041476f52455453f7b6cad3d17ce4e0b8cc40a1a5261c4c6e6  src/IPatchworkMultiAssignable.sol
+    66944f7df7fc0392fb7533baf99959b414448d271c9eaf1dd0b70cf92c61e693  src/IPatchworkPatch.sol
+    9de6304edaed84b18488649ed50870d293e741ad5a2ede2c7c97bd4140298cb8  src/IPatchworkProtocol.sol
+    f0b29a22fd78b0046215240835c6e9f43a10aa56e1d0b9ccdac3eb92fddd35a7  src/IPatchworkScoped.sol
+    801b6775d014424eee7e0e390431a2f117f90e640b7c31473d576e8c8273e97c  src/IPatchworkSingleAssignable.sol
+    c2f14ec87df761136e621612ec4464e0cbae19c68e4c4d3111b30f3815200ad3  src/Patchwork1155Patch.sol
+    9f4e7340ac443dec0be78d7bf6b2626c5ff123a7fb00a11e0522c4306d12e933  src/Patchwork721.sol
+    ee9c7c2964027886f80ba8f044d230797b8333441ad585f47051dbf6f30230ba  src/PatchworkAccountPatch.sol
+    c2f51dbac6dc9c96027cb23c20a47025f6476d7edcdc010c96da603ca7c05aee  src/PatchworkFragmentMulti.sol
+    3a82011292196afe486791abdfd5f1cf993ba07af13059658050bf6bd7ce4301  src/PatchworkFragmentSingle.sol
+    ef45b47adedd613700746030b7432147e8c2d0f278cadc2dcdea0fc3d0b03907  src/PatchworkLiteRef.sol
+    d509dff138fbd1d60b944d2c1e3707ba9e58b21deedf5d4fb0b13748aef91371  src/PatchworkPatch.sol
+    fc01291c747b3767a0411f0c25227842aee1a989f35c9bbf52e48954684ee1da  src/PatchworkProtocol.sol
+    4fa529f39c7675f9f18544680029de7e5e84425e6a66e8499636c29dfe8d9e86  src/PatchworkUtils.sol  </template>
+</content-for>
