@@ -1,0 +1,37 @@
+<page
+  clientName="Kwenta"
+  reportDate="Feb 6, 2024"
+  auditTitle="Kwenta A-13"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kwenta/token"
+  repoCommitHash="bba93cd5b29d56c8e0dd8c779012bb26dc202312"
+  repoCommitHashFinal="7194c705b333a8a8902da45ad29a05be40dbeb30"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_KWENTA"
+
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on Jan 15, 2024.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+  </ul>
+  
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    af3fd3557a4f034dc93f667773d5150e986aff412c0984b60c56744dede52cf9  contracts/TokenDistributor.sol
+    924c0ac73a9c93728baf7d3e5666b76c6af048a400781d437444af23f9c549bc  contracts/interfaces/ITokenDistributor.sol
+  </template>
+</content-for>
+
+</page>
