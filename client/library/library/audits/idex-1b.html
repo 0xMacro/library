@@ -1,6 +1,6 @@
 <page
   clientName="IDEX"
-  reportDate="January 22, 2024"
+  reportDate="February 12, 2024"
   auditTitle="IDEX B-1"
   auditVersion="1.0.0"
   repoUrl="https://github.com/idexio/idex-contracts-ikon"
@@ -10,7 +10,7 @@
   layout="/library/audits/_layout.html"
 >
   <content-for name="schedule">
-    The security audit was performed by the Macro security team from January 12, 2024 to January 16, 2024.
+    The security audit was performed by the Macro security team from January 12 to January 16, and on February 2, 2024.
   </content-for>
 
   <content-for name="spec">
@@ -62,7 +62,7 @@
       </li>
       <li class="break-words break-all">
         Commit Hash:
-        <code>57f90117f408f3dccf17fb28a15be18bc52b9b69</code>
+        <code>cc2a38c738828d945348c90421e44bd201edaf55</code>
       </li>
 
       <li>
@@ -135,6 +135,20 @@
         <code>691e9b9e8f181edc1686569c5bac1509b8a4b14a</code>
       </li>
 
+      <li>
+        <b>PR 94:</b>
+        <a
+          href="https://github.com/idexio/idex-contracts-ikon/pull/93"
+          target="_blank"
+        >
+            /idex-contracts-ikon/pull/94
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>c6d611f5739b826606813bca5d4bda7815b445e0</code>
+      </li>
+
     </ul>
   </content-for>
 
@@ -205,6 +219,18 @@
     <p>Changes for PR 93</p>
     <template type="file-hashes">
         7e2b6ee63afbb30a8e9251f73e22395b17d483600314858f1ecaf18f494a75bc  contracts/EarningsEscrow.sol
+    </template>
+
+    <br/>
+    <p>Changes for PR 94</p>
+    <template type="file-hashes">
+      8c7dac3d90ce8cddb10a9868092c5313aab77d36b3c69b4b0f57dffecb5bc31e  contracts/Custodian.sol
+      485937713f9224bfa493d83a2d05ebf8a0172506f05c2e9581a559b2a5b88481  contracts/EarningsEscrow.sol
+      042df087b1f0cc3cac3baa1f56675d90b44f57ef2da0b4375a4ec478928ab76f  contracts/Exchange.sol
+      78224a4abe8c13da328cc879e7efac635c0e70715073ea71267faf79dd37444e  contracts/Governance.sol
+      47f001901e3f0ca64439373348ca806439863498b170a6fd73bdb8420704dd1f  contracts/Owned.sol
+      44ad7e9832f6e2c47e7a5d52da3041f161824698e0a5f4bc7a0f41c760444dbe  contracts/asset-migrators/USDCeMigrator.sol
+      134e8eafb6aaf33c59a9c63c79adecc2da83100c3735ab24d4fb7d4593131a41  contracts/bridge-adapters/ExchangeStargateAdapter.sol
     </template>
   </content-for>
 
