@@ -1,0 +1,359 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">93d146bb122922271d42a9d13def7fb2ffafba50</field>
+    <field name="content">
+      ## [H-1] Incorrect state updates in PatchworkFragmentMulti.unassign()
+  
+      In the `PatchworkFragmentMulti` contract, on token `unassign()`, the corresponding storage variables are updated. Since corresponding structures include an array of assignments, a common pattern for removal is used where the last item replaces the removed element while the last element of the array is deleted.
+  
+      However, concrete implementation is incorrect since it resets the pointer for the removed element, but it doesn’t update the pointer for the element that has been moved.
+  
+      ```solidity
+      function unassign(uint256 ourTokenId, address target, uint256 targetTokenId) public virtual mustHaveTokenWriteAuth(ourTokenId) {
+          AssignmentStorage storage store = _assignmentStorage[ourTokenId];
+          (bool present, uint256 index, bytes32 targetHash) = _assignmentIndexOf(store, target, targetTokenId);
+          if (!present) {
+              revert IPatchworkProtocol.FragmentNotAssigned(address(this), ourTokenId);
+          }
+          Assignment[] storage assignments = store.assignments;
+          if (assignments.length > 1) {
+              // move the last element of the array into this index
+              assignments[index] = assignments[assignments.length-1];
+          }
+          // shorten the array by 1
+          assignments.pop();
+          // delete the index
+          delete store.index[targetHash];
+      }
+      ```
+  
+      In the code above, you may notice that `store.index[of_last_item]` has not been updated and will point to now invalid value. Consequent operations related to the moved token would have undefined behavior, and `unassign()` may fail due to index out-of-bound exception or even succeed by removing incorrect assignment.
+  
+      **Remediations to consider**
+  
+      - Update `unassign()` implementation to properly update all relevant data variables related to elements affected.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">3f52cea9278f9e8bd90109b3d1474f1544334b01</field>
+    <field name="content">
+      ## [H-2] Attacker may steal contract ETH balance due to incorrect accounting of assignFee in assignBatch()
+  
+      In the PatchworkProtocol, function _handleAssignFee() performs assign fee processing based on `msg.value` and configured fee for concrete fragment address. If the `msg.value` does not match the configured `assignFee`, processing will be halted, and a revert will be generated. If it matches and is greater than zero, protocol and scope balance will be proportionally increased based on the provided `msg.value`. 
+  
+      ```solidity
+      function _handleAssignFee(string memory scopeName, Scope storage scope, address fragmentAddress) private {
+          uint256 assignFee = scope.assignFees[fragmentAddress];
+          if (msg.value != assignFee) {
+              revert IncorrectFeeAmount();
+          }
+          if (msg.value > 0) {
+              uint256 assignBp;
+              ProtocolFeeOverride storage feeOverride = _scopeFeeOverrides[scopeName];
+              if (feeOverride.active) {
+                  assignBp = feeOverride.assignBp;
+              } else {
+                  assignBp = _protocolFeeConfig.assignBp;
+              }
+              uint256 protocolFee = msg.value * assignBp / 10000;
+              _protocolBalance += protocolFee;
+              scope.balance += msg.value - protocolFee;
+          }
+      }
+      ```
+  
+      While the above implementation works properly for the `assign()` and corresponding `_doAssign()` flow, it does not work properly when `_handleAssignFee()` is called within a loop, which is the case for flow which executes `assignBatch()`, `_batchAssignCommon()`, and `_doAssign()` as part of the inner loop.
+  
+      In a problematic use-case scenario, the attacker (scope owner) may batch-assign N fragments by providing a `msg.value` amount for a single fragment. The same `msg.value` will be counted N times and correspondingly `_protocolBalance` and `scope.balance` would be incorrectly inflated for `(N-1) * assignFee` amount. The attacker may then withdraw the scope’s inflated balance, which would result in withdrawing assets belonging to other scopes that are managed through the PatchworkProtocol contract.
+  
+      **Remediations to consider**
+  
+      - Do not use `msg.value` directly within the loop, instead use a specific variable initialized with `msg.value` and properly update it (reduce balance) on each inner loop iteration
+    </field>
+  </item>
+  
+  
+  <item>
+    <field name="topic">Protocol design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [M-1] Single locked fragment may get into an invalid state
+  
+      In the `PatchworkFragmentSingle` contract, token may get assigned by the PatchworkProtocol instance set as a manager and by the `PatchworkFragmentSingle` contract owner.
+  
+      When the PatchworkProtocol manager calls `assign()`, it first enforces that the token is not locked by performing a corresponding check. However, when the caller is `PatchworkFragmentSingle` contract owner there is no corresponding check. As a result, the invariant that a fragment may get assigned only when it is not locked may be invalidated. As a side effect in this situation events may be emitted which do not correspond to the correct state.
+  
+      Consider the following set of operations:
+  
+      - `PatchworkFragmentSingle` token owner locks it by calling `setLocked()`. As a result, parent `Patchwork721.setLocked()` is called, and `Locked()` event is emitted.
+      - If `assign()` is invoked on PatchworkProtocol for the previously mentioned token, it will fail due to the token being locked.
+      - However, if the `PatchworkFragmentSingle` contract owner calls directly `assign()` for the token, an assignment will be successful, token ownership will be transferred to the owner of the target token, and one more `Locked()` event will be emitted.
+      - If `unassign()` is called for the token by the `PatchworkProtocol` or by  `PatchworkFragmentSingle` contract owner it would succeed and it would emit `Unlocked()` event, even though token is still **locked**.
+  
+      **Remediations to consider**
+  
+      - Remove the capability for `PatchworkFragmentSingle` contract owner to manage assignments directly and to change token ownership in that way, or
+      - Enforce the same conditions in `PatchworkFragmentSingle.assign()` as PatchworkProtocol enforces, e.g., check that the token is not locked before performing the assignment.
+    </field>
+
+    <field name="response">
+        Works as intended. It is valid to be locked and then be assigned and continue to be locked.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2e2215551cb446d002bb97939dddf6270bbbc8e8</field>
+    <field name="content">
+      ## [M-2] Protocol owner and protocol bankers may update fees without delay
+  
+      In the PatchworkProtocol, protocol owner and protocol bankers can update protocol and scope level fees anytime. In addition, they may increase fees to unexpected levels where scope owners are left with less revenue share than expected. In extreme cases, when the corresponding fee is set to 10000 or 100%, the scope will not accrue any revenue from corresponding actions. 
+  
+      **Remediations to Consider**
+  
+      - Consider using Timelock and time delay for important state changes.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">120299ec815afaca2186ca280a6d4a1cd6a29977</field>
+    <field name="content">
+      ## [M-3] Invalid fees may corrupt system operations
+  
+      Protocol owner and protocol bankers may set various fees with values outside the expected range. For example, fees greater than 10000 would cause all important operations, where fees are expected to be charged, to fail due to the underflow. 
+  
+      Following operations would be affected due to reverts in `_handleMintFee()`, `_handlePatchFee()`, and `_handleAssignFee()`.
+  
+      - mint()
+      - mintBatch()
+      - patch()
+      - patch1155()
+      - patchAccount()
+      - assign()
+      - assignBatch()
+  
+      Moreover, the invalid fee may affect protocol or impact only a specific scope, depending on if it is a protocol-level fee or a fee override for a particular scope.
+  
+      **Remediations to Consider**
+  
+      - Update setters `setProtocolFeeConfig()` and `setScopeFeeOverride()` to check that the corresponding max value for the fee is less than 10000bp or 100%, e.g., to 5000bp.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">08ea99e085c24cc70747d473722516bb15c6b5c1</field>
+    <field name="content">
+      ## [L-1] PatchworkFragmentSingle.unassign() works for tokens which are not assigned
+  
+      In the `PatchworkFragmentSingle`, the contract owner may call `unassign()` for any token id (even non-existent). Since there are no checks that the token is assigned, `unassign()` for non-assigned tokens will be processed successfully and emit an `Unlocked` event.
+  
+      **Remediations to consider:**
+  
+      - Consider adding check in `unassign()` that the assignment exists as it is performed in PatchworkProtocol, or
+      - Remove the capability for the contract owner to call `unassign()` directly.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">7cc50682afa438414eca6dacdd0a320d32f27093</field>
+    <field name="content">
+      ## [L-2] Missing event updates on important state changes
+
+      In PatchworkProtocol, several functions with important state updates do not emit appropriate events. As a result, external actors may have a difficult time reacting to state changes in a timely manner.
+  
+      - `setProtocolFeeConfig()` - updates Protocol level fees which define revenue share split between scope owners and protocol.
+      - `setScopeFeeOverride()` - updates scope level fees when they are meant to differ from the Protocol level fees. These define the revenue share split between the scope owner and protocol.
+      - `setPatchFee()` - update scope level patch price.
+      - `setAssignFee()` - update scope level assign price.
+  
+      **Remediations to Consider**
+  
+      - Update the corresponding functions above to emit appropriate events.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">e1f83c37a00b2937247b05af43276c4ec4335a1d</field>
+    <field name="content">
+      ## [L-3] getTokenIdForOriginalAccount and getTokenIdForOriginal1155 have unreliable output
+  
+      In the `PatchworkAccountPatch` and `Patchwork1155Patch` contracts, `getTokenIdForOriginalAccount()` and `getTokenIdForOriginal1155()` are implemented to return value from the `_patchedAddressesRev` mapping variable.
+  
+      However, the result may be correct `tokenId` or `0` depending on if `withReverse` parameter was true when the corresponding `_storePatch()` internal function was called.
+  
+      Since both of these functions are external functions, their output would not be consistent and appropriate for others to rely upon it.
+  
+      **Remediations to consider**
+  
+      - Consider updating `_storePatch()` to always set corresponding `_patchedAddressesRev` mapping entry and not to be optional as it is now.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">bd4e8daf87a2e3f64e1a7e311aab6f8aac3c1e60</field>
+    <field name="content">
+      ## [L-4] redactReferenceAddress() and unredactReferenceAddress() may process invalid ids
+  
+      In the `PatchworkLiteRef` contract, `redactReferenceAddress()` and `unredactReferenceAddress()` functions can be called for references that are not yet generated. In addition, these functions will be successfully processed even when called with an invalid `id` such as 0 and 255.
+  
+      **Remediations to consider**
+  
+      - Consider updating the implementation of these two functions to check that the provided `id` argument is a valid input.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">da8176512e38163bf1c1ea1c520d1f7f3c0052c1</field>
+    <field name="content">
+      ## [Q-1] PatchworkPatch._burn() does not reset _patchedTokenIds
+  
+      In the `PatchworkPatch` contract, the `_burn()` function reset several variables with info related to the removed token. However, it does not reset the corresponding entry in `_patchedTokenIds` mapping.
+  
+      Consider updating `_burn()` implementation and adding the following change.
+  
+      ```solidity
+      delete _patchedTokenIds[tokenId];
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">dad08165945b6835ebd3ec5abc87089be22ebc0f</field>
+    <field name="content">
+      ## [Q-2] Unnecessary `getScope()` implementation overrides
+
+      Following implementation overrides are unnecessary since they are identical to the parent implementation in `Patchwork721`.
+  
+      - `Patchwork1155Patch.getScopeName()`
+      - `PatchworkAccountPatch.getScopeName()`
+      - `PatchworkFragmentMulti.getScopeName()`
+      - `PatchworkFragmentSingle.getScopeName()`
+      - `PatchworkPatch.getScopeName()`
+  
+      Consider removing the mentioned functions.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7a68de3491288bc33ca621d894c3f0405d93cadd</field>
+    <field name="content">
+      ## [Q-3] mustBeManager modifier not used
+  
+      In Patchwork721, the `mustBeManager()` modifier is defined but never used.
+  
+      Consider removing this modifier and allowing child contracts to implement corresponding functionality independently.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">120299ec815afaca2186ca280a6d4a1cd6a29977</field>
+    <field name="content">
+      ## [Q-4] Use constants instead of hardcoded values
+  
+      In the PatchworkProtocol, in several functions, the literal value of 10000 is hardcoded and used for fee split calculation.
+  
+      - `_handleMintFee()`
+      - `_handlePatchFee()`
+      - `_handleAssignFee()`
+  
+      Consider defining a constant and reusing it in mentioned functions.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">9a8da1d873e9c77e3ee497a63ab9efcd62ae78c7</field>
+    <field name="content">
+      ## [Q-5] Redundant Assignment struct definition
+  
+      `Assignment` struct is used in `PatchworkFragmentSingle` and `PatchworkFragmentMulti`.  Both of these contracts implement the `IPatchworkAssignable` interface. However, these contracts define the same `Assignment` structure twice in different locations. `PatchworkFragmentSingle` defines within a contract, while `PatchworkFragmentMulti` contains a definition in `IPatchworkMultiAssignable` interface. 
+  
+      Consider moving the `Assignment` struct definition to `IPatchworkAssignable` and removing it from the `PatchworkFragmentSingle` and `IPatchworkMultiAssignable`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">eeac2172ff44b581fcfcfe3dc59fa82ba8c5da26</field>
+    <field name="content">
+      ## [Q-6] Events are missing indexed attribute
+  
+      In the `IERC5192.sol`,  Locked and Unlocked events are missing indexed attribute for `tokenId` parameter, which would help off-chain tracking and monitoring.
+  
+      In the `IERC4906.sol`, MetadataUpdate and BatchMetadataUpdate events are missing indexed attribute for their corresponding arguments which would help off-chain tracking and monitoring.
+  
+      Consider adding indexed attributes for the mentioned events.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d0b144f5406950b0e500d6b61d909463816034d6</field>
+    <field name="content">
+      ## [Q-7] Natspec improvements
+  
+      Consider updating documentation for the following items.
+  
+      - Patchwork1155Patch._storePatch incorrectly ordered `withReverse` and `account` arguments
+      - PatchworkFragmentMulti has an incorrect `@dev` comment for the contract (copy/paste issue)
+      
+          > @dev base implementation of a Single-relation Fragment is IPatchworkAssignable
+          > 
+      - Incorrect notice comments in PatchworkUtils for several functions
+          1. toString16() - Converts **uint64** raw data to a 16 character string. It accepts uint128 and not uint64.
+          2. toString32() - Converts **uint64** raw data to a 32 character string. It accepts uint256 and not uint64.
+      - PatchworkProtocol._doUnassign() - has missing natspec comments for some of the parameters (direct, targetMetadataId)
+    </field>
+  </item>
+  
