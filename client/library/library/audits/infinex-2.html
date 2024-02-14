@@ -1,0 +1,53 @@
+<page
+  clientName="Infinex"
+  reportDate="February 14, 2023"
+  auditTitle="Infinex A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-io/infinex-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="6a7dd8c02826f16606d0c824122b83b88a2c7350"
+  repoCommitHashFinal="6a7dd8c02826f16606d0c824122b83b88a2c7350"
+  passwordEncrypt="env:PAGE_PASS_INFINEX_2"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from February 5, 2024 to February 6, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+    ### **Trusted entities:**
+
+    - GPStakingRewards owner:
+        - Can set the rewards duration and set the rewards to be distributed over that time. They are trusted to set these values fairly and only while Infinex accounts cannot withdraw funds.
+    - GovernancePoints owner:
+        - Can add and remove authorized minters, as well as upgrade the GovernancePoints contract. They are trusted to only authorize minters that will act in the best interest of the users and protocol, as well also not maliciously upgrade the contract.
+    - Authorized minter:
+        - Allows minting any number of GovernancePoints points to any address. It is trusted that they only mint points as specified by the protocol. The GPStakingRewards contract is one expected Authorized minter, there are also plans for a merkle tree contract to mint points to users based on other metrics.
+    - ERC2771 Trusted Forwarder:
+        - A ERC2771 Trusted Forwarder is set in the constructor of the GPStakingRewards contract. This is trusted to be a address, typically a contact that only makes calls on behalf of an account if there is a valid signature made by that account.
+
+    ### **Assumptions:**
+
+    - There is an assumption that permissioned entities will not act maliciously.
+    - It is assumed that Infinex trading accounts will not be able to withdraw while GovernancePoints are rewarded with GPStakingRewards, otherwise users could leverage flash loans or other temporary balance increases to generate a disproportionate amount of points.
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+        ea4038b7d8aba4e43ff6a58bc86285ef19d156ae933d403f25e54f06acb6fb1e  src/governance/GPStakingRewards.sol
+        9bd47b9325f04c30e06fb76ebe1c206adb627fbe9f6e7cfdc872ed6a1c6c78d6  src/governance/GovernancePoints.sol
+        69aa9b76c104ebbfab22590ff0166c1f0491482eeff0552212e6992d4679756b  src/governance/GovernancePointsStorage.sol
+    </template>
+
+  </content-for>
+</page>
