@@ -1,0 +1,193 @@
+<page
+  clientName="Covenant Labs"
+  reportDate="Feb 21, 2024"
+  auditTitle="Covenant A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/tazzlabs/tazz-core-v1"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  repoCommitHashFinal="ba47b2c0f0f224c9739169b3ff695b4262d20c55"
+  passwordEncrypt="env:PAGE_PASS_COVENANT_1"
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from Dec 18, 2023 to Feb 19, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack and video chat with the {{page.clientName}} team.</li>
+      <li>Information in the whitepaper and litepaper.</li>
+      <li>Supplemental information materials delivered over notion.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      ### Entities
+
+      - **System admins**
+          - admin, risk admin, emergency admin with access to privileged operations
+      - **Borrowers**
+          - Interact with deposit, borrow, repay, withdraw functionality
+          - Obtain asset tokens based on previously deposited collateral and exchange them for other assets on the external AMM pool.
+      - **Liquidators**
+          - Interact with liquidation functionality
+          - Close unhealthy CDPs within the system by transferring appropriate asset token amounts in exchange for corresponding collateral with additional liquidation bonus/reward
+      - **Bots, arbitrageurs, other**
+          - Refinance - trigger interest rate updates and corresponding notional factor changes
+          - Asset token <> money swaps at face value (redemption)
+          - May interact unpermissioned with other functionality that includes various state read functions and validations for the Guild
+      - **System**
+          - Core and periphery contracts
+      - **External components (**out of scope**)**
+          - AMM pool for asset token vs stablecoin/eth or other assets
+          - Lenders (byers and LP of asset token on AMM pool)
+      
+      ### System components
+      
+      - Core system
+          - **GuildAddressProvider** - main registry of addresses part of or connected to the protocol, including permissioned roles. It acts as a factory of proxies and admin, which can update corresponding implementations.
+          - **Guild** - the main system entry point that exposes core system operations to the end users
+          - **GuildConfigurator** - admin interface for controlling and configuring specific Guild instance
+          - **ACLManager** - enables management of system admin roles
+          - **PermissionedGuild** - Guild wrapper functionality with custom role-based access control (PermissionedGuildConfigurator, GuildRoleManager). It enables the whitelisting of actors interacting with the Guild to deposit, borrow, repay, and withdraw.
+      - Internal system logic
+          - **CollateralConfiguration** and **PerpetualDebtConfiguration** - enable managing various configuration settings for individual collaterals and overall system debt based on a bitpacked storage structure.
+          - **ConfiguratorLogic**, **GuildLogic** and **PerpetualDebtLogic** - handle initialization and configuration of debt and corresponding collateral data structures. In addition, ConfiguratorLogic handles upgrades of asset and liability token contracts.
+          - **CollateralLogic** - handles collateral deposit and collateral withdrawal implementation logic.
+          - **BorrowLogic** - handles the borrow and redemption implementation logic.
+          - **ValidationLogic** - implements various checks for core system operations.
+          - **GuildDebtLogic** and **PerpetualDebtLogic** - handle core operations for debt accounting, including interest accrual (`refinance`), debt creation (`mint` and `swapMint`), debt redemption (`burn` and `burnAndDistribute`).
+          - **LuqidationLogic** and **GenericLogic** - handle liquidation functionality by calculating important CDP parameters (such as liquidation health factor, collateral to liquidate - considering liquidation bonus, debt to redeem, and asset amount to charge).
+      - Pricing information
+          - **CovenantPriceOracle** - an entry point and facade for the internal system that enables the management and configuration of multiple price retrieval mechanisms (currently Chainlink and Uniswap TWAP) used to establish the value of collateral assets and debt token.
+          - This subsystem includes the following contracts: PriceOracleSentinel, ChainlinkV2V3OracleProxy, UniswapV3OracleProxy, and HardcodedOracleProxy.
+      - Token contracts
+          - **AssetToken** - is a transferable representation of borrowed assets. It represents “how much the user has borrowed.”
+          - **LiabilityToken** - non-transferable representation of particular collateralized debt position with associated accounting and interest accrual. It represents “how much is owed” to the system. In addition, LiabilityToken allows users to delegate to others to mint on their behalf based on CreditDelegation.
+          - AssetToken and LiabilityToken are **upgradeable** **contracts** with additional accounting for notional factor updates for value accrual.
+      
+      ### General Assumptions
+      
+      - Guild admins, with many privileged operations available to them, act responsibly and without malicious intent. In addition, they do not collude with borrowers or lenders to favor any of them.
+      - Initial system parameter configurations and their updates are performed with caution and analysis of implications (e.g., price oracles, fee rates, caps, flags per collateral/debt token, liquidation parameters per collateral).
+      - Before whitelisting specific collateral for the Guild, a particular ERC20 token is reviewed to ensure it follows expected risk guidelines and does not feature rebase, fee-on transfer, or other non-common ERC20 token functionality.
+      - System contracts are deployed on a Layer 2 EVM compatible network (e.g., Arbitrum, Optimism, Base), and deployment configuration considers specifics of a particular chain (e.g., block interval for reliable oracle TWAP price retrieval)
+      - All admin accounts and the owner of the GuildAddressesProvider contract instance for a particular Guild are multi-sig accounts with an appropriate number of signers.
+      
+      ### Trust Model
+      
+      - The owner of the GuildAddressesProvider has extensive privileges and may upgrade Guild implementation, GuildConfigurator implementation, GuildRoleManager implementation, CovenantPriceOracle with PriceOracleSentinel, update ACLManager with ACL admin, and change GuildDataProvider. Since these are core system components, the owner of the GuildAddressProvider is a trusted entity.
+      - Additional trust assumptions apply to specific system context in which collaterals are configured as non-mark-to-market, where loans are issued and collateral evaluated afterward based on the price of the collateral at the time of issue.
+      - The system maintains a general invariant that the value of the asset minted (asset token) is equal to the value of debt tracked (liability token) by updating notional factors whenever additional assets are minted, or debt/surplus is distributed.
+      
+      ### Recommendations
+      
+      - To perform an additional review of the system’s economic design and its performance under various stress test scenarios.
+    </template> 
+  </content-for>
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hashes:
+        <ul>
+        <li>Initial: <code>f357cc4bd28d44e974def3b71eb35a570aa39ecc</code> </li>
+        <li>Extension Oracle Proxies: <code>f1550b7af534474aa458e384e862d2a2444f3438</code> </li>
+        <li>Extension Chainlink Oracle: <code>2b554234629dbd303fbbfe00a0aa61e3dee41e8e</code> </li>
+        <li>Extension zToken<>Money swaps: <code>6f459a8ca3e2662035606982fc197e07c24587d3</code> </li>
+        <li>Extension LP Staking Rewards: <code>ba47b2c0f0f224c9739169b3ff695b4262d20c55</code> </li>
+         </ul>
+      </li>
+     
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>One initial and four extension commits were a part of Covenant's security review.</p>
+
+    <p>Specifically, we audited the following contracts for the Initial commit:</p>
+    <template type="file-hashes">
+      2cd117bc694da2324a33d5229fa813d02413d56f369e66ec10e851dfb32e3344  contracts/protocol/configuration/ACLManager.sol
+      0685645f66672cf626c067d1571144d3d3163d9a75d0f1b3f98156103a0cc83a  contracts/protocol/configuration/GuildAddressesProvider.sol
+      f03c3b3690228199a017afb2cad7ed4721c85702509c3abd46154c2f998ca201  contracts/protocol/configuration/GuildAddressesProviderRegistry.sol
+      7993207f382a256efbdb20998c1e3001da35f079be6148a32bf7a1589ef40239  contracts/protocol/guild/Guild.sol
+      ccedee01795e7d7f0d273ef54204a2b05cea65f71e11ce217c1c09cf954ab1ac  contracts/protocol/guild/GuildConfigurator.sol
+      f7ce6cce3d6b87def4c34fc1bf8ca263910c0872e757605a524a6461cb3f7a26  contracts/protocol/guild/GuildRoleManager.sol
+      0d632cabc881098d43c4906a9342b7b69b18ce9966fd8a115584f0bf2184133a  contracts/protocol/guild/GuildStorage.sol
+      938f6b462a0ef5f1974a7e864d802a05877ae2b9b741a2b7024f6ae917a6ebec  contracts/protocol/guild/PermissionedGuild.sol
+      52f5018e16fa11f352869629b1f7510096ef72f2c09e9687bc9661505d506106  contracts/protocol/guild/PermissionedGuildConfigurator.sol
+      d17c39a70ff093319eb6813ebc26481e9ed7c1bf04f2d07cf1458f88cdae3c7a  contracts/protocol/guild/PermissionedStorage.sol
+      80162e76d8a3a1188646f26a04061f4e5d071c243612aba27cbaf42df8d925aa  contracts/protocol/libraries/configuration/CollateralConfiguration.sol
+      c424d7bb99c1a712f07b8a2fee11932a82aac2be5cbe6834be38c490dd8ec8a0  contracts/protocol/libraries/configuration/PerpetualDebtConfiguration.sol
+      0c569fc2c8bf76d582bddf683b69118b2457507b3586d813f8dc1ad58afb0cb5  contracts/protocol/libraries/helpers/Errors.sol
+      4968b9e0e8cde17453505bdfc4de51a38efcfb606100089199306fcdcdecac6c  contracts/protocol/libraries/logic/BorrowLogic.sol
+      f2931f0d152a8dbe1d907b83d5f1034536b4dbfbca74955945692c4248347bb9  contracts/protocol/libraries/logic/CollateralLogic.sol
+      4821e5053010dce2a3871a48145553b2682193c0bb79a2fd2030d6116dae3e85  contracts/protocol/libraries/logic/ConfiguratorLogic.sol
+      101318a41009e1d88ab31fa38a42848a60600ffd79458fd9fb0091c9374eb555  contracts/protocol/libraries/logic/DexOracleLogic.sol
+      338bd1993422c56b33ddc1e34d2cfa7f9650762de0d9aa335f9a2080fddb588a  contracts/protocol/libraries/logic/GenericLogic.sol
+      936421d8e79c1d25233ff3da93bbc18d9d0717bb3364313460159a380a908307  contracts/protocol/libraries/logic/GuildLogic.sol
+      299b2da124895b4d6b9a37364a741d7c4ef1c37db558c769d9c2da39d57ad10f  contracts/protocol/libraries/logic/LiquidationLogic.sol
+      fa6a70962a525b9b010d33cb662dad9ff549fa4ed4ec9563be21c7b4e0fc0539  contracts/protocol/libraries/logic/PermissionedLogic.sol
+      90eed81c9b0a200c8c144b14267db8ac16a4950bf535ed06fe2bc8eff847c5c0  contracts/protocol/libraries/logic/PerpetualDebtLogic.sol
+      8918581f29a3b68c5761f46c3aa7a5ce8f1b1e6d6640fbe66b6f77525fc22d60  contracts/protocol/libraries/logic/ValidationLogic.sol
+      0ca4e9fc6f0b244444b49664063fdca6336342f526d13c3cd1fb9e2d504a4f0d  contracts/protocol/libraries/math/DebtMath.sol
+      f9d138bedf7112b401f5c6040bbbba498c481666780c4c283f443072b7f6d876  contracts/protocol/libraries/math/PercentageMath.sol
+      f13c71103ecf08c888f3f61646ec77f400b1ee18f3a1acb5739425084a1b18c8  contracts/protocol/libraries/math/WadRayMath.sol
+      9d086a81f904d280e43b3ad8a912038a99faf1a7308f0cf4616db97d44e1b74c  contracts/protocol/libraries/math/X96Math.sol
+      c6128eb80a7e8e1146d8d4a2a3fa2b5a3f52b24f2047a157448a5143673c4511  contracts/protocol/libraries/types/ConfiguratorInputTypes.sol
+      f1495947d5150648d978337db0d0ebbfebe5acde96a42c04b616c210e9489cb6  contracts/protocol/libraries/types/DataTypes.sol
+      f94b59b4d94e470b40b070caa60739cd9a92e863bbc658c46ac451639f3045f5  contracts/protocol/libraries/upgradeability/BaseImmutableAdminUpgradeabilityProxy.sol
+      89b61beba84a1071ca511a5d21ad3d6ea8fe2c8163ff750e41b7ae5fa96dd306  contracts/protocol/libraries/upgradeability/InitializableImmutableAdminUpgradeabilityProxy.sol
+      b1cdf61fd1d195527a1f4adac0d24a325a7da73cb1baaa4596e428e88030bcc0  contracts/protocol/libraries/upgradeability/VersionedInitializable.sol
+      2e8295b5bc16ea846ffefbb33642f1675b63b89d2a595d1b3a8164f061953f19  contracts/protocol/oracle/PriceOracleSentinel.sol
+      a4c5c5921a059d34205588cf42effe3ceca10d0f8cb5c036d2edb71e7cfdcef7  contracts/protocol/oracle/TazzPriceOracle.sol
+      3aa489c3ed99d95d31892e6e17f95f0187c7b511b1a52954b6847f9c7e6fdf76  contracts/protocol/oracle/proxies/AnkrEthOracleProxy.sol
+      2256fb75eefbbc384b16f55ff8c2a7bb86deaa982b359a4bf71af5a573362cd4  contracts/protocol/oracle/proxies/BalancerStableLPOracleProxy.sol
+      b06eff456c163c4f41c3080618952948868d73edf9d1b62eba5acbf99c73bb77  contracts/protocol/oracle/proxies/HardcodedOracleProxy.sol
+      5c69ec902f88caa99eb4f9453e878dcb7384cf5ba2034025b40decf933baa6ac  contracts/protocol/oracle/proxies/UniswapV3OracleProxy.sol
+      257a11b6ef4fe8819be172f46faedc9ca11d7a166656b45bb1c6610012177301  contracts/protocol/tokenization/AssetToken.sol
+      219f12b2c8b90daff5630f7906067755e572976ff7846f669249ca0d96b45662  contracts/protocol/tokenization/LiabilityToken.sol
+      3986e2d5dde3d885e083add9e9bab49439b3f5fd890980e788ac1e5e23767f00  contracts/protocol/tokenization/base/CreditDelegation.sol
+      2562482f2320a41755fad414158f7b8e02626e4a6b3f75da28b213d378c536af  contracts/protocol/tokenization/base/ERC20Storage.sol
+      29cf13d7b39c87dddbc9dc204bf356f90e41cabf92a6557332c31966a69f2109  contracts/protocol/tokenization/base/MintableUpgradeableERC20.sol
+      756439950327700f3f3c6f1300aeeb7b8f181e4cfea1c10a3092e433b8168594  contracts/protocol/tokenization/base/NotionalERC20.sol
+      37a0604e6f2d022a92a074b79402d3e42846bedde315d25d38058a19d2be0ff2  contracts/protocol/tokenization/base/UpgradeableERC20.sol
+    </template>
+
+    <p>Specifically, we audited the following contracts for the Oracle Proxies commit:</p>
+    <template type="file-hashes">
+      fb2e436e46f872a2797e2e94f2dfe5056f7faf74431571dab93927dc74059e13  contracts/protocol/oracle/proxies/HardcodedOracleProxy.sol
+      7e3bece1a98c748ce797bc4994866cb8f88adfb4ff5bae1f649f8c783725e1ed  contracts/protocol/oracle/proxies/OracleProxyCommon.sol
+      14827be708df9faab9fb91f301b92465ce5105a515252ff27e32ad4810601487  contracts/protocol/oracle/proxies/UniswapV3OracleProxy.sol
+    </template>
+
+    <p>Specifically, we audited the following contracts for the Chainlink Oracle commit:</p>
+    <template type="file-hashes">
+      7a538d3f981f7df20b4c9611f926bf38448322e3cd4e6883388b8ad2b2c55196  contracts/protocol/libraries/helpers/Errors.sol
+      48c2d500a36e5a74809ad89c7017d7115b762e3eba3b9ea74fea399b5c49ee74  contracts/protocol/oracle/proxies/ChainlinkV2V3OracleProxy.sol
+    </template>
+
+    <p>Specifically, we audited the following contracts for the zToken<>Money commit:</p>
+    <template type="file-hashes">
+      460c82b3a40e50b1885e52ec864affb2dccf3b065a90306076fe7fee7be85c74  contracts/protocol/guild/Guild.sol
+      4581ad0587e1e00060bc96da076cdf0c6bc808df776f3c2e625d0953d6e870eb  contracts/protocol/libraries/logic/BorrowLogic.sol
+      81052e5cbf01f39c4c3ab8e83933b8496ecf09702ee1c0d9d63b096c98e80f85  contracts/protocol/libraries/logic/PerpetualDebtLogic.sol
+      0dcd0dc874d8cd1c6efd67e22b48098f4a3dd7c1dc54939d88e86f5b39011a28  contracts/protocol/libraries/logic/ValidationLogic.sol
+      5c1975843e427c85e9ed0e592c11e9fcedd8a5686bef0228104aed15ec96e9c6  contracts/protocol/libraries/types/DataTypes.sol
+    </template>
+
+    <p>Specifically, we audited the following contracts for the LP Staking Rewards:</p>
+    <template type="file-hashes">
+      a35d3b1b71d7a763b2c5d4feb55e18e33483925ff596b55d97c7d755c793f91b  contracts/periphery/TazzFeeRouter.sol
+      b8a357579af68567ca47ffa5174e0f692bda22fa8a522978851f1825fd0ad3a5  contracts/protocol/guild/Guild.sol
+      1282edb6fab2d2aa25539af789dae84a392458b7da9d9602346045ab3b3e2eb0  contracts/protocol/libraries/helpers/Errors.sol
+      35af188d34900c1182c244e788cdbb5ae6a0a7ddd245c499accf3522161f5610  contracts/protocol/libraries/logic/LiquidationLogic.sol
+      b15ff872f5b0dade22f34303e8aff4988d83123e79cce811e9fb34506d00dc8e  contracts/protocol/libraries/logic/PerpetualDebtLogic.sol
+      e11395b2e2023808660e30eb451a06de7615049536c4d1c62721b882bd6a149b  contracts/protocol/oracle/TazzPriceOracle.sol
+      c64e0c9848d0e052850e60c7451ab1c2c892a58618f650abb521907bf59d5206  contracts/protocol/oracle/proxies/ChainlinkV2V3OracleProxy.sol
+    </template>
+  </content-for>
+</page>
