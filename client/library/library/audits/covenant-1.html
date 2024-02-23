@@ -6,7 +6,8 @@
   repoUrl="https://github.com/covenant-labs/covenant-v1"
   layout="/library/audits/_layout.html"
   customRepoInfo
-  repoCommitHashFinal="ba47b2c0f0f224c9739169b3ff695b4262d20c55"
+  repoCommitHash="f357cc4bd28d44e974def3b71eb35a570aa39ecc"
+  repoCommitHashFinal="23f852c4bc4f84ca7dc9b3a82c347af30d29df53"
   passwordEncrypt="env:PAGE_PASS_COVENANT_1"
   customReviewInfo
 >
@@ -93,8 +94,26 @@
       <li>
         <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
       </li>
+
+      <if cond="page.repoCommitHashFinal">
+        <li class="break-words break-all">
+          <b>Commit Hash (initial):</b>
+          <code>{{page.repoCommitHash}}</code>
+        </li>
+        <li class="break-words break-all">
+          <b>Commit Hash (final):</b>
+          <code>{{page.repoCommitHashFinal}}</code>
+        </li>
+      </if>
+      <else>
+        <li class="break-words break-all">
+          <b>Commit Hash:</b>
+          <code>{{page.repoCommitHash}}</code>
+        </li>
+      </else>
+
       <li class="break-words break-all">
-        Commit Hashes:
+        <b>Commit Hashes (initial for each extension):</b>
         <ul>
         <li>Initial: <code>f357cc4bd28d44e974def3b71eb35a570aa39ecc</code> </li>
         <li>Extension Oracle Proxies: <code>f1550b7af534474aa458e384e862d2a2444f3438</code> </li>
