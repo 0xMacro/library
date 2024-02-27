@@ -1,0 +1,141 @@
+<item>
+  <field name="topic">Griefing</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">d1aac878815d11c17da40df1e4e52d38dcb15cb3</field>
+  <field name="content">
+    ## [M-1] Quote token migration can be griefed
+    
+    **Reference**: [PR94#R83](https://github.com/idexio/idex-contracts-ikon/pull/94/files#diff-524b3227f3ccd14cb2f46d339208f5b244501e5afc0ed642e3145675fa1005e0R83)
+    
+    ### Description
+    
+    Quote token migration allows for the migration of the quote token from the initial source token to a different destination token. The protocol's intention is to initially use BWUSDC and later migrate it to the USDC.e representation, once it is in its final state.
+    
+    However, the current implementation is vulnerable to a griefing attack, which allows an attacker to break the entire migration process. The problematic part lies in the `Custodian.migrateAssets` function, specifically in the following `require` statement:
+    
+    ```jsx
+    // Entire balance must be migrated
+    require(
+      IERC20(destinationAsset).balanceOf(address(this)) == quantityInAssetUnits,
+      "Balance was not completely migrated"
+    );
+    
+    ```
+    
+    Since the balances of `destinationAsset` and the quantity sent to the `assetMigrator` must match exactly, an attacker can transfer a small amount (1 unit is enough) of the destination token to the `Custodian` contract. This action breaks the above check and causes the transaction to revert.
+    
+    The issue is classified as medium severity, as it can be remediated by upgrading (with a 3-day delay) the `USDCeMigrator` contract.
+  </field>
+</item>
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d5cbac6e5fd55fb547832fb56d32e8895d5957ce</field>
+    <field name="content">
+        ## [L-1] Fee-on-transfer tokens not supported in `EarningsEscrow`
+
+        **Reference**: [PR93#R197](https://github.com/idexio/idex-contracts-ikon/pull/93/files#diff-79c3dbdd6da98be532400f3cec175389a9ff6ed825c14198435ecc42078cb69fR197)
+        
+        ### Description
+        
+        The `_transferTo` function in *EarningsEscrow.sol* does not account for tokens applying transfer tax, which results in less value transferred to the `walletOrContract` address than requested. 
+        
+        As a result, transferring out tokens from the contract will fail on the require statement on line [L196](https://github.com/idexio/idex-contracts-ikon/pull/93/files#diff-79c3dbdd6da98be532400f3cec175389a9ff6ed825c14198435ecc42078cb69fR197):
+        
+        ```jsx
+        require(
+          balanceAfter - balanceBefore == quantityInAssetUnits,
+          "Token contract returned transfer success without expected balance change"
+        );
+        ```
+        
+        This is because (balanceAfter - balanceBefore) will be smaller than the quantity transferred.
+        
+        ### Remediations to Consider
+        
+        Consider handling fee-on-transfer tokens correctly by calculating `balanceAfter - balanceBefore` of the EarningsEscrow contract itself as instead to the receiving wallet.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4062dd24b8b334c3dce44ed8eb0543797bf3e443</field>
+    <field name="content">
+        ## [L-2] Use low-level `call` instead of `transfer`/`send` for withdrawing tokens
+        
+        **Reference**: [PR93#R188](https://github.com/idexio/idex-contracts-ikon/pull/93/files#diff-79c3dbdd6da98be532400f3cec175389a9ff6ed825c14198435ecc42078cb69fR188), [PR93#L266](https://github.com/idexio/idex-contracts-ikon/blob/691e9b9e8f181edc1686569c5bac1509b8a4b14a/contracts/bridge-adapters/ExchangeStargateAdapter.sol#L266)
+        
+        *EarningsEscrow.sol* supports earnings provided in native tokens when `assetAddress` is set to `0x0`. If so, tokens are withdrawn using the `.send` method:
+        
+        ```jsx
+        if (asset == address(0x0)) {
+          require(walletOrContract.send(quantityInAssetUnits), "ETH transfer failed");
+        } else {
+        ...
+        ```
+        
+        However, `send` sends a fixed amount of gas, and assumes the address it sends the token to doesn’t have a `fallback` or `receive` function that runs code. If the address is a contract with a custom fallback function, like a multi-sig, then the `send` will fail, and the receiving address will be prevented from withdrawing their funds.
+        
+        The same issue applies with *ExchangeStargateAdapter’s* `withdrawNativeAsset` function, which uses the `transfer` function.
+        
+        ### Remediations to Consider
+        
+        Use a low-level `call` to transfer native tokens; doing so will allow any contract or EOA to withdraw without issue.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [L-3] Missing `chainId` in signature for distributing escrow earnings
+        
+        **Reference**: [PR93#R171-R177](https://github.com/idexio/idex-contracts-ikon/pull/93/files#diff-79c3dbdd6da98be532400f3cec175389a9ff6ed825c14198435ecc42078cb69fR171-R177)
+        
+        The signature used in *EarningsEscrow* doesn’t include a `chainId` parameter. This makes the protocol susceptible to replay attacks when the protocol is deployed to multiple chains or when a hard fork of the chain happens. 
+        
+        ### Remediations to Consider
+        
+        Consider including the `chainId` to the signature message.
+    </field>
+    <field name="response">EarningEscrow contracts are only deployed by an IDEX admin with the operational practice of using a different wallet per target chain. Our operational guide for this release includes:
+
+        “The EarningsEscrow contract replay mechanism only includes the contract’s address. When deploying a new contract, confirm that the new contract address is not already used elsewhere, for example on another chain.”
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">df76ee8222d4783332ab5c6d65f67276957adc87</field>
+    <field name="content">
+        ## [Q-1] Margin requirement change on trades is not updated in documentation
+        
+        **Reference**: [PR85#R268-R302](https://github.com/idexio/idex-contracts-ikon/pull/85/files#diff-36fa6b519ace1fe41e1d1673c875798e332057b3ba35f4a4b46d0a41be0272b1R268-R302)
+        
+        Due to new business requirements, the margin requirements have changed. The change requires to meet `initialMarginRequirement` on trades when the buy or sell position is expanded and requires `maintenanceMarginRequirement` on trades when the buy or sell position is reduced.
+        
+        Consider updating the documentation properly to reflect the changed behavior.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-2] Declare functions as `external` instead of `public` when not used internally
+        
+        Throughout the code base, a lot of functions (e.g. public functions in *Custodian*, *Exchange*, *ExchangeStargateAdapter*, …) can be marked as `external` instead of `public` as they are not used internally. Consider changing them from `public` to `external` for clarity sake.
+    </field>
+  </item>

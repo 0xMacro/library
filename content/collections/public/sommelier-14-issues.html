@@ -1,0 +1,389 @@
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">98c7bd3a2df0171e191412c0182c67bf4adf3d82</field>
+    <field name="content">
+      ## [H-1] Strategist can steal assets based on slippage
+  
+      In `CurveAdaptor.sol` the functions `addLiquidity()` and `addLiquidityETH()` gives approvals to a provided `pool` address before making a call to it.
+  
+      ```solidity
+  
+       // Approve pool to spend amounts, and check for max available.
+      for (uint256 i; i < underlyingTokens.length; ++i)
+        if (orderedUnderlyingTokenAmounts[i] > 0) {
+            orderedUnderlyingTokenAmounts[i] = _maxAvailable(underlyingTokens[i], orderedUnderlyingTokenAmounts[i]);
+            underlyingTokens[i].safeApprove(pool, orderedUnderlyingTokenAmounts[i]);
+        }
+  
+       pool.functionCall(data); 
+      ```
+      Reference: [CurveAdaptor.sol#L222-L229](https://github.com/PeggyJV/cellar-contracts/blob/79cfe21291faefffe3a0f61574712b6f228acea1/src/modules/adaptors/Curve/CurveAdaptor.sol#L222-L229)
+  
+      However, this `pool` address is not validated to be associated with any positions in the cellar. This can allow a malicious strategist to pass in a custom contract and or custom `lptoken` that steals assets up to the slippage value set.
+  
+      **Remediations to Consider**
+  
+      Verify the passed in `pool` and `lptoken` are associated with one of cellars positions to ensure the contracts have been approved by the multi-sig and governance to not be malicious.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5fc6d6ece7bd2737bf9c5fb447d82a1ef902bb65</field>
+    <field name="content">
+      ## [H-2] Unverified underlying tokens
+  
+      When a strategist interacts with a curve pool, by either depositing or withdrawing liquidity, an array of `underlyingTokens` is passed in but not verified to be associated with the pool. If a strategist were to pass in some but not all of the underlying tokens of a pool when calling `withdrawLiquidityETH()`, then only the underlying tokens passed in would be received by the cellar from the `CurveHelper.sol` contract. This means that if the left out tokens received are worth less than what slippage allows, then execution would continue but the tokens would remain within the helper contract, and would be free to be taken by anyone if they call it using a custom pool. If assets of a provided underlying token are directly sent into the helper contract prior to withdrawing, the slippage check could be consistently passed, leaving at most the slippage to be taken, allowing a way to slowly drain a cellar.
+  
+      **Remediations to Consider**
+  
+      Pull the underlying tokens directly from the pool to ensure they are correct and none are missing. Additionally if the `CurveHelper.sol` contract uses the delta balance of tokens received before and after interacting with the pool rather than its total balance then assets cannot be sent in to help get over the slippage checks.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Oracle Manipulation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5be96d5e226ac693b29a04912e8511a1356564e9</field>
+    <field name="content">
+      ## [H-3] Curve pricing manipulation
+  
+      `Curve2PoolExtension.sol` and `CurveEMAExtension.sol` allowing pricing assets associated with Curve. However Curve has been found to have some pools where the `lp_price()` and `oracle_Price()` values used for these pricing to be potentially manipulatable, which could be exploited to extract value from the cellar.
+  
+      **Remediations to Consider**
+  
+      Set bounds on each asset priced with either `Curve2PoolExtension.sol` or `CurveEMAExtension.sol`, setting a limit on how much the price can diverge from expected values. Also consider making sure assets that are priced using these extensions are illiquid and only used by cellars with share price oracles, since it has multiple guards on rapid price changes.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">fb4b51a428fdad494465ac55f1e35b70a2fd2b34</field>
+    <field name="content">
+      ## [M-1] Sandwich griefing of rebalance execution
+  
+      When dealing with Curve pools that use native ETH, the `CurveHelper.sol` contract is used as a proxy to receive ETH and wrap it into WETH so the cellar can properly handle it. It will then send all the assets of the provided token types the helper contract holds to the cellar after successfully interacting with the pool and wrapping/unwrapping the ETH.
+  
+      ```solidity
+      pool.functionCall(data);
+  
+      // Iterate through tokens, update tokensOut.
+      tokensOut = new uint256[](underlyingTokens.length);
+  
+      for (uint256 i; i < underlyingTokens.length; ++i) {
+          if (address(underlyingTokens[i]) == CURVE_ETH) {
+              // Wrap any ETH we have.
+              uint256 ethBalance = address(this).balance;
+              IWETH9(nativeWrapper).deposit{ value: ethBalance }();
+              // Send WETH back to caller.
+              ERC20(nativeWrapper).safeTransfer(msg.sender, ethBalance);
+              tokensOut[i] = ethBalance;
+          } else {
+              // Send ERC20 back to caller
+              ERC20 t = ERC20(underlyingTokens[i]);
+              uint256 tBalance = t.balanceOf(address(this));
+              t.safeTransfer(msg.sender, tBalance);
+              tokensOut[i] = tBalance;
+          }
+      }
+      ```
+      Reference: [CurveHelper.sol#L152-L172](https://github.com/PeggyJV/cellar-contracts/blob/79cfe21291faefffe3a0f61574712b6f228acea1/src/modules/adaptors/Curve/CurveHelper.sol#L152-L172)
+  
+      However, since the entire balance of the helper contract is sent back to the cellar for each token an attacker could sandwich the rebalance call using this adaptor with ETH positions to send tokens expected to be received by the call directly to the curve helper. This would cause additional tokens to be sent into the cellar and with enough assets cause the rebalance deviation to be exceed after the rebalance calls are executed, causing rebalancing to revert. Then the attacker could immediately call one of the curve helper functions using a custom pool, and retrieve the tokens they initially sent in.
+  
+      This exploit could be made to prevent the cellar from executing important calls, but typically there would not be an incentive to attempt to pull this off.
+  
+      **Remediations to Consider**
+  
+      Instead of sending the entire balance of the helper for each token, get the balance before and after the interaction with the pool, ensuring the cellar only receives the tokens from the curve pool, preventing the possibility of griefing.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ce467a5b562cec786ff4614f3c3221a342dfede3</field>
+    <field name="content">
+      ## [M-2] Reentrancy guard for `CurveHelper`
+  
+      The `CurveAdaptor.sol` makes effort to prevent reentrancy from occurring when interacting with `Curve` pools as there has been known to be issues in the past with Curve. However, the `CurveHelper.sol` interacts with curve pools and directly holds assets that could be taken if a custom call is made when executing, up to the slippage tolerance.
+  
+      **Remediations to Consider**
+  
+      Add a reentrancy guard to the deposit and withdraw functions in `CurveHelper.sol`, to prevent the potential for assets to be stolen if reentrancy occurs via a curve pool. Note that this reentrancy guard should use unstructured storage to prevent a cellar delegate calling one of these functions and inadvertently writing to a used storage slot.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Error recovery</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">fb4b51a428fdad494465ac55f1e35b70a2fd2b34</field>
+    <field name="content">
+      ## [L-1] Ensure native ETH isn’t overridden
+  
+      In `CurveHelper.sol` when depositing liquidity in `addLiquidityETHViaProxy()` the amount of native ETH is tracked to send with the call to the pool.
+  
+      ```solidity
+      uint256 nativeEthAmount;
+  
+      // Transfer assets to the adaptor.
+      for (uint256 i; i < underlyingTokens.length; ++i) {
+          if (address(underlyingTokens[i]) == CURVE_ETH) {
+              // If token is CURVE_ETH, then approve adaptor to spend native wrapper.
+              ERC20(nativeWrapper).safeTransferFrom(msg.sender, address(this), orderedUnderlyingTokenAmounts[i]);
+              // Unwrap native.
+              IWETH9(nativeWrapper).withdraw(orderedUnderlyingTokenAmounts[i]);
+  
+              nativeEthAmount = orderedUnderlyingTokenAmounts[i];
+          }
+      }
+      ```
+      Reference: [CurveHelper.sol#L87-L98](https://github.com/PeggyJV/cellar-contracts/blob/79cfe21291faefffe3a0f61574712b6f228acea1/src/modules/adaptors/Curve/CurveHelper.sol#L87-L98)
+  
+      However, if there happens to be multiple `underlyingTokens` provided that are the `CURVE_ETH` address, then the tracked `nativeEthAmount` will be overridden, sending an improper value to the pool.
+  
+      **Remediations to Consider**
+  
+      Check if the `nativeEthAmount` is non-zero before setting it, and revert if thats the case.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">User inputs</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-2] `WithdrawalRequest` with zero price can be solved
+  
+      The `WithdrawQueue` contract allows users to set specific request parameters to exit ERC4626 positions by relaying complex withdrawal operations to third-party solvers. 
+  
+      Additionally, through the function `isWithdrawRequestValid` it’s possible to check whether a specific `userRequest` is valid or not depending on multiple parameters such as `sharesToWithdraw`, `deadline`, its corresponding share allowance, and `executionSharePrice`:
+  
+      ```solidity
+      function isWithdrawRequestValid(
+          ERC4626 share,
+          address user,
+          WithdrawRequest calldata userRequest
+      ) external view returns (bool) {
+          // Validate amount.
+          if (userRequest.sharesToWithdraw > share.balanceOf(user)) return false;
+          // Validate deadline.
+          if (block.timestamp > userRequest.deadline) return false;
+          // Validate approval.
+          if (share.allowance(user, address(this)) < userRequest.sharesToWithdraw) return false;
+          // Validate sharesToWithdraw is nonzero.
+          if (userRequest.sharesToWithdraw == 0) return false;
+          // Validate sharesToWithdraw is nonzero.
+          if (userRequest.executionSharePrice == 0) return false;
+  
+          return true;
+      }
+      ```
+      Reference: [WithdrawQueue.sol#L121-138](https://github.com/PeggyJV/cellar-contracts/blob/dev/macro-audit-14/src/modules/withdraw-queue/WithdrawQueue.sol#L121-L138)
+  
+      However, there are no checks in `solve()` to verify whether the `executionSharePrice` of a request is not `0`; only the `inSolve`, `deadline`, and `sharesToWithdraw` are validated:
+  
+      ```solidity
+      if (request.inSolve) revert WithdrawQueue__UserRepeated(users[i]);
+      if (block.timestamp > request.deadline) revert WithdrawQueue__RequestDeadlineExceeded(users[i]);
+      if (request.sharesToWithdraw == 0) revert WithdrawQueue__NoShares(users[i]);
+      ```
+      Reference: [WithdrawQueue.sol#L185-187](https://github.com/PeggyJV/cellar-contracts/blob/dev/macro-audit-14/src/modules/withdraw-queue/WithdrawQueue.sol#L185-L187)
+  
+      This could cause users to mistakenly set their share price to `0`, and their shares get drained without anything in return. 
+  
+      It is worth it to note that `updateWithdrawRequest` does not perform any sanity checks on the `userRequest` parameters and is used to add, update, or remove user withdrawal requests.
+  
+      **Remediations to Consider**
+  
+      Consider checking the `executionSharePrice` of each request before solving requests or documenting this potential behavior as a known pitfall.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">76b839a2b9e37ee551b8cc0698cdfbada6cd66df</field>
+    <field name="content">
+      ## [Q-1] Missing slippage input constraints
+  
+      In `CurveAdaptor.sol` slippage constraints are set in its constructor as immutable values, with a comment suggesting a range on this bound. 
+  
+      ```solidity
+      /**
+       * @notice Number between 0.9e4, and 1e4 representing the amount of slippage that can be
+       *         tolerated when entering/exiting a pool.
+       *         - 0.90e4: 10% slippage
+       *         - 0.95e4: 5% slippage
+       */
+      uint32 public immutable curveSlippage;
+  
+      constructor(address _nativeWrapper, uint32 _curveSlippage) CurveHelper(_nativeWrapper) {
+          addressThis = payable(address(this));
+          curveSlippage = _curveSlippage;
+      }
+      ```
+      Reference: [CurveAdaptor.sol#L69-L80](https://github.com/PeggyJV/cellar-contracts/blob/79cfe21291faefffe3a0f61574712b6f228acea1/src/modules/adaptors/Curve/CurveAdaptor.sol#L69-L80)
+  
+      Consider constraining the _curveSlippage to be between the values suggested to ensure slippage is setup as intended.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1bdb2d78200753027ef4165630c34317bd5a7d5e</field>
+    <field name="content">
+      ## [Q-2] Use `_maxAvailable()` for `withdrawFromBaseRewardPoolAsLPT`
+  
+      In ConvexCurveAdaptor.sol’s `withdrawFromBaseRewardPoolAsLPT()` function, if the passed in amount is set to uint256.max it sets the amount to be the balance of the cellar. This pattern is typically handled using `baseAdaptor`’s `_maxAvailable()` function. Consider using `_maxAvailable()` to keep with the same pattern followed by the other adaptors.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">5be96d5e226ac693b29a04912e8511a1356564e9</field>
+    <field name="content">
+      ## [Q-3] Use curly braces to wrap branches and loops
+  
+      In Contracts like `CurveAdaptor.sol`, there are branches and for loops that are large statements of code that are not wrapped within curly braces:
+  
+      ```solidity
+      // Approve pool to spend amounts, and check for max available.
+        for (uint256 i; i < underlyingTokens.length; ++i)
+            if (orderedUnderlyingTokenAmounts[i] > 0) {
+                orderedUnderlyingTokenAmounts[i] = _maxAvailable(underlyingTokens[i], orderedUnderlyingTokenAmounts[i]);
+                underlyingTokens[i].safeApprove(pool, orderedUnderlyingTokenAmounts[i]);
+            }
+  
+        pool.functionCall(data);
+      ```
+      Reference: [CurveAdaptor.sol#L222-L229](https://github.com/PeggyJV/cellar-contracts/blob/79cfe21291faefffe3a0f61574712b6f228acea1/src/modules/adaptors/Curve/CurveAdaptor.sol#L222-L229)
+  
+      Although this compiles, it can be confusing to read and is error prone if additional lines are added or edited. Consider wrapping longer segments of code with curly braces to make it more clear what is occurring.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">581a2ac1bca84c05f2b2893811f99608ee386de0</field>
+    <field name="content">
+      ## [Q-4] Use `uint256` for `_deadline`
+  
+      In `SimpleSlippageRouter.sol` a `_deadline` parameter is used to ensure the calls execution occurs before a set time, is of type `uint64`. Using variable sizes smaller than 32 bytes can increase gas cost, or cause callers to unnecessarily cast the value down to `uint64`. 
+  
+      Consider using `uint256` for `_deadlines`.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">03c1cd6515ed952d86511f9433e19cdd3647a066</field>
+    <field name="content">
+      ## [Q-5] `SimpleSlippageRouter` error naming
+  
+      In `SimpleSlippageRouter.sol`, the errors follow a naming convention of `SimpleSlippageAdaptor__`. 
+  
+      ```solidity
+      error SimpleSlippageAdaptor__ExpiredDeadline(uint64 deadline);
+      ```
+      Reference: [SimpleSlippageRouter.sol#L26](https://github.com/PeggyJV/cellar-contracts/blob/ee97878be541208174a7414a8fae9cb299b9372d/src/modules/SimpleSlippageRouter.sol#L26)
+  
+      Consider keeping with the name of the contract and use `SimpleSlippageRouter__` to preface errors.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">c64a36c36c06f2b9956eeae439f9dc7373bda867</field>
+    <field name="content">
+      ## [Q-6] Use `IERC4626` instead of `Cellar`
+  
+      In `SimpleSlippageRouter.sol`, each function takes in a `Cellar` which is interacted with. Since a `Cellar` shares the same interface and functionality as standard `ERC4626` vaults, using an `IERC4626` interface instead makes it more clear that the contract works for vaults in general.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">8452fbf31664e301a6dc9988473535110c9f0530</field>
+    <field name="content">
+      ## [G-1] Use delta share balance for slippage checks
+  
+      In `SimpleSlippageRouter.sol`, the functions `deposit()` and `withdraw()` preview the amount of shares received or burned for the provided `_assets` and use this value to compare slippage.
+  
+      ```solidity
+      function deposit(Cellar _cellar, uint256 _assets, uint256 _minimumShares, uint64 _deadline) public {
+          if (block.timestamp > _deadline) revert SimpleSlippageAdaptor__ExpiredDeadline(_deadline);
+          uint256 shares = _cellar.previewDeposit(_assets);
+          if (shares < _minimumShares) revert SimpleSlippageAdaptor__DepositMinimumSharesUnmet(_minimumShares, shares);
+          ERC20 baseAsset = _cellar.asset();
+          baseAsset.safeTransferFrom(msg.sender, address(this), _assets);
+          baseAsset.approve(address(_cellar), _assets);
+          _cellar.deposit(_assets, msg.sender);
+          _revokeExternalApproval(baseAsset, address(_cellar));
+      }
+      ```
+      Reference: [SimpleSlippageRouter.sol#L73-L82](https://github.com/PeggyJV/cellar-contracts/blob/ee97878be541208174a7414a8fae9cb299b9372d/src/modules/SimpleSlippageRouter.sol#L73-L82)
+  
+      The `previewDeposit()` or `previewWithdrawal()` functions are quite gas intensive, especially when called on cellars which don’t use a share price oracle. Instead of previewing, the change in shares of the caller, before and after the deposit or withdraw call can be used to determine slippage with reduced gas cost.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Chain compatibility</field>
+    <field name="content">
+      ## [I-1] `ConvexCurveAdaptor` only works for mainnet
+  
+      The `ConvexCurveAdaptor.sol` is setup to interact with Ethereum mainnet Convex contracts, since Convex contracts [differ on other chains](https://docs.convexfinance.com/convexfinanceintegration/side-chain-implemention).  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Curve Pricing</field>
+    <field name="content">
+      ## [I-2] Use caution when basing price off Curve pools
+  
+      Curve has been known to have multiple exploits and effort has and should be made to reduce the effect of potential exploits from negatively impacting Cellars. 
+      In the case of manipulating the valuation of Liquidity tokens: The `Curve2PoolExtension` is pricing is based on the values of the Curve pool, so caution and additional safety measures should be made to ensure pricing this way remains safe. Notably, Cellars that include positions priced using Curve pricing extensions should use the `ERC4626SharePriceOracle` which has additional safe guards, including a circuit breaker during volatile share price changes, as well as a time weighted average price that is used instead of the latest price if it benefits the protocol. This ensures that price manipulation has a limited effect on extracting value from the Cellar, and requires significant capital and time to do so, which should be caught beforehand. It is also suggested that positions priced using Curve should be made illiquid and not be a Cellars main asset, to prevent manipulation to over/under evaluate the value of these positions when users deposit/withdraw.
+  
+      In the case of reentrancy exploits: For each user deposit or withdrawal into Curve positions, checks are made to ensure the Curve pool isn’t in a reentered state. This ensures that no reentrancy attacks can be made by users to drain additional assets out of the cellar in case of a reentrancy exploit is found in a Curve pool a Cellar has a position in.
+    </field>
+  </item>
+  

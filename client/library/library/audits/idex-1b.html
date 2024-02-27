@@ -1,0 +1,236 @@
+<page
+  clientName="IDEX"
+  reportDate="February 12, 2024"
+  auditTitle="IDEX B-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/idexio/idex-contracts-ikon"
+  customRepoInfo
+  customReviewInfo
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from January 12 to January 16, and on February 2, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the respective PRs.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>PR 85:</b>
+        <a
+          href="https://github.com/idexio/idex-contracts-ikon/pull/85"
+          target="_blank"
+        >
+            /idex-contracts-ikon/pull/85
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>9d53426e2508587671ca891602f3262b76703d63</code>
+      </li>
+      
+      <li>
+        <b>PR 86:</b>
+        <a
+          href="https://github.com/idexio/idex-contracts-ikon/pull/86"
+          target="_blank"
+        >
+            /idex-contracts-ikon/pull/86
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>6c713066070ae62e163150585431096779030289</code>
+      </li>
+
+      <li>
+        <b>PR 87:</b>
+        <a
+          href="https://github.com/idexio/idex-contracts-ikon/pull/87"
+          target="_blank"
+        >
+            /idex-contracts-ikon/pull/87
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>cc2a38c738828d945348c90421e44bd201edaf55</code>
+      </li>
+
+      <li>
+        <b>PR 88:</b>
+        <a
+          href="https://github.com/idexio/idex-contracts-ikon/pull/88"
+          target="_blank"
+        >
+            /idex-contracts-ikon/pull/88
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>57f90117f408f3dccf17fb28a15be18bc52b9b69</code>
+      </li>
+
+      <li>
+        <b>PR 89:</b>
+        <a
+          href="https://github.com/idexio/idex-contracts-ikon/pull/89"
+          target="_blank"
+        >
+            /idex-contracts-ikon/pull/89
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>789f07db872d53776a2dc29fbbacbf60bbefe1ab</code>
+      </li>
+
+      <li>
+        <b>PR 90:</b>
+        <a
+          href="https://github.com/idexio/idex-contracts-ikon/pull/90"
+          target="_blank"
+        >
+            /idex-contracts-ikon/pull/90
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>612e842fca36031f7423e0497a0eededa8561b4a</code>
+      </li>
+
+      <li>
+        <b>PR 91:</b>
+        <a
+          href="https://github.com/idexio/idex-contracts-ikon/pull/91"
+          target="_blank"
+        >
+            /idex-contracts-ikon/pull/91
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>9fce821850ef0f981e055ec05f3d8dc3f649bd1d</code>
+      </li>
+
+      <li>
+        <b>PR 93:</b>
+        <a
+          href="https://github.com/idexio/idex-contracts-ikon/pull/93"
+          target="_blank"
+        >
+            /idex-contracts-ikon/pull/93
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>691e9b9e8f181edc1686569c5bac1509b8a4b14a</code>
+      </li>
+
+      <li>
+        <b>PR 94:</b>
+        <a
+          href="https://github.com/idexio/idex-contracts-ikon/pull/94"
+          target="_blank"
+        >
+            /idex-contracts-ikon/pull/94
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>c6d611f5739b826606813bca5d4bda7815b445e0</code>
+      </li>
+
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <br/>
+    <p>Changes for PR 85</p>
+    <template type="file-hashes">
+        5e41d4d36f4392603c161b2cb0158ad249654ad02cb02fb9ed6f7f1d349b68e5  contracts/libraries/BalanceTracking.sol
+        f676496498b45adfb30b7b6a60d0156d01f95b01a9829f96ab38b1c101034585  contracts/libraries/IndexPriceMargin.sol
+        a731c7341ca15f2e0b3795f9f1079c9a4422d9c1ad623ea8558a32cc7995ad6e  contracts/libraries/Trading.sol
+    </template>
+
+    <br/>
+    <p>Changes for PR 86</p>
+    <template type="file-hashes">
+        a181ec6fe79ccfb4fb5fcc9f55a9c77be926174897e218eeaa9ee4bf0c3f5208  contracts/bridge-adapters/ExchangeStargateAdapter.sol
+        80650b18d45190907521cfdf0a7c34dd4cccbaada979c61321b1ca9078093db8  contracts/libraries/Constants.sol
+        67e0fd2b891d02e0367dc5097abb47833385ee37c2b5fbe8029057c4b83e378f  contracts/libraries/Hashing.sol
+        f7c94e762fbf3e74af52940e43ed4f866e341f1e105bcd4d135ceca1245098ed  contracts/libraries/IndexPriceMargin.sol
+        b917dee7d20ed67705d7d48a93054ee44040af2f278c3ed0cc16901fc6c85018  contracts/libraries/PositionBelowMinimumLiquidation.sol
+        5056b4269f687d03dc2330916a4147c912809d611fe8b433d46fbc44b0e9cdb2  contracts/libraries/Structs.sol
+        c46b8e6b678a2f2ef735932e9fca526de5e89f8b05ee4b79135769dd17eb4c34  contracts/libraries/TradeValidations.sol
+        2608c3a67e834986526ae6d672009960bf80a582fae08e871f1d780a99b0a1b6  contracts/libraries/Withdrawing.sol
+    </template>
+
+    <br/>
+    <p>Changes for PR 87</p>
+    <template type="file-hashes">
+        220e0628420a810b0926c01e295206edb1fd40a614e3cedd381f7537542a4786  contracts/Exchange.sol
+        1cd0480b5dd633e680ec5c39864e856d750ffe044bcc52ee9baf4186d02ddb32  contracts/libraries/Depositing.sol
+        9489e5bb38976aa081d2feccb536df167e9a03fb54f99c76e4709976a04946d9  contracts/libraries/IndexPriceMargin.sol
+        4872aa093b59e1a054ff111d7eeff75490c57251ece62fcad5f3b0a27014eae3  contracts/libraries/OraclePriceMargin.sol
+        aa241dd4dc79a78983795b97cdffce3382879a8fcfa51f4b35fb868c0d0675f5  contracts/libraries/Withdrawing.sol
+        5f98e19a1c2566963c48f821822e6f90c140f39303b0d36c766e10dd0993af06  contracts/util/ExchangeWalletStateAggregator.sol
+    </template>
+
+    <br/>
+    <p>Changes for PR 88</p>
+    <template type="file-hashes">
+        d73b0d1b1e39c7f41ab3e05d58ec12a651c79daa37e12bae6511e92536be351a  contracts/libraries/IndexPriceMargin.sol
+        e30eeb22fd47afbc8513d03853940de6d666d965f6814185c00e9450c9c1e76b  contracts/libraries/LiquidationValidations.sol
+        5f1cb7d6a231a275203886c46cb5e795008f3ecb74c470a946981f506141c2e0  contracts/libraries/Structs.sol
+        4226aaf2e8a2254459d0d62b35e1c175ffc06ea7c8a8a62183af180969f6b628  contracts/libraries/WalletExitAcquisitionDeleveraging.sol
+        3e9a1b812ce2cba3de80d798958422ab56f7f80dd73226a1171c8a902c9405c5  contracts/libraries/WalletInMaintenanceAcquisitionDeleveraging.sol
+    </template>
+
+    <br/>
+    <p>Changes for PR 89</p>
+    <template type="file-hashes">
+        a31a0b12a38bcb037887743ce6cf24501af9a60cc37902bbf22c95aa299e432c  contracts/bridge-adapters/ExchangeStargateAdapter.sol
+    </template>
+
+    <br/>
+    <p>Changes for PR 90</p>
+    <template type="file-hashes">
+        a31a0b12a38bcb037887743ce6cf24501af9a60cc37902bbf22c95aa299e432c  contracts/bridge-adapters/ExchangeStargateAdapter.sol
+        4f3c56a05fcd515a614344f4d9dd0097e0f5ed3dacc1cbc60e630d71c7cd767c  contracts/libraries/WalletExitAcquisitionDeleveraging.sol
+        20a79c89f9074605d6a8aa8d740b9b0412e5a46b4f893109ca1bf42060c9a324  contracts/libraries/WalletInMaintenanceAcquisitionDeleveraging.sol
+    </template>
+
+    <br/>
+    <p>Changes for PR 91</p>
+    <template type="file-hashes">
+        2125b3c945e5ab69507efb5805b54f9ea04eb895d96e58f43a35492f6343c0c6  contracts/Exchange.sol
+    </template>
+
+    <br/>
+    <p>Changes for PR 93</p>
+    <template type="file-hashes">
+        7e2b6ee63afbb30a8e9251f73e22395b17d483600314858f1ecaf18f494a75bc  contracts/EarningsEscrow.sol
+    </template>
+
+    <br/>
+    <p>Changes for PR 94</p>
+    <template type="file-hashes">
+      8c7dac3d90ce8cddb10a9868092c5313aab77d36b3c69b4b0f57dffecb5bc31e  contracts/Custodian.sol
+      485937713f9224bfa493d83a2d05ebf8a0172506f05c2e9581a559b2a5b88481  contracts/EarningsEscrow.sol
+      042df087b1f0cc3cac3baa1f56675d90b44f57ef2da0b4375a4ec478928ab76f  contracts/Exchange.sol
+      78224a4abe8c13da328cc879e7efac635c0e70715073ea71267faf79dd37444e  contracts/Governance.sol
+      47f001901e3f0ca64439373348ca806439863498b170a6fd73bdb8420704dd1f  contracts/Owned.sol
+      44ad7e9832f6e2c47e7a5d52da3041f161824698e0a5f4bc7a0f41c760444dbe  contracts/asset-migrators/USDCeMigrator.sol
+      134e8eafb6aaf33c59a9c63c79adecc2da83100c3735ab24d4fb7d4593131a41  contracts/bridge-adapters/ExchangeStargateAdapter.sol
+    </template>
+  </content-for>
+
+</page>
