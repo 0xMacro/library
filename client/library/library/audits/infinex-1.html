@@ -1,7 +1,7 @@
 <page
   clientName="Infinex"
-  reportDate="December 22, 2023"
-  auditTitle="Infinex A-1a"
+  reportDate="Feb 21, 2023"
+  auditTitle="Infinex A-1"
   auditVersion="1.0.0"
   repoUrl2="https://github.com/infinex-io/infinex-platform-testnet"
   repoUrl="https://github.com/infinex-io/infinex-contracts"
@@ -12,34 +12,82 @@
   passwordEncrypt="env:PAGE_PASS_INFINEX"
 >
   <content-for name="schedule">
-    The security audit was performed by the Macro security team from December 11, 2023 to December 20, 2023.
+    The security audit was performed by the Macro security team in 3 parts 
+    Part 1 was performed from December 11, 2023 to December 20, 2023.
+    Part 2 was performed from January 18, 2024 to January 30th, 2024.
+    Part 3 was preformed from February 7th, 2024 to February 9th, 2024.
   </content-for>
 
   <content-for name="repo-info">
+
     <ul>
-      <li>
-        <b>Initial Repository:</b>
-        <a href="{{page.repoUrl2}}" target="_blank">
-          {{page.repoUrl2.split('/').slice(-1)[0]}}
-        </a>
+      <li> <b> Part 1:</b>
+        <ul>
+          <li>
+            <b>Initial Repository:</b>
+            <a href="{{page.repoUrl2}}" target="_blank">
+              {{page.repoUrl2.split('/').slice(-1)[0]}}
+            </a>
+          </li>
+          <li class="break-words break-all">
+            Commit Hash:
+            <code>c80660d5ff16f92ebfa9815c1100707c78643672</code>
+          </li>
+          
+          <li>
+            <b>Final Repository:</b>
+            <a href="{{page.repoUrl}}" target="_blank">
+              {{page.repoUrl.split('/').slice(-1)[0]}}
+            </a>
+          </li>
+          <li class="break-words break-all">
+            Commit Hash:
+            <code>4af67b895031fac265fa27d58366bf3d024bf218</code>
+          </li>
+        
+        </ul>
       </li>
-      <li class="break-words break-all">
-        Commit Hash:
-        <code>c80660d5ff16f92ebfa9815c1100707c78643672</code>
+      <li> <b>Part 2:</b>
+        <ul>
+          <li>
+            <b>Repository:</b>
+            <a href="{{page.repoUrl}}" target="_blank">
+              {{page.repoUrl2.split('/').slice(-1)[0]}}
+            </a>
+          </li>
+          <li class="break-words break-all">
+            Initial Commit Hash:
+            <code>d53e5377bbabb9fa1fa8c278d28a7c2f92f5dafb</code>
+          </li>
+          <li class="break-words break-all">
+            Final Commit Hash:
+            <code>c12879ec3ef695d8139351b21081b4fd5082c46e</code>
+          </li>
+        
+        </ul>
+
       </li>
-      
-      <li>
-        <b>Final Repository:</b>
-        <a href="{{page.repoUrl}}" target="_blank">
-          {{page.repoUrl.split('/').slice(-1)[0]}}
-        </a>
+      <li> <b>Part 3:</b>
+        <ul>
+          <li>
+            <b>Repository:</b>
+            <a href="{{page.repoUrl}}" target="_blank">
+              {{page.repoUrl2.split('/').slice(-1)[0]}}
+            </a>
+          </li>
+          <li class="break-words break-all">
+            Initial Commit Hash:
+            <code>21ca47a25b6e5dbdf945be134b38b3a2c302a993</code>
+          </li>
+          <li class="break-words break-all">
+            Final Commit Hash:
+            <code>c12879ec3ef695d8139351b21081b4fd5082c46e</code>
+          </li>
+        
+        </ul>
+
       </li>
-      <li class="break-words break-all">
-        Commit Hash:
-        <code>4af67b895031fac265fa27d58366bf3d024bf218</code>
-      </li>
-     
-    </ul>
+  </ul>
   </content-for>
 
   <content-for name="spec">
@@ -51,66 +99,56 @@
     <template type="audit-markdown">
       ### Actors
 
-    - Infinex Governance:
-        
-        Is a DAO that has control over upgrading the factory contract, setting the opt-in implementation upgrades for accounts, updating to new configuration beacons that account owners can opt into, and can set the trading and withdrawal fees for accounts.
-        
-    - Active Browser Keys:
-        
-        Can directly trade and modify collateral on accounts, initiate withdrawals to whitelisted addresses, remove active browser keys, and reject inactive browser keys. It can also upgrade the account to the value set in the `ProtocolConfigBeacon` by Infinex Governance and opt-in to update the values related to the circle bridge parameters to the values set by governance in the same beacon contract. 
-        
-        Along with an MFA key signature: can set and remove MFA and recovery keys, set an emergency withdrawal address, set allowlisted withdrawal addresses, as well as withdraw assets to any L2 address, or bridge over to any L1 address.
-        
-        Along with a Recovery key signature: can add browser keys.
-        
-    - Inactive Browser Keys:
-        
-        Can directly trade and modify collateral on accounts, and can be made into an active browser key either by another active browser key or after a 1-week delay period with a recovery key. 
-        
-    - MFA Keys:
-        
-        All actions require an active browser key as mentioned above.
-        
-    - Recovery Keys:
-        
-        Can set an inactive browser key that will activate after a 1-week delay, as well as the actions requiring an active browser key as mentioned above.
-        
-    - Emergency withdrawal address:
-        
-        Set by an active browser key and MFA key signature. Can directly withdraw and/or bridge assets from the account at any time. This should be set with caution and only trusted addresses should be used.
-        
-    - Whitelisted Address:
-        
-        Set by an active browser key and MFA key signature. Allows an active browser key to withdraw and/or bridge assets to this address. 
-        
-
-    ### External Assumptions:
-
-    - It is assumed that Synthetix governance and market owners will not act maliciously.
-    - It is assumed that Infinex governance will set fair trading and withdrawal fees, and that all account upgrades and beacon updates that accounts can opt into will be beneficial for users.
-
-    ### Account Assumptions
-
-    - Active account keys have control over the state and funds of the deployed accounts they control aside from trading and withdrawal fees. Governance can update the upgrades to accounts, and the configuration beacons, but account owners can choose to opt into them or not.
-    - Until accounts are deployed, given that the address of the deployed accounts is fully controlled by the factory, Infinex Governance has the power to change the deployed account logic; before the full flow of an account’s creation is completed in both chains (L1 deposit account and L2 trading account), it is assumed that no account implementation or beacon configurations changes would be applied.
-    - Different key actors are designed to avoid a single point of failure if any of the keys were compromised. Users can decide how to design their account’s access control and potentially centralize all guards into a singleton key if this is added to all roles.
-    - User’s funds are safe within the account as long as keys are not compromised, however, there are guards against single failure points to remove, recover, and add keys with different restrictions as described in the *Actors section.*
-
-    ### Accepted Risks:
-
-    - Users trading with these accounts will be interacting with SynthetixV3 Perps markets. These positions can be volatile, and these accounts have no safeguard to protect against losses or collateral liquidation. Users trade at their own risk.
-    - Potential exploits in Synthetix could cause account users to lose money or have assets locked.
-
-    ### Fees
-
-    - Current account implementations have a bounded withdrawal fee of 50 token units, typically USDC. Other tokens withdrawn from the account would get a max of 50 token units fee deducted as well.
-    - Trading fees are capped at 50 bps of the trade size delta.
+      - Infinex Governance:
+      Is a DAO that has control over upgrading the factory contract, setting the opt-in implementation upgrades for accounts, updating to new configuration beacons that account owners can opt into, and can set the trading and withdrawal fees for accounts.
+      - Strong Devices Keys:
+      User controlled addresses that have permission to directly trade, modify collateral on accounts, and initiate withdrawals to whitelisted addresses. It can also upgrade the account to the value set in the `ProtocolConfigBeacon` by Infinex Governance and opt-in to update the values related to the circle bridge parameters to the values set by governance in the same beacon contract. 
+              
+      Along with an Origin key signature: can revoke another strong device key, set an emergency withdrawal address, set allowlisted withdrawal addresses, add or remove a trusted forwarder, as well as withdraw assets to any L2 address, or bridge over to any L1 address.
+      - Weak Device Keys:
+          
+          Keys with less permission than strong device keys, have the ability to modify collateral and execute trades on SynthetixV3 perps. After a week delay of being set, it can be promoted to a strong device key, unless it is revoked.
+          
+      - Origin Key:
+          
+          Signing Key controlled by Infinex. As mentioned above, some Strong Device actions require a signature from this origin key. It can also add or revoke a weak device key on its own.
+          
+      - Emergency withdrawal address:
+      Set by a strong device key with an origin key signature. Can directly withdraw and/or bridge assets from the account at any time. This should be set with caution and only trusted addresses should be used.
+      - Whitelisted Address:
+      Set by a strong device key with an origin key signature. Allows a strong device key to withdraw and/or bridge assets to this address.
+      
+      ### External Assumptions:
+      
+      - It is assumed that Synthetix governance and market owners will not act maliciously.
+      - It is assumed that Infinex governance will set fair trading and withdrawal fees, and that all account upgrades and beacon updates that accounts can opt into will be beneficial for users.
+      
+      ### Account Assumptions
+      
+      - Strong device keys have control over the state and funds of the deployed accounts they control aside from trading and withdrawal fees. Governance can update the upgrades to accounts, and the configuration beacons, but account owners can choose to opt into them or not.
+      - The Origin key can add and remove weak device keys itself. A malicious weak key could lead to malicious trading/modification of collateral, and withdrawals if allowed to be promoted to a strong key after a week delay. It is assumed that the origin key will act in the best interest of users, and allow for proper account recovery.
+      - User’s funds are safe within the account as long as keys are not compromised, however, there are guards against single failure points to remove, recover, and add keys with different restrictions as described in the *Actors section.*
+      - Until accounts are deployed, given that the address of the deployed accounts is fully controlled by the factory, Infinex Governance has the power to disable the destination factory creation; before the full flow of an account’s creation is completed in both chains (L1 deposit account and L2 trading account), it is assumed that no account implementation or beacon configurations changes would be applied.
+      - Withdrawal actions require the Infinex Governance to first enable the withdrawal flag in the `ProtocolConfigBeacon`, until governance enables this flag, all deposited assets and positions will remain in the account.
+      
+      ### Accepted Risks
+      
+      - Users trading with these accounts will be interacting with SynthetixV3 Perps markets. These positions can be volatile, and these accounts have no safeguard to protect against losses or collateral liquidation. Users trade at their own risk.
+      - Potential exploits in Synthetix could cause account users to lose money or have assets locked.
+      - Users trading with these accounts will be interacting with SynthetixV3 Perps markets. These positions can be volatile, and these accounts have no safeguard to protect against losses or collateral liquidation. Users trade at their own risk.
+      - Potential exploits in Synthetix could cause account users to lose money or have assets locked.
+      
+      ### Fees
+      
+      - Current account implementations have a bounded withdrawal fee of 50 token units, typically USDC. Other tokens withdrawn from the account would get a max of 50 token units fee deducted as well.
+      - Trading fees are capped at 50 bps of the trade size delta.
+      - All actions relayed by the Infinex app will accrue gas fees for the transaction gas spent on the user’s behalf. These gas fees owed will be repaid when performing other actions and paid back to Infinex by modifying the user’s collateral position.
   </template>
   </content-for>
 
   <content-for name="source-code">
     <p>
-      Specifically, we audited the following contracts.
+      We audited the following contracts for part 1 of our audit from December 11 to December 20 2023 with a commit hash of c80660d5ff16f92ebfa9815c1100707c78643672.
     </p>
 
     <template type="file-hashes">
@@ -139,6 +177,68 @@
       eba26f4438bfed08734f400677c46cc3011cc2100282687370e6be445b7097cd  src/relayer/ERC2771Context.sol
       e0dcedf381e527360829876245c60727ec6095439ef8668e331c3faa31b459e9  src/relayer/ERC2771ContextStorage.sol
       a4630c5a99af659b9728d93cd8ad377f08aed80a752048201512810a0c88bdc7  src/relayer/ERC2771Forwarder.sol
+    </template>
+
+    <p>
+      We audited the following contracts for part 2.
+    </p>
+    <template type="file-hashes">
+      0ed92051a2be23809116168e49923a33df48afff8d33edb740ef03afe19ef2e1  src/ExternalModules.sol
+      002349016948b7771fdf5dd5dcc109d126b118f5cbc659877c3c8e0270a299f3  src/Initializable.sol
+      bfcf797fe9f0e2f34cd67ac33ca408340d18e471280f159b6d1bf366ca80b163  src/accounts/AccountFactory.sol
+      b69b12858fe67568d50953cd11dc646e4886ffdd875cc42664f168ee7ab86a96  src/accounts/modules/BaseModule.sol
+      10adbe6eec32d66947a736f369b9660803423d8b96d3e9e6b990b7ce36cec2ce  src/accounts/modules/BridgingModule.sol
+      eab08375ccbca2485d9264449370786ed7c9d45a740d4d1665cdac2877624734  src/accounts/modules/TradingModule.sol
+      acf2d5f5a1308a1444d82c5030e9abae48cd446e369d4ea5a8fcd349c41558d5  src/accounts/modules/UtilsModule.sol
+      c7f4390c2217da12f49aae465ce66c16f53c0076ec7c52b7858dd57484c0f5fd  src/accounts/modules/WithdrawModule.sol
+      06b480d6c46aa585f26199e06c58c7bd7d711a29dc479242ba6b73f1f750407d  src/accounts/storage/Account.sol
+      1b60f325a5e33380135d8d1cf03505708ea5847f271391fbc376cff28b791c58  src/accounts/storage/Bridge.sol
+      b64256fcb1be9e4e925ebc176d08a34bc0fb75c60ff05e6168750d5c859164f7  src/accounts/storage/EIP712.sol
+      2efdb02a49f35fc33e6ae563339400f1d5776da9578c6faf9c3b21463c326ad8  src/accounts/storage/Fees.sol
+      071a4f79ba0e9c841ba0231cf58f5e43012feaed858cac05bbb94a3951b2ef1e  src/accounts/storage/SecurityKeys.sol
+      7a9959a2ed601bd4420dd26bb6042dbefdae3aa119337e43419996ba93dc9073  src/accounts/storage/SynthetixV3.sol
+      002068d80636b680ac2f5f9dd8df07fbed82e7497d6c4abece09b974558ea199  src/accounts/storage/Withdrawal.sol
+      60425abe6fb2e82f11107ed2120243106dde3d3313357ec00fd190d339ddceae  src/accounts/utils/GasFeeRebate.sol
+      2e5e2571ad184cba2f08750491f1a038704bcba0da5297aa2e901a59b12d833c  src/accounts/utils/RequestTypes.sol
+      a87040fd1f98c7c12fdefd6f623a8a9806c5063bccb5f3f95db41af28c68a411  src/accounts/utils/SecurityModifiers.sol
+      29a5cf32c6e4dfd81e22fdf90fb6b03d91682e31d0b6dcb21ff7b55bf61b0ac1  src/beacons/InfinexProtocolConfigBeacon.sol
+      30500103f47a3a7fe071a3b86fa4890fe9f42d1bb9ef25e23386898c74645c44  src/beacons/SynthetixInformationBeacon.sol
+      0f6ef2572df36fd74c098f5b3cd4b9c2574f68be6b794237ee5aababce57d5a6  src/forwarder/ERC2771Context.sol
+      0f764405a8aba41a445ca119cc3313afb8e7c7ed45edfc8f5508f7e9c8858395  src/forwarder/ERC2771ContextStorage.sol
+      6791411fdcc09fa7323b29f39225321ca433d334d9ad44601a44266106b9aeac  src/forwarder/InfinexERC2771Forwarder.sol
+      ff57dffafdd6a8645d934b02e8268aecf42acd67330e3f4c7dcedfda0812650a  src/integrations/BridgeIntegrations.sol
+      c37680e3ac0b408fa6ec62279bdf1e0ade4c20ed776f4ce2edfab053c7f9c0af  src/interfaces/accounts/IAccountFactory.sol
+      004037f4abe4e3ac827e187c32619bf975c652b7be5a6df6824654e7a8825ee4  src/interfaces/accounts/IAccountTypes.sol
+      eceae141821227c75cf9881adac7ac1a27585c6504f0b1a6625fcb267c4a8413  src/interfaces/accounts/IBaseModule.sol
+      89682bfbbefc665be9010b3aa032d7563df7dca2f8703216829c7ace21353c44  src/interfaces/accounts/IBridgingModule.sol
+      0e209b31d76147d7512501b5f8240fdc72673955ad7600145d12797e0c2e2c37  src/interfaces/accounts/ITradingModule.sol
+      ad68e2b55d3bf3c57435802fb3e9660cdd8d04c4d1ae28db9e231fc75dd665f5  src/interfaces/accounts/IUtilsModule.sol
+      3b45bb3d3c87ac7f2611a0683bcd71ad23cc3ef9b4b6cc058cab25e6083bfa12  src/interfaces/accounts/IWithdrawModule.sol
+      d258824ee8ca82ef27eb5dab39974fd47f07c8eab2e65651c43f01ccd286b076  src/interfaces/beacons/IInfinexProtocolConfigBeacon.sol
+      61b5a82534cc98fa6c7cb951950017b9d4323288fc2a7ff4080b275b46a23c09  src/interfaces/beacons/ISynthetixInformationBeacon.sol
+      4b1ce64063b990b62219239072363ef4e9d0d8117b0b524208b76362ff963bee  src/interfaces/circle/IReceiver.sol
+      940772c4d6307e6d708e19cc92b56bd5c6fb02b95029bd9c0ae494e1f8c891a5  src/interfaces/circle/ITokenMessenger.sol
+      12798b9dcb0af716868373af93d0e8a46ffb4f3075063f187b21dec730cb296e  src/libraries/DecimalScaling.sol
+      21ad8cff6681d771cff49dc09d1976beaeb990542411162884189b9fc8e25f0a  src/libraries/Error.sol
+      d3fb53252d64db663a8817445f2b02fb668c003ae1636af04074ab8185950583  src/libraries/FeeCalculator.sol
+    </template>
+
+    <p>
+      We audited the following contracts for part 3.
+    </p>
+    <template type="file-hashes">
+      2161f9f35bc1266b26513e17212631228ef42d7239c5e7a092bcf86fc1a2c99a  src/accounts/AccountFactory.sol
+      7ab3f563380c03d0831d1a0ab08c610a5a1f40251ea1078df6dfe43fc4d1f8c5  src/accounts/modules/AccountUtilsModule.sol
+      887f7b44e9bf100505b623fa96d3619b76351979ac800289058b3e1721350b92  src/accounts/modules/BaseModule.sol
+      83ecd64061a4559ffebcbd065b342d6112218abd491916042036b8af92dfbcb5  src/accounts/modules/WithdrawModule.sol
+      0bd2a4a7a42d73ceac041cb89bdc57a9ce9dfd1d527b69b4ce425630e4bb95c8  src/accounts/storage/SecurityKeys.sol
+      548f6696fe0b5d6da479ed055ab3e00bccfe019fe1cf3d2afa34bb67d575e3d7  src/accounts/utils/RequestTypes.sol
+      cef1759b7cbe0be44ff054e1d0bfc6b356b01dbb7d3a06a3f224c3b1de0e8bc4  src/accounts/utils/SecurityModifiers.sol
+      616aca291af9e1958f4096c637d96c1c0151a7b0de71decff0ebc9b15f20a314  src/interfaces/accounts/IAccountFactory.sol
+      d2c2fdfd99e3ff75453a03207d868162b982d5fbf5f7f6600ad41a7f96ee42c8  src/interfaces/accounts/IAccountUtilsModule.sol
+      ea5a5c5e40988cef3f8ffeeeb9c902e2328fb30a22b4f3dc1e014eea381723a8  src/interfaces/accounts/IBaseModule.sol
+      86aa679f8e1bc542e9e668b36b10fcf63725d5dd66386694e4176d13e34fea5c  src/interfaces/accounts/IWithdrawModule.sol
+      b941503028fad186e8d631445f29399a0410222b411933e60c3cc57607fdd22c  src/libraries/Error.sol
     </template>
 
   </content-for>
