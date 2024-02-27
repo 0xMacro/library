@@ -99,60 +99,50 @@
     <template type="audit-markdown">
       ### Actors
 
-    - Infinex Governance:
-        
-        Is a DAO that has control over upgrading the factory contract, setting the opt-in implementation upgrades for accounts, updating to new configuration beacons that account owners can opt into, and can set the trading and withdrawal fees for accounts.
-        
-    - Active Browser Keys:
-        
-        Can directly trade and modify collateral on accounts, initiate withdrawals to whitelisted addresses, remove active browser keys, and reject inactive browser keys. It can also upgrade the account to the value set in the `ProtocolConfigBeacon` by Infinex Governance and opt-in to update the values related to the circle bridge parameters to the values set by governance in the same beacon contract. 
-        
-        Along with an MFA key signature: can set and remove MFA and recovery keys, set an emergency withdrawal address, set allowlisted withdrawal addresses, as well as withdraw assets to any L2 address, or bridge over to any L1 address.
-        
-        Along with a Recovery key signature: can add browser keys.
-        
-    - Inactive Browser Keys:
-        
-        Can directly trade and modify collateral on accounts, and can be made into an active browser key either by another active browser key or after a 1-week delay period with a recovery key. 
-        
-    - MFA Keys:
-        
-        All actions require an active browser key as mentioned above.
-        
-    - Recovery Keys:
-        
-        Can set an inactive browser key that will activate after a 1-week delay, as well as the actions requiring an active browser key as mentioned above.
-        
-    - Emergency withdrawal address:
-        
-        Set by an active browser key and MFA key signature. Can directly withdraw and/or bridge assets from the account at any time. This should be set with caution and only trusted addresses should be used.
-        
-    - Whitelisted Address:
-        
-        Set by an active browser key and MFA key signature. Allows an active browser key to withdraw and/or bridge assets to this address. 
-        
-
-    ### External Assumptions:
-
-    - It is assumed that Synthetix governance and market owners will not act maliciously.
-    - It is assumed that Infinex governance will set fair trading and withdrawal fees, and that all account upgrades and beacon updates that accounts can opt into will be beneficial for users.
-
-    ### Account Assumptions
-
-    - Active account keys have control over the state and funds of the deployed accounts they control aside from trading and withdrawal fees. Governance can update the upgrades to accounts, and the configuration beacons, but account owners can choose to opt into them or not.
-    - Until accounts are deployed, given that the address of the deployed accounts is fully controlled by the factory, Infinex Governance has the power to change the deployed account logic; before the full flow of an account’s creation is completed in both chains (L1 deposit account and L2 trading account), it is assumed that no account implementation or beacon configurations changes would be applied.
-    - Different key actors are designed to avoid a single point of failure if any of the keys were compromised. Users can decide how to design their account’s access control and potentially centralize all guards into a singleton key if this is added to all roles.
-    - User’s funds are safe within the account as long as keys are not compromised, however, there are guards against single failure points to remove, recover, and add keys with different restrictions as described in the *Actors section.*
-
-    ### Accepted Risks:
-
-    - Users trading with these accounts will be interacting with SynthetixV3 Perps markets. These positions can be volatile, and these accounts have no safeguard to protect against losses or collateral liquidation. Users trade at their own risk.
-    - Potential exploits in Synthetix could cause account users to lose money or have assets locked.
-
-    ### Fees
-
-    - Current account implementations have a bounded withdrawal fee of 50 token units, typically USDC. Other tokens withdrawn from the account would get a max of 50 token units fee deducted as well.
-    - Trading fees are capped at 50 bps of the trade size delta.
+      - Infinex Governance:
+      Is a DAO that has control over upgrading the factory contract, setting the opt-in implementation upgrades for accounts, updating to new configuration beacons that account owners can opt into, and can set the trading and withdrawal fees for accounts.
+      - Strong Devices Keys:
+      User controlled addresses that have permission to directly trade, modify collateral on accounts, and initiate withdrawals to whitelisted addresses. It can also upgrade the account to the value set in the `ProtocolConfigBeacon` by Infinex Governance and opt-in to update the values related to the circle bridge parameters to the values set by governance in the same beacon contract. 
+              
+      Along with an Origin key signature: can revoke another strong device key, set an emergency withdrawal address, set allowlisted withdrawal addresses, add or remove a trusted forwarder, as well as withdraw assets to any L2 address, or bridge over to any L1 address.
+      - Weak Device Keys:
+          
+          Keys with less permission than strong device keys, have the ability to modify collateral and execute trades on SynthetixV3 perps. After a week delay of being set, it can be promoted to a strong device key, unless it is revoked.
+          
+      - Origin Key:
+          
+          Signing Key controlled by Infinex. As mentioned above, some Strong Device actions require a signature from this origin key. It can also add or revoke a weak device key on its own.
+          
+      - Emergency withdrawal address:
+      Set by a strong device key with an origin key signature. Can directly withdraw and/or bridge assets from the account at any time. This should be set with caution and only trusted addresses should be used.
+      - Whitelisted Address:
+      Set by a strong device key with an origin key signature. Allows a strong device key to withdraw and/or bridge assets to this address.
+      
+      ### External Assumptions:
+      
+      - It is assumed that Synthetix governance and market owners will not act maliciously.
+      - It is assumed that Infinex governance will set fair trading and withdrawal fees, and that all account upgrades and beacon updates that accounts can opt into will be beneficial for users.
+      
+      ### Account Assumptions
+      
+      - Strong device keys have control over the state and funds of the deployed accounts they control aside from trading and withdrawal fees. Governance can update the upgrades to accounts, and the configuration beacons, but account owners can choose to opt into them or not.
+      - The Origin key can add and remove weak device keys itself. A malicious weak key could lead to malicious trading/modification of collateral, and withdrawals if allowed to be promoted to a strong key after a week delay. It is assumed that the origin key will act in the best interest of users, and allow for proper account recovery.
+      - User’s funds are safe within the account as long as keys are not compromised, however, there are guards against single failure points to remove, recover, and add keys with different restrictions as described in the *Actors section.*
+      - Until accounts are deployed, given that the address of the deployed accounts is fully controlled by the factory, Infinex Governance has the power to disable the destination factory creation; before the full flow of an account’s creation is completed in both chains (L1 deposit account and L2 trading account), it is assumed that no account implementation or beacon configurations changes would be applied.
+      - Withdrawal actions require the Infinex Governance to first enable the withdrawal flag in the `ProtocolConfigBeacon`, until governance enables this flag, all deposited assets and positions will remain in the account.
+      
+      ### Accepted Risks
+      
+      - Users trading with these accounts will be interacting with SynthetixV3 Perps markets. These positions can be volatile, and these accounts have no safeguard to protect against losses or collateral liquidation. Users trade at their own risk.
+      - Potential exploits in Synthetix could cause account users to lose money or have assets locked.
+      - Users trading with these accounts will be interacting with SynthetixV3 Perps markets. These positions can be volatile, and these accounts have no safeguard to protect against losses or collateral liquidation. Users trade at their own risk.
+      - Potential exploits in Synthetix could cause account users to lose money or have assets locked.
+      
+      ### Fees
+      
+      - Current account implementations have a bounded withdrawal fee of 50 token units, typically USDC. Other tokens withdrawn from the account would get a max of 50 token units fee deducted as well.
+      - Trading fees are capped at 50 bps of the trade size delta.
+      - All actions relayed by the Infinex app will accrue gas fees for the transaction gas spent on the user’s behalf. These gas fees owed will be repaid when performing other actions and paid back to Infinex by modifying the user’s collateral position.
   </template>
   </content-for>
 
