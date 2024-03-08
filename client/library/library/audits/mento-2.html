@@ -1,0 +1,53 @@
+<page
+  clientName="Mento"
+  reportDate="Jan 9th, 2023"
+  auditTitle="Mento A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/mento-protocol/mento-core"
+  repoCommitHash="0ea8149579ab277d181f342ff218bb2750eec04c"
+  repoCommitHashFinal="61eb278c1a1a16f103f6f1cfbc5b27aa577732f7"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_MENTO_2"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from October 17, 2023 to October 20, 2023. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+      <li>Available repository documentation and protocol documentation.</li>
+    </ul>
+
+  </content-for>
+
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+      9024a0ce18d292dd6beb54adbc82c4672d0b3c48040f957eb3bf7e8365aad7e2  ./contracts/governance/Airgrab.sol
+      57bcc0cf7d4502be94bd5bee45ec84a28d239471701ea881045d2fb166480e16  ./contracts/governance/Emission.sol
+      2fe6f7b8c6fed70ca54d764cc37f838f4497b078b9ef161d9812c66a245d2d14  ./contracts/governance/Factory.sol
+      0236961d15161f0ef18cadf93b0726aec9f70ee2f5b069335266a32573b1ddfe  ./contracts/governance/MentoGovernor.sol
+      32086fde6fe77ccd7d2b06b6eb65d44f4dc54525d19e7c4aff852781808e318b  ./contracts/governance/MentoToken.sol
+      d3929f0cea34b98766f04dbde63ba3356dc5d9f7b7e598b74f7d51391669aec9  ./contracts/governance/TimelockController.sol
+    </template>
+
+    <p>Additionally, the following forked contracts were reviewed for specific Celo changes but not fully audited as they a direct for from Raribles Locking contracts:</p>
+
+    <template type="file-hashes">
+      bd49ed658cb552a9b882c7b44c165612a8e5b702859fe45523b870f605c81f39  ./contracts/governance/locking/Locking.sol
+      19febb767f7ccc4e7c361d7846099484eff0c0e8268b8ee09c3020497216a3a1  ./contracts/governance/locking/LockingBase.sol
+      1aad15ff22b5b4141b203c5572c632d9f080ca80c424f45da92f133d2e7a59b7  ./contracts/governance/locking/LockingRelock.sol
+      e83679ec33f11f3ec0afa0f0f3ed2e42a8624de5b589d0ba8b10ab3af96b5843  ./contracts/governance/locking/LockingVotes.sol
+      ae88067d6bf351fb26c8531e810151cd94b41293e15f091d67f08d4dc42fcd2c  ./contracts/governance/locking/interfaces/ILocking.sol
+      b8f5d90ef5be5b91630d3a712760758ecf379260536ab79fe68179e349cc5523  ./contracts/governance/locking/interfaces/INextVersionLock.sol
+      591926c64bee1afaa163fd28307e6cb7b5f2240801b372825cba7e1096199f26  ./contracts/governance/locking/libs/LibBrokenLine.sol
+      2ad938c7a98263a4496b7909ab509a43c270cd267905ab5982440a9a7666e2a9  ./contracts/governance/locking/libs/LibIntMapping.sol
+    </template>
+
+  </content-for>
+  
+</page>
