@@ -1,0 +1,434 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">a9217a22fb3f17eda715dd8adf9308a44ed7afdc</field>
+    <field name="content">
+      ## [H-1] A malicious actor may preconfigure any scope with operators and whitelisted contracts under his control
+  
+      In the `PatchworkProtocol` contract, the `scope` is a main concept that defines a namespace with associated configuration settings valid for that namespace. If the scope’s owner is 0 address it is considered to be free and claimable. Anyone can claim the free scope using `PatchworkProtocol:claimScope()`. A successful claim will set the scope’s owner to the caller’s address while an unsuccessful one will revert due to the requested scope having an existing owner.
+  
+      The expectation is that after being claimed, the scope is non-configured. Also, it is expected that the new scope owner will need to configure the scope to be used properly. The scope owner can set operators, whitelist contracts, enable or disable whitelist, and update several other configuration parameters. It can also transfer ownership to a different address using the `transferScopeOwnership()` function. 
+  
+      However, the expectation that the scope is non-configured after being claimed can be broken by the actions of the malicious actor. The current implementation allows an attacker to front-run scope claim. Within the same transaction, an attacker may configure it with operators and whitelisted contracts under its own control. For this attack to succeed an attacker needs to perform at the end `transferScopeOwnership()` to `address(0)` making it *free* or claimable by the original requester.
+  
+      An original requester will successfully claim a particular scope. However, this scope will have extra operators, whitelisted contracts, and configuration settings that the current scope owner may not be aware of. As a result, an attacker may plant a backdoor in any new scope. For example, with an operator under its control, an attacker may whitelist and delist contracts, create patches, assign, batch assign, and unassign NFTs without being authorized by the current scope owner.
+  
+      **Remediations to Consider**
+  
+      - When scope is claimed it should not be possible to delete it or make it free ever again. Therefore, do not allow `transferScopeOwnership()` to `address(0)`, and
+      - Emit events in all the state-changing functions so it is easier to inspect state changes with off-chain monitoring tools.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">a1e14b229cef8b17019b273cbd2f65ccd27df62c</field>
+    <field name="content">
+      ## [H-2] Improper implementation of `PatchworkNFT:setFrozen()`
+  
+      In the `PatchworkNFT` contract, the token owner may freeze it using `setFrozen()`. When the token is frozen, it cannot be assigned, batch assigned, or unassigned as a frozen state status is checked when these operations are performed by the `PatchworkProtocol`.
+  
+      However, the `setFrozen()` function incorrectly reads the state of the `_locks[tokenId]` instead of `_freezes[tokenId]`. It performs extra conditions and logic on this improper value. This breaks the logic and spec of the contract. For example, if the token has been previously locked, it will not become frozen even though the transaction will succeed without reverts. 
+  
+      ```solidity
+      function setFrozen(uint256 tokenId, bool frozen_) public virtual {
+          require(msg.sender == ownerOf(tokenId), "not authorized");
+          //Should read the _freezes[tokenId] state variable 
+          bool _frozen = _locks[tokenId];
+          if (!(_frozen && frozen_)) {
+              if (frozen_) {
+                  _freezes[tokenId] = true;
+                  emit Frozen(tokenId);
+              } else {
+                  _freezeNonces[tokenId]++;
+                  _freezes[tokenId] = false;
+                  emit Thawed(tokenId);
+              }
+          }
+      }
+      ```
+  
+      **Remediations to Consider**
+  
+      - In the `setFrozen()` function, use `_freezes[tokenId]` state instead of `_locks[tokenId]`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Ranges</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">cc618b6f871da4fd2b8c225ce53cfb5eaaa9a145</field>
+    <field name="content">
+      ## [M-1] LiteRef implementation approach incorrect for token IDs that may be larger than uint56
+
+      In the `PatchworkLiteRef`, the `getLiteReference()` function generates a lite reference ID which acts as an identifier of the assignment of a particular fragment token to a particular `PatchworkLiteRef` contract instance. The given function generates a `uint64` lite reference by applying a bitwise OR operation between a `uint8 refId` (shifted left by 56 bits) and a `uint256 tokenId`. The implementation contains an implicit assumption that every provided fragment nft contract uses a sequentially incremented approach for `tokenId` identifiers. In addition, it assumes that the values of `tokenId` cannot be greater than type(uint56).max.
+  
+        ```solidity
+        function getLiteReference(address addr, uint256 tokenId) public virtual view returns (uint64 referenceAddress) {
+            uint8 refId = _referenceAddressIds[addr];
+            if (refId == 0) {
+                return 0;
+            }
+            return uint64(uint256(refId) << 56 | tokenId);
+        }
+        ```
+  
+      However, this assumption is not explicitly enforced. As a consequence, when `tokenId` values are larger than the expected max value, the overall integrity of the lite reference implementation will be affected as multiple different `tokenId` values may map to the same lite reference ID (due to silent overflow with uint64 downcast). This may affect the assignment and un-assignment of NFTs in dependent `PatchworkProtocol` functionality.
+  
+      **Remediations to Consider**
+  
+      - Explicitly check that the `tokenId` value is less than the `type(uint56).max` and in that way explicitly enforce the current assumption.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">48cbaecfd1f2c43066f013cc2ac801a226c52a5a</field>
+    <field name="content">
+      ## [M-2] Incorrect trust assumption in `applyTransfer()` may trigger unexpected `onAssignedTransfer()` calls
+  
+      In the `PatchworkProtocol` contract, the `applyTransfer()` function is responsible for keeping in sync state of dependent NFTs. It is meant to be called by the instances of the `PatchworkNFT` contract whenever one of the transfer function variants is invoked. However, `applyTransfer()` function is `public` and can be invoked by anyone.
+  
+      The `applyTransfer()` function performs several checks depending on which interfaces the caller supports. For example:
+  
+      - if the caller supports fragment functionality it will check if it is assigned and revert the token transfer if it is,
+      - if the caller supports patch functionality it will revert immediately as soulbound tokens transfers are not supported,
+      - if the caller supports patchwork NFT functionality it will check if it is locked and revert the token transfer if it is,
+      - if the caller supports patchwork lite references functionality, it will perform retrieval of all references from the caller and then iterate over returned references to perform `_applyAssignedTransfer()` for each, which will call `onAssignedTransfer()` on each contract defined by `addresses[i]` value.
+      
+          ```solidity
+          if (IERC165(nft).supportsInterface(IPATCHWORKLITEREF_INTERFACE)) {
+              IPatchworkLiteRef liteRefNFT = IPatchworkLiteRef(nft);
+              (address[] memory addresses, uint256[] memory tokenIds) = liteRefNFT.loadAllReferences(tokenId);
+              for (uint i = 0; i < addresses.length; i++) {
+                  if (addresses[i] != address(0)) {
+                      _applyAssignedTransfer(addresses[i], from, to, tokenIds[i]);
+                  }
+              }
+          }
+          ```
+
+      As you may notice from the above, the current implementation assumes that the caller always returns valid data. However, the caller may return fake references when `liteRefNFT.loadAllReferences(tokenId)` is invoked. As a result, `PatchworkProtocol` will on behalf of the malicious actor execute `onAssignedTransfer()` for provided tokens with from and to addresses defined by the caller/attacker.
+  
+      `PatchworkFragment:onAssignedTransfer()` even though it is public allows only the manager or `PatchworkProtocol` contract instance to invoke it. However, in this case, this check will be ineffective, and unexpected token `Transfer()` events will be emitted.
+  
+      Incorrect event emissions may adversely affect off-chain monitoring tools and dependent systems. This is especially important for a project such as Patchwork which is meant to be used and integrated with by many others.
+  
+      **Remediations to Consider**
+  
+      - Consider updating implementation to perform verification that the provided reference is indeed one that exists within the system and is managed by the caller of `applyTransfer()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">cb7769f7231b5c55a3ad8d7d54ea8b22b18332ab</field>
+    <field name="content">
+      ## [M-3] `PatchworkLiteRef`’s redacted functionality is unused
+  
+      The `PatchworkLiteRef` contract contains functionality for redacting (or suspending) previously registered reference addresses. This should not affect the fragments that are already assigned, but it should prevent any future assignments from that fragment contract. 
+  
+      However, if a particular identifier of reference address is redacted within `PatchworkLiteRef` this does not have any impact on the current system operation as the redacted state is never used or enforced anywhere within the current system implementation.
+  
+      Due to the above, the current redacted functionality is incomplete and unused.
+      So, there should be an additional check performed when assigning NFTs to ensure that they weren’t redacted.
+  
+      **Remediations to Consider**
+  
+      - Consider adding redacted state checks when assigning NFTs to ensure that they weren’t redacted, or
+      - Consider removing redacted functionality if it is not necessary.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] Long assignment chains may not be processable
+  
+      In the `PatchworkProtocol` there are several recursive functions that are used to either check the parent NFT’s frozen state during a transfer operation or to update the ownership tree.   
+  
+      - `PatchworkProtocol::_checkFrozen()`
+      - `PatchworkProtocol::updateOwnershipTree()`
+  
+      When initiating a transaction, there's a predefined gas limit, representing the utmost gas you're prepared to consume. Transactions that overshoot this limit are reverted, forfeiting the gas used until that juncture. Additionally,  every block in Ethereum has its own ceiling for gas consumption, restricting the gas expenditure for any single transaction. Deep recursions might risk exhausting a transaction's gas or risk making operations cost-prohibitive.
+  
+      **Remediations to Consider**
+  
+      - Consider limiting the level of nested assignments and/or
+      - Document current limits for end users to be aware of them.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">8c6da680a1cd0a9a9bd540a4b8ddabd924c7377d</field>
+    <field name="content">
+      ## [L-2] `setLocked()` and `setFrozen()` may emit unnecessary events
+  
+      In the `PatchworkNFT` contract, functions `setFrozen()` and `setLocked()` update `frozen` and `locked` state of the token respectively. When the state is updated corresponding events are emitted. The implementation of both functions contains logic to prevent unnecessary operations if the current state is the same as the requested state.
+  
+      However, due to the implementation error when the current state and requested state are both false, the system will emit unnecessary events and in the case of the `setFrozen()` function perform unnecessary increments of `_freezeNonces[tokenId]`. 
+  
+      This happens because the `if (!(_frozen && frozen_))` will always be `true` for the case where the values are `false` and `false` for old and new state as shown in the code snippet below:
+  
+      ```solidity
+      function setFrozen(uint256 tokenId, bool frozen_) public virtual {
+          require(msg.sender == ownerOf(tokenId), "not authorized");
+          bool _frozen = _freezes[tokenId];
+              //Duplicate calls possible for the case {false, false} as the result is `true`
+          if (!(_frozen && frozen_)) {
+                  ...
+          }
+      }
+      ```
+  
+      The same issue applies to `setLocked()` which mirrors the `setFrozen()` implementation.
+  
+      **Remediations to Consider**
+  
+      - Unnecessary events and state updates may affect off-chain monitoring tools and dependent clients. Therefore, consider updating the if condition logic in `setFrozen()`  and `setLocked()` to the following:
+      
+          ```markdown
+          if (_frozen != frozen_) {
+              ...
+          }
+          ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5d75243bf344204bce42a58c2ec16b9132566850</field>
+    <field name="content">
+      ## [L-3] `PatchworkLiteRef` implementation incompatible with ERC165 standard
+  
+      In the `PatchworkLiteRef` contract, the `supportsInterface()` function is implemented in the following way:
+  
+      ```solidity
+      function supportsInterface(bytes4 interfaceID) public view virtual returns (bool) {
+          return interfaceID == IPATCHWORKLITEREF_INTERFACE;  //PatchworkLiteReferenceInterface interface id            
+      }
+      ```
+  
+      However, concerning the `supportsInterface()` function, adherence to the ERC165 standard requires one of the following approaches:
+  
+      1. Inherit from ERC165 and utilize `super.supportsInterface(interfaceID)` to confirm support for ERC165's `interfaceId`.
+      2. Explicitly return `true` when the provided `interfaceID` matches the ERC165 `interfaceID = 0x01ffc9a7`.
+  
+      Current implementation does not implement any of these options and therefore is incompatible with ERC165.
+  
+      **Remediations to Consider**
+  
+      - Update implementation to be compatible with the ERC165 standard.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">87be12d0789fea30db127254bc9b39d6a08a9444</field>
+    <field name="content">
+      ## [Q-1] Missing events for important state changes
+  
+      Crucial state-altering functions do not emit any events. As a result, these changes are not logged. We recommend adding events to these functions to ensure state changes are comprehensively logged and indexed. This will make them easily searchable and facilitate the identification of significant state modifications with the help of off-chain monitoring and tracking tools.
+  
+      - `PatchworkProtocol`
+          - `claimScope()`
+          - `addOperator()`
+          - `removeOperator()`
+          - `setScopeRules()`
+          - `addWhitelist()`
+          - `removeWhitelist()`
+      - `PatchworkNFT`
+          - `setPermissions()`
+          - `storePackedMetadataSlot()`
+          - The `Thawed` ****event might be enhanced by including the value of the nonce in its emission
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a7fe69274cede0e0da569f1845d972e1f8c5a5b6</field>
+    <field name="content">
+      ## [Q-2] Missing indexed attributes for Frozen and Thawed events
+  
+      In the `IPatchworkNFT` interface, `Frozen()` and `Thawed()` events are defined. However, these events do not declare `tokenId` to be indexed, which enables the ability to search the logs in off-chain monitoring and tracking tools.
+  
+      ```solidity
+      /// @notice Emitted when the freeze status is changed to frozen.
+      /// @param tokenId The identifier for a token.
+      event Frozen(uint256 tokenId);
+  
+      /// @notice Emitted when the locking status is changed to not frozen.
+      /// @param tokenId The identifier for a token.
+      event Thawed(uint256 tokenId);
+      ```
+  
+      Consider adding indexed attributes for `tokenId` in `Frozen()` and `Thawed()` events.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">0b5bcce35a4e61d34f50df7619295d08250bbacb</field>
+    <field name="content">
+      ## [Q-3] Define visibility for contract variables explicitly
+  
+      In both the `PatchworkNFTBase.sol` and `PatchworkProtocol.sol` state variables are declared without visibility modifier, making them implicitly and by default `internal`. Taking into account that all of the contracts in the `PatchworkNFTBase.sol` are meant to be inherited, consider defining visibility for contract variables explicitly to facilitate usage and integration of Patchwork contracts.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5038150c1bab7238fcd8e28645e5e80e82127131</field>
+    <field name="content">
+      ## [Q-4] Remove redundant functionality in `batchAssignNFT()`
+
+      In the `PatchworkProtocol`, the `batchAssignNFT()` function enables users to assign multiple NFT fragments to a target NFT in a single batch. It provides a better user experience for a relatively common use case. In addition, as expected it shares a lot of functionality with the `assignNFT()` function which handles the assignment of a single NFT fragment to a target NFT. However, this shared functionality is duplicated. As a result, contract code size is bigger, and code maintenance may be more error-prone.
+  
+      Consider:
+  
+      - extracting common functionality into the helper internal method, or
+      - (re)moving `batchAssignNFT()` functionality from the core protocol into a utility contract as it doesn’t represent the main system feature.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b8094068f83ae3e09f5ca7e2b069a457ab13e0e3</field>
+    <field name="content">
+      ## [Q-5] Use custom errors
+  
+      Throughout the codebase, errors are defined as strings in `require` expressions. While this was for a long time the only option, since version 0.8.4 Solidity supports the [custom errors](https://soliditylang.org/blog/2021/04/21/custom-errors/) feature which provides a better developer and integration experience. In addition, the use of this feature reduces contract size and improves the gas efficiency of corresponding system operations.
+  
+      Consider updating `PatchworkProtocol` and `PatchworkNFTBase` to report custom errors which will require their enumeration and consistent application.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Natspec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5837adc91e7362a39312915694b2cf656e8d8ce6</field>
+    <field name="content">
+      ## [Q-6] Improve Natspec documentation
+
+      - `PatchworkProtocol`
+          - Add comments for state variables and events
+      - `PatchworkNFT`
+          - Add comments for state variables and events
+          - Add comments for functions, including their objectives, input parameters, and return types.
+      - `PatchworkNFTInterface`
+          - `PatchworkNFTInterfaceMeta`
+              - Missing natspec comment for structs and enums
+          - `IPatchworkNFT`
+              - Missing natspec comment for a return value for several functions
+              - Inconsistent naming of tokenId argument in different functions (`tokenId` vs `_tokenId`)
+          - `IPatchworkPatch`
+              - Inconsistent use of `uint` and `uint256` (e.g. in `mintPatch()` declaration)
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3781d4cc15bfd24e6e6db163326ab88d78975163</field>
+    <field name="content">
+      ## [Q-7] Consider using modifiers for common checks in the `PatchworkProtocol`
+
+      In the `PatchworkProtocol`, the following checks are repeated in various functions. 
+  
+      - `require(msg.sender == s.owner, "not authorized")`
+      - `require(msg.sender == s.owner || s.operators[msg.sender], "not authorized")`
+      - `require(scope.owner != address(0), "Scope does not yet exist")`
+  
+      For enhanced maintenance and readability consider implementing these checks in function modifiers or internal helper methods.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1da3a22c247dba6dedee20a31997b33c4eeb7308</field>
+    <field name="content">
+      ## [Q-8] Use built-in interface identifiers instead of precalculated constants
+  
+      In the `PatchworkNFTInterface`, four different constants are defined, which represent interface identifiers. These constants are used in both `PatchworkNFTBase` and `PatchworkProtocol` for detecting specific functionality support. However, this approach is error-prone as interface functionality may change, and constants may end up being incorrect.
+  
+      Consider using a built-in interface identifier, for example `type(IPatchworkNFT).interfaceId` instead of `IPATCHWORKNFT_INTERFACE` constant.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">82e563137fd9def64344afe6eaf73f1d240ea1b4</field>
+    <field name="content">
+      ## [Q-9] Unused string conversion utility functions in `PatchworkNFT`
+  
+      In the `PatchworkNFT` contract, the utility functions `_toString8()`, `_toString16()`, `_toString32()`, and `trimUp()` are unused. For improved modularity and easier updates in the future, we recommend relocating them to a dedicated utility library instead of being an integral part of core system contracts.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1da3a22c247dba6dedee20a31997b33c4eeb7308</field>
+    <field name="content">
+      ## [Q-10] Unnecessary import of the `Selector` contract
+
+      In the `PatchworkNFTInterface.sol` file `Selector` contract is defined. This contract is a utility contract, which is exclusively used to calculate ERC165 interface identifiers and for testing purposes. Both `PatchworkNFTBase` and `PatchworkProtocol` import  `PatchworkNFTInterface`. As a result, the `Selector` contract code unnecessarily becomes part of the deployed contracts.
+  
+      Consider relocating the `Selector` contract to the tests directory and reclassifying it as either a utility or a library function.
+    </field>
+  </item>
+ 
+  <item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8cb244465b53d4daa36fd1e453638f195fe82a06</field>
+    <field name="content">  
+      ## [Q-11] Unnecessary declaration of `locked()` in `IPatchworkNFT`
+  
+      In the `IPatchworkNFT` interface, a `locked()` function is declared. This declaration has the same function signature as the `IERC5192:locked()` function declared in the `IERC5192` interface which `IPatchworkNFT` inherits from.
+  
+      Consider removing the `locked()` function declaration from the `IPatchworkNFT` as it is unnecessary, and update the corresponding `IPATCHWORKNFT_INTERFACE` value.
+    </field>
+  </item>
+  

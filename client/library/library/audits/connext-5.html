@@ -1,0 +1,34 @@
+<page
+  clientName="Connext"
+  reportDate="February 22, 2024"
+  auditTitle="Connext A-5"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/connext/monorepo"
+  repoCommitHash="744573a6f3586159ff454ef4ddfba4cab6c88e9d"
+  repoCommitHashFinal="0074c04a8fc190768e95fc80259fb39d43201e4b"
+  layout="/library/audits/_layout.html"
+  customReviewInfo
+  passwordEncrypt="env:PAGE_PASS_CONNEXT_5"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on February 22, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Specification documentation provided by {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository, in the `packages/deployments/contracts/contracts/messaging/` directory:</p>
+
+    <template type="file-hashes">
+        a361c5a7e92990dede4bffa3661412f006117d0eda792f4ff224949c4ba04b73  packages/deployments/contracts/contracts/messaging/connectors/ConnectorsLib.sol
+        9fc2d494c996e1bac7dc5feb1342f91a76c940e55662c4d8cf11676c29f7e673  packages/deployments/contracts/contracts/messaging/connectors/scroll/BaseScroll.sol
+        4453f048ffac4b44c35c1a92c944a6f9748b0128a75ec8bccb80fe43a7f526dc  packages/deployments/contracts/contracts/messaging/connectors/scroll/ScrollHubConnector.sol
+        5118ef237666be28f6dc5d582a25503726db4aa0a424370cbae12e45464fe5c9  packages/deployments/contracts/contracts/messaging/connectors/scroll/ScrollSpokeConnector.sol
+    </template>
+</content-for>
