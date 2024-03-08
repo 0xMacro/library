@@ -1,0 +1,260 @@
+<item>
+    <field name="topic">Configuration</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4a722be36f47cff62b80ecb4a6e608a09665b3ca</field>
+    <field name="content">
+      ## [L-1] Token can be changed mid lifecycle bricking the emission schedule
+  
+      **Reference:** [Emission.sol#L46-49](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/Emission.sol#L46-L49)
+  
+      The `Emission` contract includes an `onlyOwner` setter function for the token. If this token is changed mid-cycle, the emission schedule will be disrupted, counting previously emitted tokens as emitted for the new token and potentially bricking the programmed amounts of governance token supply for any given time. 
+  
+      **Remediations to Consider**
+  
+      Consider allowing this function to only set the token contract once.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Configuration</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">4a722be36f47cff62b80ecb4a6e608a09665b3ca</field>
+    <field name="content">
+      ## [L-2] Initialization functions of contracts can be removed
+  
+      Contracts like `MentoToken.sol`, `Emission.sol`, and `Airgrab.sol` have initializers and/or setters that are used to set values after deployment. This is due to circular dependencies where they each need the address of another contract that may yet be deployed in the factory contract’s `createGovernance()` call. However, there is a way to know the address of a contract before it is deployed, since when deploying a contract using the `CREATE` opcode, it will deterministically deploy the contract with an address based on the contract’s nonce value. Since `createGoverance()` will only be called once, these values are known and the addresses of the contracts to be deployed can be predicted in advance and used in the constructors of other contracts before their deployment, provided no calls are made to them before they are deployed.
+  
+      **Remediations to Consider**
+  
+      Remove unnecessary setters and initializers by predicting the required addresses before they are deployed. This will reduce the bytecode size of the contracts as well as remove the perception that these contracts are upgradable/mutable.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Configuration</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="response">
+        We are not going to fix this because:<br>
+        1- Probability of this happening is really small, only happens for really low lock amounts<br>
+        2- Impact is low, ie a wrong revert message<br>
+        3- We want to keep the changes to the forked library minimal
+    </field>
+    <field name="content">
+      ## [L-3] `Locking` contract can underflow
+  
+      In `LockingBase.sol`’s `getLock()`function, a call is made to `divUp()` to get the `lockSlope`. The `lockAmount` is passed in as the `a` parameter which gets subtracted by 1 before it is divided.
+  
+      ```solidity
+      function divUp(uint96 a, uint96 b) internal pure returns (uint96) {
+        return ((a - 1) / b) + 1;
+      }
+      ```
+  
+      **Reference**: [LockingBase#L219-L221](https://github.com/mento-protocol/mento-core/blob/feat/tokenWork/contracts/governance/locking/LockingBase.sol#L219-L221)
+  
+      If `lockSlope` is 0, then the function will revert with an underflow. The case where the `lockSlope` can be set to zero is if the `amountMultiplied` is less than the `ST_FORMULA_DIVIDER`, which can occur if the `cliff` is set to zero, the `slopePeriod` is equal to the `minSlopePeriod`, which is 1, and the amount is sufficiently small, ≤ 5.
+  
+      ```solidity
+      function getLock(
+        uint96 amount,
+        uint32 slopePeriod,
+        uint32 cliff
+      ) public view returns (uint96 lockAmount, uint96 lockSlope) {
+        require(cliff >= minCliffPeriod, "cliff period < minimal lock period");
+        require(slopePeriod >= minSlopePeriod, "slope period < minimal lock period");
+  
+        uint96 cliffSide = (uint96(cliff - uint32(minCliffPeriod)) * (ST_FORMULA_CLIFF_MULTIPLIER)) /
+          (MAX_CLIFF_PERIOD - uint32(minCliffPeriod));
+        uint96 slopeSide = (uint96((slopePeriod - uint32(minSlopePeriod))) * (ST_FORMULA_SLOPE_MULTIPLIER)) /
+          (MAX_SLOPE_PERIOD - uint32(minSlopePeriod));
+        uint96 multiplier = cliffSide + (slopeSide) + (ST_FORMULA_CONST_MULTIPLIER);
+  
+        uint256 amountMultiplied = uint256(amount) * uint256(multiplier);
+        lockAmount = uint96(amountMultiplied / (ST_FORMULA_DIVIDER));
+        lockSlope = divUp(lockAmount, slopePeriod);
+      }
+      ```
+  
+      **Reference**: [LockingBase#L200-L221](https://github.com/mento-protocol/mento-core/blob/feat/tokenWork/contracts/governance/locking/LockingBase.sol#L200-L221)
+  
+      **Remediations to Consider**
+  
+      This case should be handled by a custom error, or the minimum amount to lock should be sufficiently high to prevent this underflow from occurring.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sanity check</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        We think address(0) check does not provide value in our case. We believe address(0) is not that different than address(1) when the function is called by the governance.
+    </field>
+    <field name="content">
+      ## [Q-1] Lack of `address(0)` checks
+  
+      **References:** [Emission.sol#L46-49](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/Emission.sol#L46-L49), [Emission.sol#L55-58](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/Emission.sol#L55-L58), [LockingBase.sol#L148](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/locking/LockingBase.sol#L148), [MentoToken.sol#L31-53](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/MentoToken.sol#L31-L53)
+  
+      Consider adding sanity checks for all address setters to avoid misconfigurations with `address(0)` as a value.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ca53ca9184d0c8151d76761db95563e155b0739f</field>
+    <field name="content">
+      ## [Q-2] Unnecessary `uint256` cast
+  
+      **Reference:** [Airgrab.sol#L131](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/Airgrab.sol#L131)
+  
+      In the `Airgrab.sol` contract, the modifier `canClaim()` unnecessarily casts the input parameter `amount` to `uint256`, even though it is already a `uint256` variable. Consider removing this unnecessary typecast.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant code</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        ILocking is not shared between LockingBase and Airgrab. Fixing this would require us to introduce a shared interface and we are not sure if it worths it
+    </field>
+    <field name="content">
+      ## [Q-3] Duplicated constant variable declaration
+  
+      **Reference:** [Airgrab.sol#L28-29](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/Airgrab.sol#L28-L29), [LockingBase.sol#L18-19](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/locking/LockingBase.sol#L18-L19)
+  
+      Both `Airgrab` and `LockingBase` contracts declare constant variables `MAX_CLIFF_PERIOD` and `MAX_SLOPE_PERIOD`. Consider moving these declarations to the shared imported interface `ILocking.sol` to keep one source of truth for these values.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Good practice</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">4a722be36f47cff62b80ecb4a6e608a09665b3ca</field>
+    <field name="content">
+      ## [Q-4] `treasury` address can be set in the constructor
+  
+      **Reference:** [Airgrab.sol#L66](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/Airgrab.sol#L66), [LockingBase.sol#L190](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/Airgrab.sol#L190)
+  
+      The `treasury` variable, in `Airgrab`, is set in the `initialize()` function, used as a workaround for the circular dependencies with the `Token` and `LockingContract`. However, this value does not need to be initialized after deployment. Consider making it immutable and setting it in the constructor instead.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Good practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ca53ca9184d0c8151d76761db95563e155b0739f</field>
+    <field name="content">
+      ## [Q-5] Misspellings
+  
+      There are some comments that have spelling errors:
+  
+      - “cliam” should be spelled “claim”
+  
+      ```solidity
+      * @dev Check if the account can cliam
+      ```
+  
+      **Reference**: [Airgrab.sol#L116](https://github.com/mento-protocol/mento-core/blob/feat/tokenWork/contracts/governance/Airgrab.sol#L116)
+  
+      - “incldued” should be spelled “included”
+  
+      ```solidity
+      * if the account hasn't already claimed and if it's incldued
+      ```
+  
+      **Reference**: [Airgrab.sol#L118](https://github.com/mento-protocol/mento-core/blob/feat/tokenWork/contracts/governance/Airgrab.sol#L118)
+  
+      - “MerkeTree” should be spelled “MerkleTree”
+  
+      ```solidity
+      * @notice This contract implements a token airgrab gated by a MerkeTree and KYC using fractal.
+      ```
+  
+      **Reference**: [Airgrab.sol#L18](https://github.com/mento-protocol/mento-core/blob/feat/tokenWork/contracts/governance/Airgrab.sol#L18)
+  
+      - “scheduledRemainigSupply” should be spelled “scheduledRemainingSupply”
+  
+      ```solidity
+      uint256 scheduledRemainigSupply = (TOTAL_EMISSION_SUPPLY * (positiveAggregate - negativeAggregate)) / SCALER;
+      ```
+  
+      **Reference**: [Emission.sol#L100](https://github.com/mento-protocol/mento-core/blob/95e9296fe964d02dcc599d76a05ebfbb6a4047bd/contracts/governance/Emission.sol#L100)
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Good practice</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="response">    
+        We use require statements across whole code base and want to keep it consistent.
+    </field>
+    <field name="content">
+      ## [Q-6] Revert with custom errors instead of require statements
+  
+      Throughout the codebase, require statements are used, which revert with a set static string. For solidity versions [0.8.4+](https://soliditylang.org/blog/2021/04/21/solidity-0.8.4-release-announcement/), custom errors can be used, which can return dynamic values to give more insight into what caused the error, as well as cost less gas on average.
+  
+      **Remediations to Consider**
+  
+      Replace all require statements with conditions that revert with a custom error containing relevant error information, in order to make it more clear why an error is occurring to the user as well as save slightly on gas costs.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ca53ca9184d0c8151d76761db95563e155b0739f</field>
+    <field name="content">
+      ## [Q-7] Duplicate `ERC20` inheritance
+  
+      `MentoToken.sol` inherits from both `ERC20`, and `ERC20Burnable`, however, `ERC20Burnable` also inherits ERC20.
+  
+      ```solidity
+      contract MentoToken is ERC20, ERC20Burnable {
+      ```
+  
+      **Reference**: [MentoToken.sol#L12](https://github.com/mento-protocol/mento-core/blob/feat/tokenWork/contracts/governance/MentoToken.sol)
+  
+      ```solidity
+      abstract contract ERC20Burnable is Context, ERC20 {
+      ```
+  
+      **Reference**: [ERC20Burnable.sol#L14](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/0a25c1940ca220686588c4af3ec526f725fe2582/contracts/token/ERC20/extensions/ERC20Burnable.sol#L14)
+  
+      **Remediations to Consider**
+  
+      Remove the `ERC20` dependency and only inherit from `ERC20Burnable` to prevent duplicate inheritance.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Savings</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="response">
+        We agree that it looks unnecessary, but we still want to keep it as it is a function that will be used just for once per user and extra gas spent will be negligible, especially on Celo.
+    </field>
+    <field name="content">
+      ## [G-1] Unnecessary reentrancy guards in `Airgrab`
+  
+      In `Airgrab.sol`, there are reentrancy guards on the functions `claim()` and `drain()`. However, there is no path for a reentrancy attack to occur. `claim()` properly follows the checks effects and interactions pattern by setting `claimed` to true for the sender before making an external call to the locking contract. Since the `canClaim` modifier is run and requires `claimed` for the sender to be false, there is no way to claim multiple times, even if the locking contract was malicious.
+      For `drain()`, there would be no benefit to reenter the call as it is just transferring the contract’s balance of tokens to the treasury contract, and no intermediate state can be manipulated.
+  
+      **Remediations to Consider**
+  
+      Remove the reentrancy guards on `claim()` and `drain()` and remove it as a dependency, to reduce the gas costs of calling these functions and reduce the deployment cost of the contract.
+    </field>
+  </item>
+  
