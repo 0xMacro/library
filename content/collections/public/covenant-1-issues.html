@@ -1,0 +1,720 @@
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">b4259d901b70593bd461198cc33b943b1a25b860</field>
+  <field name="content">
+    ## [C-1] Multi-collateral under-collateralized liquidations will lead to protocol loss of value
+
+    Tazz’s liquidation logic in LiquidationLogic.sol is written to only seize one collateral type at a time. The logic also allows for a liquidator to completely close out a borrower’s debt in a single call when the borrower is under-collateralized. This becomes problematic when a borrower is collateralized with multiple types of collateral and is under-collateralized, as they can have only one type of collateral seized while having all of their debt burned.
+
+    Using this logic pathway, under-collateralized borrowers can undesirably self-liquidate a single type of collateral, burn all of their debt, and then withdraw their other types of collateral from the system. This will allow borrowers to keep their borrowed funds and reclaim collateral while creating a negative distribution for the rest of the involved parties in the Guild.
+    
+
+    **Remediations to consider**
+
+    - For under-collateralized multi-collateral liquidations that are only requesting to receive a single collateral type, determine how much debt belongs to that collateral type and only allow for burning of a proportional amount of debt.
+    - Creating a ‘full liquidation’ logic pathway that allows a liquidator to completely close out a borrower’s account and seize all collateral.
+  </field>
+  <field name="response">
+      Team implemented a fix to correctly account for undercollateralized liquidation of multicollateral vaults. Over/underCollateralization during liquidations now utilizes the value across all collaterals, and for under-collateralized multi-collateral liquidations that are only requesting to receive a single collateral type, we determine how much debt belongs to that collateral type and only allow for burning that amount of debt. 
+
+      Guild only allows for 1 collateral to be liquidated at a time, and a “FullLiquidation” function, as suggested in the Audit, will be evaluated for a later deployment.
+    </field>  
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">6ccc8db8b3fcca232494071f471580b1f4fcaa67</field>
+  <field name="content">
+    ## [M-1] Use of protocol mint fee can cause a Guild’s `swapMoneyForZToken()` logic to revert
+
+    The current codebase will prevent users from being able to swap money for `zTokens` when the protocol mint fee is turned on with a receiving address different from the Guild.
+
+    In `BorrowLogic:executeSwapMoneyForZTokens()`, the code assumes that the total amount of `zTokens` minted are transferred to the Guild’s address and are available for transfer to the requesting user:
+
+    ```tsx
+    function executeSwapMoneyForZTokens(
+            DataTypes.PerpetualDebtData storage perpData,
+            DataTypes.MoneyForZTokenParams memory params
+        ) external returns (uint256) {
+            ...
+            // mint zTokens & dTokens (guild)
+            perpData.mint(params.onBehalfOf, params.onBehalfOf, zTokenMintAmountBase); // emits a Mint event
+
+            // transfer zTokens to user
+            perpData.getAsset().transfer(params.user, zTokenMintAmountBase);
+
+           ...
+        }
+    ```
+
+    This code fails to take into account the possible usage of a protocol mint fee with a fee address different from the Guild’s address. In this scenario, via the logic in `PerpetualDebtLogic:mint()`, not enough `zTokens` would be minted to the Guild causing the transfer of `zTokens` to revert.
+
+    **Remediations to consider**
+
+    - Taking into account the protocol mint fee into the amount of `zTokens` being transferred.
+  </field>
+</item>
+
+<item>
+  <field name="topic">3rd Party Behavior</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## [M-2] `TazzPriceOracle` Uniswap V3 Oracles can fail to index enough observations for desired TWAP period
+
+    `TazzPriceOracle` is able to use Uniswap V3 oracles under the hood. Currently there are no checks to make sure that the used Uniswap Pools have enough room in their `Observation` array to hold enough data for the desired TWAP range. This can cause specific oracles to be more susceptible to price attacks and endanger the protocol’s funds if not protected against.
+
+    **Remediations to consider:**
+
+    - Have `TazzPriceOracle` perform checks to grow the `Observation` sizes as needed. Note: there will be a lag between a Oracle’s `Observation` growth and recorded times, so manually performing this growth before an oracle’s addition or increased TWAP time would be optimal.
+  </field>
+  <field name="response">
+    Acknowledge - We leave it up to the deployer to calculate off-chain the # of observations needed to ensure the TWAP length requested will be maintained. At a maximum, the number of observations is dependent on the average block-time for the network on which the guild is being deployed.  In practice, many pools have less than 1 transaction per block the # of observations needed will depend on the expected transaction volume in the uniswap pool.
+  </field>  
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">e19acc06e23ec7390513388e150c036c1c2c3724</field>
+  <field name="content">
+    ## [M-3] `PermissionedGuild` settings fail to prevent users from opening accounts
+
+    `PermissionedGuild` uses roles with the intention to only enable allowed users to move collateral and debt through the Guild. The current code breaks this design by allowing users who are not granted the `DEPOSIT` role to open accounts with collateral through the liquidation process. This is problematic because it breaks spec and liquidators who do this will have their collateral trapped unless they are granted the `DEPOSIT` role which would allow them to withdraw the collateral.
+
+    Liquidators are able to open account by performing successful liquidations via `Guild:liquidationCall()` with the parameter `receiveCollateral` set to true. This flag will send the liquidator’s reward collateral into the Guild’s user collateral accounting system, thus opening an account. 
+
+    **Remediations to consider**
+
+    - Not allowing liquidators to select for receiving collateral when they are not permissioned properly in `PermissionedGuilds`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">e19acc06e23ec7390513388e150c036c1c2c3724</field>
+  <field name="content">
+    ## [M-4] User supply cap not enforced in the liquidation flow
+
+     `Guild` has user supply cap configuration setting for each collateral asset. This config setting, when used, prevents specific accounts from becoming too large to be efficiently processed in future liquidations. This setting is enforced when user performs deposit, and before account balance is updated.
+
+    ```solidity
+    require(
+        collateral.balances[onBehalfOf] + amount) <= (userSupplyCap * collateralUnits) / 100,
+        Errors.SUPPLY_CAP_EXCEEDED
+    );
+    ```
+
+    However, liquidators are able to update their account balance by performing successful liquidations via `Guild:liquidationCall()` with the parameter `receiveCollateral` set to true. This flag will cause liquidator’s collateral balance to be updated with the liquidator’s reward collateral. However, since corresponding user supply cap check is not present in this flow, liquidator’s collateral balance may become greater than the configured user supply cap for a Guild. This breaks specification. 
+
+    **Remediations to consider**
+
+    - Performing necessary user supply cap check on liquidation when liquidator selects to receive collateral, or
+    - Not allowing liquidators to select for receiving collateral and instead send all collateral reward to the liquidator.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">medium</field>
+  <field name="chance">high</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## [M-5] Missing access control for swapMoneyForZToken() and swapZTokenForMoney()
+
+    The `PermissionedGuild` contract contains access-controlled wrappers for Guild functionality. Each of the most important functions is access-protected with role-based access control. These include: `deposit()`, `withdraw()`, `borrow()`, and `repay()`.
+
+    However, PermissionedGuild does not override and wrap `swapMoneyForZToken()` and `swapZTokenForMoney()` from the parent Guild contract in the same way. Therefore, these important system functions are externally accessible to anyone.
+
+    **Remediations to consider**
+
+    - Override `swapMoneyForZToken()` and `swapZTokenForMoney()` in the PermissionedGuild with corresponding access controlled wrapper implementation functions.
+  </field>
+  <field name="response">
+    Team acknowledges that additional control levers might be useful when deploying a guild, but deprioritized this lever atm.
+  </field>  
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">44b98884bd9f472e43b5e0da6cddbcf140ffadd1</field>
+  <field name="content">
+    ## [M-6] User collateral can be misused when Guild’s `money` token is also used as collateral
+
+    In the scenario where a Guild’s `money` token is also registered as a collateral, users’s collateral can be misused as funds for the Guild’s `Guild:swapZTokenForMoney()` flow. 
+
+    When a user deposits collateral to the Guild the collateral is transferred to the Guild’s address. It is the intention that the collateral remains there until either the user is liquidated or performs a withdraw. 
+
+    The logic for `swapZTokenForMoney()` problematically treats the Guild’s balance of the `money` token as the signal for available funds for swapping `zTokens` for `money`. Meaning, when a user deposits `money` as collateral, those funds can be swapped out of the protocol via `swapZTokenForMoney()`, leaving the protocol short funded when a user is withdrawing or being liquidated.
+
+    **Remediations to consider**
+
+    - Using separate accounting for the inflow and outflow of `money` for the `swapZTokenForMoney()` and `swapMoneyForZToken()` flows.
+    - Do not allow Guilds to use the `money` token as collateral.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">c4f808fb7860def1ecb8a8ffb6be6d55f78be87f</field>
+  <field name="content">
+    ## [M-7] `PerpetualDebt`'s `burnAndDistribute()` can brick protocol when no debt is issued
+
+    When a Guild attempts to rebalance internal accounting to the `zN * zT == dN * dT` invariant, it can accidentally set the `zTokenNotionalFactor` to zero and brick the protocol’s operations. This will happen if a distribution is made when the total supply of the debt notional is zero.
+
+    In `PerpetualDebt:burnAndDistribute()`, the protocol will attempt update the `zTokenNotionalFactor` to match the desired invariant with the below logic:
+
+    ```solidity
+    if (zTokenTotalNotional > 0) {
+      uint256 distributeFactor = perpDebt.dToken.totalNotionalSupply().wadToRay().wadDiv(zTokenTotalNotional);
+      perpDebt.zToken.updateNotionalFactor(distributeFactor);
+    }
+    ```
+
+    Note that no check is made that the debt’s notional supply is larger than zero. If the debt’s notional supply is zero, the `zTokenNotionalFactor` is then updated to be zero itself. 
+
+    This will cause the protocol to become bricked because in `PerpetualDebt:refinance()` the logic assumes that the `zTokenNotionalFactor` is not zero and will attempt to use the value as a denominator:
+
+    ```solidity
+    uint256 notionalPrice = zPrice.rayDiv(perpDebt.zToken.getNotionalFactor());
+    ```
+
+    This will revert and cause protocol operations to halt as `refinance()` is called before most operations. 
+    
+    **Remediations to consider**
+
+    - Only make distribution adjustments when the Guild has debt issued.
+  </field>
+</item>
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">253f489cbdaeeefaacb6c2a137c34b9710785a79</field>
+  <field name="content">
+    ## [M-8] By default Guild contract accrues fees that cannot be withdrawn
+
+    When `Guild` and consequently perpetual debt is configured in PerpetualDebtLogic.init() function fee address for various operations is by default set to the Guild address itself.
+
+    ```solidity
+    function init(DataTypes.PerpetualDebtData storage perpDebt, DataTypes.ExecuteInitPerpetualDebtParams memory params) internal {
+      ...  
+      perpDebt.protocolServiceFeeAddress = address(this); //default is for guild to accrue protocol fees
+      perpDebt.protocolMintFeeAddress = address(this); //default is for guild to accrue protocol fees
+      perpDebt.protocolDistributionFeeAddress = address(this); //default is for guild to accrue protocol fees
+      perpDebt.protocolSwapFeeAddress = address(this); //default is for guild to accrue protocol fees
+      ...
+    }
+    ```
+
+    However, since the Guild contract does not contain corresponding functionality for withdrawing fees that are accrued in the asset token (zToken), these assets will be stuck, and not accessible.
+
+    **Remediations to consider**
+
+    - Initialize fee addresses to non-Guild contract address, or
+    - Add functionality for accounting and withdrawing accrued fees.
+  </field>
+</item>
+<item>
+  <field name="topic">Griefing</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">ba47b2c0f0f224c9739169b3ff695b4262d20c55</field>
+  <field name="content">
+    ## [M-9] Accrued fees may get locked in TazzFeeRouter
+
+    By design, all the fees charged for various Guild operations are accrued in the TazzFeeRouter contract. These fees accrue for a specific period before they can be transferred to the specific `UniswapV3Staker` instance for reward distribution. The reward distribution is triggered in `_checkAndCreateIncentive()` based on the initial guild registration time and previously mentioned reward accrual period.
+
+    ```solidity
+    function _checkAndCreateIncentive(IGuild guild) internal {
+        GuildInfo memory guildRegister = register[guild];
+
+        // if guild not registered, try to register
+        // otherwise , checks if an incentive can be launched
+        if (address(guildRegister.dexPool) == address(0)) {
+            registerGuild(guild);
+        } **else if (block.timestamp > guildRegister.timeStart + incentiveTimeRewardAccrual) {**
+            //update new epoch timestamp
+            register[guild].timeStart = block.timestamp;
+
+            // @dev - all assets associated with guild deposited into FeeRouter sent to new incentive
+            // @dev - this also includes potential assets recovered from previously terminated incentives
+            uint256 reward = guildRegister.asset.balanceOf(address(this));
+
+            //kick off incentive, sending the asset associated with the guild as reward
+            if (reward > 0) {
+               // incentive creation for UniswapV3Staker
+            }
+        }
+    }
+    ```
+
+    However, `registerGuild()` function is public and can be called by anyone. This function can be called multiple times for a single Guild. As a result, stored Guild entry can be updated with different `timeStart` which is based on the `block.timestamp` when `registerGuild()` was invoked. Malicious caller may invoke this function repeatedly before specific accrual period passes to extend it and consequently lock assets within TazzFeeRouter while preventing reward being distributed. 
+
+    **Remediations to consider**
+
+    - Add a check to `registerGuild()` function to prevent updates for already registered Guilds.
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">1b23ca55a8ae3e1a5514ad31667b43e12acc52b6</field>
+  <field name="content">
+    ## [L-1] TazzPriceOracle.sol initializes the `PriceContext::SPOT`'s `endLookbackTime` incorrectly
+
+    In TazzPriceOracle.sol, the `endLookbackTime` represents the oldest time that should be included in an asset price’s average. `PriceContext::SPOT` prices should have this value set to zero. 
+
+    TazzPriceOracle.sol’s constructor currently initializes this price to something non-zero:
+
+    ```solidity
+    constructor(
+            address addressesProvider,
+            address baseCurrency,
+            uint32 lookbackPeriod
+        ) {
+            require(lookbackPeriod > 0, Errors.ORACLE_LOOKBACKPERIOD_IS_ZERO);
+            ADDRESSES_PROVIDER = IGuildAddressesProvider(addressesProvider);
+            BASE_CURRENCY = baseCurrency;
+            for (uint8 i; i <= uint8(type(DataTypes.PriceContext).max); i++) {
+                _lookbackTime[DataTypes.PriceContext(i)].endLookbackTime = lookbackPeriod;
+            }
+        }
+    ```
+
+    If this variable is not set correctly it will cause `PriceContext::SPOT` prices not to return the intended price.
+
+    **Remediations to consider**
+
+    - Do not set the `PriceContext::SPOT`’s to a non-zero value.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Griefing</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">23f852c4bc4f84ca7dc9b3a82c347af30d29df53</field>
+  <field name="content">
+    ## [L-2] External actor may hinder dropCollateral() processing
+
+    In the `Guild` contract, `dropCollateral()` enables removing unused collateral and freeing the slot for new collateral in the list of limited size of potential collateral assets.
+
+    The `dropCollateral()` relies upon `GuildLogic.executeDropCollateral()` for its operation.
+
+    ```solidity
+    function executeDropCollateral(
+        mapping(address => DataTypes.CollateralData) storage collateralData,
+        mapping(uint256 => address) storage collateralList,
+        address asset
+    ) internal {
+        DataTypes.CollateralData storage collateral = collateralData[asset];
+        ValidationLogic.validateDropCollateral(collateral, collateralList, asset);
+        collateralList[collateralData[asset].id] = address(0);
+        delete collateralData[asset];
+    }
+    ```
+
+    In turn, `GuildLogic.executeDropCollateral()` relies on `ValidationLogic.validateDropCollateral()` to check if necessary preconditions for collateral removal are fulfilled.
+
+    ```solidity
+    function validateDropCollateral(
+        DataTypes.CollateralData storage collateralData,
+        mapping(uint256 => address) storage collateralList,
+        address asset
+    ) internal view {
+        require(collateralList[collateralData.id] != address(0), Errors.COLLATERAL_NOT_LISTED);
+        require(IERC20Metadata(asset).balanceOf(address(this)) == 0, Errors.POSITIVE_COLLATERAL_BALANCE);
+    }
+    ```
+
+    One of these conditions includes checking that the contract balance of the collateral asset is 0. If the balance is not 0, the collateral asset would not be dropped.
+
+    A malicious external actor may intentionally keep the contract balance non-0 by transferring minuscule asset amounts directly to the contract.
+
+    **Remediations to consider**
+
+    - Consider relaxing the check so that collateral can be dropped even if the balance is not 0 but is less than some relatively small threshold, or
+    - When performing a dropCollateral operation, consider performing `skim + dropCollateral` action.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">1b23ca55a8ae3e1a5514ad31667b43e12acc52b6</field>
+  <field name="content">
+    ## [L-3] Externally provided event argument not validated
+
+    In the `ConfiguratorLogic`, `executeUpdateAssetToken()` and `executeUpdateLiabilityToken()` functions do not validate `input.asset` and `input.liability` at all. Therefore, any values would be accepted and correspondingly emitted in `AssetTokenUpgraded` and `LiabilityTokenUpgraded` events for these parameters.
+
+    Currently, only the guild admin can trigger these functions. Therefore, only if the admin provides an incorrect value for these inputs would the events emitted not represent a correct on-chain update.
+
+    **Remediations to consider**
+
+    - Consider retrieving `input.asset` and `input.liability` values from corresponding proxies.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">a081fd8b4c29398a5f08b73c496e5f2b2317b80e</field>
+  <field name="content">
+    ## [L-4] Mismatch between event definition and event emission
+
+    The `PerpetualDebtInitialized` event is defined in two places, `IGuildConfigurator` and `ConfiguratorLogic` contract, where it is also emitted. 
+
+    ```solidity
+    /**
+        * @dev Emitted when a collateral is initialized. <=== *
+        * @param assetToken The address of the associated assetToken contract
+        * @param liabilityToken The address of the associated liability token
+        * @param monetToken The address of the associated money token
+        * @param duration The perpetual debt duration
+        * @param dex The dex address (asset/money)
+        **/
+    event PerpetualDebtInitialized(
+        address indexed assetToken,
+        address liabilityToken,
+        address monetToken, <=== *
+        uint256 duration,
+        address dex
+    );
+    ```
+
+    ```solidity
+    // See `IGuildConfigurator` for descriptions
+    event PerpetualDebtInitialized(
+        address indexed assetToken,
+        address liabilityToken,
+        address moneyToken,
+        uint256 duration,
+        uint24 dexFee //<=== this is different
+    );
+    ```
+
+    However, these two definitions differ in type and meaning of the last parameter `address dex` vs `uint24 dexFee`. As a result, off-chain tools and processing can be affected by expecting one type of parameter but receiving something else.
+
+    **Remediations to consider**
+
+    - Sync event definitions and ensure there is no ambiguity that what is emitted matches the corresponding declaration.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">b46017d2763fbe5164bf655a8b4d4e80d369d1f4</field>
+  <field name="content">
+    ## [L-5] Same event emitted for different state updates
+
+    In the `GuildConfigurator` contract, `setProtocolDistributionFeeAddress()` and `setProtocolServiceFeeAddress()` functions emit the same event `ProtocolServiceFeeAddressChanged` even though they update different config variables.
+
+    Also, the `ProtocolDistributionFeeAddressChanged` event is not even defined in IGuildConfigurator.
+
+    **Remediations to consider**
+
+    - Consider defining the `ProtocolDistributionFeeAddressChanged` event and emitting this event in `setProtocolDistributionFeeAddress()` so off-chain monitoring and tracking tools can easily determine which configuration value was changed.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">6ed836dab80c83b53f8546a9ee5713e614de91f1</field>
+  <field name="content">
+    ## [L-6] Toggling Guild’s Perpetual Debt `freeze`/`pause` states causes interest to accrue slightly incorrectly
+
+    Guilds aim to accrue interest when their perpetual debt is not frozen or paused. Currently, the protocol will fail to accrue interest properly, when switching between `freeze` and `pause` states. This is caused by failing to account for accrued interest between the last `PerpetualDebtLogic::refinance()` call and the debt’s state change. 
+
+    Right now, if `refinance()` has not been called in a while and the debt is frozen/paused, then the interest set to accrue between the last `refinance()` call and the debt freeze is lost. Conversely, if the debt is unfrozen/unpaused with the `refinance()` call being a while back, the next `refinance()` call will accrue interest from the frozen time period. 
+
+    This behavior can be seen as desirable if the reason for the freeze/pause was due to issues with the `refinance()` logic.
+
+    **Remediations to consider**
+
+    - Call `refinance()` before debt pause/freeze state changes if the `refinance()` code is safe to run.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">19e318d936f775df58f68f6901dc84a0fe0057bc</field>
+  <field name="content">
+    ## [L-7] `TazzPriceOracle` missing validation that asset prices will resolve
+
+    `TazzPriceOracle` allows for the use of oracles which are not of the token pair `asset`\<\>`baseCurrency`. For assets with this oracle type, `TazzPriceOracle` will attempt to combine different oracles until the asset is priced in the base currency in `_getAvgTick()`.
+
+    Currently, the code does not ensure that the needed assets can be resolved. This could cause issues if a needed asset fails to resolve due to a different asset being removed. 
+
+    **Remediations to consider**
+
+    - Programmatically checking that desired assets are able to be resolved when adding/removing different underlying oracles.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">66ce41673ac24252b49e7d63904b12fad78727ef</field>
+  <field name="content">
+    ## [L-8] `PermissionedGuild` roles not granular enough
+
+    `PermissionGuild` uses singular roles to guard both the inflow and outflow of assets. The `DEPOSITOR` role allows users to add and withdraw collateral and the `BORROWER` role allows users to take-out and repay debt. This setup lacks the ability to handle some potentially desired secnarios. For example, if the protocol operators would like to stop a user from taking out any more debt removing the `BORROWER` role would also prevent that user from being able to repay their outstanding debt. This lack of expressivity could fail to enable the protocol operators to operate their protocol as they would wish. 
+
+    **Remediations to consider**
+
+    - Splitting the roles into a role per function. This would enable finer grained control on what users are allowed to do.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use Cases</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">9a96c3496f619637c69a2a238663d03639e0923e</field>
+  <field name="content">
+    ## [L-9] TazzPriceOracle.sol’s `getAssetPrice()` will revert for `PriceContext::SPOT` prices with Uniswap V3 Oracles
+
+    In TazzPriceOracle.sol, querying for a `PriceContext::SPOT`’s price with `getAssetPrice()` will revert when the used underlying oracle is of type `UniswapV3OracleProxy`. This is due to the oracle’s use of the Uniswap provided `OracleLibrary:consult()` function. The `PriceContext::SPOT` price has its `endLookbackTime`/`secondsAgo` parameter resolve to zero which will cause the `consult()` function to revert:
+
+    ```solidity
+    function consult(address pool, uint32 secondsAgo)
+            internal
+            view
+            returns (int24 arithmeticMeanTick, uint128 harmonicMeanLiquidity)
+        {
+            require(secondsAgo != 0, "BP");
+            ...
+        }
+    ```
+
+    This issue is currently masked in testing due to issue [L-1], which initialized the `PriceContext::SPOT`'s `endLookbackTime` to be something besides zero.
+    
+
+    **Remediations to consider**
+
+    - Don’t use the `consult()` function when trying to query only the spot price of a Uniswap v4 pool.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use case</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## [L-10] Small debt positions not profitable to be liquidated
+
+    The implemented system features several cap mechanisms, including a total collateral supply cap, user supply cap, and total debt cap. Each of these parameters serves to tune the system for an appropriate risk profile.
+
+    However, currently, the system does not feature minimum debt restriction per position. As a result, small debt positions, even if liquidatable, may end up not being profitable to liquidate. This could lead to the accrual of bad debt.
+
+    This issue may have a larger impact on chains and networks where gas is more expensive, and the profitability threshold for liquidations is relatively higher.
+
+    **Remediations to consider**
+
+    - Introduce a restriction on minimum borrow amount, and enforce minimum debt position on partial repays.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Documentation</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">d15d42c2f2a5fc0e1487ba271d38c10c4a7dac3c</field>
+  <field name="content">
+    ## [Q-1] Incorrect inline documentation for important structs in DataTypes
+
+    In the `DataTypes` contract, `CollateralConfigurationMap` and `PerpDebtConfigurationMap` are defined. Inline documentation indicates what particular beats within packed `uint256 data` variable represent.
+
+    However, these inline comments are incorrect and are not aligned with the functionality defined in `CollateralConfiguration` and `PerpetualDebtConfiguration`.
+
+    For example, for `CollateralConfigurationMap`, bits 80-115 represent the supply cap, bits 116-151 represent the user supply cap, and bits 152-255 are unused. The corresponding inline comment on the contrary says the following:
+
+    ```solidity
+    //bit 61-115: unused
+    //bit 116-151: supply cap in whole tokens, supplyCap == 0 => no cap
+    //bit 152-167: liquidation protocol fee
+    //bit 168-255: unused
+    ```
+
+    For `PerpDebtConfigurationMap` bits 80-95 are used for protocol distribution fee (bps). However, inline comment indicates they are not used.
+
+    ```solidity
+    //bit 80-255: unused
+    ```
+
+    Consider updating inline comments for previously mentioned structs in `DataTypes` to match related functionality in `CollateralConfiguration` and `PerpetualDebtConfiguration` contracts.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## [Q-2] AssetToken.mint() does not emit Mint event
+
+    In the `LiabilityToken` contract, the `mint()` function implementation emits a `Mint` event in addition to the underlying `Transfer` event.
+
+    ```solidity
+    emit Mint(user, onBehalfOf, amount);
+    ```
+
+    However, the corresponding `mint()` function in the `AssetToken` contract does not emit a similar event.
+
+    Consider emitting a `Mint` event in the `AssetToken.mint()` for consistency.
+  </field>
+  <field name="response">
+    MintableUpgradeableERC20.sol is already emitting a transfer event during minting and burning. LiabilityToken.sol has a mint event in addition, to indicate the additional info of user + onBehalfOf that the transfer event is not recording.
+  </field>  
+</item>
+
+<item>
+  <field name="topic">Unnecessary code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">37e1f662ef8189c54ce45d628787f0ea678bb668</field>
+  <field name="content">
+    ## [Q-3] Usage of SafeMath in Solidity 0.8+
+
+    The following contracts rely on SafeMath functionality which can be removed/replaced in Solidity version 0.8+, which the Tazz codebase relies on.
+
+    - MintableUpgradeableERC20.sol
+    - UpgradeableERC20.sol
+    - CollateralLogic.sol
+    - PerpetualDebtLogic.sol
+    - LiquidationLogic.sol
+
+    Consider replacing SafeMath’s add() and sub() calls with corresponding default addition and subtraction operations.
+  </field>
+</item>
+<item>
+  <field name="topic">Unnecessary code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">81960ec1f376396d0a60fc01de829f7622642c63</field>
+  <field name="content">
+    ## [Q-4] Unused imports
+
+    In the following cases imported contracts are not used and therefore can be removed.
+
+    - NotionalERC20.sol → SafeMath import
+    - UpgradeableERC20.sol → WadRayMath import
+    - CollateralLogic.sol → WadRayMath import
+    - ValidationLogic.sol → Address import and `using Address for address;`
+    - ValidationLogic.sol → SafeCast import and `using SafeCast for uint256;`
+    - BalancerStableLPOracleProxy → WadRayMath import and `using WadRayMath for uint256;`
+    - TazzPriceOracle → WadRayMath import and `using WadRayMath for uint256;`
+    - UniswapV3OracleProxy → WadRayMath import and `using WadRayMath for uint256;`
+    - HardcodedOracleProxy → WadRayMath import and `using WadRayMath for uint256;`
+    - AnkrEthOracleProxy → WadRayMath import and `using WadRayMath for uint256;`
+  </field>
+</item>
+<item>
+  <field name="topic">Extra Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">68ee5aaaa8a5127107035ee070591eb39cd9c882</field>
+  <field name="content">
+    ## [Q-5] Commented-out code in GuildConfigurator.sol
+
+    On lines [184](https://github.com/tazzlabs/tazz-core-v1/blob/f357cc4bd28d44e974def3b71eb35a570aa39ecc/contracts/protocol/guild/GuildConfigurator.sol#L184) and [200](https://github.com/tazzlabs/tazz-core-v1/blob/f357cc4bd28d44e974def3b71eb35a570aa39ecc/contracts/protocol/guild/GuildConfigurator.sol#L200) of GuildConfigurator.sol, calls to a non-existent function `_checkNoSupplers(asset)` are commented out with a `TODO`. Consider removing the commend out code since, as per discussion with the team, the code does not need to perform the suggested logic.
+  </field>
+</item>
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="status">fixed</field>
+  <field name="commit">30f00a22232151dd2b6a9f375340cb25eac936cb</field>
+  <field name="content">
+    ## [I-1] `DexOracleLogic.updateTwapPrice()` called twice in same block is susceptible to price manipulation
+
+    In `DexOracleLogic:updateTwapPrice()`, the returned asset price can potentially be manipulated by a third party if the codebase used the function differently. This is an informational because the current codebase does not contain any codepaths which will enable this to be used in an exploit.
+
+    When the function does not need to update the TWAP price (as it is written to only update once per timestamp), it defaults to returning the Uniswap V3 pool’s actual spot price.
+
+    This spot price is manipulatable by a third party who can trigger the codepath externally. Consider the actions of a malicious third party in a single transaction:
+
+    - Flash loans needed assets from another pool.
+    - Swaps large amount of token in the Dex’s pool, manipulating the `sqrtPriceX96` value.
+    - Triggers the `DexOracleLogic:updateTwapPrice()`'s 2nd call codepath, getting the manipulated price as the result.
+    - Does other actions with this price for profit.
+    - Swaps back and returns initial flash loans.
+
+    The `updateTwapPrice()` function is currently only able to be called multiple times per timestamp on Arbitrum due to the chain being able to have the same `block.timestamp` for multiple blocks. The codebase only invokes this function once per `block.number` during `refinance()`. This doesn’t lead to an exploit because the returned price is only used for updating interest rates, but no interest rate change will occur since the elapsed time for the manipulated spot price would be zero. 
+
+    **Remediations to consider**
+
+    - Return the already computed and stored `DexOracleData`'s `twapPrice` for that block.
+  </field>
+</item>
+<item>
+  <field name="topic">Trust model</field>
+  <field name="content">
+    ## [I-2] Centralisation risks
+
+    Tazz system design in current phase relies on multiple multisig accounts acting in different privileged roles: GuildAdmin, EmergencyAdmin, RiskAdmin. Each of these roles has associated privileges which enable execution of various sensitive operations that modify core system configuration parameters, such as setting various fees, pausing or freezing collateral and debt assets.
+
+    Currently system does not have any delay in application of these important configuration changes. As a result, in case of undesired changes users of the systems will not be able to react. Due to all this, current system implementation requires users to trust protocol admins to perform privileged actions properly which is not ideal.
+
+    **Remediations to consider**
+
+    - Use Timelock mechanism for performing important configuration updates, and/or
+    - Consider introducing governance mechanism for decentralized system management
+  </field>
+</item>
+
+
+
+
+
+
+
+
+
+
+
+
+
+

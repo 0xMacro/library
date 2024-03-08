@@ -1,0 +1,62 @@
+<page
+  clientName="Kwenta"
+  reportDate="January 17, 2024"
+  auditTitle="Kwenta A-11"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kwenta/smart-margin-v3"
+  repoCommitHash="78b14a18440e9d56a9538ee1ff2e8624e5f6d4e1"
+  repoCommitHashFinal="866479d7c6a0957e085831605ac078afc8aac420"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from Jan 10, 2023 to Jan 12, 2024.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    ### Entities
+
+    - Users: Owners of a SynthetixV3 PerpsMarket account NFT, which give ownership and control of positions and collateral, as well as ability set specific permissions to other addresses for the account.
+    - Delegates: Addresses that are given permission by an account owner to execute orders or sign conditional orders on behalf of the account owner.
+    - Executors: Execute signed conditional orders once conditions are met and receive a conditional order fee. There are two types of executor
+    - Trusted Executor: This is an executor that is trusted to only execute a conditional order if conditions are met. Conditions are likely verified off-chain, so there is no guarantee all conditions are met when an order is attempting to be executed.
+    - Normal Executor: Can be anyone, but the conditions set by the order are verified on-chain before execution of the order.
+    - pDAO: Multisig wallet that has the ability to upgrade the Engine.sol contract.
+    
+    ### Trust Model
+    
+    - Users that sign conditional orders trust that the order will be executed reasonably soon after the conditions are met, this may not be the case as there may not be executors taking orders at any given time, or gas costs could theoretically exceed max conditional order fee set.
+    - If a trusted executor is used, there is trust that they only execute the order when conditions are met.
+    - Any delegates given permission to execute orders are trusted to act in the interest of the account owner.
+    - Engine.sol now has the possibility to be upgraded, this is intended to allow for the engine contract to adapt to changes that synthetix may make, since SynthetixV3 is upgradeable itself. Upgrades are authorized by pDAO, if set, and it is trusted that only upgrades that are beneficial to users will be made.
+        
+    ### Assumptions
+
+    - It is assumed that when buying/selling, sUSDC and sUSD can be exchanged at a 1:1 rate. Functions using Zap will revert if there isn't a 1:1 exchange, which can occur if fees are added to the sUSD spot market or the price of sUSDC deviates from sUSD.
+
+    ### Accepted Risks
+    
+    - Synthetix could be exploited, potentially causing users funds to be lost.
+    </template>
+  
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    24383912f66cf3b66b3702b756813ba63bf31da98c52fccc3a65244b68c41476  src/Engine.sol
+    ff3f950ea0752668c902fc0f85ca2b5df081cd75e2f125cbcf7cc7c534e9c363  src/interfaces/IEngine.sol
+  </template>
+</content-for>
+
+</page>

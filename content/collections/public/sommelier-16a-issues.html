@@ -1,0 +1,394 @@
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">critical</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">51feaae47d61c49d2660558db3e0345729522648</field>
+    <field name="content">
+        ## [H-1] Strategist can drain cellar using malicious Morpho Blue market
+
+        In `MorphoBlueSupplyAdaptor.sol`’s `deposit()` function, the market provided is not validated to be a position in the cellar, as is done by other functions by calling `_validateMBMarket()`. Since the market passed into `deposit()` can be any market, this allows a strategist to deposit assets into a market that is untracked, which can allow assets to be lost up to the rebalance deviation on each call.
+        
+        ```solidity
+        /**
+         * @notice Allows user to deposit into MB markets, only if Cellar has a MBSupplyAdaptorPosition as its holding position.
+         * @dev Cellar must approve Morpho Blue to spend its assets, then call deposit to lend its assets.
+         * @param assets the amount of assets to lend on Morpho Blue.
+         * @param adaptorData adaptor data containing the abi encoded Morpho Blue market.
+         * @dev configurationData is NOT used.
+         */
+        function deposit(uint256 assets, bytes memory adaptorData, bytes memory) public override {
+            MarketParams memory market = abi.decode(adaptorData, (MarketParams));
+            ERC20 loanToken = ERC20(market.loanToken);
+            loanToken.safeApprove(address(morphoBlue), assets);
+            _deposit(market, assets, address(this));
+        
+            // Zero out approvals if necessary.
+            _revokeExternalApproval(loanToken, address(morphoBlue));
+        }
+        ```
+        
+        Reference: [MorphoBlueSupplyAdaptor.sol#L69-L84](https://github.com/PeggyJV/cellar-contracts/blob/59e723a2b5f39bc314e4597887cb68a03640224b/src/modules/adaptors/Morpho/MorphoBlue/MorphoBlueSupplyAdaptor.sol#L69-L84)
+        
+        Since Morpho Blue markets can be created by anyone and they are oracle agnostic, a market can be created with any oracle used to price the collateral asset relative to the loan asset, as well as set any token as collateral.
+        
+        ```solidity
+        //@audit notice there is no check on marketParams.oracle or the collateral token
+        function createMarket(MarketParams memory marketParams) external {
+            Id id = marketParams.id();
+            require(isIrmEnabled[marketParams.irm], ErrorsLib.IRM_NOT_ENABLED);
+            require(isLltvEnabled[marketParams.lltv], ErrorsLib.LLTV_NOT_ENABLED);
+            require(market[id].lastUpdate == 0, ErrorsLib.MARKET_ALREADY_CREATED);
+        
+            // Safe "unchecked" cast.
+            market[id].lastUpdate = uint128(block.timestamp);
+            idToMarketParams[id] = marketParams;
+        
+            emit EventsLib.CreateMarket(id, marketParams);
+        
+            // Call to initialize the IRM in case it is stateful.
+            if (marketParams.irm != address(0)) IIrm(marketParams.irm).borrowRate(marketParams, market[id]);
+        }
+        ```
+        
+        Reference: [Morpho.sol#L150-L164](https://github.com/morpho-org/morpho-blue/blob/2ffb6821815ec542c78e0d0379b5e7094d6fd37a/src/Morpho.sol#L150-L164)
+        
+        If a strategist were to create a token where they own the entire supply and make a market using it as collateral with a malicious oracle contract that inaccurately prices this collateral as valuable relative to the loan asset, it could allow the strategist to borrow all the assets in the market that have been provided by the cellar using the worthless token as collateral, effectively stealing all assets sent into the market from the cellar.
+        
+        **Remediations to Consider**
+        
+        In `MorphoBlueSupplyAdaptor:deposit()` call `_validateMBMarket()` to verify the cellar has the provided market as a position, which ensures the market is trusted.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Data consistency</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="commit"></field>
+    <field name="content">
+        ## [M-1] Balances don’t account for interest or debt accrued can lead to inaccurate share price
+        
+        In both `MorphoBlueSupplyAdaptor.sol` and `MorphoBlueDebtAdaptor.sol`’s `balanceOf()` functions the balance returned only reads from the current state, and does not consider pending interest or debt incurred since the last time the market was interacted with. Since `balanceOf()` is used to determine the assets held when determining the cellar’s share price, this can lead to an inaccuracies in the share price. Although the true balances after interest/debt has been accounted for may not typically deviate from the actual balance, it could make a noticable difference if there are positions in markets that are not interacted with frequently, and/or if cellars have multiple MorphoBlue market positions. These differences could open up arbitrage opportunities that could be exploited.
+        
+        **Remediations to Consider**
+        
+        Use the `MorphoBalancesLib.sol` and pull the expected values required that take interest/debt into consideration.
+    </field>
+    <field name="response">
+        The high-level design where these smart contracts read state versus relying on the MorphoBalancesLib.sol for expected values is a battle-tested setup in principle within production cellars and other adaptor integrations. There are a number of reasons that reading state, and thus having a bit of discrepancy (due to possible lack of accrueInterest being called to update markets) is favorable. These include:
+
+        1. We only rely on the Morpho Blue code itself vs relying on library contracts.
+        2. Gas efficiency.
+        3. Since share price is not always changing, strategists are free to collect fees owed without making share price goe down.
+        
+        Under normal market conditions, Morpho Blue markets will be interacted with regularly, making the reported values sufficiently close to the ideal values(that include pending interest). Also lending/supply interest rates are usually very low, so pending interest is usually not that large.
+        
+        Under extreme market conditions, interest rates can be much higher which would cause pending interest values to be larger than normal, however, given that interest rates are much higher, market activity will also be much higher as lenders want to capture large interest rates, and borrowers want to repay expensive debt. All of these factors will help to keep the reported values close to the ideal values.
+        
+        Finally the vast majority of vaults using Morpho Blue markets will use share price oracles. So even if we have some black swan event that causes pending interest to be much larger than anticipated, it is still a difficult arbitrage to capture, as the share price takes days to reflect a large change. 
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">7754e2cd812adeb8dbee44c527443b068835958c</field>
+    <field name="content">
+        ## [L-1] `Deposit` event breaks `ERC4626` standard
+
+        `Cellar.sol` adjusted the `Deposit` event to add the specific deposit asset used for the deposit.
+         
+        
+        ```solidity
+        /**
+        * @notice Emitted during deposits.
+        */
+        event Deposit(address indexed caller, address indexed owner, address depositAsset, uint256 assets, uint256 shares);
+        ```
+        
+        Reference: [Cellar.sol#L710-L713](https://github.com/PeggyJV/cellar-contracts/blob/0ee446e6eb9d101e6752929a89a8fa51c8033662/src/base/Cellar.sol#L710-L713)
+        
+        However, this breaks the [ERC4626 standard](https://eips.ethereum.org/EIPS/eip-4626), as it requires a specific event signature of: `Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares)`. Deviation from the expected event signature could disrupt indexers or front/backend applications that expect ERC4626 compliant contracts to emit.
+        
+        **Remediations to Consider**
+        
+        Add a separate event that specifies when an asset has been deposited that is not the expected cellar’s primary `asset()`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Use cases</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">731165df55092a655ff892dfb221f0a34ef660c2</field>
+    <field name="content">
+        ## [L-2] Adapters won't work with MorphoBlue markets that don’t have an interest rate
+        
+        The [documentation](https://sommelier-finance.gitbook.io/sommelier-documentation/smart-contracts/external-protocol-integration/building-adaptors/baseadaptor) on "Building adapters" states:
+        
+        > `withdrawableFrom` should never revert.
+        > 
+        
+        However, by using MorphoBlue (MB) adapters, `withdrawableFrom` reverts when MB markets don’t have an IRM address specified. In MB, markets can be created without specifying an interest rate. This seems to be a valid configuration for MB markets and is explicitly handled in the MB codebase, specifically in the [*_accrueInterest*](https://github.com/morpho-org/morpho-blue/blob/main/src/Morpho.sol#L487) function.
+        
+        Sommeliers MB adapters use an outdated MorphoBalancesLib.sol, which doesn't correctly handle this case and reverts on [MorphoBalancesLib.sol#L46](https://github.com/PeggyJV/cellar-contracts/blob/7754e2cd812adeb8dbee44c527443b068835958c/src/interfaces/external/Morpho/MorphoBlue/libraries/periphery/MorphoBalancesLib.sol#L46) inside the `expectedMarketBalances` function. As a consequence, all functions in the MorphoBalancesLib's will revert when called for MB markets with zero interest rates (IRM = 0x0).
+        
+        This in particular breaks the `MorphoBlueSupplyAdaptor:withdrawableFrom` function, since it internally calls `expectedMarketBalances`.
+        
+        The severity of this issue is considered low, as it seems very unlikely that strategists would want to integrate Morpho Blue markets that have zero interest rate configured.
+        
+        **Remediations to Consider**
+        
+        Replace MorphoBalancesLib.sol with the [updated version](https://github.com/morpho-org/morpho-blue/blob/main/src/libraries/periphery/MorphoBalancesLib.sol), including [the fix](https://github.com/morpho-org/morpho-blue/commit/598c43e41303ec8fc7ec4bd2f3d518a6bf818453) to support markets with IRM = 0x0.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">7754e2cd812adeb8dbee44c527443b068835958c</field>
+    <field name="content">
+        ## [Q-1] A Multi asset deposit should be a separate function
+        
+        In `CellarWithMultiAssetDeposit.sol` and its variants, an alternative asset is deposited by calling `deposit()` with additional data encoded into the call that it parsed by `_getDepositAssetAndAdjustedAssetsAndPosition()`, if no data is present a normal deposit of the cellars `asset()` occurs.     
+         
+        
+        ```solidity
+        function deposit(uint256 assets, address receiver) public override nonReentrant returns (uint256 shares) {
+            // Use `_calculateTotalAssetsOrTotalAssetsWithdrawable` instead of totalAssets bc re-entrancy is already checked in this function.
+            (uint256 _totalAssets, uint256 _totalSupply) = _getTotalAssetsAndTotalSupply(true);
+        
+            (
+                ERC20 depositAsset,
+                uint256 assetsConvertedToAsset,
+                uint256 assetsConvertedToAssetWithFeeRemoved,
+                uint32 position
+            ) = _getDepositAssetAndAdjustedAssetsAndPosition(assets);
+        
+            // Perform share calculation using assetsConvertedToAssetWithFeeRemoved.
+            // Check for rounding error since we round down in previewDeposit.
+            // NOTE for totalAssets, we add the delta between assetsConvertedToAsset, and assetsConvertedToAssetWithFeeRemoved, so that the fee the caller pays
+            // to join with the alternative asset is factored into share price calculation.
+            if (
+                (shares = _convertToShares(
+                    assetsConvertedToAssetWithFeeRemoved,
+                    _totalAssets + (assetsConvertedToAsset - assetsConvertedToAssetWithFeeRemoved),
+                    _totalSupply
+                )) == 0
+            ) revert Cellar__ZeroShares();
+        
+            if ((_totalSupply + shares) > shareSupplyCap) revert Cellar__ShareSupplyCapExceeded();
+        
+            // _enter into holding position but passing in actual assets.
+            _enter(depositAsset, position, assets, shares, receiver);
+        }
+        ```
+        
+        Reference: [CellarWithMultiAssetDeposit.sol#L138-L165](https://github.com/PeggyJV/cellar-contracts/blob/0ee446e6eb9d101e6752929a89a8fa51c8033662/src/base/permutations/CellarWithMultiAssetDeposit.sol#L169-L208)
+        
+        Consider separating out alternative asset deposits into a separate function to make it more clear to users and integrators how to deposit an alternative asset.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Unnecessary call</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">758d05eb3ef441f97b3ff26b68b7c7ae87eaea1f</field>
+    <field name="content">
+        ## [Q-2] Unnecessary external receiver check
+
+        In `MorphoBlueSupplyAdaptor`’s `withdrawFromMorphoBlue()`, there is a external receiver check made with `address(this)` as the parameter:
+        
+        ```solidity
+        function withdrawFromMorphoBlue(MarketParams memory _market, uint256 _assets) public {
+          // Run external receiver check.
+          _externalReceiverCheck(address(this));
+          _validateMBMarket(_market);
+          Id _id = MarketParamsLib.id(_market);
+          if (_assets == type(uint256).max) {
+              uint256 _shares = _userSupplyShareBalance(_id, address(this));
+              _withdrawShares(_market, _shares, address(this));
+          } else {
+              // Withdraw assets from Morpho Blue.
+              _withdraw(_market, _assets, address(this));
+          }
+        }
+        ```
+        
+        Reference: [MorphoBlueSupplyAdaptor.sol#L186-L198](https://github.com/PeggyJV/cellar-contracts/blob/59e723a2b5f39bc314e4597887cb68a03640224b/src/modules/adaptors/Morpho/MorphoBlue/MorphoBlueSupplyAdaptor.sol#L186-L198)
+        
+        However, the external receiver check is only relevant if the receiver is an address other than `address(this)`:
+        
+        ```solidity
+        function _externalReceiverCheck(address receiver) internal view {
+            if (receiver != address(this) && Cellar(address(this)).blockExternalReceiver())
+                revert BaseAdaptor__ExternalReceiverBlocked();
+        }
+        ```
+        
+        Reference: [BaseAdaptor.sol#L194-L197](https://github.com/PeggyJV/cellar-contracts/blob/59e723a2b5f39bc314e4597887cb68a03640224b/src/modules/adaptors/BaseAdaptor.sol#L194-L197)
+        
+        **Remediations to Consider**
+        
+        Remove the external receiver check from `withdrawFromMorphoBlue()`
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Comments</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">78590ff3eaaa541e250e86d063953616226fdb4b</field>
+    <field name="content">
+        ## [Q-3] Misleading comment
+        
+        In Cellar.sol’s `addAdaptorToCatalogue()` there is a comment that mentions making sure the adaptor is not paused:
+        
+        ```solidity
+        function addAdaptorToCatalogue(address adaptor) external {
+          _onlyOwner();
+          // Make sure adaptor is not paused and is trusted.
+          registry.revertIfAdaptorIsNotTrusted(adaptor);
+          adaptorCatalogue[adaptor] = true;
+          emit AdaptorCatalogueAltered(adaptor, true);
+        }
+        ```
+        
+        Reference: [Cellar.sol#L316-L322](https://github.com/PeggyJV/cellar-contracts/blob/7754e2cd812adeb8dbee44c527443b068835958c/src/base/Cellar.sol#L316-L322)
+        
+        However, adaptors cannot be paused, only trusted/distrusted. 
+        
+        Consider adjusting this comment to be more accurate
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Redundant code</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">2265d2101e0e064e8cdd6083de0b09a937f4ab46</field>
+    <field name="content">
+        ## [Q-4] `_validateMBMarket` code is duplicated
+        
+        Each MorphoBlue adaptor implements is own version of `_validateMBMarket()`. However, each is mostly the same aside from the unique adapter identifier received and the boolean defining if it is a debt position.
+        
+        To reduce duplicate code, and reduce the likelihood of errors if this needs to be updated in the future, consider moving `_validateMBMarket()` to the MorphoBlueHelperLogic contract each inherits, and allow the identifier and is debt bool to be passed into it.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Redundant Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">343e1554965a77cd1f11830d3e62036aea9b388a</field>
+    <field name="content">
+        ## [G-1] Redundant market validation when repaying debt
+        
+        MorphoBlueDebtAdaptor’s `repayMorphoBlueDebt` calls `_validateMBMarket` at the beginning of the function. Subsequently, `_accrueInterest` is called which again validates the market parameters:
+        
+        ```solidity
+        function accrueInterest(MarketParams memory _market) public {
+            _validateMBMarket(_market);
+            _accrueInterest(_market);
+        }
+        ```
+        
+        **Remediations to Consider**
+        
+        Remove the `_validateMBMarket` check from the `accrueInterest` function in the `MorphoBlueDebtAdaptor` to reduce gas costs. Additionally, consider removing the `_validateMBMarket` check in the `accrueInterest` functions of both `MorphoBlueSupplyAdaptor` and `MorphoBlueCollateralAdoptor`. Market validation is not necessary in these cases, as a malicious strategist does not benefit from updating an untracked market.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Duplicate calls</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">731165df55092a655ff892dfb221f0a34ef660c2</field>
+    <field name="content">
+        ## [G-2] `withdrawableFrom` calculation can be optimized
+        
+        `MorphoBlueSupplyAdaptor.sol`’s `withdrawableFrom()` calculates the available assets to withdraw by taking into account pending interest:
+        
+        ```solidity
+        function withdrawableFrom(
+            bytes memory adaptorData,
+            bytes memory configurationData
+        ) public view override returns (uint256 withdrawableSupply) {
+            bool isLiquid = abi.decode(configurationData, (bool));
+        
+            if (isLiquid) {
+                MarketParams memory market = abi.decode(adaptorData, (MarketParams));
+                (uint256 totalSupplyAssets, , uint256 totalBorrowAssets, ) = morphoBlue.expectedMarketBalances(market);
+                if (totalBorrowAssets >= totalSupplyAssets) return 0;
+                uint256 liquidSupply = totalSupplyAssets - totalBorrowAssets;
+                uint256 cellarSuppliedBalance = morphoBlue.expectedSupplyAssets(market, msg.sender);
+                withdrawableSupply = cellarSuppliedBalance > liquidSupply ? liquidSupply : cellarSuppliedBalance;
+            } else return 0;
+        }
+        ```
+        
+        It does this by pulling values from the MorphoBlue market using the `MorphoBalancesLib` functions `expectedMarketBalances()` and `expectedSupplyAssets()`.
+        
+        However, the `expectSupplyAssets()` call, also makes a call to `expectedMarketBalances()`:
+        
+        ```solidity
+        function expectedSupplyAssets(IMorpho morpho, MarketParams memory marketParams, address user)
+            internal
+            view
+            returns (uint256)
+        {
+            Id id = marketParams.id();
+            uint256 supplyShares = morpho.supplyShares(id, user);
+            (uint256 totalSupplyAssets, uint256 totalSupplyShares,,) = expectedMarketBalances(morpho, marketParams);
+        
+            return supplyShares.toAssetsDown(totalSupplyAssets, totalSupplyShares);
+        }
+        ```
+        
+        Reference: [MorphoBalancesLib.sol#L95-L105](https://github.com/PeggyJV/cellar-contracts/blob/59e723a2b5f39bc314e4597887cb68a03640224b/src/interfaces/external/Morpho/MorphoBlue/libraries/periphery/MorphoBalancesLib.sol#L95-L105)
+        
+        Since `expectedMarketBalances()` makes external calls to the Morpho Blue contract as well as the markets interest rate model contract to calculate the market’s expected balances after interest, it can consume a fair bit of gas, if the values from the first call to `expectedMarketBalances()` were used to calculate the expectedSupplyAssets, it would reduce the gas used to call `withdrawableFrom()`.
+        
+        **Remediations to Consider**
+        
+        Prevent a duplicate call to `expectedMarketBalances()` by using the values returned in the first call to determine the expected supply assets in `withdrawableFrom()`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Use cases</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [I-1] Use caution when adding alternate deposit assets with non ERC20 adaptor holding positions
+        
+        Cellars that allow for multi asset deposits should use caution when allowing alternate deposits that don’t use a simple `ERC20Adaptor` for it’s holding position. Each non-simple holding position  opens up more attack surface area for the cellar, as user deposits can interact with the protocol associated with the position’s adaptor in potentially malicious ways, and new attack vectors could open up that require multiple adaptors and/or deposit assets.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="commit"></field>
+    <field name="content">
+        ## [I-2] Non-standard ERC20 tokens are not supported
+        
+        The cellars underlying adapters don’t support non-standard ERC20 tokens like BNB. BNB's implementation of approve reverts when approving a zero value - which is the case when revoking approvals via the `BaseAdapter._revokeExternalApproval`. 
+        
+        ```jsx
+        function _revokeExternalApproval(ERC20 asset, address spender) internal {   // @audit does not support non-standard token like BNB
+            if (asset.allowance(address(this), spender) > 0) asset.safeApprove(spender, 0);
+        }
+        ```
+        
+        It is recommended to handle those [weird ERC20 tokens](https://github.com/d-xo/weird-erc20) specifically, or if they are officially not supported by the protocol, proper documentation should be provided.
+    </field>
+  </item>

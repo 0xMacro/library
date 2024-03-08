@@ -1,0 +1,54 @@
+<page
+  clientName="Mintra"
+  reportDate="January 15, 2024"
+  auditTitle="Mintra 1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/mintra-marketplace/thirdweb_contracts"
+  repoCommitHash="96f014facd5e236806611bfe45ace9cb9baa7038"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from January 3, 2024 to January 5, 2024.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    The Mintra marketplace utilizes the following actors:
+    <ul>
+        <li>Wizard: The wizard address is set in the constructor and is allowed to set the platform fee. The platform fee is capped at 3,69%</li>
+        <li>Listing creators: Can update and cancel their listings. In addition, they can restrict their listings to approved buyers and can support different currencies for their listings.</li>
+        <li>Owner of the ERC721/1155 collection: The owner of the collection is allowed to set the royalty fee. There is no cap on royalty fee enforced.</li>
+   </ul>    
+    </template>
+
+  <h2 id="invariants">Invariants</h2>
+  <template type="audit-markdown">
+    <ul>
+        <li>Listings can only be created with quantity > 0.</li>
+        <li>When status is set to Status.Created, quantity must be > 0.</li>
+        <li>When all quantities are bought, status is set to Status.Completed and quantity = 0.</li>
+        <li>Cannot buy quantity > listing.quantity.</li>
+        <li>If listing.reserved is set to true, only approved buyers can buy.</li>
+        <li>Assets can be bought only in valid timeframe (block.timestamp < listing.endTimestamp and >= listing.startTimestamp).</li>
+        <li>When an additional currency is approved, it takes precedence over the primary currency (listing.currency).</li>
+        <li>When listing a token with tokenType of ERC721, quantity must be 1.</li>
+    </ul>    
+    </template>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">\
+    5516e15b71df0a3292e76a1efff532c459e408b19f555475fa2bc520eda92e31  contracts/prebuilts/marketplace/direct-listings/MintraDirectListingsLogicStandalone.sol
+  </template>
+</content-for>

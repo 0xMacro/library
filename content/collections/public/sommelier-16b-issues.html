@@ -1,0 +1,574 @@
+<item>
+    <field name="topic">Error Recovery</field>
+    <field name="impact">critical</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [H-1] Chainlink could change the router address
+        
+        Recently chainlink [changed their ccip router address](https://docs.chain.link/ccip/supported-networks/v1_0_0/mainnet), and will depreciate the old router, no longer supporting it after March 31st 2024. Currently, contracts using ccip directly interact with the router and it is set to be immutable, assuming it will not change. If chainlink does change the router in the future, tokens bridged may not be able to be bridged back and recovered, removing the backing of the tokens created in the `DestinationMinter` contract, and locking them in the `SourceLocker` contract forever. 
+        
+        **Remediations to Consider**
+        
+        Assuming a new router would be backwards compatible with the current one, allowing the owner to update to the new router would allow contracts to adapt to a router change. Consider adding a timelock to the contract,
+    </field>
+    <field name="response">
+        Multichain products are very experimental, and it is difficult to foresee all the ways a multichain design could fail. With this in mind we are choosing to keep the current design as simple as possible, and without owner permissions, so that it is as flexible as possible to unknown issues. That being said, if the router address does change, we understand we will need to inform all users to bridge their shares back to the source chain, so that they are not lost forever.
+        We can then deploy a new set of multichain contracts with the updated router address.
+    </field>
+
+  </item>
+
+  <item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/PeggyJV/cellar-contracts/commit/f66aa2d906a2f0d43145fd81fc556346d072aea6,https://github.com/PeggyJV/cellar-contracts/commit/a3f666ed25671959bf2ad458c7f0c57b96ead07b</field>
+    <field name="content">
+        ## [H-2] Lido withdrawal amount may be less than assumed
+        
+        In `LidoStakingAdaptor.sol`'s `balanceOf()` function it is assumed that the amount of `stETH` deposited in a request will be equal to the amount of ETH received when the request is finalized, or in other words that 1 `stETH` will be exchanged for 1 `ETH`:
+        
+        ```solidity
+        function _balanceOf(address account) internal view override returns (uint256 amount) {
+            uint256[] memory requests = StakingAdaptor(adaptorAddress).getRequestIds(account);
+            IUNSTETH.WithdrawalRequestStatus[] memory statuses = unstETH.getWithdrawalStatus(requests);
+            for (uint256 i; i < statuses.length; ++i) {
+                amount += statuses[i].amountOfStETH;
+            }
+        }
+        ```
+        
+        Reference: [LidoStakingAdaptor.sol#L94-L99](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/adaptors/Staking/LidoStakingAdaptor.sol#L94-L99https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/adaptors/Staking/LidoStakingAdaptor.sol#L94-L99)
+        
+        However, when a request is finalized, a max rate is set that limits the amount of ETH received to be either nominal: 1 stETH = 1 ETH or at a discount, where less ETH is received than stETH deposited, as mentioned in the withdrawalQueue comments can occur if the protocol share rate drops:
+        
+        ```solidity
+        //
+        // FINALIZATION FLOW
+        //
+        // Process when protocol is fixing the withdrawal request value and lock the required amount of ETH.
+        // The value of a request after finalization can be:
+        //  - nominal (when the amount of eth locked for this request are equal to the request's stETH)
+        //  - discounted (when the amount of eth will be lower, because the protocol share rate dropped
+        ```
+        
+        Reference: [WithdrawalQueueBase.sol#L148-154](https://github.com/lidofinance/lido-dao/blob/master/contracts/0.8.9/WithdrawalQueueBase.sol#L148-L154)
+        
+        In cases where a finalized request end up with a discounted rate, then `LidoStakingAdaptor`'s `balanceOf()` will report a larger value of ETH owed than it actually would receive when withdrawn. This would cause an inaccurate share price, and a share price drop when the ETH is withdrawn on rebalance, potentially preventing a withdrawal if the loss exceeds the rebalance deviation.
+        
+        It is important to note that for unfinalized requests it is not possible to estimate the expected ETH that will be claimable once finalized, so it has to be assumed it can be exchanged at a 1:1 rate, which may not be accurate if the exchange rate decreases. There may be conditions that `_balanceOf()` would report inaccurate values for unfinalized requests, which could lead to a drop in share value once these requests get finalized, which may give users an opportunity to react to this delay.
+        
+        **Remediations to Consider**
+        
+        In `balanceOf()`, use the same pricing for the unfinalized requests, but for the requests that are finalized, call `getClaimableEther()` for each request after querying the request id’s hint using `findCheckpointHints()`. This will ensure an accurate `balanceOf()` for finalized requests  will be calculated and properly cover large deviations to withdrawal rates.
+        
+        This solution is quite gas intensive, and as mentioned in H-4 it could revert due to out of gas errors due to the unbounded loops made to calculate the hint in `findCheckpointHints()`. Consideration should be made, potentially limiting the maximum withdrawal requests.
+    </field>
+    <field name="response">
+        Re stETH ETH 1:1 assumed exchange rate.
+        Under 99.99% of market conditions, this is a safe assumption, that Sommelier has made for months with pricing stETH, along with multiple other protocols. With this in mind, there are certainly black swan events that can make this assumption problematic, however Cellars using this adaptor will be Share Price Oracle based Cellars, which greatly reduce the arbability of them when it comes to single TXs altering the Cellar’s share price, which greatly mitigates the downsides of this assumption.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">2e9b9e9f0e501ca713eaef5d14768142d0899f05</field>
+    <field name="content">
+        ## [H-3] Stader withdrawal amount may be less than assumed
+        
+        In `StaderStakingAdaptor’s` `balanceOf()` function, the balance is calculated by iterating over the users withdrawal requests and accumulating the amount based on the current exchange rate.  
+        
+        ```jsx
+        for (uint256 i; i < requestsLength; ++i) {
+            IUserWithdrawManager.WithdrawRequest memory request = userWithdrawManager.userWithdrawRequests(
+                uint256(requests[i])
+            );
+            uint256 ethXValueUsingCurrentExchangeRate = request.ethXAmount.mulDivDown(exchangeRate, DECIMALS);
+            amount += request.ethExpected.min(ethXValueUsingCurrentExchangeRate);
+        }
+        ```
+        
+        Reference: [StaderStakingAdaptor.sol#L75-L88](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/adaptors/Staking/StaderStakingAdaptor.sol#L75-L88)
+        
+        The above calculation doesn’t explicitly account for the finalized withdrawal requests where the amount was calculated with an older exchange rate and is tracked in the `WithdrawRequest.ethFinalized` property.
+        
+        Under normal market conditions, the exchange rate is expected to increase over time. Thus, in cases where finalized withdrawal requests that have not been claimed yet, the `balanceOf` function reports a larger value than the actual amount that can be withdrawn.
+        
+        Similar to [H-1], this would cause an inaccurate share price, and a share price drop when the ETH is withdrawn on rebalance, potentially preventing a withdrawal if the loss exceeds the rebalance deviation.
+        
+        **Remediations to Consider**
+        
+        Adjust `balanceOf` function to use `ethFinalized` value for finalized request (this is the case when `ethFinalized > 0`)
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Incentive design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">e5630ad3cf908d4b77d70a70e8858fb8a65be91a</field>
+    <field name="content">
+        ## [H-4] Lido withdrawals may revert
+        
+        `LidoStakingAdaptor`’s `_completeBurn` function uses `WithdrawalQueue.claimWithdrawal` function to redeem assets from Lido:
+        
+        ```jsx
+        function _completeBurn(uint256 id) internal override {
+            unstETH.claimWithdrawal(id);
+        }
+        ```
+        
+        Reference: [LidoStakingAdaptor.sol#L124](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/adaptors/Staking/LidoStakingAdaptor.sol#L124)
+        
+        As mentioned in the `claimWithdrawal` comments, this function is susceptible to run out-of-gas due to the use of an unbounded loop:
+        
+        ```jsx
+        /// @dev use unbounded loop to find a hint, which can lead to OOG
+        ```
+        
+        Reference: [WithdrawalQueue.sol#L279](https://github.com/lidofinance/lido-dao/blob/master/contracts/0.8.9/WithdrawalQueue.sol#L279)
+        
+        This can prevent strategists to withdraw assets from the `LidoStakingAdaptor`.
+        
+        According to [Lido’s documentation](https://docs.lido.fi/guides/lido-tokens-integration-guide/#claiming), it is recommended to provide a `hint` value to optimize the claiming flow and to avoid running out-of-gas. 
+        
+        **Remediations to Consider**
+        
+        Provide the option to specify a hint value (which can be queried using `findCheckpointHints()`) for the `completeBurn` function, so that strategist can opt for the optimized claiming flow or to avoid running out-of-gas.
+    </field>
+
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [M-1] Potential incompatibility with future CCIP upgrades
+        
+        According to the [Chainlink CCIP Best Practices](https://docs.chain.link/ccip/best-practices#using-extraargs), it is recommended to make the `extraArgs` value mutable:
+        
+        > The purpose of `extraArgs` is to allow compatibility with future CCIP upgrades. To get this benefit, make sure that `extraArgs` is mutable in production deployments.
+        > 
+        
+        In the current implementation, the `extraArgs` value is computed as follows:
+        
+        ```jsx
+        extraArgs: Client._argsToBytes(
+            // Additional arguments, setting gas limit and non-strict sequencing mode
+            Client.EVMExtraArgsV1({ gasLimit: messageGasLimit /*, strict: false*/ })
+        ),
+        ```
+        
+        Since the `extraArgs` value is hardcoded and cannot be altered after deployment, it may break compatibility with future CCIP upgrades.
+        
+        **Remediations to Consider**
+        
+        Consider computing the `extraArgs` value off-chain and providing it via an owner-controlled setter function; or alternatively allow users to set the value when bridging the shares.
+    </field>
+    <field name="response">
+        As mentioned in H-1 we are prioritizing simplicity and flexibility, and accepting the fact that if Chainlink makes breaking changes in the future we will need to deprecate and re-deploy
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Error Recovery</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/PeggyJV/cellar-contracts/commit/9503e5036932dd7f7e1e04ffe63d604dbe54b573,https://github.com/PeggyJV/cellar-contracts/commit/15ca0b4e23dec949c00400573d210bc6345991fa,https://github.com/PeggyJV/cellar-contracts/commit/570d4d562c81e717e1b55fb5f861cb0708225324</field>
+    <field name="content">
+        ## [M-2] Withdrawal Requests completion book keeping could be skipped
+        
+        Staking Adaptors that inherit `StakingAdaptor.sol` assume that only the cellar can complete a pending withdrawal request. This is important since an array of `requestIds` is added to and removed on request and completion respectively, as well as any ETH sent to the cellar on withdrawal is immediately wrapped so it can be properly handled and tracked by the cellar.
+        
+        ```solidity
+        /**
+         * @notice Allows a strategist to request to burn/withdraw a derivative for a chains native asset.
+         * @param amount the amount of derivative to burn/withdraw
+         */
+        function requestBurn(uint256 amount) external virtual {
+            if (amount == 0) revert StakingAdaptor__ZeroAmount();
+        
+            uint256 id = _requestBurn(amount);
+        
+            // Add request id to staking adaptor.
+            StakingAdaptor(adaptorAddress).addRequestId(id);
+        }
+        
+        /**
+         * @notice Allows a strategist to complete a burn/withdraw of a derivative asset for a native asset.
+         * @dev Will automatically wrap the native asset received from burn/withdraw.
+         * @param id the request id
+         */
+        function completeBurn(uint256 id) external virtual {
+            uint256 primitiveDelta = address(this).balance;
+            _completeBurn(id);
+            primitiveDelta = address(this).balance - primitiveDelta;
+            wrappedPrimitive.deposit{ value: primitiveDelta }();
+            StakingAdaptor(adaptorAddress).removeRequestId(id);
+        }
+        ```
+        
+        Reference: [StakingAdaptor.sol#L232-L256](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/adaptors/Staking/StakingAdaptor.sol#L232-L256)
+        
+        However, if a protocol allows finalized withdrawals to be executed permissionlessly, it would skip the wrapping of the ETH the cellar received, and the removal of the requestId. This would lead to an inaccurate requestId array, which could lead to considering withdrawn requests as pending balances, or cause issues with the `balanceOf()`. It would also lead to native tokens being deposited into the cellar which would be untracked. 
+        
+        **Remediations to Consider**
+        
+        Resolution of this requires multiple adjustments:
+        
+        - Allow the ability to remove request ids from the `requestIds` array after verifying it has already been claimed, or in all of `_completeBurns()` implementations handle the already claimed case.
+        - Ensure that a request hasn’t been claimed already in the implementations of `_balanceOf()` to prevent counting already claimed withdrawals
+        - Create a nativeTokenAdaptor that tracks the cellar’s native token balance, and ensure that each cellar that uses a staking adaptor also has a position with this adaptor to make sure all withdrawals are still tracked.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-1] `SourceLocker` can be deployed without a corresponding `DestinationMinter`
+        
+        To properly deploy `SourceLocker` and `DestinationMinter`, `SourceLockerFactory` needs to be connected with a corresponding `DestinationMinterFactory`. However, in the `SourceLockerFactory.deploy` method, there is no check to ensure that `DestinationMinterFactory` has been set. This can result in a successful deployment of `SourceLocker` without having a corresponding `DestinationMinter`, as the ccip message fails to reach the `DestinationMinterFactory` for deploying the `DestinationMinter`.
+        
+        **Remediations to Consider**
+        
+        Consider adding a check to `SourceLockerFactory.deploy`, to ensure the `DestinationMinterFactory` has been properly set.
+    </field>
+    <field name="response">
+        This mistake can only be made by the owner of the SourceLockerFactory, so we will fix this by properly setting up the factories before trying to set up a cross chain bridge.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-2] Cellars do not support handling ERC1155 tokens
+        
+        Cellars currently inherit ERC721Holder, allowing them to receive ERC721 tokens. However, in its current state, the cellars don’t support receiving ERC1155 tokens. There could be protocols that issue ERC1155 instead of ERC721 tokens that strategists want to interact with. 
+        
+        **Remediations to Consider**
+        
+        Add ERC1155Holder to the cellar’s inheritance chain
+    </field>
+    <field name="response">
+        There is not enough room in Cellar.sol to add the ERC1155Holder.sol. So if a future protocol does use ERC1155 we will re-evaluate adding in support for it.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Unused Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">f0eb4e2b0bc205aa0a57ee898764d82a7643a1eb</field>
+    <field name="content">
+        ## [Q-1] `sourceChainSelector`/`destinationChainSelector` not needed in `SourceLocker`/`DestinationMinter`
+        
+        In the `SourceLocker` contract, the `sourceChainSelector` variable is set in the constructor, but it is not used anywhere in the contract. Similarly, in the `DestinationMinter` contract, the `destinationChainSelector` variable is set in the constructor, but it is also not used anywhere in the contract.
+        
+        **Remediations to Consider**
+        
+        To improve readability, consider removing these unused state variables from the code.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">58d01835d6da4e0dddc57ed91c84fcb9228407be</field>
+
+    <field name="content">
+        ## [Q-2] Improve events
+        
+        In SourceLockerFactory’s `deploy` function, there is no event emitted. Consider emitting an event containing parameters such as `target` and `locker` address, `messageId`, etc.
+        
+        Additionally, SourceLocker’s `bridgeToDestination` and DestinationMinter’s `bridgeToSource` function emit events that don’t include a `messageId`.
+        
+        ```jsx
+        emit BridgeToDestination(amount, to);
+        emit BridgeToSource(amount, to);
+        ```
+        
+        It is recommended to include the `messageId` returned by `router.ccipSend` when emitting an event in the same function. This can be helpful when searching for sent messages in [Chainlink’s CCIP Explorer](https://ccip.chain.link/).
+    </field>
+
+  </item>
+
+  <item>
+    <field name="topic">Composability</field>
+    <field name="impact">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [Q-3] Allow `SourceLocker` and `DestinationMinter` contracts to be retrievable from factories
+        
+        Currently the SourceLocker and DestinationMinter factories deploy the respective contracts and emit their addresses so they can be retrieved off-chain. However, there is no way for contracts on chain to easily know the contract address to interact with to bridge a particular cellar share token, without it being explicitly provided.
+        
+        **Remediations to Consider**
+        
+        Store the addresses of deployed contracts in the respective factories in a mapping with a key that can be used to easily retrieve either the `SourceLocker` or `DestinationMinter` contracts based on the token wanting to be bridged.
+    </field>
+    <field name="response">
+        This is a good convenience function that we can hash out for the more matured final version of this code.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Composability</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [Q-4] Bridging contracts should share the same interface
+        
+        The SourceLocker and DestinationMinter contracts both allow the bridging of tokens from one chain to the other, and share the same parameters.
+        
+        ```solidity
+        /**
+         * @notice Bridge shares back to source chain.
+         * @dev Caller should approve LINK to be spent by this contract.
+         * @param amount Number of shares to burn on destination network and unlock/transfer on source network.
+         * @param to Specified address to burn destination network `share` tokens, and receive unlocked `share` tokens on source network.
+         * @param maxLinkToPay Specified max amount of LINK fees to pay as per this contract.
+         * @return messageId Resultant CCIP messageId.
+         */
+        function bridgeToSource(uint256 amount, address to, uint256 maxLinkToPay) external returns (bytes32 messageId) {
+            if (to == address(0)) revert DestinationMinter___InvalidTo();
+            _burn(msg.sender, amount);
+        
+            Client.EVM2AnyMessage memory message = _buildMessage(amount, to);
+        
+            IRouterClient router = IRouterClient(this.getRouter());
+        
+            uint256 fees = router.getFee(sourceChainSelector, message);
+        
+            if (fees > maxLinkToPay) revert DestinationMinter___FeeTooHigh();
+        
+            LINK.safeTransferFrom(msg.sender, address(this), fees);
+        
+            LINK.safeApprove(address(router), fees);
+        
+            messageId = router.ccipSend(sourceChainSelector, message);
+            emit BridgeToSource(amount, to);
+        }
+        ```
+        
+        Reference: [DestinationMinter.sol#L87-L113](https://github.com/PeggyJV/cellar-contracts/blob/b7004cd67831b549fbd18c0f92503f2f841c9215/src/modules/multi-chain-share/DestinationMinter.sol#L87-L113)
+        
+        ```solidity
+        /**
+         * @notice Bridge shares to destination chain.
+         * @notice Reverts if target destination is not yet set.
+         * @param amount number of `share` token to bridge.
+         * @param to Specified address to receive newly minted bridged shares on destination network.
+         * @param maxLinkToPay Specified max amount of LINK fees to pay.
+         * @return messageId Resultant CCIP messageId.
+         */
+        function bridgeToDestination(
+            uint256 amount,
+            address to,
+            uint256 maxLinkToPay
+        ) external returns (bytes32 messageId) {
+            if (to == address(0)) revert SourceLocker___InvalidTo();
+            shareToken.safeTransferFrom(msg.sender, address(this), amount);
+        
+            Client.EVM2AnyMessage memory message = _buildMessage(amount, to);
+        
+            IRouterClient router = IRouterClient(this.getRouter());
+        
+            uint256 fees = router.getFee(destinationChainSelector, message);
+        
+            if (fees > maxLinkToPay) revert SourceLocker___FeeTooHigh();
+        
+            LINK.safeTransferFrom(msg.sender, address(this), fees);
+        
+            LINK.safeApprove(address(router), fees);
+        
+            messageId = router.ccipSend(destinationChainSelector, message);
+            emit BridgeToDestination(amount, to);
+        }
+        ```
+        
+        Reference: [SourceLocker.sol#L113-L143](https://github.com/PeggyJV/cellar-contracts/blob/b7004cd67831b549fbd18c0f92503f2f841c9215/src/modules/multi-chain-share/SourceLocker.sol#L113-L143)
+        
+        Although their execution differs slightly, one locks tokens and the other burns them, from the users perspective they function the same. Currently a user needs to know if their token originated on it’s chain or not in order to bridge it to another supported chain, since the interface of the contract differs. Having to determine where a share token originated before bridging may make interacting with these contracts confusing to integrate with.
+        
+        **Remediations to Consider**
+        
+        Standardize the bridging functions to share the same interface to make interacting with these contracts easier.
+    </field>
+    <field name="response">
+        This is a good convenience function that we can hash out for the more matured final version of this code.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Composability</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">e5630ad3cf908d4b77d70a70e8858fb8a65be91a</field>
+    <field name="content">
+        ## [Q-5] Allow for flexible input parameters in `StakingAdaptor`
+        
+        StakingAdaptor is an abstract contract that is intended to be inherited by protocol specific staking adaptors, and it’s intent is to allow for these adaptors to all share the same interface, simplifying how strategist interacts with the varying staking protocol’s adaptors.
+        
+        However, since `StakingAdaptor` is intended to be used by all any potential current or future protocol, there may be specific dynamic input parameters required. If that is the case, than another `StakingAdaptor` would need to be created with a differing interface.
+        
+        **Remediations to Consider**
+        
+        Add a bytes input parameter to the stakingAdaptors functions, and pass it into the internal functions that the specific protocol’s adaptors override. Doing this allow protocols to use this data and decode it as expected, giving the `StakingAdaptor` more flexibility to be interoperable with any staking protocol.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Consistency</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">e312ad49cf41098a1a073c00077a20403097c939</field>
+    <field name="content">
+        ## [Q-6] Generic CompoundV3 adaptor names and identifiers
+        
+        The CompoundV3 adaptors have generic names like `BorrowAdaptor.sol` and `CollateralAdaptor.sol`. These names are also used as their unique identifiers:
+        
+        ```solidity
+        function identifier() public pure virtual override returns (bytes32) {
+            return keccak256(abi.encode("Collateral Adaptor V 0.0"));
+        }
+        ```
+        
+        Reference: [CollateralAdaptor.sol#L53-L55](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/adaptors/Compound/V3/CollateralAdaptor.sol#L53-L55)
+        
+        This naming convention makes it difficult to determine what the adaptor is doing and what protocol it is interacting with.
+        
+        **Remediations to Consider**
+        
+        Update the names to be more specific, following the same adaptor naming convention already established.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ff395ce4cc7c5370824d550345d15a3f588bf977</field>
+    <field name="content">
+        ## [Q-7] Inaccurate Comments
+
+        - [offerToSolve](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/atomic-queue/AtomicQueue.sol#L54) should be `assetsToOffer`
+        - [AtomicQueue](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/atomic-queue/AtomicQueue.sol#L93-L95) is not limited to exchanging shares for underlying assets
+        - [support](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/adaptors/Staking/StakingAdaptor.sol#L305) misspelled
+        - [oooof](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/adaptors/Staking/StakingAdaptor.sol#L378)
+        - [Shares are burned](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/multi-chain-share/DestinationMinter.sol#L91) from msg.sender and not from the specified to param.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">cd1c6d031cbe72a50294c845974b9844ff72bd13</field>
+    <field name="content">
+        ## [Q-8] Misleading parameter names in fulfilled event
+        
+        In `AtomicQueue.sol`, the `AtomicRequestFulfilled` event is declared as follows:
+        
+        ```jsx
+        event AtomicRequestFulfilled(
+                address user,
+                address offerToken,     
+                address wantToken,
+                uint256 sharesSpent,  
+                uint256 assetsReceived,
+                uint256 timestamp
+            );
+        ```
+        
+        Reference: [AtomicQueue.sol#L100-L101](https://github.com/PeggyJV/cellar-contracts/blob/f7a1613012177619f76c1cf9da203feacd53856b/src/modules/atomic-queue/AtomicQueue.sol#L100-L101)
+        
+        In the context of the `AtomicQueue`, transferred tokens are defined as `offer` and `want`, rather than `share` and `assets`. 
+        
+        **Remediations to Consider**
+        
+        For clarity sake, rename `sharesSpent` and `assetsReceived` parameters in the above event to something more meaningful, such as `offerAmountSpent` and `wantAmountReceived`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Gas optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5519cd2327b721c386a5443d96f569daa2415d29</field>
+    <field name="content">
+        ## [G-1] Improving `getAccountHealthFactor()`
+        
+        `V3Helper.sol`’s `getAccountHealthFactor()` calculates the cellars health factor for a given market. However, it differs from how Compound calculates it health factor in `isLiquidatable()`:
+        
+        ```solidity
+        /**
+         * @notice Check whether an account has enough collateral to not be liquidated
+         * @param account The address to check
+         * @return Whether the account is minimally collateralized enough to not be liquidated
+         */
+        function isLiquidatable(address account) override public view returns (bool) {
+            int104 principal = userBasic[account].principal;
+        
+            if (principal >= 0) {
+                return false;
+            }
+        
+            uint16 assetsIn = userBasic[account].assetsIn;
+            int liquidity = signedMulPrice(
+                presentValue(principal),
+                getPrice(baseTokenPriceFeed),
+                uint64(baseScale)
+            );
+        
+            for (uint8 i = 0; i < numAssets; ) {
+                if (isInAsset(assetsIn, i)) {
+                    if (liquidity >= 0) {
+                        return false;
+                    }
+        
+                    AssetInfo memory asset = getAssetInfo(i);
+                    uint newAmount = mulPrice(
+                        userCollateral[account][asset.asset].balance,
+                        getPrice(asset.priceFeed),
+                        asset.scale
+                    );
+                    liquidity += signed256(mulFactor(
+                        newAmount,
+                        asset.liquidateCollateralFactor
+                    ));
+                }
+                unchecked { i++; }
+            }
+        
+            return liquidity < 0;
+        }
+        ```
+        
+        Reference: [Comet.sol#L541-581](https://github.com/compound-finance/comet/blob/main/contracts/Comet.sol#L541-L581)
+        
+        Notably a collateral assets `scale` is used rather than querying the assets `decimals()`, and `isInAsset()` is checked to determine if the account has collateral of that asset type before doing any calculations. 
+        
+        **Remediations to Consider**
+        
+        - Pull the assetsIn for the cellar and use that to remove calculating the  health factor for collateral the cellar doesn’t have deposited.
+        - Use `info.scale` rather than retrieving the assets decimals to reduce external calls and ensure you are using the same value for the calculations as compound is.
+        - Consider removing the `maxNumberOfAssets` check since only collateral deposited should be considered, reducing the gas costs for markets that accept many assets as collateral.
+    </field>
+  </item>
+
+  

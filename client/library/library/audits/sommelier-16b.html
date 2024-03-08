@@ -1,0 +1,75 @@
+<page
+  clientName="Sommelier"
+  reportDate="February 12, 2024"
+  auditTitle="Sommelier A-16b"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="f7a1613012177619f76c1cf9da203feacd53856b"
+  repoCommitHashFinal="6020dae9399062bc8c1ee86fd9a78573ee7290de"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from January 23, 2024 to January 31, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        ### Trusted entities:
+
+        - Strategists:
+            - User that can manage positions in the cellar. Is trusted to act in the benefit of the cellars shareholders, and earns a portion of the cellars profits. All actions made by the strategist are approved by Sommelier governance. Has the ability to shutdown the cellar in case of an emergency.
+        - Governance:
+            - Sommelier governance responsible for approving strategist actions, as well as adding or removing trusted positions for cellars.
+        - Multisig:
+            - Approves adaptors and positions in the registry as well as adding and updating price feeds for assets in the priceRouter. Can pause cellars, which can be unpaused by governance.
+        - Chainlink:
+            - Responsible for a majority of pricing, as well as running automated tasks for share price oracles. It is trusted that the data it provides is correct.
+  
+        The goal of the system is to to have checks and balances for each permissioned action, where if any one permissioned entity acts malicious, the others can remedy the situation, requiring multiple points failure before it can negatively impact users.
+  
+        ### Assumptions:
+  
+        - There is an assumption that permissioned entities will not act maliciously.
+        - It is assumed that the protocols that a cellar interacts with wont act maliciously, and will operate as intended.
+  
+        ### Accepted Risks:
+  
+        - Share price varies based on market conditions, and there is no guarantee share price will increase.
+        - Protocols that a cellar interacts with could be exploited. There are ways trusted entities can help mitigate the effect of such exploits, but there may be a negative effect on share price and a loss of funds for users.
+   
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+        a5255faff5625e3337f8785e0d0c19f37cf2a257c800e436bea99f88b593c931  src/modules/multi-chain-share/DestinationMinter.sol
+        b155089909314f80f4194370ce309498ecf8081b937312b2f03c440351c62f7b  src/modules/multi-chain-share/DestinationMinterFactory.sol
+        068a70bb5a40e40bed28a322753ed277f8034d8bb569ed902b3a13e15a1a1f5b  src/modules/multi-chain-share/SourceLocker.sol
+        9358b68d48d6ef795c668a1c82577f81ab185d41e8992da7f10ddf8ad880f82a  src/modules/multi-chain-share/SourceLockerFactory.sol
+        586199e16fbd3f6917fab98e8c679a6db7d55f8f61e735787b9b6828f72cbfd9  src/modules/adaptors/Compound/V3/BorrowAdaptor.sol
+        21835cbc1a69ef9d0212c827760c05cc7bbc0283a50a4ff912425fe33e7d526b  src/modules/adaptors/Compound/V3/CollateralAdaptor.sol
+        b22d669dfbbf0cd16d43dfad8cf990413d03351c079e4051b26bc3ada2071ffc  src/modules/adaptors/Compound/V3/RewardsAdaptor.sol
+        7c7b17c7d32924536c000f7967aea331437d73aa9f59e339acf04ba611fda8b9  src/modules/adaptors/Compound/V3/SupplyAdaptor.sol
+        d6870250073d76ffc9aed722cbba301af363ddeb54b4dff2d705ac34fbdf52d8  src/modules/adaptors/Compound/V3/V3Helper.sol
+        a566409152358b67570b4beffdcf7c0bc84b9fcbffd65b42ac0a52d18f818624  src/modules/adaptors/Staking/EtherFiStakingAdaptor.sol
+        c56bd3bb2ba81044114f86b84057aa02c098d45488cf2f60dafc4e9fd46d1a64  src/modules/adaptors/Staking/KelpDAOStakingAdaptor.sol
+        5a36ec0065cb9aea5960b3a213096b60b7cb462c7130330839911947b2dbc261  src/modules/adaptors/Staking/LidoStakingAdaptor.sol
+        19068b6b2a9e9c4bc4d4773e4d7409306e8d25e881c3242ccf99dff18caf4021  src/modules/adaptors/Staking/RenzoStakingAdaptor.sol
+        b0eebb1502f4fdb4e262f2c5e7db4a4689ffed8ffa858f065ae6629afe9fc904  src/modules/adaptors/Staking/StaderStakingAdaptor.sol
+        32d872bc07cbe94aeb86b4f08ca6950dce99d966b626812fe58b127b4583725b  src/modules/adaptors/Staking/StakingAdaptor.sol
+        5ca190207fa2fb1bc24f1363ab8b351ee436cab64863d6394a2220425bc4f4be  src/modules/adaptors/Staking/SwellStakingAdaptor.sol
+        41dd439ff7f7f7ce0ffb91fe5d00dbbf5f16ad4dab720600832be549aafc42c8  src/modules/price-router/Extensions/EtherFi/eETHExtension.sol
+        4349ae3bb0f61f5d8123718ee66adc115f0eb980b681f4765039c71f615e3f63  src/modules/atomic-queue/AtomicQueue.sol
+    </template>
+
+  </content-for>
+</page>
