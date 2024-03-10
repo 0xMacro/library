@@ -1,0 +1,40 @@
+<page
+  clientName="Seven Seas"
+  reportDate="March 10, 2024"
+  auditTitle="Seven Seas A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/cellar-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="0a7d659064c9070bd369d5c511ba94c6b01bbab2"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on March 10th.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository, which replaced Openzeppelin's Ownable with Solmate's Auth to handle function permissions.
+    </p>
+
+    <template type="file-hashes">
+        e4d75ac26ab4e489a03638b3d5994cb525000c4bdde3603fcf0ae91b62345ff8  src/Deployer.sol
+        a6d824470b2b6242a8cdea3bb3b23d22345649d91714236664febcc78bf480e8  src/base/Cellar.sol
+        fc7aea1d34ee6366b7b2ab0319939d45844effd5144ee06a58856f2fd2880e41  src/base/permutations/CellarWithMultiAssetDeposit.sol
+        b8196ab25e5ed0a5140910dc1b5f152e4bf52c027df325cd9b7c7c0070d6a9a7  src/base/permutations/CellarWithOracle.sol
+        b21092054f4baa20decd1cdaf47c39980ceb15ae3f6d6726314bd07ea7858936  src/base/permutations/CellarWithShareLockPeriod.sol
+        d48be1672a1a570ef67e5b873afc8b1ec581b47b0e9f677e8a42d72faa7b03ca  src/base/permutations/advanced/CellarWithOracleWithAaveFlashLoansWithMultiAssetDeposit.sol
+        2f8511f86c51c4dd5cdf0c9203444a5ef4fdc71900c365b40ca9c3e62495e68d  src/base/permutations/advanced/CellarWithOracleWithBalancerFlashLoansWithMultiAssetDeposit.sol
+        808acfe65ce3ab784bf8655535f5b3e91ffb2a1c53abeb993a7e0e965ab6be75  src/modules/FeesAndReserves.sol
+        d8ad158f9126c047ee0d02ec9600b2dbe841c39475878c468e521f1d51207fce  src/modules/ProtocolFeeCollector.sol
+        b109e123708b7552ef96378da5903d1eef94b8650cd22174366aff49755e1e0b  src/modules/adaptors/BaseAdaptor.sol
+    </template>
+
+  </content-for>
+</page>
