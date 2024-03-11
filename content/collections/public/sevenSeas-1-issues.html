@@ -1,0 +1,30 @@
+<item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      ## [I-1] Functions using the isAuthorized modifier may not be authorized correctly when called internally
+  
+      Solmate’s Auth contract checks if the sender is authorized to call a specific function using the `msg.sig` value when checking with the authority contract, if set.
+  
+      ```solidity
+      modifier requiresAuth() virtual {
+         require(isAuthorized(msg.sender, msg.sig), "UNAUTHORIZED");
+  
+          _;
+      }
+  
+      function isAuthorized(address user, bytes4 functionSig) internal view virtual returns (bool) {
+          Authority auth = authority; // Memoizing authority saves us a warm SLOAD, around 100 gas.
+  
+          // Checking if the caller is the owner only after calling the authority saves gas in most cases, but be
+          // aware that this makes protected functions uncallable even to the owner if the authority is out of order.
+          return (address(auth) != address(0) && auth.canCall(user, address(this), functionSig)) || user == owner;
+      }
+      ```
+      Reference: [Auth.sol#L4-L36](https://github.com/transmissions11/solmate/blob/main/src/auth/Auth.sol#L24-L36)
+  
+      However, the `msg.sig` returns the function selector of the external function that initiated the transaction, which may not be the function intended to be verified, like in the case of a public function being called internally, or a internal function with this modifier. 
+  
+      Although there are no instances in the cellar of calling permissioned functions internally, care should be made to ensure there the correct function selector is being verified when integrating with Solmate’s Auth contract.
+    </field>
+  </item>
+  
