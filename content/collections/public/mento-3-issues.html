@@ -1,0 +1,263 @@
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">085a02116b0c34a478068aafc2276d346f41f7f6</field>
+    <field name="content">
+        ## [M-1] Mento tokens can be lost, or delegated incorrectly
+        
+        In `Locking.sol`’s `lock()` function, a specified `amount` of Mento tokens can be locked in return for `veMento` for the duration of the lock period.
+        
+        ```solidity
+        function lock(
+          address account,
+          address _delegate,
+          uint96 amount,
+          uint32 slopePeriod,
+          uint32 cliff
+        ) external override notStopped notMigrating returns (uint256) {
+          require(amount > 0, "zero amount");
+          require(cliff <= MAX_CLIFF_PERIOD, "cliff too big");
+          require(slopePeriod <= MAX_SLOPE_PERIOD, "period too big");
+        
+          counter++;
+        
+          uint32 currentBlock = getBlockNumber();
+          uint32 time = roundTimestamp(currentBlock);
+          addLines(account, _delegate, amount, slopePeriod, cliff, time, currentBlock);
+          accounts[account].amount = accounts[account].amount + (amount);
+        
+          // slither-disable-next-line reentrancy-events
+          require(token.transferFrom(msg.sender, address(this), amount), "transfer failed");
+        
+          emit LockCreate(counter, account, _delegate, time, amount, slopePeriod, cliff);
+          return counter;
+        }
+        ```
+        
+        Reference: [Locking.sol#L44-L67](https://github.com/mento-protocol/mento-core/blob/472a1d9d776da3cd4cdabc281c3bbc30e97af15a/contracts/governance/locking/Locking.sol#L44-L67)
+        
+        However, the inputted account and _delegate addresses are not validated to ensure they are not the zero address.
+        
+        In the case where the `_delegate` is set to `address(0)`, the mento tokens are locked for the set duration, but the `veMento` gained will be useless. Users may incorrectly assume that they can set delegate to `address(0)` so that they do not delegate to anyone else, rather than use their own address as the delegate as expected for this case.
+        
+        In the case where `account` is `address(0)`, then ownership of the locked Mento tokens would be given to the zero address which cannot withdraw the tokens, effectively burning the Mento tokens.
+        
+        **Remediations to Consider**
+        
+        Validate the `account` and `_delegate` input parameters to ensure they are not set to `address(0)` to prevent locking Mento tokens in the contract indefinitely, and miss-delegate of `veMento`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Use Case</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">220b5b8e0252dba14ce4a695d73f2e3c67e82401</field>
+    <field name="content">
+        ## [L-1] Locking migration breaks withdrawals for unpaused `MentoToken`
+        
+        The `Locking` contract supports migration of lock entries to another contract via the `migrate` function. In addition, `MentoToken` transfers are initially disabled and will be enabled at a later point when the contract gets unpaused. The logic to prevent transfers is implemented in the overridden `_beforeTokenTransfer` function:
+        
+        ```jsx
+          function _beforeTokenTransfer(
+            address from,
+            address to,
+            uint256 amount
+          ) internal virtual override {
+            super._beforeTokenTransfer(from, to, amount);
+        
+            require(to != address(this), "MentoToken: cannot transfer tokens to token contract");
+            // Token transfers are only possible if the contract is not paused
+            // OR if triggered by the owner of the contract
+            // OR if triggered by the locking contract
+            // OR if triggered by the emission contract
+            require(
+              !paused() || owner() == _msgSender() || locking == _msgSender() || emission == _msgSender(),
+              "MentoToken: token transfer while paused"
+            );
+          }
+        ```
+        
+        **Reference**: [MentoToken.sol#L116](https://github.com/mento-protocol/mento-core/blob/472a1d9d776da3cd4cdabc281c3bbc30e97af15a/contracts/governance/MentoToken.sol#L116)
+        
+        According to this logic, transfers are only possible when the contract is unpaused or when triggered by the `owner`, `emission`, or `locking` contract. 
+        
+        But, if lock entries are migrated to a new `Locking` contract, this new contract is not allowed to trigger transfers anymore, since this new address is not updated in the `MentoToken` implementation. As a consequence, withdrawing from the new `Locking` contract would revert when the `MentoToken` is paused, leading to locked tokens until the `MentoToken` is unpaused. 
+        
+        Another consequence of migrating locks to a new contract is that calling `lock` would revert for the same reason, including a revert on the `Airgrab.claim` function.
+        
+        Note that - after clarification with the Mento team - the severity of this issue is considered low, as it is very unlikely to utilize the Locking’s `migrate` function. If the `Locking` contract needs to be changed for any reason, the preferred method is to upgrade the contract rather than performing a `migrate`.
+        
+        **Remediation to Consider**
+        
+        Entirely remove migration capability from the `Locking` contract or alternatively, to maintain support for migration, consider allowing the `locking` address referenced in the `MentoToken` to be updated on migration.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1e60cb80f31e4ca0ca864212ffb6c302cae5dc57</field>
+    <field name="content">
+        ## [L-2] Minimum values for `cliff` and `slope` periods cannot be set to match max amounts after deployment
+        
+        The minimum allowed values for both the cliff and slope period can initially be set in the `__LockingBase_init_unchained` function during deployment. These values can be later adjusted via the owner-controlled functions `setMinCliffPeriod` and `setMinSlopePeriod`. 
+        
+        The `require` checks in the init function allow the min periods to be set to values equal to or less than the `MAX_CLIFF_PERIOD` **and **`MAX_SLOPE_PERIOD`*:*
+        
+        ```
+        //setting min cliff and slope
+        require(_minCliffPeriod <= MAX_CLIFF_PERIOD, "cliff too big");
+        require(_minSlopePeriod <= MAX_SLOPE_PERIOD, "period too big");
+        ```
+        
+        Reference: [LockingBase.sol#L148-L149](https://github.com/mento-protocol/mento-core/blob/472a1d9d776da3cd4cdabc281c3bbc30e97af15a/contracts/governance/locking/LockingBase.sol#L148-L149)
+        
+        However, in the respective setter functions, the `require` checks only allow values less than the maximum amounts, not equal to them. 
+        
+        ```jsx
+        function setMinCliffPeriod(uint32 newMinCliffPeriod) external notStopped notMigrating onlyOwner {
+          require(newMinCliffPeriod < MAX_CLIFF_PERIOD, "new cliff period > 2 years");
+          minCliffPeriod = newMinCliffPeriod;
+        
+          emit SetMinCliffPeriod(newMinCliffPeriod);
+        }
+        
+        function setMinSlopePeriod(uint32 newMinSlopePeriod) external notStopped notMigrating onlyOwner {
+          require(newMinSlopePeriod < MAX_SLOPE_PERIOD, "new slope period > 2 years");
+          minSlopePeriod = newMinSlopePeriod;
+        
+          emit SetMinSlopePeriod(newMinSlopePeriod);
+        }
+        ```
+        
+        Reference: [LockingBase.sol#L269-L281](https://github.com/mento-protocol/mento-core/blob/472a1d9d776da3cd4cdabc281c3bbc30e97af15a/contracts/governance/locking/LockingBase.sol#L269-L281)
+        
+        **Remediation to Consider**
+        
+        Change `setMinCliffPeriod` and `setMinSlopePeriod` to allow new values being equal to the configured `MAX_CLIFF_PERIOD` **and **`MAX_SLOPE_PERIOD`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-3] Locking with a cliff is more effective than using a slope
+        
+        Currently in `Locking.sol` the `MAX_CLIFF_PERIOD` is less than the `MAX_SLOPE_PERIOD`:
+        
+        ```solidity
+        uint32 constant MAX_CLIFF_PERIOD = 103;
+        uint32 constant MAX_SLOPE_PERIOD = 104;
+        ```
+        
+        Reference: [LockingBase.sol#L18-L19](https://github.com/mento-protocol/mento-core/blob/472a1d9d776da3cd4cdabc281c3bbc30e97af15a/contracts/governance/locking/LockingBase.sol#L18-L19)
+        
+        The calculation to determine the percent multiplier of locked Mento token to `veMento`, uses the cliff or slope period, divided by it’s respective max period:
+        
+        ```solidity
+        uint96 cliffSide = (uint96(cliff) * ST_FORMULA_BASIS) / MAX_CLIFF_PERIOD;
+        uint96 slopeSide = (uint96(slopePeriod) * ST_FORMULA_BASIS) / MAX_SLOPE_PERIOD;
+        uint96 multiplier = cliffSide + slopeSide;
+        
+        //@audit: notice the multiplier is capped at effectively 100%
+        if (multiplier > ST_FORMULA_BASIS) {
+          multiplier = ST_FORMULA_BASIS;
+        }
+        
+        uint256 amountMultiplied = uint256(amount) * uint256(multiplier);
+        lockAmount = uint96(amountMultiplied / (ST_FORMULA_BASIS));
+        ```
+        
+        Reference: [LockingBase.sol#L219-L228](https://github.com/mento-protocol/mento-core/blob/472a1d9d776da3cd4cdabc281c3bbc30e97af15a/contracts/governance/locking/LockingBase.sol#L219-L228)
+        
+        However, since the `MAX_CLIFF_PERIOD` is smaller, the weight of each cliff period is just under 1% more effective than if a user were to lock with a slope.
+        
+        **Remediations to Consider**
+        
+        Consider setting the max periods to be the same.
+    </field>
+    <field name="response">
+        Making the MAX_CLIFF_PERIOD 104 would effectively mean max cliff period being 105 weeks, taking 1 week of min slope - which acts like a cliff - into account.
+        We are fine with cliff lockers having <1% advantage.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">d189b988c0d58ae5259dad86a7b83b6b4e06ebef</field>
+    <field name="content">
+        ## [Q-1] Locking contracts missing Natspec
+        
+        The contracts involved in vote escrowed Mento tokens, including `Locking`, `LockingBase`, `LockingRelock`, and `LockingVotes` and their interface contracts are missing Natspec comments, which is present in other contracts within the protocol. Natspec helps users and developers understand the intention of functions and the parameters.
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">37e1e8a0ff3dfc57258719757bc142a3c7440118</field>
+    <field name="content">
+        ## [Q-2] `assert` check is missing after `MentoGovernor` deployment
+
+        Reference: [GovernanceFactory.sol#L265](https://github.com/mento-protocol/mento-core/blob/472a1d9d776da3cd4cdabc281c3bbc30e97af15a/contracts/governance/GovernanceFactory.sol#L265)
+
+        In `GovernanceFactory.createGovernance`, there is an `assert` statement after each deployment to verify that the pre-calculated address matches the actual deployed address.
+
+        However, this `assert` check is missing for the `MentoGovernor` deployment.
+
+        **Remediation to Consider**
+
+        For consistency and clarity sake, add an appropriate check to verify correct deployment of `MentoGovernor`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+        ## [I-1] Celo network shutdown could increase Mento token lock period
+
+        `Locking.sol` allows users to lock their Mento tokens for a set period, and in return give them vote escrowed tokens that can be used to vote on proposals in Mento’s governance contract. The locking duration is based on block numbers rather than timestamps, which if the Celo network stops processing blocks, it would increase the expected duration that users Mento tokens would be locked for.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+        ## [I-2] Locking tokens past a point does not grant additional `veMento`
+
+        When locking Mento tokens in the `Locking` contract in return for `veMento` tokens, the amount of `veMento` received is determined by a percent multiplier that is calculated based on the locking duration, which is a combination of the cliff period and slope period set.
+        
+        ```solidity
+        uint96 cliffSide = (uint96(cliff) * ST_FORMULA_BASIS) / MAX_CLIFF_PERIOD;
+        uint96 slopeSide = (uint96(slopePeriod) * ST_FORMULA_BASIS) / MAX_SLOPE_PERIOD;
+        uint96 multiplier = cliffSide + slopeSide;
+        
+        //@audit: notice the multiplier is capped at effectively 100%
+        if (multiplier > ST_FORMULA_BASIS) {
+          multiplier = ST_FORMULA_BASIS;
+        }
+        
+        uint256 amountMultiplied = uint256(amount) * uint256(multiplier);
+        lockAmount = uint96(amountMultiplied / (ST_FORMULA_BASIS));
+        ```
+        
+        Reference: [LockingBase.sol#L219-L228](https://github.com/mento-protocol/mento-core/blob/472a1d9d776da3cd4cdabc281c3bbc30e97af15a/contracts/governance/locking/LockingBase.sol#L219-L228)
+        
+        If a `cliff` and `slopePeriod` were used that would bring the multiplier above 100%, then the `multiplier` would be capped, and the additional lock duration would not have any additional benefit other than maintaining a balance of `veMento` tokens for a longer duration. This may lead to users locking their Mento tokens for longer durations than they would otherwise.
+        
+        The Mento team stated will notify users of this on their front end application, however users that integrate with this contract, or use it directly should be aware of this.
+    </field>
+  </item>
