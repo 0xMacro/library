@@ -1,0 +1,122 @@
+<page
+  clientName="Obelisk"
+  reportDate="March 12, 2024"
+  auditTitle="Obelisk A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/lz-asia/obelisk"
+  repoCommitHash="814eca50992057ed58053c7a3086b1c9c5701632"
+  repoCommitHashFinal=""
+  layout="/library/audits/_layout.html"
+  customReviewInfo
+  passwordEncrypt="env:PAGE_PASS_OBELISK_1"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on February 12 to February 20, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Specification documentation provided by {{page.clientName}} team.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    ## **Actors**
+
+    The `owner` address, a protocol multi-sig, and assigned during deployment. This is the sole access control role and rank, having permission to change, configure, and start the flow of rounds and staking params.
+    
+    All the potential actions and configurations are described as follows:
+    
+    - Initialize contract parameters for `Obelisk`, `YieldHubPirexEth`, and `RNGSender` contracts; this initialization process can only be called once.
+    - Can perform the following calls in `Obelisk`:
+        - `startRound()`.
+        - `enableProtocolFee()`.
+        - `updateTreasury()`.
+    - Can execute and modify the following configurations in `Obelisk`:
+        - `updateRequestRNGRemoteGasLimit()` (inherited `RNGReceiver`).
+    - Can call the `transferNative()` in `RNGSender`.
+    - The following shared configurations in `Obelisk` and `RNGSender`:
+        - `setConfig()` (inherited `LzApp`).
+        - `setSendVersion()` (inherited `LzApp`).
+        - `setReceiveVersion()` (inherited `LzApp`).
+        - `forceResumeReceive()` (inherited `LzApp`).
+        - `setTrustedRemote()`(inherited `LzApp`).
+        - `setTrustedRemoteAddress()`(inherited `LzApp`).
+        - `setPrecrime()` (inherited `LzApp`).
+        - `setMinDstGas()` (inherited `LzApp`).
+        - `setPayloadSizeLimit()` (inherited `LzApp`).
+    - and perform the following calls in `Papyrus`:
+        - `updatePrice()`.
+        - `updateTreasurty()`.
+        - `updateTransferrer()`.
+        - `setUseCustomAdapterParams()` (Inherited `ONFT1155Core`).
+    
+    Note that the `owner` role and can be changed at any given moment.
+    
+    ## External parties
+    
+    There are three key external parties that are assumed to serve properly and fulfill the requested actions in order to complete the whole automation of staking/unstaking and random requests. 
+    
+    ### Dinero (PirexETH)
+    
+    Used as the native `ETH` staking platform, deposits are sent from `Obelisk` through the `YieldHubPirexEth` to the `AutoPxEth` contract, as seen in the following graphic flow:
+    
+    ![Flow-1](https://i.ibb.co/VqC1sBd/Untitled.png)
+    
+    As we can visualize in the graphic above, users receive the corresponding `ERC4626` shares of `apxETH` on their behalf and remain in the `Obelisk` contract until the round’s lifecycle is finished. When withdrawing, `apxETH` shares are burned and `upxETH` tokens are minted and returned to the user to eventually redeem the staked ETH. More details can be found in [Dinero docs](https://dineroismoney.com/docs/architecture#withdrawal-pool).
+    
+    The Obelisk protocol only correctly works as long as PirexETH does not collect any fees. If fees are enabled by the PirexETH protocol, Obelisk will incorrectly account for rewards, and users will be at risk of losing funds.
+    
+    ### Randomizer AI
+    
+    `Obelisk` currently uses [RandomizerAI](https://randomizer.ai/) as an RNG dependency; the flow of randomness requests has some caveats as the main `Obelisk` contracts are deployed on Ethereum mainnet, while the Randomizer contract is deployed on Arbitrum L2. The architecture is designed around bridging a message using LayerZero and sending a randomness request to an `RNGSender` contract deployed on Arbitrum to interact with the **RandomizerDiamond.** 
+    
+    Randomizer AI uses a beacon system where multiple validators supply and combine random values. At the time of performing the audit, it consists of seven beacon nodes running and fulfilling random requests. It is also worth noting that the recent requests per day have been spaced, with the latest random value being submitted ~1 month ago from this report’s date:
+    
+    ![Dune-1](https://i.ibb.co/XtwmxWt/Screenshot-2024-02-20-at-14-36-04.png)
+    
+    Source: https://dune.com/h1m1u/vrfs
+    
+    Randomizer AI contracts use a diamond pattern that can be upgraded and change it’s logic. Additionally, it has `onlyOwner` restricted functions, such as adding new beacons. More information in Randomizer [GitHub contracts repo](https://github.com/RandomizerAi/randomizer-contract) and [docs](https://randomizer.ai/docs). 
+    
+    It is assumed that Randomizer will perform the requested callback within the default block confirmations and provide an unpredictable random value.
+    
+    ### LayerZero
+    
+    In order to bridge the random request and value to and from the mainnet to Arbitrum’s Randomizer contract, Obelisk implements a `LzApp` on both ends to enable the protocol to send and receive cross-chain messages through LayerZero’s endpoint. 
+    
+    The implemented integration uses most of the best practices and has a wide range of owner configurations that can be set and changed as mentioned in the *Actors* section.
+    
+    It is assumed that LayerZero will bridge and deliver this message from both directions to ensure the proper finalization of the round. 
+    
+    ## Additional Notes
+    
+    - In the audited Obelisk v0 release, NFTs deposited have no utility but will be utilized to generate additional yields and have more features in upcoming versions.
+    - Papyrus are soul-bounded NFTs that will only be transferable from the Obelisk contract.
+    - Protocol fees are hardcoded to 1% of the accrued reward yield per round and can be turned on irreversible by the owner at any given moment.
+    - Any external protocol dependency exploit could jeopardize the protocol integration and is not under the scope of this audit.
+    - There is no proper validation done on the round properties when starting a round. Thus, the owner could e.g. create a round with an `endTime` very far in the future (`type(uint96).max`), leading to locked funds.
+  </template>
+  </content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+      a3a713e73646a8a3605a049c41c69fb8762f5da4289de0adf061810ab44177d6  ./src/Initializing.sol
+      7923e2d43b6c306565349f4ff041558b2d1ea8ea9db2aeb2eadc2ca9b09047b3  ./src/Obelisk.sol
+      9402b4f4c444d2978fdfe5d8587f32a9401e21c38c9d18c87201b8c07f4cf7fc  ./src/RNGReceiver.sol
+      9bc2e8fc6af614855fafe30520ccc5b437830e94934724face0b5d43f34ff6ee  ./src/YieldHubPirexEth.sol
+      80ad18452747fe56c02677a62f4178f37474c1d0b95bc4273ad866138f57aec1  ./src/arbitrum/RNGSender.sol
+      070e7c39ee438a6b1b15b5b95846183c9fc998474811cfdbd4f95cbfe575ecaf  ./src/interfaces/IAutoPxEth.sol
+      ebe947ced334d2f718298e0d116aa969a661efbfb6da13b7471ac1a06c91df32  ./src/interfaces/IObelisk.sol
+      279539c76f73c58fbf406be2143e3ae140ae5f628e11e822c54ee9c67eb41772  ./src/interfaces/IPirexEth.sol
+      7b1e0631d41b1e9e6414dc5c2f7af1d400ebb44567f68b9c33b978d90ec58dd5  ./src/interfaces/IRandomizer.sol
+      fa221453f7fc352259db5ef8cc82f5d48dc22840a82e369b1a97be01a8bea920  ./src/interfaces/IRandomizerCallback.sol
+      9c5e2af2f0f3b0c0f14de06797ad244838b0840feaf44af05fdd9f5b28488871  ./src/interfaces/IYieldHub.sol
+      1393f6a080fa561462d52ccde48e4077fc2e01ecca1e2cea8ebf01174fe1260e  ./src/signals/SObelisk.sol
+      29487846eb9e8fddff5aa8fa1f5d28398af4c53a3635f691f10e2ca7acadc2b4  ./src/tokens/Papyrus.sol
+    </template>
+</content-for>
