@@ -1,0 +1,79 @@
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">0074c04a8fc190768e95fc80259fb39d43201e4b</field>
+    <field name="content">
+      ## [L-1] Missing refundAddress may result in lost assets
+  
+      In the `ScrollHubConnector` contract, the `_sendMessage()` implementation tries to decode `refundAddress` parameter value from the  `_encodedData` input argument. If missing then `refundAddress` is set to address(0). 
+  
+      ```solidity
+      function _sendMessage(bytes memory _data, bytes memory _encodedData) internal override checkMessageLength(_data) {
+        address _refundAddress = (_encodedData.length > 0) ? abi.decode(_encodedData, (address)) : address(0);
+        bytes memory _calldata = abi.encodeWithSelector(Connector.processMessage.selector, _data);
+        L1_SCROLL_MESSENGER.sendMessage{value: msg.value}(
+          mirrorConnector,
+          ZERO_MSG_VALUE,
+          _calldata,
+          gasCap,
+          _refundAddress
+        );
+      }
+      ```
+  
+      Scroll’s L1Messenger contract would use `_refundAddress` value to return with surplus `msg.value`. If this `_refundAddress` is `address(0)`, those surplus native assets will be forever lost.
+  
+      **Remediations to consider**
+  
+      - Revert if the value for `refundAddress` is not provided within `_encodedData` input argument, or
+      - `refundAddress` should be initialized with an address under control when it is not provided so that assets can be retrieved later.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-1] Unnecessary storage read in ScrollSpokeConnector
+    
+      In the `ScrollSpokeConnector`, `_sendMessage()` function implementation when invoking sendMessage() on L2_SCROLL_MESSENGER provides and references `gasCap` storage variable from the parent `GasCap` contract.
+  
+      ```solidity
+      function _sendMessage(bytes memory _data, bytes memory) internal override checkMessageLength(_data) {
+        bytes memory _calldata = abi.encodeWithSelector(Connector.processMessage.selector, _data);
+        L2_SCROLL_MESSENGER.sendMessage(mirrorConnector, ZERO_MSG_VALUE, _calldata, **gasCap**);
+      }
+      ```
+  
+      However, `gasCap` value is not used or relied upon in the L2_SCROLL_MESSENGER.sendMessage().
+  
+      Therefore, consider providing a constant value of 0 instead of `gasCap`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-2] Documentation improvements
+
+      1. Notice natspec comment for ScrollHubConnector should refer to L2 Scroll Spoke Connector instead of L2 Scroll Hub Connector.
+      
+          ```solidity
+          Scroll Hub Connector contract in charge of sending messages to the L2 Scroll ~~Hub~~Spoke Connector through the
+          L1 Scroll Messenger, and receiving messages from the L2 Scroll ~~Hub~~Spoke Connector through the L1 Scroll Messenger
+          ```
+      
+      2. Notice and dev natspec comments for IL1ScrollMessenger.relayMessageWithProof() are incorrect.
+      
+          ```solidity
+          * @notice Execute L1 => L2 message. // replace with: Relay a L2 => L1 message with message proof.
+          * @dev Make sure this is only called by privileged accounts. // there are no requirements for callers to be privileged
+          ```
+    </field>
+  </item>
+  
