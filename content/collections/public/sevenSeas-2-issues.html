@@ -1,0 +1,121 @@
+<item>
+    <field name="topic">Pricing</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5854f3a5a8d1370c24b757be794891e428862b41</field>
+    <field name="content">
+      ## [H-1] Tokens with underlying assets using non-standard decimals are miss-priced
+  
+      In the `PendleExtension.sol`, when pricing either a LP, PT or YT token, a rate conversion of the token to underlying asset is received by querying the oracle contract:
+  
+      ```solidity
+      if (stor.kind == PendleAsset.LP) {
+          uint256 lpToAssetRate = ptOracle.getLpToAssetRate(stor.market, stor.duration);
+          return lpToAssetRate.mulDivDown(underlyingAssetInUsd, 10 ** stor.underlyingDecimals);
+      } else {
+          uint256 ptToAssetRate = ptOracle.getPtToAssetRate(stor.market, stor.duration);
+          uint256 ptPriceInUsd = ptToAssetRate.mulDivDown(underlyingAssetInUsd, 10 ** stor.underlyingDecimals);
+          ...
+      ```
+      Reference: [PendleExtension.sol#L94-L99](https://github.com/Se7en-Seas/cellar-contracts/blob/52aae77c0a990e9dd627dd802263dd6c49775c7a/src/modules/price-router/Extensions/Pendle/PendleExtension.sol#L94-L99)
+  
+      It is assumed that the rate returned has the same decimals as the underlying asset. However, it returns a rate with a range of `0` to `1e18`, which means multiplying the underlying price by the rate and dividing by `1e18` will yield the proper conversion.
+      Currently the calculation is divided by the underlying assets decimals, which in most cases is the standard 18 decimals, but when the underlying asset uses non-standard decimals, the price calculation will be wrong.
+  
+      If these assets are setup improperly, then the cellar would either under or over value the assets and would lead to inaccurate share prices, loss of cellar funds, and/or issues rebalancing positions.
+  
+      **Remediations to Consider**
+  
+      Instead of dividing by the underlying asset’s decimals, divide by `1e18` to properly price these tokens.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Pricing</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">3958ded6170a08061cef8a2bfe84777f0ac3f7b8</field>
+    <field name="content">
+      ## [H-2] SY tokens can be priced incorrectly
+  
+      In `PendleExtension.sol`, SY tokens are priced based on the set underlying asset price:
+  
+      ```solidity
+      function getPriceInUSD(ERC20 asset) external view override returns (uint256) {
+          ExtensionStorage memory stor = extensionStorage[asset];
+          uint256 underlyingAssetInUsd = priceRouter.getPriceInUSD(stor.underlying);
+          if (stor.kind == PendleAsset.SY) {
+              return underlyingAssetInUsd;
+          }
+          ...
+      ```
+      Reference: [PendleExtension.sol#L87-L92](https://github.com/Se7en-Seas/cellar-contracts/blob/52aae77c0a990e9dd627dd802263dd6c49775c7a/src/modules/price-router/Extensions/Pendle/PendleExtension.sol#L87-L92)
+  
+      However, the balance of SY tokens may be based on a separate asset that appreciates against the expected underlying asset In the case of `SY-stETH`, the underlying asset used in pricing the related PT, LP, and YT tokens  is stETH, but the balance of SY is related to wstETH, as it appreciates against stETH. Since these values differ, SY tokens have a public `exchangeRate()` function to convert its balance to the underlying asset that the other protocol’s tokens are priced in.
+  
+      Since the SY exchange rate is not used to price SY tokens, an inaccurate price may be calculated if the underlying asset is set to be the underlying asset of the other related tokens.
+  
+      **Remediations to Consider**
+  
+      Use the SY tokens `exchangeRate()` function to convert it’s held appreciating asset to the expected underlying. It is important to note that the exchange rate function implementation varies for each SY token and could be inaccurate, permissioned, or [return a separate but correlated asset](https://docs.pendle.finance/Developers/Contracts/TechnicalDetails#asset-of-sy--assetinfo-function) that leads to an accurate price. Caution should be used when setting up pricing for each.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">678e34fbb42b5aa65e89ae0296a2f9567081fead</field>
+    <field name="content">
+      ## [L-1] `redeemPyToSy()`  does not handle case where YT is expired
+  
+      In `PendleAdaptor.sol`’s `redeemPyToSy()`, the market’s PT and YT tokens are exchanged for their corresponding SY token. Since typically the same amount of PT and YT tokens are required to receive some SY tokens, if the `netPyIn` is set to max, it takes the minimum balance of the cellars YT and PT tokens, and sets that as the amount of PT to send in.
+  
+      ```solidity
+      function redeemPyToSy(IPendleMarket market, uint256 netPyIn, uint256 minSyOut) external {
+          _verifyMarket(market);
+          (, address pt, address yt) = market.readTokens();
+          ERC20 ptIn = ERC20(pt);
+          ERC20 ytIn = ERC20(yt);
+          if (netPyIn == type(uint256).max) {
+              uint256 ptBalance = ptIn.balanceOf(address(this));
+              uint256 ytBalance = ytIn.balanceOf(address(this));
+              // Choose the smaller of the two balances.
+              netPyIn = ptBalance > ytBalance ? ytBalance : ptBalance;
+          }
+          ptIn.safeApprove(address(router), netPyIn);
+          ytIn.safeApprove(address(router), netPyIn);
+          router.redeemPyToSy(address(this), yt, netPyIn, minSyOut);
+          _revokeExternalApproval(ptIn, address(router));
+          _revokeExternalApproval(ytIn, address(router));
+      }
+      ```
+      Reference: [PendleAdaptor.sol#L180-L196](https://github.com/Se7en-Seas/cellar-contracts/blob/52aae77c0a990e9dd627dd802263dd6c49775c7a/src/modules/adaptors/Pendle/PendleAdaptor.sol#L180-L196)
+  
+      However, in the case the the YT is expired it is not required to redeem SY tokens, since at that point they are not worth anything. It may be common for a cellar to hold PT tokens to maturity and not have a balance of YT. In this case, they could not call `redeemPyToSy()` using `uint.max` for `netPyIn`, since that would set `netPyIn` to zero, when the balance of PT should be used instead.
+  
+      **Remediations to Consider**
+  
+      Only use the minimum of YT and PT balance for `netPyIn`  if the YT is not expired. This allows a strategist to redeem using a max `netPyIn` for a matured PT without requiring holding the same amount of worthless corresponding YT.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      ## [I-1] Implementations of Pendle tokens vary based on its related protocol
+  
+      Each protocol that Pendle integrates has it’s own custom implementation for each of it’s YT, PT, and SY tokens. This can lead to unexpected differences between the behaviour of interacting with these standard functions, since each protocol is unique. Some exchange rates for SY tokens return different assets, have varying trust assumptions, or are less accurate than others. Issues may arise with the implementation of a particular protocol that may prevent interacting with it in the way that the Pendle adaptor or pricing extension expects. Addtional caution should be made when adding pricing or a Pendle token position to ensure it works as expected and is priced appropriately.
+  
+    </field>
+    <field name="response">
+        Accepted. Before integrating a new Pendle market, the SY token logic will be inspected to determine if the underlying logic meets our security standards, also if there are any other weird interactions the custom logic might create.
+    </field>
+  </item>
+  
