@@ -1,0 +1,27 @@
+<item>
+  <field name="topic">TODO</field>
+  <field name="content">
+    ## [I-1] Pricing assumes a 1:1 peg of eETH to ETH
+
+    The `weEthExtension.sol` prices wrapped eETH by converting it to eETH using the rate providers rate, then prices it as if it is normal wrapped ETH:
+
+    ```solidity
+    /**
+     * @notice Called during pricing operations.
+     * @dev asset not used since setup function confirms `asset` is weETH.
+     * @return price of weETH in USD
+     */
+    function getPriceInUSD(ERC20) external view override returns (uint256) {
+        return
+            priceRouter.getPriceInUSD(wETH).mulDivDown(IRateProvider(address(weETH)).getRate(), 10 ** weETH.decimals());
+    }
+    ```
+    Reference: [weEthExtension.sol#L42-L50](https://github.com/Se7en-Seas/cellar-contracts/blob/459dc3986781eaf199e36854de1a375cae070d08/src/modules/price-router/Extensions/EtherFi/weETHExtension.sol#L42-L51)
+
+    Since eETH is exchangeable for ETH by withdrawing, it should always exchangeable for the same amount of ETH after waiting in a withdrawal queue. However, the market value of eETH can fluctuate from wETH due to numerous market conditions, which could lead to a large deviation in the values of these assets. Assuming a 1:1 peg may overvalue or undervalue positions that are priced based on weETH if the prices are diverged. This could open up arbitrage opportunities, or share price drops when rebalancing from positions priced using this extension, which could exceed allowed rebalance deviations.
+    It is important to note that if there is a significant depegging of the price of eETH to ETH, strategists should consider withdrawing their weETH positions, as that will lead to a 1:1 conversion after the withdrawal queue delay.
+  </field>
+  <field name="response">
+    The Cellar is already setup to use permissioned withdrawals, so it is a much riskier arbitrage option for attackers. In addition the strategists do have the ability to usntake eETH in the event of a major depeg.
+  </field>
+</item>
