@@ -111,7 +111,7 @@ Contracts usually have multiple functions, and calldata is what tells the contra
 
 ## ABI Encoding of calldata
 
-Most contracts in the EVM adhere to a standardized encoding scheme, which we call “ABI encoding”. The scheme is, essentially, a set of rules that provide structure to the calldata and tell us how to make function calls to contracts. We’ll give some high-level information about ABI encoding in this chapter, and then go into much more detail in Chapter 6.1.  
+Most contracts in the EVM adhere to a standardized encoding scheme, which we call “ABI encoding”. The scheme is, essentially, a set of rules that provide structure to the calldata and tell us how to make function calls to contracts. We’ll give some high-level information about ABI encoding in this chapter, and then go into much more detail in <chapter>abi/anatomy</chapter>.
 
 <aside>The standardization of the ABI encoding scheme across the ecosystem is necessary for tools like Hardhat and Forge to interact programmatically with smart contracts.</aside>
 
@@ -125,7 +125,7 @@ Suppose our contract’s bytecode was compiled from a Solidity contract with a f
 
 The first four bytes of calldata, called the **function selector**, are used by the contract to determine which function to execute. The contract’s various functions all reside in different places in the contract’s bytecode. So, the first thing the contract does is use the function selector to determine where in the bytecode to jump to, using JUMP opcodes.
 
-The function selector is calculated using a combination of the function name and parameter types - we go into much more detail on this process in [a later chapter](https://learnevm.com/chapters/abi-encoding/anatomy#the-function-selector). For now, we’ll just highlight a few interesting aspects of function selectors:
+The function selector is calculated using a combination of the function name and parameter types - we go into much more detail on this process in <chapter href="abi/anatomy#the-function-selector">a later chapter</chapter>. For now, we’ll just highlight a few interesting aspects of function selectors:
 
 - Changing the **type** of a parameter will change the function selector.
 - Changing the **name** of a parameter *will not* change the function selector.
@@ -133,9 +133,9 @@ The function selector is calculated using a combination of the function name and
 - Function selectors are not “unique” - different function signatures can produce the same function selector. There’s even [an online database](https://www.4byte.directory/) which shows collisions.
 - However, in practice, function selectors *are* unique on a given contract, because tools like Solidity throw an error and fail to compile if the same function selector occurs multiple times on a contract. This guard is important so that each function within a contract can be uniquely identified by its selector.
 
-All the data *after* the function selector are the parameter values for the function call. In the diagram above, we see the values for `a` and `b` are provided sequentially. Again, we’ll cover the rules for encoding the parameters in much more detail in [a later chapter](https://learnevm.com/chapters/abi-encoding/anatomy#the-function-arguments).
+All the data *after* the function selector are the parameter values for the function call. In the diagram above, we see the values for `a` and `b` are provided sequentially. Again, we’ll cover the rules for encoding the parameters in much more detail in <chapter>abi/anatomy</chapter>.
 
-<aside>Compiling a contract from a higher-level language such as Solidity to bytecode generates a JSON file known as the contract's ABI (Application Binary Interface) file. This essential file contains all the information required to correctly construct calldata for invoking the contract's functions. We discuss these files in more detail in [a later chapter](https://learnevm.com/chapters/abi-encoding/why-learn#hardhat--frontend-applications).</aside>
+<aside>Compiling a contract from a higher-level language such as Solidity to bytecode generates a JSON file known as the contract's ABI (Application Binary Interface) file. This essential file contains all the information required to correctly construct calldata for invoking the contract's functions. We discuss these files in more detail in <chapter>abi/overview#hardhat--frontend-applications</chapter></aside>
 
 ## Reading and decoding of calldata
 
