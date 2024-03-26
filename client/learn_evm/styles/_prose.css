@@ -87,6 +87,9 @@
   letter-spacing: 0;
   @apply font-normal dark:text-zinc-100 bg-gray-200/75 dark:bg-zinc-700;
 }
+.prose a code {
+  @apply dark:text-blue-500;
+}
 .prose pre {
   @apply dark:bg-zinc-700;
 }
