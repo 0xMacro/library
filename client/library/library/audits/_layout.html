@@ -6,8 +6,9 @@
 {{var issues = collection(`${page.passwordEncrypt ? 'private/' : 'public/'}${auditId}-issues`).map(Issues.normalize)}}
 {{issues.map(Issues.validate) && ''}}
 
-<div class="py-5 print:px-5 fixed print:static z-20 top-0 right-0 left-0 bg-gray-100 dark:bg-gray-900 print:bg-transparent">
-  <div class="px-4 sm:px-12 lg:px-0 mx-auto max-w-3xl flex">
+  <div class="fixed print:static z-20 top-0 right-0 left-0 bg-gray-100 dark:bg-gray-900 print:bg-transparent">
+    <include src="./library/_sticky-cta.html" />
+    <div class="py-5 print:px-5 px-4 sm:px-12 lg:px-0 mx-auto max-w-3xl flex">
     <a href="https://0xmacro.com">
       <img class="h-6 dark:hidden" src="/library/logotype-t.svg" />
       <img class="h-6 hidden dark:block" src="/library/logotype-t-ondark.svg" />
