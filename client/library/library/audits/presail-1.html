@@ -1,6 +1,6 @@
 <page
   clientName="Presail"
-  reportDate="March 15, 2024"
+  reportDate="April 1st, 2024"
   auditTitle="Presail A-1"
   auditVersion="1.0.0"
   repoUrl="https://github.com/datablock-ai/presail-contracts"
@@ -10,7 +10,7 @@
   passwordEncrypt="env:PAGE_PASS_PRESAIL_1"
 >
   <content-for name="schedule">
-    The security audit was performed by the Macro security team on March 7th - March 8th.
+    The security audit was performed by the Macro security team on March 7th - March 8th, and another small review on March 29th.
   </content-for>
 
   <content-for name="spec">
@@ -27,6 +27,14 @@
 
     <template type="file-hashes">
       531ba8a29be72b969b5274ea8c9524b56010f05256c3bd761170b57f785d839c  contracts/PresailDeck.sol
+    </template>
+
+    <p>
+      Additional functions were added to the PresailDeck, and was reviewed again with no additional issues found.
+    </p>
+
+    <template type="file-hashes">
+      56bd610ac96f71758d7f031b55c8f57a8c783ddd8dcefac2c1965561ef957992  contracts/PresailDeck.sol
     </template>
 
   </content-for>
