@@ -1,0 +1,33 @@
+<page
+  clientName="Sommelier"
+  reportDate="April 1, 2024"
+  auditTitle="Sommelier A-17"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/PeggyJV/cellar-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="dda39c99f5d448f96faafcdb00f3e24f9d385ea2"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on March 1st, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we reviewed the Uniswap V3 adaptors compatibility with Pancakeswap V3 contracts, ensuring they can be used to add and remove liquidity positions as well as swap tokens on Pancakeswap V3 pools. It was concluded that it is safe to interact with Pancakeswap V3 pools using either the UniswapV3Adaptor or SwapWithUniswapAdaptor, as was done with a Uniswap V3 pool.   
+    </p>
+
+    <template type="file-hashes">
+        680607f3f029fb53aec5d0e1c881476f6f8d96ace84e89c6f283cd96c481843e  src/modules/adaptors/Uniswap/SwapWithUniswapAdaptor.sol
+        02f12375ad25274a4c827fa63a74c44b80881e06eea99e0efc2eb2fb8a5e162b  src/modules/adaptors/Uniswap/UniswapV3Adaptor.sol
+        bf1f09a14ad795bce2986bbb760daee45e4d2750384e03c4d50b6d74b9e4f5de  src/modules/adaptors/Uniswap/UniswapV3PositionTracker.sol
+    </template>
+
+  </content-for>
+</page>
