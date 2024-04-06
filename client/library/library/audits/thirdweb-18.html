@@ -1,0 +1,68 @@
+<!-- @format -->
+
+<page
+  clientName="thirdweb"
+  reportDate="April 5th, 2024"
+  auditTitle="thirdweb A-18"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts"
+  repoCommitHash="b44b56363230afcfe5e9c8dbdccf654c54182467"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from March 27, 2024 to March 29, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the thirdweb team.</li>
+      <li>A audit handoff document provided through Notion.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+    
+    </template>
+
+    </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+        <li>
+          <b>Repository:</b>
+          <a href="{{page.repoUrl}}" target="_blank">
+            {{page.repoUrl.split('/').slice(-1)[0]}}
+          </a>
+        </li>
+        <li style="list-style: none;" class="break-words break-all">
+          Commit Hash:
+          <code>b44b56363230afcfe5e9c8dbdccf654c54182467</code>
+        </li>
+        <li>
+          <b>Repository:</b>
+          <a href="https://github.com/thirdweb-dev/contracts-pay-gateway" target="_blank">
+            {{"https://github.com/thirdweb-dev/contracts-pay-gateway".split('/').slice(-1)[0]}}
+          </a>
+        </li>
+        <li style="list-style: none;" class="break-words break-all">
+          Commit Hash:
+          <code>f2db1bffe10cc8b455640d054940f5b7ef330208</code>
+        </li>
+      </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>We audited the following contracts within the <b>contracts</b> repository:</p>
+
+    <template type="file-hashes">
+        74f76f1f1f05c7d083b0355dcfc4ef9f06a8c8f5a4f4533a00ca948a2a8ce244  contracts/prebuilts/unaudited/airdrop/Airdrop.sol
+    </template>
+  
+    <p>We audited the following contracts within the <b>contracts-pay-gateway</b> repository:</p>
+  
+    <template type="file-hashes">
+        1d378d4aa6360496829591233d446ae4fb5ee48fecfb3796074e394283e7e81c  src/PaymentsGateway.sol
+    </template>
+  </content-for>
+</page>
