@@ -1,0 +1,259 @@
+<item>
+    <field name="topic">Locked Funds</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [M-1] Pulling tokens after initiating the token purchase potentially fails
+
+        In the PaymentsGateway contract, when calling `initiateTokenPurchase` with some ERC20 token set as `tokenAddress`, the specified `tokenAmount` is transferred to the PaymentsGateway contract and approval is given to the `forwardAddress`:
+
+        ```jsx
+        SafeTransferLib.safeTransferFrom(req.tokenAddress, msg.sender, address(this), req.tokenAmount);
+        SafeTransferLib.safeApprove(req.tokenAddress, req.forwardAddress, req.tokenAmount);
+        ```
+
+        The expected behavior of the forwarder contract is to pull the tokens from the PaymentsGateway contract in the same transaction as `initiateTokenPurchase`. However, as this can’t be guaranteed for all forwarder contracts, the following issue can occur: 
+
+        1. `initiateTokenPurchase` is called with `tokenAmount` of `10_000` and `forwardAddress` of `0x123`. 
+        2. At this stage, the `PaymentsGateway` token balance is `10_000`
+        3. Before the tokens are pulled by the forwarder contract, another `initiateTokenPurchase` is done with `tokenAmount` of `1_000` using the same `forwardAddress` of `0x123`
+        4. Now, the PaymentsGateway token balance is `11_000`
+
+        However, the forwarder contract can now only pull `1_000` tokens instead of `11_000`, as this was the latest value that was approved. The issue occurs because on the `safeApprove` call, the exact `tokenAmount` is set without considering any previous approvals that have not yet been pulled.
+
+        **Remediation to Consider**
+
+        Increase the allowance by the `tokenAmount` instead of setting it exactly to the `tokenAmount`.
+    </field>
+    <field name="response">
+        Looking at the forwarders we plan to use, the forwarder will pull the tokens in the same transaction. Also, it may add extra steps to keep track of allowance and set it to an increased value etc. We'll add this change if we use other forwarders in future that require this kind of setup.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-1] Airdropping tokens using push or signature-based methods can be griefed
+        
+        In the Airdrop contract, the push and signature-based airdrop methods are susceptible to a griefing attack. When iterating over the array of provided `_contents`, execution control is given to the recipient in certain situations, depending on the token standard and airdrop type being used:
+        
+        - `airdropNativeToken` gives execution control to the recipient when executing the low-level `.call` method.
+        - `airdropERC20` gives execution control to the recipient by internally calling `tokensReceived` hook when the provided token is compatible with ERC777 standard.
+        - `airdropERC721` gives execution control to the recipient by internally calling `onERC721Received` hook.
+        - `airdropERC1155` gives execution control to the recipient by internally calling `onERC1155Received` hook.
+        
+        As a result, a recipient contract can execute malicious code, such as consuming all the provided gas. If this occurs, calls could cost substantially more than expected or exceed the block gas limit, preventing calls from executing.
+        
+        If this happens, the owner could always execute the airdrop again by omitting the malicious recipient for push-based airdrops. For signature-based airdrops, the owner would need to create a new signature excluding the malicious recipient. 
+        
+        **Remediation to Consider**
+        
+        - Explicitly pass in the amount of gas for the transfer, ensuring there is enough gas to allow the contract to execute normal operations, but not provide the entire gas of the transaction that can be used maliciously.
+        - As a minimum, appropriate comments should be added to the susceptible airdrop functions, making above shortcoming clear to any caller.
+    </field>
+    <field name="response">
+        Gas estimation should be able to detect if a griefing recipient is in the list.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Locked Funds</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-pay-gateway/pull/6/commits/caf72cb921608caac1d41cf94e8a861a0d95d317</field>
+    <field name="content">
+        ## [L-2] Completing the token purchase potentially locks native tokens
+        
+        In PaymentsGateway’s `completeTokenPurchase`, native tokens can get locked in the contract in the following ways:
+        
+        1. User accidentally sends `msg.value > 0` when specifying an ERC20 token as `tokenAddress`. All `msg.value` passed will be locked.
+        2. User sends `msg.value > tokenAmount` when specifying the native token as `tokenAddress`. The excess amount (`msg.value - tokenAmount`) will be locked.
+        
+        The owner of the contract could withdraw locked tokens and give back the overpaid amount to the user via the `withdrawTo` function. However, it is recommended to prevent above scenario in the first place.
+        
+        **Remediation to Consider**
+        
+        - In case of `tokenAddress` is an ERC20 token, don’t allow `msg.value > 0` to be passed
+        - and in case of `tokenAddress` is the native token, make sure `msg.value == tokenAmount`  
+    </field>
+    <field name="response">
+        
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-3] Initiating the token purchase doesn’t correctly account for fee-on-transfer tokens
+        
+        In PaymentsGateway, the `initiateTokenPurchase` function doesn’t correctly account for tokens that apply a transfer tax, which results in less value transferred than the `tokenAmount` specified.  
+        
+        However, the `tokenAmount` is approved to the `forwardAddress`, allowing the forwarding contract to pull the full `tokenAmount`, rather than the `tokenAmount - fees`:
+        
+        ```jsx
+        SafeTransferLib.safeTransferFrom(req.tokenAddress, msg.sender, address(this), req.tokenAmount);
+        SafeTransferLib.safeApprove(req.tokenAddress, req.forwardAddress, req.tokenAmount); 
+        ```
+        
+        **Remediation to Consider**
+        
+        To handle fee-on-transfer tokens correctly, calculate the contract’s balance before and after the safeTransferFrom call, and approve this difference instead of the full `tokenAmount`.
+    </field>
+    <field name="response">
+        
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a3f9f2731ee2c0fdf84980180f6a1aad1422854a</field>
+    <field name="content">
+        ## [Q-1] Missing `natspec` documentation
+
+        The Airdrop contract is entirely missing appropriate `natspec` documentation. Note that `natspec` documentation is considered as good practice to make the intent of the function clear to users.
+
+        **Remediation to Consider**
+        
+        Add `natspec` documentation for all the functions, or at least for the external ones.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts/pull/634/commits/29f02ccf34b4213f77274d53a9a223de54ead3a9,https://github.com/thirdweb-dev/contracts-pay-gateway/pull/6/commits/7bb507660d33a79651bdf6ea923cb8f9097c92d1</field>    
+    <field name="content">
+## [Q-2] Make `processed` mapping public
+
+
+In the Airdrop contract, the `processed` mapping is used to track already processed requests and prevents replay attacks. This information can help users or other contracts to check the status of a request using the request Id. However, because the `processed` mapping is declared as `private`, the processed status cannot be retrieved easily. 
+
+Similar issues exists with the `processed` mapping in the PaymentsGateway contract.
+
+**Remediation to Consider**
+
+Make the `processed` mapping `public`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6bb17f205d38da2c0cca030553da05c585183a79</field>
+    <field name="content">
+        ## [Q-3] Unused error definition
+        
+        The Airdrop contract declares the following error
+        
+        ```jsx
+        error AirdropInvalidTokenAddress(); 
+        ```
+        
+        However, this error is not used anywhere in the code.
+        
+        **Remediation to Consider**
+        
+        Remove the above error declaration.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">fb8595a65f98815710baf6552614520493516b74</field>
+    <field name="content">
+        ## [Q-4] Use separate events for each airdrop type
+        
+        In the Airdrop contract, the same `Airdrop` event is emitted for both the push-based as well as the signature-based airdrops, whereas for the claim-based airdrops, a separate `AirdropClaimed` event is emitted. 
+        
+        **Remediation to Consider**
+        
+        Use separate events for push and signature-based functions to make it clear which airdrop type was used when the event is emitted.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Consistency</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">fbde069b3b9006ee85ec23d7f1403a60721a1d20</field>
+    <field name="content">
+        ## [Q-5] Use `safeTransferETH` instead of low-level call
+        
+        In the `withdraw` function, `SafeTransferLib.safeTransferETH` is used to transfer native tokens to the caller. However `airdropNativeToken`, uses the low-level call directly:
+        
+        ```jsx
+        (bool success, ) = _contents[i].recipient.call{ value: _contents[i].amount }("");
+        ```
+        
+        **Remediation to Consider**
+        
+        For readability and consistency reason, use `safeTransferETH` in the `airdropNativeToken` function to transfer native tokens to the recipient, instead of using the low-level call.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">3d418a9c6c19f6ce97e74991ddc2db7c8d8355e1</field>
+    <field name="content">
+        ## [Q-6] Missing native token support for claim and signature-based airdrops
+        
+        In the Airdrop contract, all of the three types of airdrops naming push-based, signature-based and claim-based support airdropping ERC20, 721, and 1155 tokens. 
+        
+        However, in the current design, only the push-based airdrop supports native tokens.
+        
+        **Remediation to Consider**
+        
+        Add native token support for signature-based and claim-based airdrops.
+    </field>
+    <field name="response">
+       We won’t be adding native token support for these.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts/commit/3e3d176fd62ddcb304a294c5f7b2c3af943f5fe2,https://github.com/thirdweb-dev/contracts/pull/634/commits/19c01204b60add4cd057317f0b3c0028b74dd987</field>
+    <field name="content">
+        ## [Q-7] Contract signatures not supported
+        
+        With the current implementation, `ECDSA.recover` is used for the signature-based airdrops to verify signatures. However, `ECDSA.recover` only supports normal EOA signature, but doesn’t support contract signatures with EIP-1271 standard. 
+        
+        **Remediation to Consider**
+        
+        Add EIP-1271 support to allow contract such as smart wallet creating and verifying signatures.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7d234112ded842736d8ca2f8ae2e742d50a0eab5</field>
+    <field name="content">
+        ## [G-1] Use `verifyCalldata` to verify Merkle tree
+        
+        Solady’s [MerkleTree library](https://github.com/vectorized/solady/blob/main/src/utils/MerkleProofLib.sol) offers two ways to verify a provided leaf is in a Merkle tree, one where the proof is provided as memory with the regular `verify()` function, and another that takes the proof as `calldata` using `verifyCalldata()`. When a user claims tokens and provides a proof, it is passed in as `calldata`, since it is not altered during execution. `calldata` is cheaper to read than memory, which leads to less gas consumed for users to verify their claims if the function `verifyCalldata()` is used rather than `verify()`.
+        
+        **Remediations to Consider**
+        
+        Replace the call to `verify()` with `verifyCalldata()` to save users gas when claiming
+    </field>
+</item>
