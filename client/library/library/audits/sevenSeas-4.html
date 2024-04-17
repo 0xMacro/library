@@ -1,0 +1,135 @@
+<page
+  clientName="Seven Seas"
+  reportDate="March 20, 2024"
+  auditTitle="Seven Seas A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="939c77e25473dff3ed18fa104f004f7afd13452e"
+  finalRepoCommitHash="74abe18e75f00a5b294f8ab425c06fd1c3bdbf02"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from April 1st to April 5th 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <template type="audit-markdown">
+      ## Trust Model, Assumptions, and Accepted Risks (TMAAR)
+
+      ### Architecture Roles:
+
+      - Manager:
+          
+          Intended to be the `manageVaultWithMerkleVerification` contract, which allows verified callers to manage the `BoringVault` with calls verified to be allowed via a set merkle tree.
+          
+      - Minter:
+          
+          Intended to be set to be the `TellerWithMultiAssetSupport` contract to mint new shares at a rate provided by the minter by calling `enter()` on the `BoringVault`.
+          
+      - Burner:
+          
+          Intended to be set to be the `TellerWithMultiAssetSupport` contract to burn shares in return for assets in the `BoringVault` at a rate provided by the burner.
+          
+      - Internal Manager:
+          
+          Will be set to be the  `manageVaultWithMerkleVerification` contract itself to call manageVaultWithMerkleVerification after receiving a balancer flashloan via the `receiveFlashloan()` function.
+          
+      - Solver:
+          
+          Will be a contract that implements the `IAtomicSolver` interface, and controlled by an address with the strategist role. Can call `bulkDeposit()` and `bulkWithdrawal()` on the `TellerWithMultiAssetSupport` contract.
+          
+      - Micromanager:
+          
+          Role intended for micro manager contracts such as `DexSwapperUManager` and `DexAggregatorUManager` to call `manageVaultWithMerkleVerification()` on the `ManagerWithMerkleVerification` contract.
+          
+
+      ### Timelock Roles:
+
+      - Owner:
+          
+          This is an address that controls setting, updating, adding or removing important values for the `BoringVault`, `AccountantWithRateProviders`, `ManagerWithMerkleVerification`, `TellerWithMultiAssetSupport`, `DexAggregatorUManager`, and `DexSwapperUManager` contracts. It also controls the authority contract that determines the functions that roles can call throughout the protocol. This role is intended to be a timelocked multisig contract, with signers on the seven seas team as well as members of associated protocol.
+          
+
+      ### EOA roles:
+
+      - Multisig:
+          
+          A multisig contract that has some administrative functions with the ability to more quickly interact with the protocol than the timelocked owner does. Can pause and unpause the `AccountantWithRateProviders`, `TellerWithMultiAssetSupport`, and `ManagerWithMerkleVerification` contracts as well as well as set allowed slippage, period and rate limit of the `DexSwapperUManager` and `DexAggregatorUManager` contracts. Controlled by signers on the seven seas team as well as members of associated protocol.
+          
+      - Strategist multisig:
+          
+          Multisig that can call `refundDeposit()` on the `TellerWithMultiAssetSupport()` to return assets from a deposit that may have acted maliciously, like in cases of major arbitrage. Controlled by members of Seven Seas.
+          
+      - Strategist:
+          
+          Main caller of `manageVaultWithMerkleVerification()` on the `ManagerWithMerkleVerification` contract, and may be able to call micro manager functions. Held by members of Seven Seas
+          
+      - Update exchange rate:
+          
+          Role that allows setting the exchange rate in the `AccountantWithRateProviders` via the `updateExchangeRate()` function.
+          
+
+      ## Trust Assumptions:
+
+      - It is assumed that all permissioned roles mentioned above will act in the best interest of the vaults it’s shareholders. Despite some control measures, they do have the ability to act outside this interest, so trust is required before investing in the vault.
+
+      ## Accepted Risks:
+
+      - Investing in a vault does not guarantee a positive return, and depending on the strategies employed and the state of the market, losses can occur.
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+
+      6c4bfc962181782185acbd638a2c2264f136d4901cf619078bc112c2a066e2fc  src/atomic-queue/AtomicQueue.sol
+      f54be47be35176cda73d5a5dcd8c6e925feedc66a31e6cdc0b24a2b7275da946  src/atomic-queue/AtomicSolver.sol
+      0c561124046b7fe07f34b9df914b73dce833bb0316945a2d57575856b35defc4  src/atomic-queue/IAtomicSolver.sol
+      b0edb5d795fcb81124e46355670ea9ddf40b93690497c6b2dd524e58f6944a7d  src/base/BoringVault.sol
+      59e9e2da41b76807eae5ad2fcc6adc45dd35dc974733c0b7266eb88979d9a293  src/base/DecodersAndSanitizers/BaseDecoderAndSanitizer.sol
+      c56d628745bc482373758d92666fc22b415634c02c345fb86616957d1f8800c5  src/base/DecodersAndSanitizers/EtherFiLiquidDecoderAndSanitizer.sol
+      12300763fd14e0c9e043753414d8fe1d8356bc0c7fd080cba53fdc9dd221fb85  src/base/DecodersAndSanitizers/LidoLiquidDecoderAndSanitizer.sol
+      ee2cf9e87bb4877ec2578365d6c3fdabd8f7c799a7b57dcd14523fb03bba1d4f  src/base/DecodersAndSanitizers/Protocols/AaveV3DecoderAndSanitizer.sol
+      d89a171943ab7b21297ec40f2c2a48f83fba973c0ff0bbd738cd7b53f1eddf90  src/base/DecodersAndSanitizers/Protocols/AuraDecoderAndSanitizer.sol
+      c10d52e51e641658cc5915781103d1672a3f6afabc1f763726b84c4cbdb6173a  src/base/DecodersAndSanitizers/Protocols/BalancerV2DecoderAndSanitizer.sol
+      5d25a0715f1967451511d21cd4b0a9371b590709ac22247a1aa2f0256a4e617a  src/base/DecodersAndSanitizers/Protocols/ConvexDecoderAndSanitizer.sol
+      c4a44c5a0ab672a7a04c20cff7ed41340eef4fe81fb603d539bedea435714d14  src/base/DecodersAndSanitizers/Protocols/CurveDecoderAndSanitizer.sol
+      1a167df426e44540eefd69249075d14d5402a86a4558d425aa4e6b3ddd42d94e  src/base/DecodersAndSanitizers/Protocols/ERC4626DecoderAndSanitizer.sol
+      9a2f3a42ac7a00f327755d308d7e96679c3b6eef79dd6dac5ed61353ab9b37ac  src/base/DecodersAndSanitizers/Protocols/EtherFiDecoderAndSanitizer.sol
+      54f09e65d394c13c26e958ce42fc077e852f2a37ff9765823410683bd34f320e  src/base/DecodersAndSanitizers/Protocols/GearboxDecoderAndSanitizer.sol
+      67d2c958b914f1add251af6e14e02da15fce81d0b9514a3fc071417817935f58  src/base/DecodersAndSanitizers/Protocols/LidoDecoderAndSanitizer.sol
+      b00d406c21837d3a82a24b214be5776f365bbfa1b5403ed25c4d46f424fbb41a  src/base/DecodersAndSanitizers/Protocols/MorphoBlueDecoderAndSanitizer.sol
+      fa41c17b07410dc15450569fc6ee9eb45cf189e19613fd376586837e62ae52dd  src/base/DecodersAndSanitizers/Protocols/NativeWrapperDecoderAndSanitizer.sol
+      18964becdb3b9c9e317990f6f1bccf72b44460d25b00f310eb3541e512ba5977  src/base/DecodersAndSanitizers/Protocols/OneInchDecoderAndSanitizer.sol
+      c0208cccf5f0ebef4fba7636284dbe76bbf06248fcd0ac23e8eba8347f481515  src/base/DecodersAndSanitizers/Protocols/PendleRouterDecoderAndSanitizer.sol
+      a474b26c2856c1fbc3727cb6f877c081b10c7349352c8ef7adf4eb4e2e92a13f  src/base/DecodersAndSanitizers/Protocols/UniswapV3DecoderAndSanitizer.sol
+      5afb5aa5b96fa71da3d1fc3564dd5b54459526b15f1ce2d1cc16e73d832ad93f  src/base/Roles/AccountantWithRateProviders.sol
+      358a56c2035f67158d02804d4d4b1966704ceb7a4232df8e1e7e1be80c8d9062  src/base/Roles/ManagerWithMerkleVerification.sol
+      e6633b4fed0a5d5cf2c4ffc66905390a93f2e9cfd0858371e0b03f17d1fa63f7  src/base/Roles/TellerWithMultiAssetSupport.sol
+      cb5c00603aec0d26ac309ab2bb2807a049dd37e682f0ea4fa9dbc949b34bbf23  src/helper/BoringVaultV0Lens.sol
+      20d6520f87de266c02779d583dd5ebd899bddbdf97460d6020ebf93e41af0da6  src/interfaces/AggregationRouterV5.sol
+      210c23c5dfa783273fb5f7cbdb912b5bedb762580a50cf65153aea37462ff6bb  src/interfaces/BalancerVault.sol
+      a839387d607f8525e520e053cb818d09934d13fe29560efdfa9777835820c5da  src/interfaces/BeforeTransferHook.sol
+      ec0a94b71df0e7a14282332b2dab72da26cb88056b04c03b51c132e2bf8966d2  src/interfaces/DecoderCustomTypes.sol
+      a1efd56fc6f451f7afa61f5ff1d26cbace8600548ab533b6957e4898e8b83da2  src/interfaces/EtherFiLiquid1.sol
+      209b0d3b89a45a2edad0120c699272223b9df0cdca924857bce3cbdd07e1c6d7  src/interfaces/IRateProvider.sol
+      da66b6453561c018b73bc788e19e798405ef48f88f470e0772eb95176a199414  src/interfaces/IStaking.sol
+      07e54f895d2e96a922fd26ed7936c3ca432047815f40b9651d613cb73fcb8d81  src/interfaces/IUniswapV3Router.sol
+      c284dee00354274fe8e460b089d9b5416d867943716b1eecf789ae907c6f45b7  src/interfaces/PriceRouter.sol
+      29da7215cfe59a69bdd97c29b39e4ca3ed9278adc74870089b004953c1398d55  src/interfaces/RawDataDecoderAndSanitizerInterfaces.sol
+      8a50ecd266f430e85847568cf475b69e900fb040d6ba8a6c12d8b84d5dfe20b6  src/micro-managers/DexAggregatorUManager.sol
+      95304d5eb86d40a418e9ebf9d9efebd9e9a54f20b2d2ec71817a2231fd911e0f  src/micro-managers/DexSwapperUManager.sol
+      dee75c9908b677b7b7c7e10af8086e9ce6e7672feeefaf7438c4bdf9f4cf3b6a  src/migration/CellarMigrationAdaptor.sol
+      
+    </template>
+
+  </content-for>
+</page>
