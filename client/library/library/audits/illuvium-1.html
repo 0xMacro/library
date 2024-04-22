@@ -1,0 +1,46 @@
+<page
+  clientName="Illuvium"
+  reportDate="March 28, 2024"
+  auditTitle="Illuvium A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/IlluviumGame/fuel-exchange-contracts"
+  repoCommitHash="ddf9761591e0593f9132283d219c41fc2ed6fb31"
+  repoCommitHashFinal="d1a3ab8a3a354237d7b2984facf6a0731a411380"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on March 27, 2024.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    Notable features of the contract include minting and burning, pausability, and upgradeability. The contract implements a roles-based access control with dedicated roles for each of the aforementioned functionalities. The roles include:
+    ### Roles
+    - `ADMIN_ROLE` - can grant roles
+    - `UPGRADER_ROLE` - can upgrade the contract
+    - `PAUSER_ROLE` - can pause and unpause the contract
+    - `BURNER_ROLE` - can burn tokens
+    - `MINTER_ROLE` - can mint tokens
+
+    </template>
+  
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contract within this repository:</p>
+
+  <template type="file-hashes">
+    1b1adddabceeddad989a3c47567034a6c0067f3e89c87843a4364e9ff5bf689a  contracts/Fuel.sol
+  </template>
+</content-for>
+
+</page>

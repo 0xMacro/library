@@ -1,0 +1,298 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">61d9a4863e5a7a9a38660eae45cb2f568a8a4fc3</field>
+    <field name="content">
+      ## [M-1] Vault manager cannot quickly pause strategist actions
+  
+      The `ManagerWithMerkleVerification` contract allows permissioned addresses, typically strategists, to manage the `BoringVault` after verifying the calls are valid to make. However, in the case where a strategist starts to act against the best interest of the vault, there are no measures in place to quickly mitigate the damage. Currently the owner role can remove the merkle root associated with a strategist, but this action is behind a timelock and cannot act quickly if required.
+  
+      **Remediations to Consider**
+  
+      Allow pausing and unpausing strategists from managing the vault via a non-timelocked trusted role to allow quick action if a strategist goes rogue. Also consider rate limiting strategist actions, to reduce the potential impact of a rogue strategist. 
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d400d0741cd631df304bae9b968c7d55214b7740</field>
+    <field name="content">
+      ## [M-2] Token addresses not verified for increasing or decreasing uniswapV3 liquidity
+  
+      In `UniswapV3DecoderAndSanitizer.sol` the functions `increaseLiquidity` and `decreaseLiquidty`, and `collect()`, the tokens in the pool associated with the provided tokenId are not checked to see if they are supported, unlike for the functions `exactInput()` and `mint()`. Although ownership of the provided token id is checked to be the vault, adding liquidity to this pool may be unauthorized seeing as anyone can create a lp position and transfer it to the vault. This allows strategists to take up unexpected lp positions, and or collect unexpected rewards.
+  
+      **Remediations to Consider**
+  
+      Check with the uniswap position manager which tokens are related to the token id, and add these tokens to the returned addressesFound array to be verified via the merkle tree.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Error Recovery</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Se7en-Seas/boring-vault/commit/546ff962e2266ca181624ae84a76ebc817495be4, https://github.com/Se7en-Seas/boring-vault/commit/59a18048d7512b02055794d6487a1cb6894eae09</field>
+    <field name="content">
+      ## [M-3] Bulk deposits and withdrawals missing supported asset check
+  
+      In `TellerWithMultiAssetSupport.sol` the [`deposit()`](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/TellerWithMultiAssetSupport.sol#L223-L250) and [`depositWithPermit()`](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/TellerWithMultiAssetSupport.sol#L252-L276) functions require the provided `depositAsset` is supported, by checking it with the `isSupported` mapping. 
+  
+      However, the functions [`bulkDeposit()`](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/TellerWithMultiAssetSupport.sol#L278-L289) and [`bulkWithdraw()`](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/TellerWithMultiAssetSupport.sol#L291-L304) do not make this check. Although both of these functions are permissioned, there may be multiple entities allowed to call these functions, including some select other vaults in the case of the [`CellarMigrationAdaptor`](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/migration/CellarMigrationAdaptor.sol#L149-L164), where ensuring the requested assets are allowed to be deposited and or withdrawn.
+  
+      **Remediations to Consider**
+  
+      Check the `isSupported` mapping if the `depositAsset` or `withdrawAsset` is supported before allowing bulk deposit or withdrawals.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Pricing</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">94a1abc73d14983288c527fb87f7c7b561f403ac</field>
+    <field name="content">
+      ## [M-4] Rate calculations may use the wrong decimals
+
+      The `AccountantWithRateProvider.sol` contract, allows setting an exchange rate of a Boring Vaults shares based in a base asset, using the base assets decimals. This contract also allows getting the exchange rate denominated in a provided quote asset, if it is supported, by calling [getRateInQuote()](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/AccountantWithRateProviders.sol#L320-L333), or a strategist can [claimFees()](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/AccountantWithRateProviders.sol#L272-L296) in a provided asset. In both these cases the exchange rate needs to be converted from a rate of base/share to quote asset/share. However, some assets are pegged to the base asset, meaning their price is tied and assumed to be exchanged 1:1, but currently it is assumed that their decimals are also the same:
+  
+        ```solidity
+        ...
+        if (address(feeAsset) == address(base) || data.isPeggedToBase) {
+            feesOwedInFeeAsset = state.feesOwedInBase;
+        }
+        ...
+        ```
+  
+      Reference: [AccountantWithRateProvider.sol#L284-286](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/AccountantWithRateProviders.sol#L284-L286)
+  
+      ```solidity
+       if (data.isPeggedToBase) {
+            rateInQuote = accountantState.exchangeRate;
+        }
+      ```
+  
+      Reference: [AccountantWithRateProvider.sol#L325-327](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/AccountantWithRateProviders.sol#L325-L327)
+  
+      If the decimals are different for the quote asset than the base it can lead to an inaccurate value.
+      This is also the case for non-pegged assets, where the exchange rate is determined by calling `getRate()` on an associated rate provider, but is is assumed that the quote asset has the same decimals as the base asset as well, leading to the same issue.
+  
+      Using inaccurate decimals for these functions results in inaccurate fees claimed or the rate returned, leading to either more or less fees collected, or more or less shares received when depositing. This can be remedied with refunding deposits if caught, and assuming a strategist is trusted could have inaccurate fees received covered or returned.
+  
+      **Remediations to Consider**
+  
+      Convert these values from the base assets decimals to the quote assets decimals for both pegged and non-pegged assets when claiming fees or getting the exchange rate in a quote asset.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ddf67b36c1a7311a792283287eede48324bcaf89</field>
+    <field name="content">
+      ## [L-1] No transaction deadline set
+
+      When a transaction gets submitted to an RPC it is typically added to the mempool and can stay there for a indefinite amount of time, and can be delayed for a number of reasons. Sometimes malicious MEV/block builders may hold off executing a transaction until it suits them. Other times the gas price submitted may not be sufficient to compete to other demand, and execution  may be held until competitive gas prices drop back down, but for time or condition sensitive transactions, this delay may result in the user no longer wanting to execute the transaction. 
+  
+      Protocols like UniswapV3 take an execution deadline as a parameter to give users control over this, however in the `DexSwapperUManager` micro manager, the deadline is set to the `block.timestamp`, which means it will always be a valid time, negating it set purpose:**
+  
+      ```solidity
+       IUniswapV3Router.ExactInputParams memory params = IUniswapV3Router.ExactInputParams({
+          path: packedPath,
+          recipient: boringVault,
+          deadline: block.timestamp,
+          amountIn: amountIn,
+          amountOutMinimum: amountOutMinimum
+      });
+      ```
+  
+      Reference: [DexSwapperUManager.sol#L115-L121](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/micro-managers/DexSwapperUManager.sol#L115-L121)
+  
+      **Remediations to Consider**
+  
+      Add an additional deadline parameter to `ManagerWithMerkleVerification.sol`’s `manageVaultWithMerkleVerification()` function, and require that the deadline hasn’t been exceeded, to give control over the timing of vault managements. Alternatively, for protocol interactions that are known to be timing sensitive, require a deadline in its corresponding micro manager.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Roles</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Se7en-Seas/boring-vault/commit/2921e0cdd22695ade83bf63923d62a8578a07d0e, https://github.com/Se7en-Seas/boring-vault/commit/6d64ee3132c02d630745a9d4394d0a5e2dab6aab</field>
+    <field name="content">
+      ## [L-2] Manager flashloan functions authorization should be explicit and immutable
+  
+      In `ManagerWithMerkleVerification.sol`, the function [`flashLoan()`](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/ManagerWithMerkleVerification.sol#L129-L140) is intended to be called by the `BoringVault` that it manages, after being initiated by [`manageVaultWithMerkleVerification()`](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/ManagerWithMerkleVerification.sol#L94-L119), which initiates a balancer flashloan where the balancer vault calls [`receiveFlashloan()`](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/ManagerWithMerkleVerification.sol#L148-L189). Both of these functions have a explicit intended caller that should not change, and these addresses are currently immutable values within the `ManagerWithMerkleVerification` contract. However, authorization is determined using the `onlyAuth` modifier which allows for  the authorized addresses to change.
+  
+      **Remediations to Consider**
+  
+      Instead of using the `onlyAuth` modifier for `flashLoan()` and `receiveFlashloan()`, explicitly require the caller to be the `vault` and `balancerVault` addresses respectively.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Se7en-Seas/boring-vault/commit/0dec5733e2cf145a79ae12a2db33b00565ca2678, https://github.com/Se7en-Seas/boring-vault/commit/bfb89b7c4bba5c1858ff5fb57461d1bc882e73ce</field>
+    <field name="content">
+      ## [L-3] Teller minimum exchange rate update delay is inflexible
+
+      In `AccountantWithRateProviders.sol`, a permissioned entity is allowed to call [`updateExchangeRate()`](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/AccountantWithRateProviders.sol#L226-L270) to update the vaults exchange rate, based on the value of assets in the vault per share. They are limited to only updating the exchange rate every so often and is defined by the `minimumUpdateDelayInHours`, otherwise attempting to update it before will can cause the vault to be paused:
+  
+        ```solidity
+        if (
+            currentTime < state.lastUpdateTimestamp + (state.minimumUpdateDelayInHours * ONE_HOUR) || newExchangeRate > currentExchangeRate.mulDivDown(state.allowedExchangeRateChangeUpper, 1e4)
+            || newExchangeRate < currentExchangeRate.mulDivDown(state.allowedExchangeRateChangeLower, 1e4)
+        ) {
+            // Instead of reverting, pause the contract. This way the exchange rate updater is able to update the exchange rate
+            // to a better value, and pause it.
+            state.isPaused = true;
+        }
+      ```
+      Reference: [AccountantWithRateProviders.sol#L237-L244](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/AccountantWithRateProviders.sol#L237-L244)
+      
+      This delay is limited to being defined in hours, which may not be as precise as a vault requires. Currently the `minimumUpdateDelayInHours` is packed in a storage slot as a unit8, but there is enough room in the slot to be up to a uint40 which could allow this delay to be reasonably expressed in seconds.
+  
+      **Remediations to Consider**
+  
+      Adjust the minimum delay to be defined in seconds to give more flexibility to the exchange rate updater.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Liquidation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-4] Can unsafely borrow from protocols bringing vault close to liquidation
+  
+      BoringVaults are setup to potentially borrow assets from protocols like Morpho blue and Aave by posting collateral. Borrowing assets is risky, since the collateral put up has to be worth more than the value of the borrowed amount, otherwise the collateral will be liquidated. Most protocols ensure the value of collateral to loan, the health factor, is above the liquidation threshold, however setting an unhealthy health factor adds a lot of risk to the vault of losing assets from having the position liquidated, which may want to be prevented. The assumption is that strategists will act to the vaults benefit, but without additional checks in place a strategist may create a more risky loan than intended.
+  
+      **Remediations to Consider**
+  
+      Add micro managers that ensure positions maintain a sufficiently high health factor for all loans made to protocols.
+  
+    </field>
+
+    <field name="response">
+        This issue will be addressed in future audits, by using a uManager.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Quality of Life</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] No max available functionality for ease of managing the vault
+  
+      In the prior vault managing protocol, cellar functions allowed strategists to specify they wanted to use all of a particular asset in the vault to do some action, which made interacting with the vault easier than providing exact amounts, which could vary throughout a set of rebalance actions. However, in this version that functionality is missing which is a quality of life decrease from the prior version.
+  
+      **Remediations to Consider**
+  
+      Add the ability for a strategist to specify the max amount of an asset the valut has available to use for relevant actions. Consider handling this in the sanitizers and decoders as an extra argument, and returning this additional data.
+  
+    </field>
+    <field name="response">
+        This issue will be addressed in future audits.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">224613ec74e21eaa17c0569f1e98dabd30669f5e</field>
+    <field name="content">
+      ## [Q-2] Index relevant event parameters to allow services to easily query
+  
+      Events like `deposit` in the `TellerWithMultiAssetSupport` contract emits relevant deposit info, like the `recipient`, the `depositAsset` which could be used by front-end applications or services to more easily query and display a users actions and assets if these values were indexed. 
+  
+      **Remediations to Consider**
+  
+      Index relevant event parameters in events like the teller’s `deposit` and the `BoringVault`’s `enter` and `exit` events.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Authorization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">506e19792d1c4360f5ef16e88c080b49655f972b</field>
+    <field name="content">
+      ## [Q-3] Roles intended for authorized functions are unclear
+  
+      Authorized functions throughout the boring vault repo use [solmate’s Auth](https://github.com/transmissions11/solmate/blob/main/src/auth/Auth.sol)’s requiresAuth modifier to check if the sender is authorized to call the specific function. However, there are multiple potential roles that could be authorized but it is not explicitly stated which role is expected to call each function
+  
+      **Remediations to Consider**
+  
+      Add the intended role to the Natspec of each authorized function to make the intention more clear.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Errors</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d7a883f34355607b471f0b569f3498ac3d6fb2b1</field>
+    <field name="content">
+      ## [Q-4] Error missing relevant info making debugging difficult
+  
+      In `ManagerWithMerkleVerification.sol’`s `manageVaultWithMerkleVerification()` strategists pass in data for function calls they would like the corresponding vault to make, along with a proof that each call is in a merkle tree and thus allowed. When each of these function calls is verified it calls [`_verifyCalldata()`](https://github.com/Se7en-Seas/boring-vault/blob/939c77e25473dff3ed18fa104f004f7afd13452e/src/base/Roles/ManagerWithMerkleVerification.sol#L196-L220) which will revert with `ManagerWithMerkleVerification__FailedToVerifyManageProof` if a call is not successfully verified.
+  
+      However, this error does not return any information about the invalid function call and calls`manageVaultWithMerkleVerification()` may take multiple function calls, which may make it difficult for a strategist to determine which of their calls is invalid.
+  
+      **Remediations to Consider**
+  
+      Add additional parameters to the `ManagerWithMerkleVerification__FailedToVerifyManageProof` that make it clear which call has failed, making it easier for strategists to debug complicated manage calls.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      ## [I-1] Manager safeguards do not entirely prevent malicious actions
+
+      Although every call a `BoringVault` makes is verified by the set merkle tree for a given caller, these verification checks are not a catch all to prevent malicious behaviour from a strategist. Users that invest in the vault still have to trust that the managers will act in the best interest of the vault and it’s shareholders. 
+
+    </field>
+    <field name="response">
+        This issue will be addressed by introducing a more decentralized setup to sanitize rebalance TXs.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">MEV</field>
+    <field name="content">
+      ## [I-2] Vault manages are susceptible to MEV
+  
+      Since the vault does not check the value held in the vault before and after a call to manage, there could be protocol interactions that could be exploited via MEV, such as sandwich attacks or front-running, that may negatively impact the vault. It is important that this is considered and all calls to manage the vault be done so through a trusted private RPC to reduces the likelihood of being negatively effected by MEV.
+  
+    </field>
+    <field name="response">
+        Rebalance TX will always be submitted using a trusted block builder.
+    </field>
+  </item>
+  

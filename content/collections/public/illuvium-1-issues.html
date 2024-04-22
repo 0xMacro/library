@@ -1,0 +1,93 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">3a0e28a110a8703c2218922dcd82f2e1bdb82637</field>
+    <field name="content">
+        ## [M-1] No public methods for pause/unpause
+        
+        The Fuel contracts inherits from `ERC20PausableUpgradeable` contract with the goal to support pausing and unpausing of certain functions via the `whenNotPaused` modifier.
+        
+        However, inheriting the `ERC20PausableUpgradeable` contract requires to provide a public pause and unpause function to make use of the pausing capability.
+        
+        **Remediation to Consider**
+        
+        Add a public `pause` and `unpause` function to the contract. The functions should only be callable by a privileged role.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">3a0e28a110a8703c2218922dcd82f2e1bdb82637</field>
+    <field name="content">
+        ## [M-2] Contract can’t be upgraded when paused
+        
+        The `whenNotPaused` modifier is applied to the `burn`, `mint`, and `_authorizeUpgrade` functions, enabling pausing capability for those. 
+        
+        While allowing pausing for `burn` and `mint` functions makes sense in case of an emergency, it doesn’t necessarily for the `_authorizeUpgrade` function. A common scenario is to pause any ERC-20 functionality in case of an issue and then upgrade the contract with a fixed version. However, applying `whenNotPaused` to the `_authorizeUpgrade` function would prevent fixing the contract when it is paused.
+        
+        **Remediation to Consider**
+        
+        Remove the `whenNotPaused` modifier from `_authorizeUpgrade` to allow the contract to be upgraded when in paused state.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Unnecessary Code</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">6c10943cdd60aee58af90f21e5fda9bbfd193e36</field>
+    <field name="content">
+        ## [Q-1] Unnecessary `whenNotPaused` modifier
+        
+        The `whenNotPaused` modifier is applied to the `burn` and `mint` functions, with the intention to pause/unpause the burning and minting of tokens. 
+        
+        However, the contracts already inherits from `ERC20PausableUpgradeable`, applying pausability to mint, burn, and transfers. Thus, `whenNotPaused` modifier is not explicitly required on respective `mint` and `burn` functions. 
+        
+        **Remediation to Consider**
+        
+        Remove `whenNotPaused` modifier from `burn` and `mint` functions.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5bec2cfd77cf90011237acd42638b78d4f8a7935</field>
+    <field name="content">
+        ## [Q-2] Use `init` instead of `init_unchained`
+
+        In the `initialize` function, the ERC20 contract is initialized with
+        
+        ```jsx
+        __ERC20_init_unchained(name, symbol);
+        ```
+        
+        whereas the other parent contracts are all initialized using the `init` function instead of `init_unchained`.
+        
+        **Remediation to Consider**
+        
+        For consistency reasons, use the `__ERC20_init` function for initializing the ERC20 contract.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5bec2cfd77cf90011237acd42638b78d4f8a7935</field>
+    <field name="content">
+        ## [Q-3] Use `external` instead of `public` for functions
+        
+        The public functions `initialize`, `burn`, and `mint` are not used internally and thus can be safely marked as `external`.
+        
+        **Remediation to Consider**
+        
+        To follow Solidity conventions, mark the above functions as `external` instead of `public`.
+    </field>
+  </item>
