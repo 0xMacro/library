@@ -1,4 +1,42 @@
 <item>
+  <field name="topic">DOS</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">e4f0c613e99210fc232338727d00df2805effac6</field>
+  <field name="content">
+      ## [H-1] Attacker can DoS the governance execution for all proposals
+
+      **Note: This issue was found in Sherlock contest after this audit was performed, more details on this specific issue can be found [here](https://github.com/sherlock-audit/2024-02-mento-judging/issues/4)**
+
+      An attacker can DoS the governance execution mechanism by making calls to
+      LockingVotes.getPastTotalSupply gas expensive.
+
+      The total supply of veMento tokens is calculated in the Locking contract.
+      The calculations take every liquidity lines stored in the
+
+      An attacker can create multiple small locks.
+      For each lock, a line will be added to the total supply in the Locking contract.
+
+      Then, when a proposal is executed, the governor contract will call LockingVotes.getPastTotalSupply
+      to get the veMENTO total supply at a specific block.
+
+      The issue is that this total supply is calculated from a set of lines.
+      The more lines there are, the more expensive the call to Locking.getPastTotalSupply is.
+
+      As the attacker can register as much locks as he wants and
+      that the amount of token for a lock can be low (104 in POC, nothing compared as token is 18 decimals),
+      the attacker can make the calls to Locking.totalSupply and LockingVotes.getPastTotalSupply too gas-consuming
+      that it doesn't fit in one block.
+
+      Impact
+      HIGH Governance proposals can't be executed because of gas required.
+
+
+  </field>
+</item>
+
+<item>
     <field name="topic">Input Validation</field>
     <field name="impact">high</field>
     <field name="chance">low</field>
@@ -188,6 +226,196 @@
     <field name="response">
         Making the MAX_CLIFF_PERIOD 104 would effectively mean max cliff period being 105 weeks, taking 1 week of min slope - which acts like a cliff - into account.
         We are fine with cliff lockers having <1% advantage.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">KYC</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">87506149aa537281de8559f376a47ce973516a03</field>
+    <field name="content">
+        ## [L-4] KYC credentials are invalid
+
+        **Note: This issue was found in Sherlock contest after this audit was performed, more details on this specific issue can be found [here](https://github.com/sherlock-audit/2024-02-mento-judging/issues/28)**
+
+        We noticed the Airgrab contract was using an incorrect KYC credential and after the contest ended, we discussed this with the KYC provider and updated the contracts accordingly.
+
+        Old credential:
+        level:plus;residency_not:ca,us
+
+        New credential:
+        level:plus+liveness;citizenship_not:;residency_not:cd,cu,gb,ir,kp,ml,mm,ss,sy,us,ye
+
+        This issue is not about the countries that are put as placeholder, it is about the level of the credential which lacks liveness and citizenship_not:
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Edge Case</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">99d35f76af21e8c49c5fb8398afa66faf96f4550</field>
+    <field name="content">
+        ## [L-5] User Can Vote Even When They Have 0 Locked Mento
+
+        **Note: This issue was found in Sherlock contest after this audit was performed, more details on this specific issue can be found [here](https://github.com/sherlock-audit/2024-02-mento-judging/issues/14)**
+
+        The flow to receiving voting power can be understood in simple terms as follows:
+
+        Users locks his MENTO and chooses a delegate-> received veMENTO which gives them(delegatee) voting power (there's cliff and slope at play too)
+
+        The veMENTO is not a standard ERC20 , it is depicted through "lines" , voting power declines ( ie. slope period) with time
+        and with time you can withdraw more of your MENTO.
+
+        The edge case where the user will be withdrawing his entire locked MENTO amount and even then will be able
+        to vote is as follows ->
+
+        1. User has locked his MENTO balance in the Locking.sol
+
+        2. The owner of the contract "stops" the contract for some emergency reason.
+
+        3. In this stopped state the user calls withdraw() which calls getAvailableForWithdraw() here https://github.com/sherlock-audit/2024-02-mento/blob/main/mento-core/contracts/governance/locking/Locking.sol#L97
+
+        4. Since the contract is stopped , the getAvailableForWithdraw will return the entire locked amount of the user as withdrawable
+            ```solidity
+            function getAvailableForWithdraw(address account) public view returns (uint96) {
+                uint96 value = accounts[account].amount;
+                if (!stopped) {
+                  uint32 currentBlock = getBlockNumber();
+                  uint32 time = roundTimestamp(currentBlock);
+                  uint96 bias = accounts[account].locked.actualValue(time, currentBlock);
+                  value = value - (bias);
+                }
+                return value;
+            ```
+        5. The user receives his entire locked amount in L101.
+
+        6. The owner "start()" the contract again
+
+        7. Since the user's veMENTO power was not effected by the above flow , there still exists veMENTO a.k.a voting power to the delegate,
+        and the user's delegate is still able to vote on proposals (even when the user has withdrew everything).
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Initialization</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c658d07d121e58dbe793fc362a90fd29f8069097</field>
+    <field name="content">
+      ## [L-6] Discrepancy Between Initialization and Setter Function for "Internal Time" Resulting in Time Management Dysfunction
+
+      **Note: This issue was found in Sherlock contest after this audit was performed, more details on this specific issue can be found [here](https://github.com/sherlock-audit/2024-02-mento-judging/issues/19)**
+      
+      The startingPointWeek variable is responsible for maintaining internal timing consistency within the locking contract. This variable is initialized as follows in the GovernanceFactory:
+
+        uint32 startingPointWeek = uint32(Locking(lockingImpl).getWeek() - 1);
+        TransparentUpgradeableProxy lockingProxy = ProxyDeployerLib.deployProxy( // NONCE:7
+          address(lockingImpl),
+          address(proxyAdmin),
+          abi.encodeWithSelector(
+            lockingImpl.__Locking_init.selector,
+            address(mentoToken), /// @param _token The token to be locked in exchange for voting power in form of veTokens.
+            startingPointWeek, ///   @param _startingPointWeek The locking epoch start in weeks. We start the locking contract from week 1 with min slope duration of 1
+            0, ///                   @param _minCliffPeriod minimum cliff period in weeks.
+            1 ///                    @param _minSlopePeriod minimum slope period in weeks.
+          )
+
+      Now, let's examine the function call trace during the initialization of this variable:
+
+
+        /**
+        * @notice Returns "current week" of the contract. The Locking contract works with a week-based time system
+        * for managing locks and voting power. The current week number is calculated based on the number of weeks passed
+        * since the starting point week. The starting point is set during the contract initialization.
+        */
+        function getWeek() external view returns (uint256) {
+          return roundTimestamp(getBlockNumber());
+        }
+        ...
+          /**
+          * @notice Calculates the week number for a given blocknumber
+          * @param ts block number
+          * @return week number the block number belongs to
+          */
+          function roundTimestamp(uint32 ts) public view returns (uint32) { 
+            if (ts < getEpochShift()) {
+              return 0;
+            }
+            uint32 shifted = ts - (getEpochShift());
+            return shifted / WEEK - uint32(startingPointWeek);
+          }
+        ...
+        function getBlockNumber() internal view virtual returns (uint32) {
+          return uint32(block.number);
+        }
+
+      As we can observe, the getWeek function within LockingImpl returns the number of weeks elapsed since the gnosis block because currently startingPointWeek is 0 since it is not initialized yet.
+      Let's assume it corresponds to "179" (Test setup that I will use from protocol tests is using this value so I will continue with it) and continue.
+      The startingPointWeek within the locking contract is initialized with the value 179. Calculations involving the getWeek() function will operate correctly, as it deducts startingPointWeek when computing the system's internal week.
+      Now lets check the setStartingPointWeek() function:
+
+      ```solidity
+      /**
+      * @notice Sets the starting point for the week-based time system
+      * @param newStartingPointWeek new starting point
+      */
+      function setStartingPointWeek(uint32 newStartingPointWeek) public notStopped onlyOwner { 
+        require(newStartingPointWeek < roundTimestamp(getBlockNumber()), "wrong newStartingPointWeek");
+        startingPointWeek = newStartingPointWeek;
+
+        emit SetStartingPointWeek(newStartingPointWeek);
+      }
+      ```
+      
+      As we can see from the require statement, setStartingPointWeek() will only permit newStartingPointWeek to be less than roundTimestamp(getBlockNumber()). Currently, when computing weeks, it subtracts startingPointWeek (initialized with 179). Therefore, if there have been 10 weeks since the initialization, setStartingPointWeek() can only accept numbers smaller than 10. This assertion is confirmed by the following Proof of Concept (POC):
+
+      ```solidity
+      function test_notAllowChangeWeek() public {
+        vm.timeTravel(BLOCKS_WEEK * 10);
+        vm.prank(address(governanceTimelock));
+        locking.setStartingPointWeek(11);
+      }
+      ```
+
+      Add the function provided above to LockIntegration.fuzz.t.sol and execute the test. You will notice that it reverts with "wrong newStartingPointWeek". This outcome aligns with the natspec comment observed during the deployment of Locking:
+
+      ```solidity
+      startingPointWeek, ///   @param _startingPointWeek The locking epoch start in weeks. We start the locking contract from week 1 with min slope duration of 1
+      ```
+      So there is no problem so far, we can only change the startingPointWeek with values less than current internal week number.
+      Let's change it and see what happens then (Again add it to **LockIntegration.fuzz.t.sol**):
+
+      ```solidity
+      function test_ChangeWeekBrokesSystem() public {
+        vm.timeTravel(BLOCKS_WEEK * 10);
+
+        uint32 currentWeek = locking.roundTimestamp(uint32(block.number));
+        console.log("Internal week before update:", currentWeek);
+
+        vm.prank(address(governanceTimelock));
+        locking.setStartingPointWeek(9);
+
+        currentWeek = locking.roundTimestamp(uint32(block.number));
+        console.log("Internal week after update:", currentWeek);
+      }
+      ```
+    Here is the console output:
+
+    > [PASS] test_ChangeWeekBrokesSystem() (gas: 37271)
+    > Logs:
+    > Internal week before update: 11
+    > Internal week after update: 181
+
+    As we can see internal week accounting is completely broken after a benign setStartingPointWeek() call.
+    This issue arises because during the deployment of the proxy, the calculation setting startingPointWeek utilized the implementation contract's variable, which is (un)initialized to 0. Consequently, it computed the variable with reference to the gnosis block. However, upon calling setStartingPointWeek(), it utilizes the proxy's storage (now set to 179), causing it to calculate the variable with reference to the internal system time. As a result, instead of producing the expected impact, it essentially disrupts the entire week accounting in the contract, leading to the unlocking of all locks.
+
     </field>
   </item>
 
