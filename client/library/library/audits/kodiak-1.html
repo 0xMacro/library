@@ -1,0 +1,283 @@
+<page
+  clientName="Kodiak-1"
+  reportDate="April 19th, 2024"
+  auditTitle="Kodiak A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kodiak-Finance/kodiak-core"
+  customRepoInfo
+  customReviewInfo
+  passwordEncrypt="env:PAGE_PASS_KODIAK_1"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit performed by the Macro security team lasted 8 audit days, from March 18th till April 4th, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+      <li>Available documentation present in auditor handoff documents.</li>
+      <li>Available documentation in the respective repositories.</li>
+    </ul>
+
+    <p><b>Note:</b> Since Kodiak project incorporates forks of several different projects, within this audit we reviewed only the <b>code changes</b> from the provided reference commits of individual forked projects. The assumption is that these projects have been audited previously.</p>
+
+    <p>For kodiak-core repository base contract references are the following:</p>
+    <table class="mt-8 table-fixed w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
+        <thead>
+          <tr>
+            <th
+              scope="col"
+              class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300 dark:text-gray-300"
+            >
+              Contract
+            </th>
+            <th scope="col" class="py-3.5 px-4 text-center  font-medium text-gray-900 dark:text-gray-300">
+              Source
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-600"> 
+            <tr>
+              <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/auditors/src/pools/v3-core/UniswapV3Pool.sol">UniswapV3Pool</a>
+              </td>
+              <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                <a href="https://github.com/Uniswap/v3-core/blob/d8b1c635c275d2a9450bd6a78f3fa2484fef73eb/contracts/UniswapV3Pool.sol">c5ccf4d (Uniswap)</a> and <a href="https://github.com/pancakeswap/pancake-v3-contracts/blob/main/projects/v3-core/contracts/PancakeV3Pool.sol">ffa4fb2 (Pancake)</a>
+              </td>
+            </tr>
+            <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/auditors/src/pools/v3-core/UniswapV3Factory.sol">UniswapV3Factory</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/v3-core/blob/d8b1c635c275d2a9450bd6a78f3fa2484fef73eb/contracts/UniswapV3Factory.sol">4024732</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/auditors/src/pools/v2-core/UniswapV2Pair.sol">UniswapV2Pair</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/v2-core/blob/ee547b17853e71ed4e0101ccfd52e70d5acded58/contracts/UniswapV2Pair.sol">1136544</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/auditors/src/pools/v2-core/UniswapV2Factory.sol">UniswapV2Factory</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/v2-core/blob/ee547b17853e71ed4e0101ccfd52e70d5acded58/contracts/UniswapV2Factory.sol">1136544</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/auditors/src/pools/v2-core/UniswapV2ERC20.sol">UniswapV2ERC20</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/v2-core/blob/ee547b17853e71ed4e0101ccfd52e70d5acded58/contracts/UniswapV2ERC20.sol">55ae251</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/main/src/vaults/vault-v1-core/KodiakVaultV1.sol">KodiakVaultV1</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/ArrakisFinance/vault-v1-core/blob/main/contracts/ArrakisVaultV1.sol">d2d879e</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/main/src/vaults/vault-v1-core/KodiakFactoryV1.sol">KodiakFactoryV1</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/ArrakisFinance/vault-v1-core/blob/main/contracts/ArrakisFactoryV1.sol">d2d879e</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/auditors/src/tokens/CommunalFarm.sol">CommunalFarm</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/FraxFinance/frax-solidity/blob/58970f56be72eef7b3f4737ea044181e6fcba5d9/src/hardhat/contracts/Staking/CommunalFarm.sol">58970f5</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/auditors/src/tokens/KDK.sol">KodiakToken</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="#"></a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/auditors/src/tokens/XKDK.sol">XKodiakToken</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://arbiscan.io/address/0x3CAaE25Ee616f2C8E13C74dA0813402eae3F496b#code" rel="nofollow">xGRAIL</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-core/blob/auditors/src/tokens/TokenRewards.sol">TokenRewards</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://arbiscan.io/address/0x5422AA06a38fd9875fc2501380b40659fEebD3bB#code" rel="nofollow">DividendsV2</a>
+                </td>
+              </tr>
+        </tbody>
+      </table>
+    
+      <br/>
+      <p>For kodiak-periphery repository base contract references are the following:</p>
+      <table class="mt-8 table-fixed w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
+        <thead>
+          <tr>
+            <th
+              scope="col"
+              class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300 dark:text-gray-300"
+            >
+              Contract
+            </th>
+            <th scope="col" class="py-3.5 px-4 text-center  font-medium text-gray-900 dark:text-gray-300">
+              Source
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-600"> 
+            <tr>
+              <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                <a href="https://github.com/Kodiak-Finance/kodiak-periphery/blob/main/src/pools/v3-periphery/NonfungiblePositionManager.sol">NonfungiblePositionManager</a>
+              </td>
+              <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                <a href="https://github.com/Uniswap/v3-periphery/blob/697c2474757ea89fec12a4e6db16a574fe259610/contracts/NonfungiblePositionManager.sol">a0e0e58</a>
+              </td>
+            </tr>
+            <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-periphery/blob/main/src/pools/v3-periphery/SwapRouter.sol">SwapRouter</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/v3-periphery/blob/697c2474757ea89fec12a4e6db16a574fe259610/contracts/SwapRouter.sol">eb0852f</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-periphery/blob/main/src/pools/v3-periphery/NonfungibleTokenPositionDescriptor.sol">NonfungibleTokenPositionDescriptor</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/v3-periphery/blob/697c2474757ea89fec12a4e6db16a574fe259610/contracts/NonfungibleTokenPositionDescriptor.sol">de4e437</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-periphery/blob/main/src/pools/v2-periphery/UniswapV2Router02.sol">UniswapV2Router02</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/v2-periphery/blob/0335e8f7e1bd1e8d8329fd300aea2ef2f36dd19f/contracts/UniswapV2Router02.sol">6961711</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-periphery/blob/main/src/pools/v2-periphery/UniswapV2Router01.sol">UniswapV2Router01</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/v2-periphery/blob/0335e8f7e1bd1e8d8329fd300aea2ef2f36dd19f/contracts/UniswapV2Router01.sol">87edfdc</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-periphery/blob/main/src/pools/swap-router-contracts/SwapRouter02.sol">SwapRouter02</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/swap-router-contracts/blob/550c0f20373a487996fcc957075377b67af9df07/contracts/SwapRouter02.sol">a56e970</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-periphery/blob/main/src/pools/swap-router-contracts/V2SwapRouter.sol">V2SwapRouter</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/swap-router-contracts/blob/550c0f20373a487996fcc957075377b67af9df07/contracts/V2SwapRouter.sol">9dc4a9c</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-periphery/blob/main/src/pools/swap-router-contracts/V3SwapRouter.sol">V3SwapRouter</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/Uniswap/swap-router-contracts/blob/550c0f20373a487996fcc957075377b67af9df07/contracts/V3SwapRouter.sol">9dc4a9c</a>
+                </td>
+              </tr>
+              <tr>
+                <td class="w-1/2 p-4 text-gray-900 dark:text-gray-300 text-left break-words">
+                    <a href="https://github.com/Kodiak-Finance/kodiak-periphery/blob/main/src/vaults/vault-v1-periphery/KodiakV1RouterStaking.sol">KodiakV1RouterStaking</a>
+                </td>
+                <td class="Copy w-1/2 p-4 dark:text-gray-100 font-ui text-left break-words break-all">
+                    <a href="https://github.com/ArrakisFinance/vault-v1-periphery/blob/98681b3180ad162ba0e0cdfab15fe33fefd2aa10/contracts/ArrakisV1RouterStaking.sol">28f3685</a>
+                </td>
+              </tr>
+        </tbody>
+      </table>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>kodiak-core</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+            {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>edd42d43d64bb38d8306cd734d3cf065ac543246</code>
+      </li>
+      
+      <li>
+        <b>kodiak-core</b>
+        <a href="https://github.com/Kodiak-Finance/kodiak-periphery/" target="_blank">
+            kodiak-periphery
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>e96430721def5ea9b3585611512b9673e7ebad76</code>
+      </li>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contract within <b>kodiak-core</b> repository:</p>
+
+    <template type="file-hashes">
+        a23585a3c78d540a45f968d5d418b388e7e77303dcd60732ef84a1d05baf2cdc  src/pools/v3-core/UniswapV3Factory.sol
+        f564cac03ed70c35ff11e5904db7035e82839e470c10f6f5629373bd0cddf04d  src/pools/v3-core/UniswapV3Pool.sol
+        a95c02584edfb5b7299efc7fd8c5d90b66735bc2987f8d5caeb4521a3782eed7  src/pools/v2-core/UniswapV2ERC20.sol
+        c57ae4df1da2d16b8a35b4588ac56e62e572a321712a33c05ac8313cec1ec222  src/pools/v2-core/UniswapV2Factory.sol
+        196bafde45f80f2ddecb0183371a074276105e72337736f690c10fb046627160  src/pools/v2-core/UniswapV2Pair.sol
+        e2093d67caa300cc0032ea26e865be4ec9949a4ed13ef48d427170c9c22d72e8  src/vaults/vault-v1-core/KodiakFactoryV1.sol
+        a6132d817f2913e9a4e9e8ef7f2689558ad506db49934ea9821d62e8cf3734e0  src/vaults/vault-v1-core/KodiakVaultV1.sol
+        d2bde43cb759998ba240be8875207bf60d836a78582cfe62b9742f4f839f8589  src/tokens/CommunalFarm.sol
+        aa7b51df30687a4ec99e1461ca10189b1d9e09bc7aae153947fbb027e7116cef  src/tokens/KDK.sol
+        c396c0726dfc5cb6c32b8948b69aec67c2da6e1f30ec721fe71fa8cdb0dfc0f2  src/tokens/TokenRewards.sol
+        eb29d3a74ccdddd9207f6963e1c2a58e5c604722e877c7bd27cd56c30a0d9691  src/tokens/xKDK.sol
+    </template>
+
+    <p>We also audited the following contract within <b>kodiak-periphery</b> repository:</p>
+
+    <template type="file-hashes">
+        6f5c59a2f3e6ec1390ea2fc82db2581fecc9a34e409be136731c24cab15d4631  src/pools/v3-periphery/NonfungiblePositionManager.sol
+        ca8d2c872bf5f3ab63217fb663215335f91f6f3dadea91439883cf6d20f54511  src/pools/v3-periphery/NonfungibleTokenPositionDescriptor.sol
+        c627a74eea2ce2a0065d43af2e87371c54ca4955d3a228e17988a1cd932882f2  src/pools/v3-periphery/SwapRouter.sol
+        452643f17ec1c07c598497bc0c460f3923001b0a847862deb05e526c3dc6cc9e  src/pools/v2-periphery/UniswapV2Router01.sol
+        a5a2135eb2561f2cf9d5e4513a333d350bfec67f45f2bfa1acf62bcf8ce3e239  src/pools/v2-periphery/UniswapV2Router02.sol
+        7dbf088a33df7d6973ff2f813da8157af2e576058c3114e7b7ceaab263c420b8  src/pools/swap-router-contracts/SwapRouter02.sol
+        c76ee175e9d2c57689fa682bfbff8f184125807888830263250745014174b125  src/pools/swap-router-contracts/V2SwapRouter.sol
+        faa8711c705238e7c182e75aa7c311f6dd0d35e1f5fba8437ede6a3d512518a9  src/pools/swap-router-contracts/V3SwapRouter.sol
+        a4c820a2aff86d381c3d137bf793c737b43cf65d817a4bbb7e0205756b1e54cd  src/vaults/vault-v1-periphery/KodiakV1RouterStaking.sol
+    </template>
+
+  </content-for>
+</page>
