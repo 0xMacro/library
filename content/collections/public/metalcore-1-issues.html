@@ -1,0 +1,15 @@
+<item>
+  <field name="topic">Use cases</field>
+  <field name="content">
+    ## [I-1] Renounce ownership functionality disabled but can happen by mistake
+
+    The ImmutableERC20FixedSupplyNoBurn contract inherits OpenZeppelin’s Ownable functionality. Part of this functionality is the `renounceOwnership()` function which irreversibly resets the owner.
+
+    The ImmutableERC20FixedSupplyNoBurn implementation prevents renouncing ownership by overriding the parent function and reverting whenever it is invoked. However, this restriction can be circumvented if the current owner calls `transferOwnership()` with an address value not controlled by anyone.
+
+    Consider removing the Ownable functionality since it is not within the current context or using Ownable2Step to prevent accidental loss of ownership.
+  </field>
+  <field name="response">
+    Acceptable risk since it requires owner privileges.
+  </field>
+</item>

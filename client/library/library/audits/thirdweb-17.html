@@ -1,0 +1,49 @@
+<!-- @format -->
+
+<page
+  clientName="thirdweb"
+  reportDate="April 23rd, 2024"
+  auditTitle="thirdweb A-17"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/seaport-eip1271"
+  repoCommitHash="355fa9f481f0c3ee06f628ba063aa6bccee2aaf0"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on March 18, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the thirdweb team.</li>
+      <li>A audit handoff document provided through Notion.</li>
+    </ul>
+
+
+    </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+        <li>
+          <b>Repository:</b>
+          <a href="{{page.repoUrl}}" target="_blank">
+            {{page.repoUrl.split('/').slice(-1)[0]}}
+          </a>
+        </li>
+        <li style="list-style: none;" class="break-words break-all">
+          Commit Hash:
+          <code>355fa9f481f0c3ee06f628ba063aa6bccee2aaf0</code>
+        </li>
+      </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>We audited the following contract within this repository:</p>
+
+    <template type="file-hashes">
+        7ba6ae7782649784f6473f7ae9190e036fcf29fb17b2d7c4c57ec4b592792004  src/SeaportEIP1271.sol
+    </template>
+
+  </content-for>
+</page>

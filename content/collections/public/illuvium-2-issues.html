@@ -1,0 +1,100 @@
+<item>
+    <field name="topic">Errors</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">fc67303ed1ddcfb24cc49dda55efa439623a146b</field>
+    <field name="content">
+        ## [Q-1] Incorrect error in `pause` function
+        
+        The `pause` function reverts with the `AlreadyPaused` error in the following cases:
+        
+        ```jsx
+        if ((isPaused && shouldPause) || (!isPaused && !shouldPause)) revert AlreadyPaused();
+        ```
+        
+        As per the right branch of the OR operator above, it also reverts with `AlreadyPaused` when the contract is unpaused and `shouldPause = false` is passed. However, in this case, it should rather revert with an `AlreadyUnpaused` error.
+        
+        **Remediation to Consider**
+        
+        For the case mentioned above, revert with an explicit `AlreadyUnpaused` error.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Coding Standard</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/IlluviumGame/staking-contracts-v2/commit/4e76e17a35a3aae3f5ea920ca7ac42053d3ebfaf,https://github.com/IlluviumGame/staking-contracts-v2/commit/7989cfd20f9fe9caea8e7b31237d5564e89190e4</field>
+
+    <field name="content">
+        ## [Q-2] Unlocking and recovering fails for non-compliant ERC20
+        
+        Some of the well known ERC20 tokens - such as USDT - don’t fully comply with the ERC20 standard as they don’t return a boolean on e.g. `transfer` and `transferFrom`. 
+        
+        For such type of ERC20 tokens, transferring tokens to the user would fail on the following line:
+        
+        ```jsx
+        require(IERC20(underlying).transfer(msg.sender, amount), "MerkleDistributorToken: Unlock failed");
+        ```
+        
+        **Remediation to Consider**
+        
+        Use `safeTransfer` from Openzepellin’s [SafeERC20](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol#L141-L142) library which explicitly handles tokens that don’t return a bool on transfers.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Merkle Tree</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-3] Potentially susceptible to a second preimage attack
+        
+        The merkle leave is only single-hashed as seen in the `claim` function when computing the merkle node/leaf:
+        
+        ```jsx
+        bytes32 node = keccak256(abi.encodePacked(index, msg.sender, amount));
+        ```
+        
+        This makes the contract potentially vulnerable to a [second preimage attack](https://flawed.net.nz/2018/02/21/attacking-merkle-trees-with-a-second-preimage-attack/). 
+        
+        For instance, [Openzeppelin’s Javascript MerkleTree library](https://github.com/OpenZeppelin/merkle-tree?tab=readme-ov-file#standard-merkle-trees), double-hashes the leaves to prevent this type of attack. This can be seen by how the leaf is generated:
+        
+        ```jsx
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(addr, amount))));
+        ```
+        
+        **Remediation to Consider**
+        
+        Although this type of attack seems to be very unlikely, it is recommended to follow best practicing by double-hashing the merkle leaves. Consider using Openzeppelin’s [Javascript MerkleTree library](https://github.com/OpenZeppelin/merkle-tree?tab=readme-ov-file#standard-merkle-trees) for this purpose.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Nitpicks</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">fc67303ed1ddcfb24cc49dda55efa439623a146b</field>
+    <field name="content">
+        ## [Q-4] Nitpicks
+
+        - On [MerkleDistributorToken.sol#L88](https://github.com/IlluviumGame/staking-contracts-v2/blob/4924d59d5152ae7e77535358a820bad6cb545e41/contracts/MerkleDistributorToken.sol#L88), the Natspec documentation for the constructor covers the `owner_`, `underlying_`, and `merkleRoot_` parameters but doesn’t cover the `tiers_` param.
+        - Incorrect comment on [MerkleDistributorToken.sol#L43-L44](https://github.com/IlluviumGame/staking-contracts-v2/blob/4924d59d5152ae7e77535358a820bad6cb545e41/contracts/MerkleDistributorToken.sol#L43-L44). The `vestingTiers` mapping contains the **base + bonus percentage** rather than only the bonus percentage as mentioned in the comment.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">fc67303ed1ddcfb24cc49dda55efa439623a146b</field>
+    <field name="content">
+        ## [G-1] Use `verifyCalldata` to verify Merkle tree
+        
+        Openzeppelin’s [MerkleTree library](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/MerkleProof.sol) offers two ways to verify a provided leaf is in a Merkle tree, one where the proof is provided as memory with the regular `verify()` function, and another that takes the proof as `calldata` using `verifyCalldata()`. When a user claims tokens and provides a proof, it is passed in as `calldata`, since it is not altered during execution. `calldata`  is cheaper to read than memory, which leads to less gas consumed for users to verify their claims if the function `verifyCalldata()` is used rather than `verify()`.
+        
+        **Remediations to Consider**
+        
+        Replace the call to `verify()` with `verifyCalldata()` to save users gas when claiming
+    </field>
+</item>
