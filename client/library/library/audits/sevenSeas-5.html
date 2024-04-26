@@ -1,0 +1,49 @@
+<page
+  clientName="Seven Seas"
+  reportDate="April 22, 2024"
+  auditTitle="Seven Seas A-5"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="db54a948fbce3bc7a59574407ff36fb376117f4d"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on April 19th 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <template type="audit-markdown">
+      ## Trust Model, Assumptions, and Accepted Risks (TMAAR)
+
+      Trust Assumptions:
+
+      In addition to the trust assumptions mentioned in [SevenSeas-4](https://0xmacro.com/library/audits/sevenSeas-4.html), this update allows interacting with Into the Block contracts, and holding positions with them. Each is intended to be setup with the vault as the owner, but will likely set Executors on deployment of each of Into the Block’s position managers. These executors are bots managed by Into the Block, and have the ability to manage positions that have been setup by the vault, but only the vaults can set approvals and withdraw assets. There is a trust assumption that these set executors will manage the vault’s assets as intended. As mentioned in I-1, there is also a trust assumption that contracts deployed are the same as those provided for this review, as the contracts are unverified and private.
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+
+      cca2554a697a30179ef16e87d768154c23627fd11bcdb6f7f5ef91eccea483d7  src/base/DecodersAndSanitizers/Protocols/ITB/ITBPositionDecoderAndSanitizer.sol
+      62f8744a6f1603eded0c66bec5a4a61f1e12a65ef184d3542ac0fc200bf42ed4  src/base/DecodersAndSanitizers/Protocols/ITB/aave/AaveDecoderAndSanitizer.sol
+      8abc0e9ed3ff91ef2a7bcb3644ebc81f398617aabd5d2cef9c6f309ba7770b36  src/base/DecodersAndSanitizers/Protocols/ITB/common/BoringDecoderAndSanitizer.sol
+      60b43c345e1c45e3f64aae1dd05575d1644c98689255d271f96119b7dd78fe1a  src/base/DecodersAndSanitizers/Protocols/ITB/common/ITBContractDecoderAndSanitizer.sol
+      e2ac84785f681b6b0707293ea85e4a25a66304cbb43ac6790ca73a64c4056725  src/base/DecodersAndSanitizers/Protocols/ITB/common/Ownable2StepDecoderAndSanitizer.sol
+      fd0dd86da91e6431b662541f68e97be7c0c5643f026153d21ed5ed0f229c445d  src/base/DecodersAndSanitizers/Protocols/ITB/common/WithdrawableDecoderAndSanitizer.sol
+      293163a971f30b8abb7c1f5108901c09719420e59f340a684b16c731d5b2846b  src/base/DecodersAndSanitizers/Protocols/ITB/curve_and_convex/ConvexDecoderAndSanitizer.sol
+      0c455a09c93c388c093f5ca8eac53f3887dfc16169fb3e76b87b58eea90f696f  src/base/DecodersAndSanitizers/Protocols/ITB/curve_and_convex/CurveAndConvexDecoderAndSanitizer.sol
+      2593eb0b799ce09129265e73aae870060a66fa5a1b0687254e3b22e0a8a0ddfa  src/base/DecodersAndSanitizers/Protocols/ITB/curve_and_convex/CurveNoConfigDecoderAndSanitizer.sol
+      31c2383034cdbd706ab30fca8e64b4a97d236454fbf72d074d84bebb6704f270  src/base/DecodersAndSanitizers/Protocols/ITB/gearbox/GearboxDecoderAndSanitizer.sol
+      
+    </template>
+
+  </content-for>
+</page>

@@ -1,0 +1,13 @@
+<item>
+    <field name="topic">Informational</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [I-1] Into the Block’s contracts are unverified and private
+  
+      As mentioned in the trust assumptions, vaults that hold positions with Into the Blocks contracts. These contracts are private, but were reviewed within this audit, . The contracts that a Boring Vault is setup to interact with are position manager contracts that vary based on the protocol it interacts with. This audit covered sanitizers and a tree that allow for vaults to setup into the block positions for Aave, GearBox, and Convex-Curve, with the vault having ownership of the position manager, having the sole ability to withdraw assets and set approvals. Executor addresses are set in the construction of each manager, and they have the permission to manage the position, ie. stake and unstake assets, in the respective protocols.
+    </field>
+    <field name="response">
+      IntoTheBlock has used these contracts in production for years, and is a very reputable team. The contracts were also reviewed by the 7Seas team and no issues were found.
+    </field>
+  </item>
+  
