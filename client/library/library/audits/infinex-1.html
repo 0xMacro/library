@@ -55,24 +55,28 @@
     </ul>
     <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
     <template type="audit-markdown">
-      ## Actors
+      As part as a comprehensive review, security included not only that user funds would be secure from external actors, but also from Infinex acting maliciously.
 
-      ### Infinex Governance
+      ## Infinex Governance
 
       Protocol DAO that has control over contract implementation upgrades and configurations as the `Owner` role:
       - Controlling the Account factory migration and can enable or disable the account address prediction and creation.
       - Setting configuration parameters in the Procotol Configuration Beacon such as:
-        - Setting proxy and account implementation addresses used for Account creation and migration. (Opt-in by Account control).
+        - Setting proxy and account implementation addresses used for Account creation and upgrades. (Upgrades are Opt-in by Account control).
         - `trustedRecoveryKeepers` that sets or unsets an address as a trusted recovery keeper who can recover assets from accounts to the owner's recovery address if set.
         - `revenuePool` that sets the pool address where fees are sent to.
-        - `USDC` address of the USDC token contract. (Opt-in by Account control).
-        - `bridgeConfiguration.minimumUSDCBridgeAmount` minimum USDC amount that can be bridged. (Opt-in by Account control).
-        - Wormhole and Circle bridging parameters. (Opt-in by Account control).
+        - `USDC` address of the USDC token contract. (Update of this in the account is Opt-in by Account control).
+        - `bridgeConfiguration.minimumUSDCBridgeAmount` minimum USDC amount that can be bridged. (Update of this in the account is Opt-in by Account control).
+        - Wormhole and Circle bridging parameters. (Update of this in the account is Opt-in by Account control).
+
+      ## Infinex Users
+
+      Users control their accounts with the following keys:
 
       ### Sudo Keys
 
       Super user set of addresses, initially set during the account creation as the Account owner but can be expanded to multiple Sudo key entities. 
-      Essentially acts as the highest authority and can perform most actions such as set other Sudo keys, setup Operational keys, setup the Recovery key, upgrade Account's implementation, upgrade Configurations from the Protocol beacon, and perform withdrawals with the only exception being the emergency Recovery.
+      Essentially acts as the highest authority and can perform most actions such as set other Sudo keys, setup Operational keys, setup the Recovery key, upgrade the Account's implementation, upgrade Configurations from the Protocol beacon, and perform withdrawals.
       
       ### Operation Keys
 
@@ -89,8 +93,8 @@
 
     ## Account Assumptions
 
-    - Governance can update the upgrades to accounts, and the configuration beacons, but account owners can choose to opt into them or not.
-    - Until accounts are deployed, given that the address of the deployed accounts is controlled by the factory, Infinex Governance has the power to disallow or allow the account deployment on both chains; before the full flow of an account’s creation is completed in both chains (L1 account and L2 account), it is assumed that no account implementation or beacon configurations changes would be applied.
+    - Governance can update configuration in the beacons, including the implementation used for account creation and account upgrades, but account owners can choose to opt into using them or not.
+    - Until accounts are deployed, given that the address of the deployed accounts is controlled by the factory, Infinex Governance has the power to disallow or allow the account deployment on all chains; before the full flow of an account’s creation is completed on all supported chains, it is assumed that no account implementation or beacon configurations changes would be applied.
     - Different key actors are designed to avoid a single point of failure if any of the keys were compromised. Users can decide how to design their account’s access control and potentially centralize all guards into a singleton key if this is added to all roles.
     - User’s funds are safe within the account as long as keys are not compromised, however, there are guards against single failure points to remove, recover, and add keys with different restrictions as described in the *Actors section.*
 
