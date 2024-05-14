@@ -1,0 +1,30 @@
+<page
+  clientName="Seven Seas"
+  reportDate="May 12, 2024"
+  auditTitle="Seven Seas A-5"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="449d919e4cf15303aa0fee848f0bd1627836b18f"
+  finalRepoCommitHash="74abe18e75f00a5b294f8ab425c06fd1c3bdbf02"
+
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on April 19th 2024.
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+
+      b9b67816dcb7efa3b34c9a2b12a60fadb0284478c83cd36b290cb42093204c09  src/base/DecodersAndSanitizers/Protocols/SwellSimpleStakingDecoderAndSanitizer.sol
+      5b27e8dde63cd334ec1db5cdddb07ce5435f7cbf11b4867c16e4728ac63ea819  src/base/DecodersAndSanitizers/Protocols/ZircuitSimpleStakingDecoderAndSanitizer.sol
+      779c57758c7b1fac8460abeaefb6fd637cd134ee1bd2fe9d5e00488da25ba92e  src/helper/GenericRateProvider.sol
+      477589f503105a92ffc99b923baf6d135ecda145b469a300cace56017906807e  src/base/DecodersAndSanitizers/Protocols/EigenLayerLSTStakingDecoderAndSanitizer.sol
+    </template>
+
+  </content-for>
+</page>
