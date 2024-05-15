@@ -1,0 +1,41 @@
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">74abe18e75f00a5b294f8ab425c06fd1c3bdbf02</field>
+    <field name="content">
+      ## [M-1] Eigenlayer withdrawals can receive unintended rewards
+  
+      In `EigenLayerLSTStakingDecoderAndSanitizer.sol`’s `completeQueuedWithdrawals()`, withdrawal data as well as the tokens the withdrawal is to be received in are decoded so they can be verified to be on the manager’s set merkle root, to ensure this interaction is approved:
+  
+      ```solidity
+      function completeQueuedWithdrawals(
+          DecoderCustomTypes.Withdrawal[] calldata withdrawals,
+          address[][] calldata tokens,
+          uint256[] calldata, /*middlewareTimesIndexes*/
+          bool[] calldata /*receiveAsTokens*/
+      ) external pure virtual returns (bytes memory addressesFound) {
+          for (uint256 i = 0; i < withdrawals.length; i++) {
+              addressesFound = abi.encodePacked(
+                  addressesFound, withdrawals[i].staker, withdrawals[i].delegatedTo, withdrawals[i].withdrawer
+              );
+              for (uint256 j = 0; j < withdrawals[i].strategies.length; j++) {
+                  addressesFound = abi.encodePacked(addressesFound, withdrawals[i].strategies[j]);
+              }
+              for (uint256 j = 0; j < tokens.length; j++) {
+                  addressesFound = abi.encodePacked(addressesFound, tokens[i][j]);
+              }
+          }
+      }
+      ```
+      Reference: [EigenLayerLSTStakingDecoderAndSanitizer.sol#L32-L49](https://github.com/Se7en-Seas/boring-vault/blob/449d919e4cf15303aa0fee848f0bd1627836b18f/src/base/DecodersAndSanitizers/Protocols/EigenLayerLSTStakingDecoderAndSanitizer.sol#L32-L49)
+  
+      However, the value `receiveAsTokens` is commented out and not sanitized. This means a strategist can set it as either true or false when making this call. The intended functionality is to set it as true, which results in receiving the tokens defined in tokens, which are verified to be on the tree. In the case where false is set for `receiveAsTokens`, tokens are not received as expected, [but shares are received](https://github.com/Layr-Labs/eigenlayer-contracts/blob/dev/src/contracts/core/DelegationManager.sol#L589-L654) in either the StrategyManager or EigenPodManager depending on the strategy. This may cause issues as a vault likely does not have the ability to properly manage these shares, and are assets the vault was likely not intended to hold.
+  
+      **Remediations to Consider**
+  
+      Revert if the `receiveAsTokens` value for a withdrawal is false, to ensure the intended and verified tokens are received. Alternatively, if receiving shares is desired, consider only reverting if `receiveAsTokens` is false, and the length of the tokens array is non-zero, allowing for a non-token call receiving shares if is verified on the tree.
+    </field>
+  </item>
+  
