@@ -1,0 +1,124 @@
+<page
+  clientName="Compound"
+  reportDate="May 20, 2024"
+  auditTitle="Compound Quark A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/compound-finance/quark"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+  repoCommitHash="9d8f07d571298b448852bf63997b9b5278725f3e"
+  repoCommitHash2="9b334b0239c6a10a7a34578948ca6dc86db444e0"
+  repoCommitHashFinal="e1da89dbc792bf1f36a1bddd0a8ceadb2a4b85db"
+  passwordEncrypt="env:PAGE_PASS_COMPOUND_1"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from April 30, 2024 to May 6, 2023. For a total of three audit days.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available public documentation and provided docs for the specific release.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        Quark is an Ethereum smart contract wallet system designed to run custom code with each transaction. 
+
+        ### Entities
+
+        - **Quark Wallet** – A programmable wallet that executes QuarkOperations containing contract code (or corresponding code reference) and calldata for triggering function from the provided contract code.
+        - **Quark State Manager** – A contract that provides isolated storage for each Quark wallet.
+        - **Code Jar** – Manages references to previously deployed and deploys new contract code to be used in future Quark operations.
+        - **Wallet Proxy Factory** – Enables efficient deploy of new Quark Wallet instance at a counterfactual address derived from an owner EOA based on the minimal proxy contract architecture.
+        - **Quark Script** – An extensible contract that exposes helper functions for other Quark scripts to inherit from. The helper functions enable callbacks, allow replay of QuarkOperations, and reading from and writing to an isolated storage space in the QuarkStateManager.
+        - **Core Scripts** – A set of important scripts that should be deployed via CodeJar to cover essential operations that a large number of QuarkOperations will likely use. Examples of Core Scripts include multicall, ethcall, and flashloans with callbacks.
+        - **User Scripts** – An unbounded and unpermissioned set of arbitrary scripts deployed by the users.
+        
+        ### Trust Model
+
+        - Only signer of the wallet instance can authorize quark operation execution for the wallet.
+        - Only executor of the wallet instance can run quark operation directly on the wallet.
+        - Quark wallet instance related custom state is managed and available through the quark state manager.
+        - Quark wallet instance related custom state cannot be modified outside of the execution context of the particular wallet instance.
+        - Code Jar deploys the runtime code referenced by operations (if it hasn't been already deployed) and returns reference to the correct code.
+        - Quark Script provides properly implemented helper functions for Quark script authors to follow best practices in developing User scripts.
+        - Core scripts securely and properly implement corresponding operations by relying on Quark Script provided functionality.
+        
+        ### General Assumptions
+        
+        - Quark is an extensible framework that relies on plugins in the form of Scripts (Core/User) to enable flexible runtime operations.
+        - User scripts are arbitrary code components that are executed in the context of a specific Quark Wallet instance. They may transfer assets owned by the wallet (and have capabilities as arbitrary smart contracts). Therefore, end users need to verify their proper operation.
+        - New user scripts will follow QuarkWallet’s guidelines for Quark user script development to ensure proper execution (usage of allowCallbacks, allowReplay, read, write for isolated storage, nonReentrant, onlyWallet, etc).
+        - New user scripts interacting with external systems will follow security best practices and be reviewed within a specific deployment context to ensure a lack of security issues.
+        - Security model for user script used within the context of QuarkWallet is similar as for an individual smart contract with the same functionality. Therefore, user script needs to be properly implemented to avoid related security risks.
+
+        ### Accepted Risks
+        
+        - If users execute insecure arbitrary user scripts in the context of their Quark wallet instance they may lose assets owned by the corresponding wallet.
+        - If users reference user script which may be destroyed by others they may need to pay higher cost for their Quark operation execution since contract code will need to be redeployed.
+        - Valid signatures for replayable operations can be replayed by unexpected third parties arbitrary number of times. User scripts should properly handle this edge case.
+        - Signatures for previously failed operations may unexpectedly be successfully reused in the future. User scripts should provide ability for invalidating previous signatures.
+        - MultiQuark operations intended to be executed cross chain cannot guarantee the proper execution order given the conditional isolation for different chains.
+
+    </template>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+        <li>
+            <b>Repository:</b>
+            <a href="{{page.repoUrl}}" target="_blank">
+                {{page.repoUrl.split('/').slice(-1)[0]}}
+            </a>
+        </li>
+        <li class="break-words break-all">
+            Initial Commit Hash <b>(Majority of contracts):</b> </br>
+            <code>9d8f07d571298b448852bf63997b9b5278725f3e</code>
+        </li>
+        <li class="break-words break-all">
+            Commit Hash <b>(QuoteCall script addition):</b> </br>
+            <code>9b334b0239c6a10a7a34578948ca6dc86db444e0</code> 
+        </li>
+    </ul>
+  </br> This security review focused primarily on general refactoring of the QuarkWallet directory structure, the introduction of MultiQuark operations, and the addition of Paycall and Quotecall scripts. More details on the specific contracts are provided below. Additionally, the script deployment was adapted to deploy the runtime code.
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts with the <code>9d8f07d571298b448852bf63997b9b5278725f3</code> commit hash:
+    </p>
+
+    <template type="file-hashes">
+      75ae09c6f57e61f1ecf7e4c55b92e1ab174adfb6f3480ac848aaafee7182ac1b  ./src/codejar/src/CodeJar.sol
+      41e3f715a0a19ba364917173d1b1c712d75b497715ead351dc1d04814e57e59f  ./src/codejar/src/CodeJarFactory.sol
+
+      65ea45b22d7a1a5b1e5cf27bb9e83d613c7e6f6d36c18f10119e969cfafaab8d  ./src/quark-core/src/QuarkScript.sol
+      648dfe12d713a48252489aa3acef75d34114a5cde84a348f18ff4fe7c1696fa9  ./src/quark-core/src/QuarkStateManager.sol
+      00a20445cf77ba6560658b7c6a92f7e160af27990b69f8b5c4e1ecb7fa2d34f4  ./src/quark-core/src/QuarkWallet.sol
+      56a75e4ab5679c173b4e5cc54f0e1bb8145d04eecceee1dfaf5fea62ffad8f36  ./src/quark-core/src/QuarkWalletStandalone.sol
+      15921dc30d4be0b2a38a4c470bd2c350d9eca637ea3db6af125006cbea2ff2ae  ./src/quark-core/src/interfaces/IHasSignerExecutor.sol
+      8ba603e452ad9699eb7b069cf1e917fbbdec00ea760aed0e3b4386f90ac87dba  ./src/quark-core/src/interfaces/IQuarkWallet.sol
+      4a972442dbf3b4dd0e3018d33854536b539af2a228bdb343e6a7fcdce5c23f62  ./src/quark-core/src/periphery/BatchExecutor.sol
+      7f11e6ebf4ea32a9e845a68a56661c6319cac0001552d4e0c96a71544a9d6272  ./src/quark-core-scripts/src/Ethcall.sol
+      af1fa4abeb7158163094c3b74e41e8617a6ae580166cb9677807b4ddd12a8dd6  ./src/quark-core-scripts/src/Multicall.sol
+      0e5708eeb5f1dacbbcb32c790615098b5cc51c6ccacd93e35c769adb0ea96c57  ./src/quark-core-scripts/src/Paycall.sol
+      3aa07833c47e7c9f87ac769e9e3cbeeb044ba24a61cd818ca69880a027a03b23  ./src/quark-core-scripts/src/UniswapFlashLoan.sol
+      07c275e0d2f004e8228c65794f3aa6c7ccae47ce6af3f6d7c93fa61950c86781  ./src/quark-core-scripts/src/UniswapFlashSwapExactOut.sol
+      570e490638d8ffc7c5307b445dd9b3bb2574b18dd2ae8373914d466d331b4ebb  ./src/quark-core-scripts/src/lib/UniswapFactoryAddress.sol
+      14d1af5988ba1a486deaa8f81f42a7992de22d0b104beb21086f3de44107134b  ./src/quark-core-scripts/src/vendor/chainlink/AggregatorV3Interface.sol
+      6ae36efb47db4d2e41f28a6d3c13e8d21cb434b6fad2c744a4712bc197b3664b  ./src/quark-core-scripts/src/vendor/uniswap_v3_periphery/PoolAddress.sol
+      ac13523967b68f0f904e2bc0057f5ee5d4f78e008d890344c5cd6f3b38f7b365  ./src/quark-factory/src/QuarkFactory.sol
+      f2f1d6eb3dd11b333682d95de9eee80281f7a2314a1a40be2172aac1e706561f  ./src/quark-proxy/src/QuarkMinimalProxy.sol
+      2c9b11a026ecda84f085c11e7b0bd6166a4cdc339e6166b048b551bc77ed37ff  ./src/quark-proxy/src/QuarkWalletProxyFactory.sol
+    </template>
+
+    <p>
+      Additionally, we audited the following contracts with the <code>9b334b0239c6a10a7a34578948ca6dc86db444e</code> commit hash. (QuoteCall addition and minor Paycall changes):</p>
+
+    <template type="file-hashes">
+      67eda1f0702d5d0c2e055951af45bb49501f055768b62ca5191298c5e2e5fd47  ./src/quark-core-scripts/src/Paycall.sol
+      1aed845d0dcd46bce62a007d7740930c6ea092751b9366788e4ee208cc28fddd  ./src/quark-core-scripts/src/Quotecall.sol
+    </template>
+  </content-for>
+</page>
