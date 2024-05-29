@@ -1,0 +1,41 @@
+<page
+  clientName="Seven Seas"
+  reportDate="May 14, 2024"
+  auditTitle="Seven Seas A-7"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="9c6e1e4458fba53f2ff09efe21195dcf570ffc3e"
+  finalRepoCommitHash="8de7678302b9f52c52315b43e6cd16d9cf6e5121"
+
+>
+  <content-for name="spec">
+    The security audit was performed by the Macro security team on May 22nd 2024.
+    <template type="audit-markdown">
+      ## Trust Model, Assumptions, and Accepted Risks (TMAAR)
+
+      Trust Assumptions:
+
+      In addition to the trust assumptions mentioned in [SevenSeas-4](https://0xmacro.com/library/audits/sevenSeas-4.html), and [SevenSeas-5](https://0xmacro.com/library/audits/sevenSeas-5.html) this update allows addresses to be blacklisted from interacting with boringVault shares. Users must trust that addresses with the role authorized to update the blacklist will do so in the interest of the protocol and not freeze users assets without good reason.
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository, and reviewed the migration steps to move assets from the Liquid cellar to a Liquid boring vault.
+    </p>
+
+    <template type="file-hashes">
+
+      38253e3f0fb66c856d8293e7ea7b709e7cd05035c208077979c62e7e8d98e24d  src/base/BoringVault.sol
+      c1e9fecdcab6a7896df2f79f1b4b100bb8c9a2849b7a94e673a9279492ae1254  src/base/Roles/TellerWithMultiAssetSupport.sol
+      154e4924894c1e63f65ca1e30de5138561a77990b48c491b802974c0b84966da  src/base/DecodersAndSanitizers/Protocols/EthenaWithdrawDecoderAndSanitizer.sol
+      5c774f8963326fbfe202cbeba092d2bbed97f263d18283ba574673186773d854  src/migration/CellarMigrationAdaptor.sol
+      110e76323040580e4e354e8b1f7206acb5c53fa03952022d355e855c0f4a8f56  src/migration/CellarMigrationAdaptor2.sol
+      cd3021756928dcc1c71819271c7ce077e24c0254b04f2ff55bc1641d22da573d  src/migration/CellarMigratorWithSharePriceParity.sol
+      69d84b13fd18883758c5f54cec4f50aad8e6b555435d814dc64e5b54bd24d5a4  src/migration/ParitySharePriceOracle.sol
+
+    </template>
+
+  </content-for>
+</page>
