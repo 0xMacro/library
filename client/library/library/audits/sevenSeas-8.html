@@ -1,0 +1,46 @@
+<page
+  clientName="Seven Seas"
+  reportDate="June 4, 2024"
+  auditTitle="Seven Seas A-8"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="938478e59619c693150a2290ff677191b19a0948"
+  finalRepoCommitHash="c614edf1762288b7419223e205d370c2996807d1"
+
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on May 29th to May 30th 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+      ### Trust Assumptions:
+
+      This update added performance fees to the vault based on the highest share price, or high water mark. It is setup so that a percentage of the increase in share price above the last highest price is taken as a performance fee. The intent is to incentivize the managers of the vault to always increase the share price, benefiting holders. However, since the share price can be set, and high water mark reset by the owners, users must trust that the managers will only use these privileged functions to benefit the protocol as a whole, and not extract unearned performance fees.   </template>
+  </content-for>
+
+ 
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+      7cc947b8a8c011d88db1cb3810d4f11bf433902a9f3e96794037ca65ec17ea9c  src/base/Roles/AccountantWithRateProviders.sol
+      463e49716872b2726bdf520d74217a0e9c11db60983b8de835706dc80dd753f9  src/base/Roles/DelayedWithdraw.sol
+      57f8f87f1fec7eaeee4cbe225bf43feb54d87b8c98ce8ff6708be0311b7b8c5e  src/base/Roles/TellerWithMultiAssetSupport.sol
+      8f0beba89fd76c4e40c8b5db44d1a417061914cda72b6487b7fa2c7eafd7869a  src/base/Roles/TellerWithRemediation.sol
+
+      281066bcbed6d8debbc142c71ab8575ef114390544fa18711964d676b95be124  src/base/DecodersAndSanitizers/Protocols/ITB/eigen_layer/EigenLayerDecoderAndSanitizer.sol
+    </template>
+
+  </content-for>
+</page>
