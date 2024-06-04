@@ -5,89 +5,87 @@
     <field name="status">fixed</field>
     <field name="commit">f7e1c66ad79e8f99ad8a857ed874ae092795d12b</field>
     <field name="content">
-      ## [L-1] Resetting high water mark can effect management fees calculations
-  
-      In `AccountantWithRateProviders.sol’`**s** [`resetHighWaterMark()`](https://github.com/Se7en-Seas/boring-vault/blob/938478e59619c693150a2290ff677191b19a0948/src/base/Roles/AccountantWithRateProviders.sol#L254-L263), the owner can reset the `highwaterMark` used to calculate performance fees. This is intended to only be done to incentivize growth if too far below the last high water mark, and should be used sparingly. However, when it is done it also sets the `totalSharesLastUpdate` to the vaults current shares. `totalSharesLastUpdate` is used in both the performance fees and management fees calculation, so updating this will effect both. In the case of management fees, it is calculated by taking the minimum of the `totalSharesLastUpdate` and current shares, and taking a percent based on time since last update and the management fee. If the `totalSharesLastUpdate` increased or decreased since the call to `updateExchangeRate()`, reseting the high water mark could result in more or less management fees from being taken the next time the exchange rate is updated.
-  
-      **Remediations to Consider**
-  
-      When `resetHighWaterMark()` is called, handle the management fees as well using the current exchange rate, or alternatively do not update `totalSharesLastUpdate`.
-  
+        ## [L-1] Resetting high water mark can effect management fees calculations
+
+        In `AccountantWithRateProviders.sol’`**s** [`resetHighWaterMark()`](https://github.com/Se7en-Seas/boring-vault/blob/938478e59619c693150a2290ff677191b19a0948/src/base/Roles/AccountantWithRateProviders.sol#L254-L263), the owner can reset the `highwaterMark` used to calculate performance fees. This is intended to only be done to incentivize growth if too far below the last high water mark, and should be used sparingly. However, when it is done it also sets the `totalSharesLastUpdate` to the vaults current shares. `totalSharesLastUpdate` is used in both the performance fees and management fees calculation, so updating this will effect both. In the case of management fees, it is calculated by taking the minimum of the `totalSharesLastUpdate` and current shares, and taking a percent based on time since last update and the management fee. If the `totalSharesLastUpdate` increased or decreased since the call to `updateExchangeRate()`, reseting the high water mark could result in more or less management fees from being taken the next time the exchange rate is updated.
+
+        **Remediations to Consider**
+
+        When `resetHighWaterMark()` is called, handle the management fees as well using the current exchange rate, or alternatively do not update `totalSharesLastUpdate`.
     </field>
-  </item>
-  
-  <item>
+</item>
+
+<item>
     <field name="topic">Quality of life</field>
     <field name="impact">medium</field>
     <field name="status">fixed</field>
     <field name="commit">a783c06b7ac28604d41098e09b29e051be6b4d64</field>
     <field name="content">
-      ## [Q-1] Users have no control on when their withdrawal is executed
-  
-      In `DelayedWithdraw.sol`, withdrawal request can be completed by anyone after the delay has elapsed. The user then has no control of when the withdrawal goes through, and could be executed at a bad time, or a rate they don’t like. Allowing users to have more control over their withdrawals if they like may give users a better experience.
-  
-      **Remediations to Consider**
-  
-      Allow users to set if anyone can complete the withdrawal or not. Consider also adding a withdrawal window to prevent long duration pending withdrawals from being used to mitigate risk as mentioned in issue I-1.
+        ## [Q-1] Users have no control on when their withdrawal is executed
+
+        In `DelayedWithdraw.sol`, withdrawal request can be completed by anyone after the delay has elapsed. The user then has no control of when the withdrawal goes through, and could be executed at a bad time, or a rate they don’t like. Allowing users to have more control over their withdrawals if they like may give users a better experience.
+
+        **Remediations to Consider**
+
+        Allow users to set if anyone can complete the withdrawal or not. Consider also adding a withdrawal window to prevent long duration pending withdrawals from being used to mitigate risk as mentioned in issue I-1.
     </field>
-  </item>
-  
-  <item>
+</item>
+
+<item>
     <field name="topic">Quality of life</field>
     <field name="impact">medium</field>
     <field name="status">fixed</field>
     <field name="commit">a783c06b7ac28604d41098e09b29e051be6b4d64</field>
     <field name="content">
-      ## [Q-2] Users cannot define their own max loss for withdraw requests
-  
-      When completing a withdrawal in `DelayedWithdraw.sol`'s [`completeWithdraw()`](https://github.com/Se7en-Seas/boring-vault/blob/938478e59619c693150a2290ff677191b19a0948/src/base/Roles/DelayedWithdraw.sol#L251-L302) there is a check to ensure that the resulting rate does not exceed the `maxLoss` for the given withdrawal asset. This `maxLoss` value effectively sets a slippage bound on the rate as it changes from request to completion. `maxLoss` is set by the owner via [`changeMaxLoss()`](https://github.com/Se7en-Seas/boring-vault/blob/938478e59619c693150a2290ff677191b19a0948/src/base/Roles/DelayedWithdraw.sol#L179-L198), which could be adjusted while withdrawals are requested, leading to undesirable outcomes for users. Depending on how it is adjusted it could lead to allowing users to receive less assets than they expected on initial request, or prevent a withdrawal they really need to execute. If users were allowed to set their own `maxLoss`, they could set it based on their own needs giving more control to users, and reducing trust requirements.
-  
-      **Remediations to Consider**
-  
-      Allow users to set their own `maxLoss`, and have the defined `maxLoss` per asset be the default in none is set by the user.
+        ## [Q-2] Users cannot define their own max loss for withdraw requests
+
+        When completing a withdrawal in `DelayedWithdraw.sol`'s [`completeWithdraw()`](https://github.com/Se7en-Seas/boring-vault/blob/938478e59619c693150a2290ff677191b19a0948/src/base/Roles/DelayedWithdraw.sol#L251-L302) there is a check to ensure that the resulting rate does not exceed the `maxLoss` for the given withdrawal asset. This `maxLoss` value effectively sets a slippage bound on the rate as it changes from request to completion. `maxLoss` is set by the owner via [`changeMaxLoss()`](https://github.com/Se7en-Seas/boring-vault/blob/938478e59619c693150a2290ff677191b19a0948/src/base/Roles/DelayedWithdraw.sol#L179-L198), which could be adjusted while withdrawals are requested, leading to undesirable outcomes for users. Depending on how it is adjusted it could lead to allowing users to receive less assets than they expected on initial request, or prevent a withdrawal they really need to execute. If users were allowed to set their own `maxLoss`, they could set it based on their own needs giving more control to users, and reducing trust requirements.
+
+        **Remediations to Consider**
+
+        Allow users to set their own `maxLoss`, and have the defined `maxLoss` per asset be the default in none is set by the user.
     </field>
-  </item>
-  
-  <item>
+</item>
+
+<item>
     <field name="topic">Protocol Design</field>
     <field name="impact">high</field>
     <field name="status">fixed</field>
     <field name="commit">372693b674de5e3c753765d016e3fbfde93bd5e9</field>
     <field name="content">
-      ## [Q-3] Cannot change Eigen Layer delegate
-  
-      In `EigenLayerDecoderAndSanitizer.sol` is intended to be used with a Into the Block position manager contract. This position manager is private, but it’s [`delegate()`](https://github.com/Into-The-Block-Corp/ITBDecoders/blob/b9f9512368cc2b76a7d2fe698a9516eb439f489e/contracts/eigen_layer/EigenLayerDecoderAndSanitizer.sol#L19-L22) function calls `delegateTo()` on the set Eigen Layer `DelegationManager.sol`:
-  
-      ```solidity
-      function delegateTo(
-          address operator,
-          SignatureWithExpiry memory approverSignatureAndExpiry,
-          bytes32 approverSalt
-      ) external {
-          require(!isDelegated(msg.sender), "DelegationManager.delegateTo: staker is already actively delegated");
-          require(isOperator(operator), "DelegationManager.delegateTo: operator is not registered in EigenLayer");
-          // go through the internal delegation flow, checking the `approverSignatureAndExpiry` if applicable
-          _delegate(msg.sender, operator, approverSignatureAndExpiry, approverSalt);
-      }
-      ```
-       However, if the sender already has a delegate, the call reverts. When the Position Manager is deployed a delegate is set, meaning any additional calls to `delegate()` revert. Currently there is no way to undelegate the current delegate leading to no way to change the delegate in the Position Manager after deployment. If a new delegate were required, a new position manager would need to be deployed, assets migrated after withdrawing, and new merkle leaves having to be set, which would not be ideal.
-  
-      **Remediations to Consider**
-  
-      Add a method to Into the Blocks position manager to allow for undelegation, and add this function to the `EigenLayerDecoderAndSanitizer.sol` contract to allow the vault to call it.
-  
+        ## [Q-3] Cannot change Eigen Layer delegate
+
+        In `EigenLayerDecoderAndSanitizer.sol` is intended to be used with a Into the Block position manager contract. This position manager is private, but it’s [`delegate()`](https://github.com/Into-The-Block-Corp/ITBDecoders/blob/b9f9512368cc2b76a7d2fe698a9516eb439f489e/contracts/eigen_layer/EigenLayerDecoderAndSanitizer.sol#L19-L22) function calls `delegateTo()` on the set Eigen Layer `DelegationManager.sol`:
+
+        ```solidity
+        function delegateTo(
+            address operator,
+            SignatureWithExpiry memory approverSignatureAndExpiry,
+            bytes32 approverSalt
+        ) external {
+            require(!isDelegated(msg.sender), "DelegationManager.delegateTo: staker is already actively delegated");
+            require(isOperator(operator), "DelegationManager.delegateTo: operator is not registered in EigenLayer");
+            // go through the internal delegation flow, checking the `approverSignatureAndExpiry` if applicable
+            _delegate(msg.sender, operator, approverSignatureAndExpiry, approverSalt);
+        }
+        ```
+        However, if the sender already has a delegate, the call reverts. When the Position Manager is deployed a delegate is set, meaning any additional calls to `delegate()` revert. Currently there is no way to undelegate the current delegate leading to no way to change the delegate in the Position Manager after deployment. If a new delegate were required, a new position manager would need to be deployed, assets migrated after withdrawing, and new merkle leaves having to be set, which would not be ideal.
+
+        **Remediations to Consider**
+
+        Add a method to Into the Blocks position manager to allow for undelegation, and add this function to the `EigenLayerDecoderAndSanitizer.sol` contract to allow the vault to call it.
     </field>
-  </item>
-  
-  <item>
+</item>
+
+<item>
     <field name="topic">Incentive Design</field>
     <field name="content">
-      ## [I-1] Users can leverage the delayed withdrawal to mitigate risk
-  
-      `DelayedWithdraw.sol` allows users to request a withdrawal of their vault shares, which initiates a delay before the withdrawal can be completed, and the current value of the shares is noted. However after this delay, they can withdraw their assets out at any time taking the worse of the rate at withdrawal or the rate at request, provided the vault has enough assets to cover it. 
-      In the case where there is a black swan event occurs and assets in the cellar are worth substantially less, if a advanced user already had a prepared withdrawal, they could withdrawal in response to this news, and before a new rate has been set, this would allow them to immediately withdraw at the rate of the initial request, dodging the potential losses. 
-  
-      The Q-1 issue’s resolution allows a user to prevent anyone from withdrawing their shares, so that gives more ability to leverage this, but a withdrawal window is now limits the duration a withdrawal can be open for. This withdrawal window does not completely disincentives users from attempting this, but it does reduce it’s effectiveness.
+        ## [I-1] Users can leverage the delayed withdrawal to mitigate risk
+
+        `DelayedWithdraw.sol` allows users to request a withdrawal of their vault shares, which initiates a delay before the withdrawal can be completed, and the current value of the shares is noted. However after this delay, they can withdraw their assets out at any time taking the worse of the rate at withdrawal or the rate at request, provided the vault has enough assets to cover it. 
+        In the case where there is a black swan event occurs and assets in the cellar are worth substantially less, if a advanced user already had a prepared withdrawal, they could withdrawal in response to this news, and before a new rate has been set, this would allow them to immediately withdraw at the rate of the initial request, dodging the potential losses. 
+
+        The Q-1 issue’s resolution allows a user to prevent anyone from withdrawing their shares, so that gives more ability to leverage this, but a withdrawal window is now limits the duration a withdrawal can be open for. This withdrawal window does not completely disincentives users from attempting this, but it does reduce it’s effectiveness.
     </field>
-  </item>
+</item>
   
