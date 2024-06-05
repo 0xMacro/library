@@ -78,6 +78,25 @@
 </item>
 
 <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">6a0438148b4b7d9aa5889f1b2427e21808fc2a50</field>
+    <field name="content">
+      ## [Q-4] Withdrawals cannot be paused
+  
+      There could be multiple instances where the vault may not want to allow for withdrawals for a period of time. The is by because of increased volatility like a black swan event, or to prevent a security vulnerability from being taken advantage of.
+  
+      Currently withdrawals can be prevented from completing by removing authorization for the Delayed Withdrawal to call `exit()` on the vault, but a more explicit pausing functionality would be more clean and explicit.
+  
+      **Remediations to Consider**
+  
+      Add pause and unpause permissioned functions and only allow withdrawal requests and completing withdrawals if the contact isn’t paused.
+    </field>
+  </item>
+  
+
+<item>
     <field name="topic">Incentive Design</field>
     <field name="status">ack</field>
     <field name="content">
@@ -87,6 +106,9 @@
         In the case where there is a black swan event occurs and assets in the cellar are worth substantially less, if a advanced user already had a prepared withdrawal, they could withdrawal in response to this news, and before a new rate has been set, this would allow them to immediately withdraw at the rate of the initial request, dodging the potential losses. 
 
         The Q-1 issue’s resolution allows a user to prevent anyone from withdrawing their shares, so that gives more ability to leverage this, but a withdrawal window is now limits the duration a withdrawal can be open for. This withdrawal window does not completely disincentives users from attempting this, but it does reduce it’s effectiveness.
+    </field>
+    <field name="response">
+        If users do try to take advantage of this, we have several options available, we can increase the delay time withdraws take to be valid, decrease the completion window, add a withdraw fee for the asset the user is trying to withdraw, then autofill their withdraw once it is valid, and in a worst case scenario we could always turn off withdraws from this contract, and only allow withdraws through the atomic queue.
     </field>
 </item>
   
