@@ -6,7 +6,7 @@
   repoUrl="https://github.com/Se7en-Seas/boring-vault"
   layout="/library/audits/_layout.html" 
   repoCommitHash="938478e59619c693150a2290ff677191b19a0948"
-  finalRepoCommitHash="c614edf1762288b7419223e205d370c2996807d1"
+  finalRepoCommitHash="6a0438148b4b7d9aa5889f1b2427e21808fc2a50"
 
 >
 
@@ -24,6 +24,7 @@
       ### Trust Assumptions:
 
       This update added performance fees to the vault based on the highest share price, or high water mark. It is setup so that a percentage of the increase in share price above the last highest price is taken as a performance fee. The intent is to incentivize the managers of the vault to always increase the share price, benefiting holders. However, since the share price can be set, and high water mark reset by the owners, users must trust that the managers will only use these privileged functions to benefit the protocol as a whole, and not extract unearned performance fees.
+      
       Withdrawals via DelayedWithdrawals, can now be paused. It is trusted that withdrawals will only be paused when necessary, and to benefit the users. and protocol. 
     </template>
   </content-for>
