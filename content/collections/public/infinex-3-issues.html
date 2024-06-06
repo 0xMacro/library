@@ -1,0 +1,518 @@
+<item>
+    <field name="topic">Spoofing</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">68ab9486027ead5326494584defb74b2b15c7aa7</field>
+    <field name="content">
+        ## [H-1] Veto signers can be spoofed
+        
+        `BaseSafeModule.sol` is a module and guard for multiple safe wallets that control the infinex protocol. Depending on how they are setup, there are two types of signers set, council and veto signers. In order for the safe to execute calls, it checks with the `BaseSafeModule` via the checkSignatures function, and requires council signers need to reach a quorum of half of the total signers rounded up, while all veto signers are required to sign on. The safe initially verifies that each signer is an owner, and there are no duplicates, before it call the guard. Because the safe already checked for duplicates, it assumes that there cannot be and forgoes the same check.
+        
+        ```solidity
+          ...
+          // it doesn't make sense to check for signers order or address 0 because those checks are performed on the
+          // Safe with checkSignatures before calling this function
+          ...
+        ```
+        
+        Reference: [BaseSafeModule.sol#L167-L168](https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/src/safe-module/BaseSafeModule.sol#L167-L168) 
+        
+        However, in the case where `v == 1` the signer is assumed to be the `msg.sender`, but in the safe, `v == 1` can also mean the signer pre approved the call via the approveTransaction call. This means that the signer verified in the safe can differ than the one verified in the guard when the pre-approved signer ≠ `msg.sender`.
+        
+        ```solidity
+        } else if (v == 1) {
+            // v ==1 means that the sender is approving the txn, or its an approvedHash (which we are not going to
+            // deal with here)
+            curOwner = msgSender;
+        }
+        ```
+        
+        Reference: [BaseSafeModule.sol#L152-L156](https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/src/safe-module/BaseSafeModule.sol#L152-L156)
+        
+        ```solidity
+        else if (v == 1) {
+            // If v is 1 then it is an approved hash
+            // When handling approved hashes the address of the approver is encoded into r
+            currentOwner = address(uint160(uint256(r)));
+            // Hashes are automatically approved by the sender of the message or when they have been pre-approved via a separate transaction
+            if (executor != currentOwner && approvedHashes[currentOwner][dataHash] == 0) revertWithError("GS025");
+        }
+        ```
+        
+        Reference: [Safe.sol#L297-L303](https://github.com/safe-global/safe-smart-account/blob/main/contracts/Safe.sol#L297-L303)
+        
+        In the case where there are at least 2 veto signers, but one does not want to sign for the transaction, and there are more council signers in favour of the transaction than required, then the veto members can be spoofed by the extra members by doing the following:
+        
+        - extra council members call `approveHash()` on the safe to pre-approve the transaction
+        - for the signatures of pre-approved council members, set the signatures `v` value to 1 and encode signers address in the signatures `r` value.
+        - have the one veto member that is in favour initiate the call to `execTransaction()`,  which will cause them to be counted an additional time for each pre-approved council member.
+        
+        **Remediations to Consider**
+        
+        Use the same address as the safe uses for the signer, and/or check to make sure there are no duplicate signers as is done initially in the safe.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">2657966640f0b39e9b850ec9ff06f5aedb62af98</field>
+    <field name="content">
+        ## [H-2] Duplicate council members prevent updating the Safe owners
+        
+        The Infinex’s election system allows anyone to nominate any address for election. During the voting period, users can vote with their assigned voting power on nominated addresses. Once the voting period is over and council members have been elected, calling `resetSafeSigners` on the `InfinexSafeModule` updates the Safe owners according to the elected council members. 
+        
+        As multiple councils - each with its own election system - are used within the Infinex protocol, there is nothing to prevent an address getting elected on different councils simultaneously. If this happens, a call to `resetSafeSigners` would revert, preventing the Safe owners to get updated. 
+        
+        Consider the following scenario:
+        
+        - The Ecosystem council elects member `0x123`.
+        - Similarly, the same address `0x123` gets elected during the Trader Council election.
+        
+        Since each of the four Safe wallets (TreasurySafe, DeployerSafe, OperationsSafe, and SecuritySafe) is associated with both the Ecosystem Council as well as the Trader Council, updating Safe owners via `resetSafeSigners` would include `0x123` twice into the `councilSigners` array and trying to add it twice as an owner to the Safe via the `addOwnerWithThreshold` call [here](https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/src/safe-module/BaseSafeModule.sol#L75). However, the Safe reverts when an address is added that is already configured as an owner:
+        
+        ```jsx
+        // No duplicate owners allowed.
+        if (owners[owner] != address(0)) revertWithError("GS204");
+        ```
+        
+        Reference: [OwnerManager.sol#L54C1-L55C67](https://github.com/safe-global/safe-smart-account/blob/main/contracts/base/OwnerManager.sol#L54C1-L55C67)
+        
+        As a result, the new elected council members cannot be applied as signers to the different Safes, leaving the old owners in the Safes. The old owners remain signers until new council members get elected (without duplicates) or an appropriate proposal is executed through the migrator to remove or add certain council members.  
+        
+        **Remediations to Consider**
+        
+        Handling duplicate members across different councils can be addressed in different parts of the protocol, each with its own pros and cons:
+        
+        1. In the `resetSafeSigners` function, a check can be included to prevent adding an already existing owner to the Safe. In this case, additional logic is required to calculate the `requiredSigners` amount accordingly. Note that this check is included for veto signers [here](https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/src/safe-module/BaseSafeModule.sol#L71), but currently left out for council signers. 
+            
+            Handling duplicate owners this way can lead to scenarios where only a single signer or an undesired small number of signers control a Safe.
+            
+        2. A broader redesign of the system could be considered avoiding duplicates in the first place, such as having only one council associated to a Safe.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1a1fe4ce16be621ff2d2bf5e5e29c388cb7524fa</field>
+    <field name="content">
+        ## [H-3] Required number of signers not met when veto signer is a council signer, preventing to update the safe owners
+        
+        When updating the Safe owners via `resetSafeSigners` on the `InfinexSafeModule`, the transaction may revert if the required signers threshold is not met. In particular, this happens when a veto signer is already among the council signers.
+        
+        Consider the following case:
+        
+        - Given `Council_A` with 2 signers → `councilThreshold` = `2`
+        - Given `Council_B` with 1 veto signer → `vetoSignersThreshold` = `1`
+        - This results in `requiredSigners` = `3`
+        
+        This works well as long as all 3 signers are unique, meaning that the 1 veto signer of `Council_B` isn’t one of the signers of `Council_A`. 
+        
+        In the case a veto signer is one of the signers of `Council_A`, adding the veto signer to the Safe will be skipped due to the `else if` check below:
+        
+        ```jsx
+        for (uint256 i = 0; i < vetoSigners.length; i++) {
+            if (oldSigners.length > 0 && vetoSigners[i] == oldSigners[0]) {
+                oldSigners = new address[](0);
+                ++addedSigners;
+            **} else if (!targetSafe.isOwner(vetoSigners[i])) {**
+                _execOnSafe(
+                    targetSafe,
+                    abi.encodeWithSelector(
+                        ISafe.addOwnerWithThreshold.selector,
+                        vetoSigners[i],
+                        requiredSigners < ++addedSigners ? requiredSigners : addedSigners
+                    )
+                );
+            }
+        }
+        ```
+        
+        **Reference**: [BaseSafeModule.sol#L71](https://github.com/infinex-io/contracts-governance/blob/624a3a74c042b51d95ae451208ef58a383508b15/src/safe-module/BaseSafeModule.sol#L71)
+        
+        Up to this point, it works just fine and we have a calculated `requiredSigners = 3` and a `addedSigners = 2`. In the final step of the `_resetSafeSigners` function, the old signer is removed:
+        
+        ```jsx
+        if (oldSigners.length > 0) {
+            address prevOwner = councilSigners.length > 0 ? councilSigners[0] : vetoSigners[0];
+            _execOnSafe(
+                targetSafe,
+                abi.encodeWithSelector(ISafe.removeOwner.selector, prevOwner, oldSigners[0], requiredSigners)
+            );
+        }
+        ```
+        
+        **Reference**: [BaseSafeModule.sol#L83-L89](https://github.com/infinex-io/contracts-governance/blob/624a3a74c042b51d95ae451208ef58a383508b15/src/safe-module/BaseSafeModule.sol#L83-L89)
+        
+        This is where the transaction fails, as we attempt to set the required signers threshold to `3`, but only two signers have been added to the Safe.
+        
+        As a consequence, similar to H-2, the new elected members cannot be applied.
+        
+        **Remediation to Consider**
+        
+        In the final step when removing the old signer, the threshold needs to be set to either `requiredSigners` or `addedSigners`, whatever is smaller.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Frontrunning</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">311a02ddecb0ca79cb7741e9d2a48a27cfa1fb19</field>
+    <field name="content">
+        ## [H-4] Ownership of `IRMigrator` can be taken over after deployment
+        
+        Deployment of the Infinex Governance contracts is done by using the [Cannon tool](https://usecannon.com/). Throughout the various deployment steps, the contracts are usually initialized with an owner set to the deployer admin and after the Safes are deployed, a new owner is nominated corresponding the new deployed Safe address. Let’s look at the deployment steps for SecurityElectionModule:
+        
+        1. `SecurityElectionModule` is deployed together with `OwnerModule` using the Router setup:
+            
+            ```jsx
+            [router.SecurityElectionRouter]
+            contracts = [
+              "OwnerModule",
+              "SecurityElectionModule",
+            ]
+            ```
+            
+        2. Owner is nominated to deployer admin
+            
+            ```jsx
+            [invoke.SecurityElectionRouterNominate]
+            target = ["SecurityElectionRouter"]
+            func = "nominateNewOwner"
+            args = ["<%= settings.admin %>"]
+            depends = ["router.SecurityElectionRouter"]
+            ```
+            
+        3. Deployer admin accepts ownership
+            
+            ```jsx
+            [invoke.SecurityElectionRouterAccept]
+            target = ["SecurityElectionRouter"]
+            func = "acceptOwnership"
+            depends = ["invoke.SecurityElectionRouterNominate"]
+            ```
+            
+        4. Now, the module can be initialized with `initializeElectionModule`
+            
+            ```jsx
+            [invoke.SecurityElectionRouterInit]
+            target = ["SecurityElectionRouter"]
+            func = "initializeElectionModule"
+            args = [
+              "<%= settings.SEC_TOKEN_NAME %>",
+              "<%= settings.SEC_TOKEN_SYMBOL %>",
+              "<%= settings.initialSecurityCouncillor %>",
+            ]
+            ```
+            
+        5. Finally, after `SecuritySafe` has been deployed, the Safe’s address can be nominated to become the new owner
+            
+            ```jsx
+            # Security Safe will have to call acceptOwnership, so the initial councillors will have their first job
+            [invoke.SecurityElectionSafeOwner]
+            target = ["SecurityElectionRouter"]
+            func = "nominateNewOwner"
+            args = [
+              "<%= imports.security_council_safe.contracts.Safe.address %>"
+            ]
+            depends = ["provision.security_council_safe"]
+            ```
+            
+        
+        After deployment, the owner of the `SecurityElectionModule` is still set to the deployer admin until the `SecuritySafe` accepts the ownership. 
+        
+        The above deployment steps for the `SecurityElectionModule` are fine (apart from the risk mentioned in X-?) and after deployment, ownership can only be taken over by the `SecuritySafe`. 
+        
+        However, this is not the case for the `IRMigrator` contract. Let’s look at how this contract is  deployed:
+        
+        1. `IRMigrator` is deployed
+            
+            ```jsx
+            [contract.IRMigrator]
+            artifact = "IRMigrator"
+            args = [
+              "<%= settings.admin %>", # This is changed to DeployerSafe later
+              "<%= settings.crossDomainMessenger %>",
+              "<%= settings.wormholeRelayer %>",
+              "<%= settings.OP_WORMHOLE_SOURCE_CHAIN %>"
+            ]
+            ```
+            
+            and passes the deployer admin (`settings.admin`) as first argument to the constructor, which is nominated as the new owner:
+            
+            ```jsx
+            constructor(address _owner, address _crossDomainMessenger, address _wormholeRelayer, uint16 _sourceChain) {
+                **nominateNewOwner(_owner);**
+                _setCrossDomainMessenger(_crossDomainMessenger);
+                _setWormholeRelayer(_wormholeRelayer);
+                _setSourceChain(_sourceChain);
+            }
+            ```
+            
+            However, it has to be noticed that the ownership is not accepted in the constructor above.
+            
+        2. Finally, after `DeployerSafe` has been deployed, the Safe’s address is nominated to become the new owner:
+            
+            ```jsx
+            # DeployerSafe will have to call acceptOwnership, so the initial councillors will have their first job
+            [invoke.IRMigratorElectionAdminSet]
+            target = ["IRMigrator"]
+            func = "nominateNewOwner"
+            args = [
+              "<%= imports.deployer_safe.contracts.Safe.address %>"
+            ]
+            depends = ["provision.deployer_safe"]
+            ```
+            
+        
+        After deployment, the `IRMigrator` contract remains without an owner and requires the `DeployerSafe` to accept the ownership, which may take a while to get approval from all required signers. 
+        
+        Since there is no owner initialized until this point, anyone can call `nominateNewOwner` with their own address and a following call to `acceptOwnership` to take over the ownership. As the owner of the IRMigrator, someone can take full control over the entire Infinex Governance by letting proposals pass (and setting the merkle tree accordingly) such as adding and removing certain members from the councils. 
+        
+        **Remediation to Consider**
+        
+        The owner of the IRMigrator needs to be initialized during deployment. This is can be achieved by adding a call to acceptOwnership in the constructor after the owner is nominated.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [M-1] Owners can gain permanent control over the Safe
+        
+        During the deployment of Safe wallets, a Safe module as well as a guard are configured on the Safe, which are both implemented in `InfinexSafeModule.sol`. The module provides functionality for updating the Safe owners based on the elected council members, while the guard’s responsibility is to verify that the required number of council signers and veto signers have approved the transaction. This is done via the `checkTransaction` function. 
+        
+        An important part of the Infinex protocol is the rotation of Safe owners after each election period, typically every 90 days, according to the defined election cycle.
+        
+        However, the guard’s `checkTransaction` function doesn’t prevent certain transactions from being executed, allowing the current owners to initiate any transaction as long as they reach consensus (meeting the minimum number of signers). This would enable them to initiate a transaction that disables the module or the guard. If this happens, any functions defined in `InfinexSafeModule.sol` cannot be further executed, involving updating the owners after new council members are elected. As a result, the current owners would retain control over the Safe forever.
+        
+        **Remediations to Consider**
+        
+        Prevent certain functions from getting executed in the guard’s `checkTransaction` function, including [disable a module](https://github.com/safe-global/safe-smart-account/blob/main/contracts/base/ModuleManager.sol#L91) and [removing a guard](https://github.com/safe-global/safe-smart-account/blob/main/contracts/base/GuardManager.sol#L79).
+    </field>
+    <field name="response">
+        Finding an issue in the future for the SafeModule and not being able to replace it could lead to kind off bricking the whole governance. To take advantage of this risk, councillors would need to collude.
+        This is considered as an accepted risk.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">66c389225af134128bed495489e2faf409da3c5a</field>
+    <field name="content">
+        ## [M-2] An invalid councillor can prevent Safes from getting updated
+        
+        In the Operations and Security council, a councillor can be set directly by the owned Safe via `setCouncillor`. All Safes associated with one of those DirectElection councils, the councillor is set to one of the Safe owners when calling `resetSafeSigners` on the `InfinexSafeModul`. 
+        
+        When `addOwnerWithThreshold` is getting called inside the `resetSafeSigners` function, the Safe validates the passed address as follows:
+        
+        ```jsx
+        function addOwnerWithThreshold(address owner, uint256 _threshold) public override authorized {
+            // Owner address cannot be null, the sentinel or the Safe itself.
+            if (owner == address(0) || owner == SENTINEL_OWNERS || owner == address(this)) revertWithError("GS203");
+        ```
+        
+        Reference: [OwnerManager.sol#L53](https://github.com/safe-global/safe-smart-account/blob/main/contracts/base/OwnerManager.sol#L53)
+        
+        This means the owner can only be added successfully if the address is not null, the sentinel, or the Safe itself. 
+        
+        However, there is no appropriate address validation done in the `setCouncillor` function, allowing the councillor be be set to any of these invalid addresses. Consequently, resetting the safe signers would revert, and the current owners would retain control over the Safe until a valid councillor address is added. In addition, there is the risk of adding a councillor’s address that is an elected member of a different council (as stated in H-2), also causing `resetSafeSigners` to fail.
+        
+        Setting an invalid address could be done on purpose by a required group of signers to avoid being replaced as Safe owners by new election members, or could happen unintentionally. 
+        
+        **Remediation to Consider**
+        
+        The `setCouncillor` functions should prevent setting an invalid councillor address. Adding checks to not allow `address(0)` and the `sentinel` address is straight forward. Disallowing any of the Safes addresses would require additional logic to reference those in the DirectMigratorModule directly.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [M-3] The deployer safe has the most power, but least security
+
+        Deployer safe is intended to control the IRMigrator contract, which itself has the power to change the councils that are signers for other safes, as well as directly change the members of these councils. This gives the IRMigrator contract power to override the other contracts involved in governance, which is by design as it is intended to allows governance to be flexible, but means it has the most control over governance structure, and since the deployer safe owns and control this, it would be expected to have the highest quorum required, and additional guards such as veto signers. However, based on the cannon deployment script, it has the least quorum requirements with a threshold of 4 but the most potential signers of 7, and no veto signer requirement. The most strict requirement for the safes is the treasury safe, which has a threshold of 5, with 7 signers, with the treasury council signer being required as a veto signer, but has the same councils as with the deployer.
+        
+        In the case where a quorum of council members, 4 in this case, were malicious and there goal was to steal assets owned by the treasury safe, they wouldn’t have the signatures to directly execute on the safe, however they could steal these assets by using their control of the deployer safe if the following way:
+        
+        - Create a proposal on the `IRMigrator` contract to adjust the councils that own the treasury safe to councils that they control, resulting in them gaining control of the safe.
+        - Have the deployer safe set a malicious merkle root tied to this new proposal, where the leafs are only for addresses of these malicious council members, giving them control over voting on this proposal.
+        - Vote to pass the proposal.
+        - Wait 7 days for the proposal to complete the voting period, and not sign treasury safe requests to move the funds out in response to the pending proposal, keeping the funds locked.
+        - Execute the proposal, then with the new owners of the safe drain the funds.
+        
+        The above example shows that the deployer safe in its current state should be the hardest for signers to corrupt, as it can otherwise lead to control of more secure safes.
+        
+        **Remediations to Consider**
+        
+        Increase the threshold of signers for the deployment safe, or have a council set as a veto signer. The end result should be that it has the most requirements compared to the other safes, or at least tied with the most requirements.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [M-4] Deployer safe take over governance with a malicious root
+
+        The deployer safe is intended to have the ability to set the merkle root associated with determining voting power for both the `IRMigrator` and the Ecosystem Council. This root is trusted to be set to correctly relate to snx token balances across multiple chains, but there is no certainty that this root is correct. As mentioned in issue M-3, a malicious root can be set which can lead to controlling governance, or also effect the results of a election for the Ecosystem Council. 
+        
+        Considering how much control the root has over Infinex governance, there should be consideration into ways to verify the root. Although verifying a tree on-chain is potentially expensive, and difficult considering balances over multiple chains need to be considered, off-chain verification is possible, using services like chainlink functions or keepers, or other trusted services.
+        
+        **Remediations to Consider**
+        
+        Set up a method to verify the merkle tree, likely off chain, and have this be a veto signer for the deployer safe, to ensure that any merkle root has been verified to accurately relate to the voting power expected for a given council or the IRMigrator.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [M-5] Deployer can set a malicious bridge contracts
+
+        As mentioned is issue M-4, and M-3, the deployer safe can control governance using a malicious root. However, if this is resolved and verified as suggested in M-4, another method for control remains. The deployer safe can also set the addresses of the contracts responsible for bridging in the `IRMigrator`, these bridge addresses are trusted that provided sender of the message is correct and from a target chain. However, this bridge address can be set to anything and provide potentially any address, which the `IRMigrater` will use to generate the leaf and verify the provided proof to determine voting power and cast a vote. If the merkle tree is correct, a malicious bridge address could be used to spoof snx token holders and allow votes to be made on malicious proposals.
+        
+        **Remediations to Consider**
+        
+        Set the associated bridge addresses to be immutable, preventing them from being adjusted maliciously. It is important to note that in doing so it would prevent responding to the potential of the set bridge no longer functioning for various reasons, and may require redeploying the governance contracts if this does occur and the bridge address needs to be changed.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">da5c93dde8b08cac8a280483d7b082494b643ffc</field>
+    <field name="content">
+        ## [Q-1] Replace synthetix with infinex for storage slot generation
+
+        Some contracts use the unstructured storage pattern, where storage data is separated into related parts as structs at a storage slot that is typically a hash of a unique string defining it’s purpose. This ensures that there is no storage collisions unless that same string is used for other data within the same contract. An example is the `DirectElectionStorage` contract which stores data required by the `DirectElectionModule`, as described in the comment showing the hash used to generate the storage slot:
+        
+        ```solidity
+        contract DirectElectionStorage {
+          struct DirectElectionStore {
+              // True if initializeElectionModule was called
+              bool initialized;
+              // The address of the council NFT
+              address councilToken;
+          }
+        
+          function _directElectionStore() internal pure returns (DirectElectionStore storage store) {
+              // solhint-disable-next-line no-inline-assembly
+              assembly {
+                      //@audit: notice the slot is the hash of the s
+                  // bytes32(uint(keccak256("io.synthetix.directelectionmodule")) - 1)
+                  store.slot := 0x7c60e870ca22a961b6f9ac5a5e422b050949150c6dcb0e0682dc5a3d0c8c0024
+              }
+          }
+        }
+        ```
+        
+        However, the hash used for this and other similar storage contracts use “synthetix” in the string, which these contracts are pulled from, but these should be changed to “infinex” as this is for the infinex protocol.
+        
+        **Remediations to Consider**
+        
+        Change the storage slot hashes to use infinex rather than synthetix.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Nitpicks</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">be6362d38efeea30a452e05beadc08d90294ca7b,c97f5da6578e121c0c44e22f27f3e886671685e0,6863d6f91d0d8265cdc5c0d45f729562fda37848</field>
+    <field name="content">
+        ## [Q-2] Nitpicks
+
+        - On [DirectElectionModule.sol#L107](https://github.com/infinex-io/contracts-governance/blob/624a3a74c042b51d95ae451208ef58a383508b15/src/direct-council/modules/DirectElectionModule.sol#L107), use `store.councilToken` for better readability.
+        - Unused error definition on [IRMigrator.sol#L73](https://github.com/infinex-io/contracts-governance/blob/624a3a74c042b51d95ae451208ef58a383508b15/src/ir-migrator/IRMigrator.sol#L73)
+        
+        The following are just typos in comments:
+        
+        - Typo on [DirectElectionModule.sol#L107](https://github.com/infinex-io/contracts-governance/blob/624a3a74c042b51d95ae451208ef58a383508b15/src/direct-council/modules/DirectElectionModule.sol#L107), use `declareAndCastRelayed` instead of `declareAndCastCrossChain`.
+        - Typo on [TreasuryElectionModule.sol#L8](https://github.com/infinex-io/contracts-governance/blob/624a3a74c042b51d95ae451208ef58a383508b15/src/treasury-council/modules/TreasuryElectionModule.sol#L8), remove `as`.
+        - Typo and invalid comment on [DirectElectionModule.sol#L14-L16](https://github.com/infinex-io/contracts-governance/blob/624a3a74c042b51d95ae451208ef58a383508b15/src/direct-council/modules/DirectElectionModule.sol#L14-L16)
+        - Typo in [WormholeDeclareAndCastModule.sol#L180](https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/src/ecosystem-council/modules/WormholeDeclareAndCastModule.sol#L180), [WormholeDeclareAndCastModule.sol#L141](https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/src/ecosystem-council/modules/WormholeDeclareAndCastModule.sol#L141https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/src/ecosystem-council/modules/WormholeDeclareAndCastModule.sol#L141), [WormholeDeclareAndCastModule.sol#L250](https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/src/ecosystem-council/modules/WormholeDeclareAndCastModule.sol#L250), [WormholeDeclareAndCastModule.sol#L221](https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/src/ecosystem-council/modules/WormholeDeclareAndCastModule.sol#L221)
+        - Initial contract description for [WormholeDeclareAndCastModule.sol#L22-L42](https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/src/ecosystem-council/modules/WormholeDeclareAndCastModule.sol#L22-L42) mentions it handling both L1 and optimism L2 cross chain voting, but this only handles optimism.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Deployment</field>
+    <field name="status">fixed</field>
+    <field name="commit">0dd9071a2d958c8707ea3a40c8d890fc24edade8</field>
+    <field name="content">
+        ## [I-1] Governance deployments can be front-ran and griefed
+
+        These governance contracts are intended to be deployed using Cannon, which will deploy these contracts following a cannonfile script, like [this one for base](https://github.com/infinex-io/contracts-governance/blob/fdc7abd973ff377c79e01db32bf4c7d1a4e2964f/cannonfile.base.toml). It is setup to execute the defined deployments or function calls, where some calls are dependent on another executing. For example these two calls in the base cannonfile:
+        
+        ```solidity
+        [invoke.SecurityElectionRouterNominate]
+        target = ["SecurityElectionRouter"]
+        func = "nominateNewOwner"
+        args = ["<%= settings.admin %>"]
+        depends = ["router.SecurityElectionRouter"]
+        
+        [invoke.SecurityElectionRouterAccept]
+        target = ["SecurityElectionRouter"]
+        func = "acceptOwnership"
+        depends = ["invoke.SecurityElectionRouterNominate"]
+        ```
+        
+        Reference: [cannonfile.base.toml#L136-L145]([invoke.SecurityElectionRouterNominate] target = ["SecurityElectionRouter"] func = "nominateNewOwner" args = ["<%= settings.admin %>"] depends = ["router.SecurityElectionRouter"]  [invoke.SecurityElectionRouterAccept] target = ["SecurityElectionRouter"] func = "acceptOwnership" depends = ["invoke.SecurityElectionRouterNominate"])
+        
+        In this case a call to `nominateNewOwner()` is made to the `SecurityElectionRouter`, nominating the admin, and it depends on the `SecurityElectionRouter` to have been deployed. Then the next call is for the admin to accept ownership, and will only execute after the prior nomination call has executed.
+        
+        However, these are executed in separate transactions, and allow someone to front run the acceptance of ownership, as mentioned in issue H-4, since it is currently unowned anyone can nominate a new owner, and take ownership. In this case the nomination and/or acceptance needs to occur before ownership is accepted by the admin. 
+        
+        This is one case of possible front-running during deployment, multiple exist, like for each initialization call after deployment, where there are no permission requirements.
+        
+        Any front running would be caught during deployment as some functions would fail, and if this occurs redeployment is likely necessary. Make sure to check the state of these contracts are as intended after deployment, and/or consider setting up factory contracts that handle deployment, initialization and setting ownership in a singular transaction, but this may disrupt the intended cannon deployment flow.
+    </field>
+    <field name="response">
+        The fix includes changes on the way the ownership is initialized for the ElectionModule routers on the deployment scripts by using initializeOwnerModule instead of nominateNewOwner and acceptOwnership. This partially address the issue.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Voting Power</field>
+    <field name="content">
+        ## [I-2] Splitting snx balance across accounts increases voting power
+
+        Synthetix debt share in the form of snx tokens are used to determine voting power for the ecosystem council and IRMigrator. Voting power is determined by taking the square root of the users snx balance, which has the effect of reducing the voting power of larger holders relative to smaller ones, since the square root reduces larger numbers substantially more than smaller numbers. However, this effect on large holders of snx tokens could be circumvented, by splitting up their token balance across multiple accounts, reducing the loss of voting power. This may give an unfair boost in voting power to large holders that decide to do this, relative to holders that maintain a large balance in a single account. Typically it would be assumed that splitting balances across many accounts would be costly and cumbersome, but if there is an incentive to do so, potentially by supporting malicious proposals, then malicious actors may end up with more sway than honest whales.  
+    </field>
+    <field name="response">
+        This problem is inherent to quadratic voting.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Voting Power</field>
+    <field name="content">
+        ## [I-3] Incentive misalignment of snx voters
+
+        As mentioned Synthetix snx tokens are used for voting in both the ecosystem council and the IRMigrator contract, which gives these holders a lot of control over infinex governance. Synthetix governance also gives voting power to these users, but since these tokens are directly tied to the synthetix protocol, larger holders are incentivized to vote honestly for proposals that benefit Synthetix as a whole. This is not so much the case for voting on infinex proposals as there is no direct link between snx token value and the wellbeing of Infinex. This lack of incentive alignment could lead to higher risk of malicious proposals and votes, and should be observed with additional caution.
+    </field>
+  </item>
