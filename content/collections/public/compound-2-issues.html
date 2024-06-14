@@ -1,0 +1,148 @@
+<item>
+    <field name="topic">Oracle</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7354cac3ff1162f294d2985df7b7164751e3414e</field>
+    <field name="content">
+      ## [L-1] Oracle data feeds lack sanity checks
+    
+      `Quotecall` and `Paycall` scripts use Chainlink data feeds to fetch the native chain asset prices and calculate the gas amount needed for the transaction. However, there are no sanity checks implemented to the returned answer in the `latestRoundData()` call.
+  
+      **Remediations to Consider**
+  
+      Consider adding proper input validation to ensure the returned price. 
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">c32456dd9dad58dd780b78194e48f9e5844973ca</field>
+    <field name="content">
+      ## [Q-1] Encode static type array without looping
+  
+      Consider encoding the `opDigest` array using `encodePacked` directly in `getDigestForMultiQuarkOperation()` to avoid looping an static type dynamic array:
+  
+      ```solidity
+      function getDigestForMultiQuarkOperation(bytes32[] memory opDigests) public pure returns (bytes32) {
+          bytes memory encodedOpDigests;
+          for (uint256 i = 0; i < opDigests.length; ++i) {
+              encodedOpDigests = abi.encodePacked(encodedOpDigests, opDigests[i]);
+          }
+  
+          bytes32 structHash = keccak256(abi.encode(MULTI_QUARK_OPERATION_TYPEHASH, keccak256(encodedOpDigests)));
+          return keccak256(abi.encodePacked("\x19\x01", MULTI_QUARK_OPERATION_DOMAIN_SEPARATOR, structHash));
+      }
+      ```
+  
+      **Reference:** [QuarkWallet.sol#L294-302](https://github.com/compound-finance/quark/blob/9b334b0239c6a10a7a34578948ca6dc86db444e0/src/quark-core/src/QuarkWallet.sol#L294-L302)
+  
+      Suggested code snippet: 
+  
+      ```solidity
+      function getDigestForMultiQuarkOperation(bytes32[] memory opDigests) public pure returns (bytes32) {
+          bytes32 encodedOpDigests = keccak256(abi.encodePacked(opDigests));
+          bytes32 structHash = keccak256(abi.encode(MULTI_QUARK_OPERATION_TYPEHASH, encodedOpDigests));
+          return keccak256(abi.encodePacked("\x19\x01", MULTI_QUARK_OPERATION_DOMAIN_SEPARATOR, structHash));
+      }
+      ```
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c32456dd9dad58dd780b78194e48f9e5844973ca</field>
+    <field name="content">
+      ## [Q-2] Use consistent counter increments in loops
+  
+      The `Multicall` core script uses an `unchecked` block to increment the loop iteration variable. Consider increasing this in the `for` statement declaration to keep it consistent with the rest of the codebase. 
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c32456dd9dad58dd780b78194e48f9e5844973ca</field>
+    <field name="content">
+      ## [Q-3] Native token decimals can be declared as constant
+
+      Consider declaring the native token decimals as a constant in `Paycall` and `Quotecall` scripts.
+  
+      ```solidity
+      // Note: Assumes the native token has 18 decimals
+      divisorScale = 10
+          ** uint256(
+              18 + AggregatorV3Interface(nativeTokenBasedPriceFeedAddress).decimals()
+                  - IERC20Metadata(paymentTokenAddress).decimals()
+          );
+      ```
+  
+      **Reference:** [Paycall.sol#L53-58](https://github.com/compound-finance/quark/blob/9b334b0239c6a10a7a34578948ca6dc86db444e0/src/quark-core-scripts/src/Paycall.sol#L53-L59)
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c32456dd9dad58dd780b78194e48f9e5844973ca</field>
+    <field name="content">
+      ## [Q-4] Inaccurate comments
+
+      - `codeExist()` function in `CodeJar.sol` refers to runtime code as the input parameter `code`:
+      
+          ```solidity
+           * @param code The runtime bytecode of the code to check
+          ```
+      
+          **Reference:** [CodeJar.sol#L47](https://github.com/compound-finance/quark/blob/9b334b0239c6a10a7a34578948ca6dc86db444e0/src/codejar/src/CodeJar.sol#L47)
+      
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        We would rather not explicitly enforce a bound on this value, as any bounds we pick would be subjective and arbitrary.
+    </field>
+    <field name="content">
+      ## [Q-5] No input validation for `maxDeltaPercentage_`
+  
+      In `QuoteCall` script, the parameter `maxDeltaPercentage` set during the contract’s initialization is not bounded to any value. If it is set to a value high value, it could spend a considerably higher amount of tokens than the actual gas spent. Consider limiting this value to a fair amount, for example, `1e18`, which is a 100% variation of the actual amount spent.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8a0ae7af2ff687d6e588527bcdc30a3bf5ad25f0</field>
+    <field name="statusNote">
+        Updated the constant to a more accurate value. Both scripts use roughly the same amount of gas, so have the same constant value.
+    </field>
+    <field name="content">
+      ## [Q-6] `GAS_OVERHEAD` should be adapted for different scripts
+  
+      `Paycall` and `Quotecall` scripts declare a `GAS_OVERHEAD` amount to account for the gas used by the contract itself outside the gas metrics being tracked in the `run()` logic. However, both scripts have the same value being used, even if `Quotecall` has less untracked logic in it. Consider adapting this constant for different scripts.
+    </field>
+  </item>
+  
