@@ -1,0 +1,71 @@
+<page
+  clientName="Polynomial"
+  reportDate="June 17, 2024"
+  auditTitle="Polynomial A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Polynomial-Protocol/polychain-deployment"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="7dd39667c7a991c39a0d819ca6534ad1e8f22149"
+  finalRepoCommitHash="d0d373376bdefd97efe5c7a8dd251ac27e12c9b4"
+  passwordEncrypt="env:PAGE_PASS_POLYNOMIAL_1"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on June 10th to June 12th 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+        ### Trust Model, Assumptions, and Accepted Risks (TMAAR)
+
+        Similar to Syntheix V3, this protocol is upgradeable and has permissioned setters that can effect all aspects of the protocol which can effect stakers and market participants. Users of the protocol must trust that the owners and privileged roles will act in the best interest of the protocol and it’s users.
+        A notable change from the Synthetix V3 architecture is the current state does not have decentralized governance, and the main owner will be set as a multisig, controlled by trusted members of the Polynomial protocol.
+    </template>
+  </content-for>
+
+ 
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+        51ece454bb86bb8fa71acd7bd5ece42b8b0d221c98a8e54ba2966a50092c1e39  packages/markets/perps-market/cannonfile.toml
+        bc3b698a3b4dc4d25010138122087771ef9e01e0689d87591216615cbb77d120  packages/markets/spot-market/cannonfile.toml
+        ce3da25db61a853de4d750382744f70a1cc7928f1142fbc0723894ffddd69292  packages/protocol/oracle-manager/cannonfile.toml
+        95f01d14a925d7afc8d455c3eb9f83b1a77da77c039ccf00019663f72c5f6428  packages/protocol/synthetix/cannonfile.toml
+        1a1dc45842ab1f149221cdcf5dccfdc3f97e2424e6b867faa55e977ccdcf5254  polynomial-mainnet/cannonfile.toml
+        a1cc0b70aa4c40dff59e61d9e94b35897eee2955c61970f966f43a2dd4657d66  polynomial-mainnet/tomls/collaterals/susdc.toml
+        0eafa4e951bd9e0e2528860c51abc6380c7a2853e6b492a0d2baf06a13fc02ce  polynomial-mainnet/tomls/core.toml
+        af75cadf590b64ca0a23255d8a3b464e4402d50bf1d41dc3f49bd61aa5cca060  polynomial-mainnet/tomls/markets/common/bigcap-settings.toml
+        5adb9bc16181b7d254dd1c8f4c4096b48b6394051b9c56b29bb60541251066cf  polynomial-mainnet/tomls/markets/common/settlement-settings.toml
+        7ae9363fed441ac94b796f4ee5917cecdd71fec16fe892bd878318a667cafe0f  polynomial-mainnet/tomls/markets/perps-factory.toml
+        799770d579066ece2201ea65d50c0ecd41935a42f61547dc996903386a84effc  polynomial-mainnet/tomls/markets/spot-factory.toml
+        3908fd17b352f2ff58fe570ca2120130266fa1599b9667f5fb446f3fb62c5d75  polynomial-mainnet/tomls/oracles/btc.toml
+        543f91b49b86feeab6136c7eb55ed1f5cfd6cabc7777fab1144e1ccc41ab5b24  polynomial-mainnet/tomls/oracles/eth.toml
+        734c92c2a9bd82933c15d044e5e94f62cffae4f6d205c0c78bbad79f77ad5a3f  polynomial-mainnet/tomls/oracles/perps-keeper-cost.toml
+        da11d5255d91dab97c778753e7dc0438788269cc990ec51949746322a17d131a  polynomial-mainnet/tomls/oracles/pyth-btc.toml
+        8ab81a3f9b3a8fd455eeb24c2579c8f314a62676d95a031f66917cb1f64ff10d  polynomial-mainnet/tomls/oracles/pyth-eth.toml
+        19de2a815457656732a388a3b3fb87ae68b83002261e988f5c6256114be932b5  polynomial-mainnet/tomls/permissions.toml
+        3c9365fe5c732f42f1ba2c15747ffb8c65e6123ab55319208d39d0ccc31eb0d3  polynomial-mainnet/tomls/permit-all-perps-perpsSystem.toml
+        c08328e11dac0d0e6ef2f3ddaf1ab0bb997b3b21be24850767cb74568460fcae  polynomial-mainnet/tomls/permit-deniers.toml
+        0287f0fe4a16114aea80f4e14155acec3f8f4f055f917c71aa21054d186f97fe  polynomial-mainnet/tomls/polynomial-mainnet-andromeda/collaterals/susdc.toml
+        3bf572c351443ef55555f4c4d459f5e6f5208ed6400916f76b0efb1fb621d413  polynomial-mainnet/tomls/polynomial-mainnet-andromeda/perps/btc-invokes.toml
+        1a3afa727dd073e48a1a566ccdf2e932063d13e2b51b7f97288e7fff2fa62220  polynomial-mainnet/tomls/polynomial-mainnet-andromeda/perps/btc.toml
+        83b8ac3761b9991c554b48d3e4aee8ae1dfeb552a5947eeec4e7a3ec32d29759  polynomial-mainnet/tomls/polynomial-mainnet-andromeda/perps/eth-invokes.toml
+        e5796845d129d9a70a26c12ad7164ed99180cac7db1c4b485fa20f6b9b63bf63  polynomial-mainnet/tomls/polynomial-mainnet-andromeda/perps/eth.toml
+        5eed49b7f849c8b787df3973f80d103571a9da659d762d1588737382507c96a8  polynomial-mainnet/tomls/polynomial-mainnet-andromeda/perps/global.toml
+        7ca7c37df26fb5efde89254d15a788926155adfe325261910c7556eea177463a  polynomial-mainnet/tomls/polynomial-mainnet-andromeda/perps/referrers.toml
+        dfba240a4d8fa9d87fb05a35252a04685b2364f6a3239a2df6f8060f070111ae  polynomial-mainnet/tomls/polynomial-mainnet-andromeda/spot/usdc.toml
+        f1964067f13d91e66d341f6140d50cc017dd03512c554a24a4c2b4ed86bf7558  polynomial-mainnet/tomls/pools/main-pool.toml
+        d94577d516d06585b77fd4c4b538d3d4e6b8ff40a5686578c8a2b9a0c19c34a4  polynomial-mainnet/tomls/settings.toml
+    </template>
+
+  </content-for>
+</page>
