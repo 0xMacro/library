@@ -1,0 +1,117 @@
+<item>
+    <field name="topic">Authorization</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7adee26da1e75250c44620406539ced84f365458</field>
+    <field name="content">
+      ## [M-1] Incorrect denier addresses set, potentially temporarily blocking the perps market
+  
+      In deployment of these contracts, [`setDeniers()`](https://github.com/Polynomial-Protocol/fx-contracts/blob/main/utils/core-modules/contracts/modules/FeatureFlagModule.sol#L78-L100) is invoked in [`permit-deniers.toml`](https://github.com/Polynomial-Protocol/polychain-deployment/blob/7dd39667c7a991c39a0d819ca6534ad1e8f22149/polynomial-mainnet/tomls/permit-deniers.toml), which allows the ability for these set addresses to effectively turn off the provided feature, in this case `withdraw` in the core contracts, and the `perpsSystem` in the perps market contract. The set deniers can do this via [`setFeatureFlagDenyAll()`](https://github.com/Polynomial-Protocol/fx-contracts/blob/main/utils/core-modules/contracts/modules/FeatureFlagModule.sol#L31-L44) which sets `flag.denyAll`, which any check to [`ensureAccessToFeature()`](https://github.com/Polynomial-Protocol/fx-contracts/blob/main/utils/core-modules/contracts/storage/FeatureFlag.sol#L27-L31), for the particular feature, will then be prevented. This allows the set addresses to prevent users from interacting with the perps system, preventing actions like [committing](https://github.com/Polynomial-Protocol/fx-contracts/blob/main/markets/perps-market/contracts/modules/AsyncOrderModule.sol#L31-L34) and [canceling](https://github.com/Polynomial-Protocol/fx-contracts/blob/main/markets/perps-market/contracts/modules/AsyncOrderCancelModule.sol#L33-L34) orders.
+  
+      These deniers are expected to be trusted addresses that can quickly shut off functionality, which may be necessary to mitigate damage in the case of an exploit or other issues. However, in this case the addresses set are the same as those [set by synthetix](https://github.com/Synthetixio/synthetix-deployments/blob/main/tomls/permit-deniers.toml), rather than trusted members of the polynomial protocol. This could lead to these deniers shutting down the perps market maliciously, and also prevents the polynomial team from reacting to potential exploits.
+  
+      **Remediations to Consider**
+  
+      Change the addresses set to addresses trusted and controlled by Polynomial, to ensure this functionality will be used as intended and to benefit the protocol.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a1097e7a27bae83184c8a843eb3492fcce359c5a</field>
+    <field name="content">
+      ## [M-2] Perps values set differ from documentation
+  
+      In [global.toml](https://github.com/Polynomial-Protocol/polychain-deployment/blob/44587283e0bfc2ff3b27e60187611b7d8d4b2935/polynomial-mainnet/tomls/polynomial-mainnet-andromeda/perps/global.toml), values are set that will be used to configure the perps markets. However, some of these values differ from the documentation of intended values, where each of the gradient values were intended to be set to 0:
+  
+      ```solidity
+      [setting.perps_low_util_gradient]
+      defaultValue = "0.000025"
+  
+      [setting.perps_gradient_breakpoint]
+      defaultValue = "0.80"
+  
+      [setting.perps_high_util_gradient]
+      defaultValue = "0.01"
+      ```
+      Reference: [global.toml#L34-L41](https://github.com/Polynomial-Protocol/polychain-deployment/blob/44587283e0bfc2ff3b27e60187611b7d8d4b2935/polynomial-mainnet/tomls/polynomial-mainnet-andromeda/perps/global.toml#L34-L41)
+  
+      This can lead to unintended effects on the perps market that may have a detrimental effect for users of the protocol.
+  
+      **Remediations to Consider**
+  
+      Set these global perps values to the intended values mentioned in the spec.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Versioning</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d0d373376bdefd97efe5c7a8dd251ac27e12c9b4</field>
+    <field name="content">
+      ## [L-1] Wrong package version
+  
+      In `Cannonfile.toml` the perps market package uses version `3.318`, but this should be set to `3.3.18` as that is the actual version of this package:
+  
+      ```solidity
+      [setting.perps_market_package]
+      defaultValue = "fx-perps-market:3.318"
+      ```
+      Reference: [Cannonfile.toml#L47-L48](https://github.com/Polynomial-Protocol/polychain-deployment/blob/7dd39667c7a991c39a0d819ca6534ad1e8f22149/polynomial-mainnet/cannonfile.toml#L47-L48)
+  
+      **Remediations to Consider**
+  
+      Change the value to: `"fx-perps-market:3.3.18"`
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Oracles</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a1097e7a27bae83184c8a843eb3492fcce359c5a</field>
+    <field name="content">
+      ## [L-2] Unnecessary inclusion of Chainlink nodes
+  
+      In [`btc-invokes.toml`](https://github.com/Polynomial-Protocol/polychain-deployment/blob/44587283e0bfc2ff3b27e60187611b7d8d4b2935/polynomial-mainnet/tomls/polynomial-mainnet-andromeda/perps/btc-invokes.toml#L1) and [`eth-invokes.toml`](https://github.com/Polynomial-Protocol/polychain-deployment/blob/44587283e0bfc2ff3b27e60187611b7d8d4b2935/polynomial-mainnet/tomls/polynomial-mainnet-andromeda/perps/eth-invokes.toml) the corresponding oracle is included:
+  
+      ```solidity
+      include = ["../../oracles/btc.toml", "../../markets/common/bigcap-settings.toml"]
+      ```
+      Reference: [btc-invokes.toml#L1](https://www.notion.so/Kwenta-15-Audit-Estimate-external-e27ed944065743e5ba2c5b2466d23331?pvs=21)
+  
+      However, these files sets up a chainlink oracle node for pricing either BTC or ETH, using a unset aggregator address. Chainlink currently doesn’t support the Polynomial network, so any chainlink type nodes will currently not work.
+  
+      **Remediations to Consider**
+  
+      Remove references to the chainlink oracles, [btc.toml](https://github.com/Polynomial-Protocol/polychain-deployment/blob/44587283e0bfc2ff3b27e60187611b7d8d4b2935/polynomial-mainnet/tomls/oracles/btc.toml) and [eth.toml](https://github.com/Polynomial-Protocol/polychain-deployment/blob/44587283e0bfc2ff3b27e60187611b7d8d4b2935/polynomial-mainnet/tomls/oracles/eth.toml).
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7adee26da1e75250c44620406539ced84f365458</field>
+    <field name="content">
+      ## [Q-1] Dependancies are not set for cannon deployment calls
+  
+      Cannon allows for depends values to be set for each call to invoke. This means that a call wont execute until after all its set dependancies have. Setting proper depends values for each call will ensure that execution occurs in the order expected, which can be important in cases where values are expected to be set within the call execution and prevents interaction with contracts that are yet to be deployed. [Cannon](https://usecannon.com/learn/cannonfile#deploy) automatically will detect these dependancies, but explicitly setting them ensures they are set correctly and as expect.
+  
+      **Remediations to Consider**
+  
+      Add dependancies to the relevant deployment calls to ensure proper execution order.
+    </field>
+  </item>
+  
