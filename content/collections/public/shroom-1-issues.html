@@ -1,0 +1,102 @@
+<item>
+    <field name="topic">Logic Bug</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [H-1] `transferFrom()` charges double fee
+  
+      The `CommunityCurrency` contract is mainly a standard ERC20 implementation, specifically inherited from Thirdweb’s ERC20 base. It uses some minimal custom logic to calculate, deduct, and transfer protocol fees, which are currently set at a fixed rate of 0,5% (`taxRate` set to `50` out of `10_000` max basis points).
+  
+      This added custom logic overrides both `_transfer()` internal function and `transferFrom()` external function to calculate tax amounts and final amounts on each transfer:
+  
+      ```solidity
+      function _transfer(
+          address _from,
+          address _to,
+          uint256 _amount
+      ) internal override {
+          require(_to != address(0), "ERC20: transfer to the zero address");
+  
+          uint256 tax = calculateTax(_amount);
+          uint256 amountAfterTax = _amount - tax;
+  
+          // Tax is split between deployer and founder wallets
+          super._transfer(_from, deployerWallet, tax / 2);
+          super._transfer(_from, founderWallet, tax / 2);
+          super._transfer(_from, _to, amountAfterTax);
+      }
+  
+      function transferFrom(
+          address _from,
+          address _to,
+          uint256 _value
+      ) public override returns (bool success) {
+          uint256 tax = calculateTax(_value);
+          uint256 amountAfterTax = _value - tax;
+  
+          // Distributing tax to both wallets
+          super.transferFrom(_from, deployerWallet, tax / 2);
+          super.transferFrom(_from, founderWallet, tax / 2);
+          return super.transferFrom(_from, _to, amountAfterTax);
+      }
+      ```
+  
+      **Reference:** CommunityCurrency.sol#L53-81
+  
+      However, the `transferFrom()` overridden logic generates approximately double the intended tax rate. This is because `transferFrom()` function internally calls `_transfer()`, which is the overridden `_transfer()` function as well. Essentially, each `super.transferFrom()` call charging and transferring fees one additional time:
+  
+      ```solidity
+      function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
+          address spender = _msgSender();
+          _spendAllowance(from, spender, amount);
+          _transfer(from, to, amount);
+          return true;
+      }
+      ```
+  
+      **Reference:** ERC20.sol#L158-163
+  
+      It is worth noting that `transferFrom()` is one of the main external methods for third-party contract integrations to pull assets from the user with prior approval. This means all these integrations will incur approximately double the rate fee.
+  
+      **Remediations to Consider:**
+  
+      Consider removing the `transferFrom()` overridden function logic in `CommunityCurrency.sol`.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Centralization</field>
+    <field name="content">
+      ## [I-1] Owner controls the supply and balances
+  
+      ERC20Base contract functions allow the owner to mint and burn tokens arbitrarily. Through functions `mintTo()` and `burnFrom()`, the owner can change any user’s balance. Minting schedules can be used to avoid the need for a single owner entity to manually mint tokens and keep the transparency of the supply within the code execution.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] Unused Permissions extension
+  
+      `CommunityCurrency` contract inherits the `Permission` extension from thirdweb’s library but does not use any role access control function or modifier.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-2] Immutable variables
+
+  
+      Storage variables `deployerWallet`, `founderWallet`, and `taxRate` are set in the contract’s constructor and should be marked as immutable.
+    </field>
+  </item>
+  
