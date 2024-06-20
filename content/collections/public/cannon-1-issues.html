@@ -1,0 +1,61 @@
+<item>
+    <field name="topic">Input validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">486a39a5ed461b3cfcd5f6b826e0c0fedf9f1b68</field>
+    <field name="content">
+
+        ## [L-1] Invalid package names can be accepted
+
+        When registering a package, via [`setPackageOwnership()`](https://github.com/usecannon/cannon/blob/f04d09d994713f5729845b5c94609ff0b00e551a/packages/registry/contracts/CannonRegistry.sol#L249-L307) the package name is validated to have expected characters and a set format:
+  
+        ```solidity
+        /**
+         * @notice Determines if the given _name can be used to register a package
+         * @param _name the string to check if its a valid package name for registration
+         */
+        function validatePackageName(bytes32 _name) public pure returns (bool) {
+          // each character must be in the supported charset
+        
+          for (uint256 i = 0; i < 32; i++) {
+            if (_name[i] == bytes1(0)) {
+              // must be long enough
+              if (i < MIN_PACKAGE_NAME_LENGTH) {
+                return false;
+              }
+        
+              // last character cannot be `-`
+              if (_name[i - 1] == "-") {
+                return false;
+              }
+        
+              break;
+            }
+        
+            // must be in valid character set
+            if (
+              (_name[i] < "0" || _name[i] > "9") &&
+                  (_name[i] < "a" || _name[i] > "z") &&
+                  // first character cannot be `-`
+                  (i == 0 || _name[i] != "-")
+                ) {
+                  return false;
+                }
+              }
+        
+              return true;
+            }
+        ```
+        Reference: [CannonRegistry.sol#L410-L444](https://github.com/usecannon/cannon/blob/f04d09d994713f5729845b5c94609ff0b00e551a/packages/registry/contracts/CannonRegistry.sol#L410-L444)
+    
+        This will accept a package name with up to 32 characters, with a limited character set, and some exceptions. Cannon scripts take in a string value for the name, and convert it to a bytes32 value. In doing so, it only accepts strings with less than 32 characters to it can insert a null terminator character at the end. In the case where a package is registered directly, or outside cannon, inputting a package name of length 32, and without a null terminator, then cannon will currently fail to be able to use this package name in its scripts.
+    
+        **Remediations to Consider**
+    
+        Either adjust cannon to handle 32 character strings with no null terminator, or explicitly require the last character is `bytes(0)` in `validatePackageName()` to ensure all package names work as expected.
+
+    </field>
+    
+  </item>
+  
