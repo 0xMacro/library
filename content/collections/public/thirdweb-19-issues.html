@@ -1,0 +1,768 @@
+<item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6560c776d55ad505313a563466501e8c354cd884</field>
+    <field name="content">
+        ## [M-1] Encryption key can be potentially intercepted to retrieve revealed URI
+
+        DelayedRevealBatchMetadataERC721 utilizes symmetric encryption to encrypt/decrypt the token URIs, meaning that the same encryption key is used for encrypting and decrypting the URI. The process is the following:
+        
+        1. A minter (someone holding the `MINTER_ROLE`) encrypts the URI off-chain by using the secret encryption key.
+        2. The minter calls  `uploadMetadata` and passes the `encryptedURI` in the `_data` param.
+        3. Once the minter calls `reveal` with the proper encryption key, the `encryptedURI` is decrypted and the revealed URI can be retrieved via `tokenURI`. 
+        
+        The above process is secure, as long as the encryption key can be kept secret and doesn’t get into the hand of a malicious actor. However, exactly this can happen when the minter calls either
+        
+        - `encryptDecrypt` to encrypt the data
+        - or the helper function `getRevealURI` for e.g. verification purposes.
+        
+        Even the calls are declared as `pure` and `view` function and don’t generate an actual transaction on the chain, they can still be potentially intercepted on the RPC node. If this happens, a malicious actor can gain knowledge of the secret to take advantage of revealing the encrypted URIs before they are actually revealed by the minter, and thereby defeating the whole purpose of the “delayed reveal” functionality. 
+        
+        **Remediation to Consider**
+        
+        The data encryption process should be fully off-chain, allowing the `encryptDecrypt` function to be changed to `private`. Also, completely remove the public `getRevealURI` function from the DelayedRevealBatchMetadataERC721 contract.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">4b46e14c7fc31a9a05bb059cc361006c1f021538</field>
+    <field name="content">
+        ## [M-2] Callback marked as `OPTIONAL` does revert when not implemented in extension
+
+        Callback functions can be marked by the core contract as either OPTIONAL or REQUIRED. Marking the callback as OPTIONAL means that the execution shouldn’t revert if the callback function isn’t implemented by the extension.
+        
+        However, this is currently not the case, as trying to execute the callback via `_executeCallbackFunction` reverts when an OPTIONAL callback is not implemented by the extension.
+        
+        In `ModularCore._executeCallbackFunction`, the following logic implemented to check for callbacks:
+        
+        ```jsx
+          if (callbackFunction.implementation != address(0)) {
+              (success, returndata) = callbackFunction.implementation.delegatecall(_abiEncodedCalldata);
+          } else {
+              if (callbackMode == CallbackMode.REQUIRED) {
+                  revert CallbackFunctionRequired();
+              }
+          }
+        
+          if (!success) {
+              _revert(returndata, CallbackExecutionReverted.selector);
+          }
+        ```
+        
+        **Reference**: [ModularCore.sol#L309-L319](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/ModularCore.sol#L309-L319)
+        
+        The above logic works correctly for REQUIRED callbacks because the tx reverts with an `CallbackFunctionRequired()` error when the callback is not implemented. However, it doesn’t work for OPTIONAL callbacks. In this case, the `delegatecall` would return `success=false`, causing the tx revert on the final `!success` check. 
+        
+        **Remediation to Consider**
+        
+        Modify the above logic to not revert on OPTIONAL callbacks.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Reentrancy</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5b56aa72598513ebac13ab60bd6d06a88f5bcb1c</field>
+    <field name="content">
+        ## [M-3]  ERC1155Core's `mint()` doesn’t follow the CEI pattern can lead to potential reentrancy
+
+        `mint()`  function in `ERC1155CoreInitializable` and `ERC1155Core` contract:
+        
+        ```solidity
+            function mint(address to, uint256 tokenId, uint256 value, bytes memory data) external payable {
+                _beforeMint(to, tokenId, value, data);
+                _mint(to, tokenId, value, "");
+        
+                _totalSupply[tokenId] += value;
+            }
+        ```
+        
+        **Reference:** [ERC1155Core.sol#L169-L174 ,](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC1155Core.sol#L169-L174) [ERC1155Core.sol#L184-L189](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC1155Core.sol#L184-L189)
+        
+        Notice here that the `_totalSupply` variable will get updated after `_mint()`. While in the `_mint()` function, it will call to `to.onERC1155Received()` :
+        
+        ```solidity
+            function _mint(address to, uint256 id, uint256 amount, bytes memory data) internal virtual {
+                ... mint logic
+                
+                // basically calling to `to.onERC1155Received()` if `to` is a contract
+                if (_hasCode(to)) _checkOnERC1155Received(address(0), to, id, amount, data);
+            }
+        ```
+        
+        Because `_totalSupply` variable will get updated **after** `_mint()` , it can potentially lead to reentrancy. Even though, in the current code there’s no harm for reentrancy to exploit this because `_totalSupply` has no use case currently, it can be a huge risk when there are extensions that rely on `_totalSupply` . Let’s take an example:
+        
+        - Builder builds an extension contract for `ERC1155Core` , which can limit the total supply of each tokenId to 5. To do that, the builder will have to develop `beforeMintERC1155()` function in the extension contract. It will look something like this (this is a pseudo-code):
+        
+        ```solidity
+        function beforeMintERC1155(address _caller, address _to, uint256 _id, uint256 _quantity, bytes memory _data)
+                external
+                payable
+                virtual
+                returns (bytes memory result)
+            {
+                ...
+                currentTotalSupply = ERC1155_CORE.totalSuppy(_id);
+                require(currentTotalSupply + _quantity <= 5, "Not allowed);
+                ...
+            }
+        ```
+        
+        - Malicious users notice that `mint()` doesn’t follow the CEI pattern, so they can build a malicious contract that looks something like this (this is a pseudo-code):
+        
+        ```solidity
+        contract Malicious {
+            function mint() external {
+                // mint 4 token with tokenId = 999 to this address
+                ERC1155Core.mint((address(this), 999, 4, "");
+            }
+            
+            function onERC1155Received(address,address,uint256,uint256,bytes) external returns(bytes4){
+                // check we minted 100 token with tokenId = 999 to this address
+                if (ERC1155.balanceOf(address(this, 999) < 100) {
+                    // mint 4 token with tokenId = 999 to this address
+                    ERC1155Core.mint((address(this), 999, 4, "");
+                }	
+                return 0xf23a6e61;
+            }
+        }
+        ```
+        
+        - In the end, malicious users can bypass the invariant “Not allowed to mint more than 5 tokens for each tokenId”
+        
+        **Remediations to Consider**
+        
+        Make `mint()` follow CEI pattern. Also while `burn()` is not affected by reentrancy, it’s recommended to follow the CEI pattern
+    </field>
+</item>
+
+<item>
+    <field name="topic">DoS</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">9b357398e5c314b458c54e262e7a521214c733a2</field>
+    <field name="content">
+        ## [M-4] Extension may fail to get uninstalled
+
+        During the installation and uninstallation of an extension, if `registerInstallationCallback` is set in the config, `onInstall` and `onUninstall` will be called respectively. 
+        
+        However, there could be extensions that only properly implement the `onInstall` callback, but are missing an `onUninstall`. In this case, the extension gets properly installed but is reverting when trying to get uninstalled in `ModularCore._uninstallExtension`:
+        
+        ```jsx
+        if (config.registerInstallationCallback) {
+            (bool success, bytes memory returndata) = _extension.call{value: msg.value}(
+                abi.encodeCall(IInstallationCallback.onUninstall, (msg.sender, _data))
+            );
+            if (!success) {
+                _revert(returndata, CallbackExecutionReverted.selector);
+            }
+        }
+        ```
+        
+        **Reference**: 
+        
+        As per above, the call to `onUninstall` will fail for extensions not implementing an `onUninstall` function and returns `success=false`. Finally, it will revert on the last line with an `CallbackExecutionReverted` error.
+        
+        This can be especially problematic where an extension gets compromised and it is needed to get an extension uninstalled.
+        
+        **Remediation to Consider**
+        
+        Make `onUninstall` optional and don’t revert if the call to `onUninstall` returns false.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Frontrunning</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">dc16d51ccc4a9992a95679fbbc281255450eef01</field>
+    <field name="content">
+        ## [M-5] Update to `ClaimCondition` can cause the caller paying more than expected
+
+        In ClaimableERC20/721/1155, tokens can be claimed by either callers being part of the allowlist, or by callers specifying a properly signed `ClaimRequest`. For allowlisted callers, the overall price to be paid is determined by the current `pricePerUnit` and `currency` address set in the `ClaimConditions`. However, these values can be changed by an address holding the `MINTER_ROLE` any time. This can lead to situations where an allowlisted caller pays substantially more than what they expected to pay. Lets consider the following scenario:
+        
+        1. Tx1: An NFT project is launched using the ClaimableERC721 extension. A privileged address holding the `MINTER_ROLE` sets the initial `pricePerUnit` to 1 ether and the `currency` address to USDC.
+        2. Tx2: An allowlisted caller initiates a transaction to buy 10 NFTs, expecting to pay 10 ether.
+        3. Tx3: The minter could potentially frontrun tx2 by sending a transaction to raise the price to 1,5 ether per NFT. Note that this can also happen accidentally and doesn’t necessarily require bad intention. 
+        4. As a result, the whitelisted caller pays 15 ether (in USDC) as opposed to the expected 10 ether. 
+        
+        The above scenario only works when the caller approves a higher amount of tokens than the expected price to be paid. However, this is quite common for frontends to specify the max uint256 value as allowance, for better UX.
+        
+        **Remediation to Consider**
+        
+        Add the possibility for callers to specify the expected `currency` and `pricePerUnit`, so that the transaction reverts when there was a change in currency or price.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Upgradability</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [M-6] Unsafe storage layout can lead to storage collisions on upgrades
+
+        Extension contracts use the [“Namespaced Storage Layout”](https://eips.ethereum.org/EIPS/eip-7201) to prevent collisions between different extensions as well as between extension and core contract. 
+        
+        However, this doesn’t protect against storage collisions between different version upgrades. It is important to layout the storage variables in a safe way to make them extendable for future versions. Specifically the layout of state variables used in `/minting` and `/royalty` cannot be considered safe for future upgrades.
+        
+        Let’s take a look at the storage layout of ClaimableERC20.sol:
+        
+        ```jsx
+        struct Data {
+            // sale config: primary sale recipient, and platform fee recipient + BPS.
+            ClaimableERC20.SaleConfig saleConfig;
+            // claim condition
+            ClaimableERC20.ClaimCondition claimCondition;
+            // UID => whether it has been used
+            mapping(bytes32 => bool) uidUsed;
+        }
+        ```
+        
+        `saleConfig` is stored at offset 0 (from the defined namespace) and only takes one storage slot since it only contains one address field:
+        
+        ```jsx
+        struct SaleConfig {
+            address primarySaleRecipient;
+        }
+        ```
+        
+        `claimCondition` is stored at offset 1 and takes multiple storage slots for the different fields defined in `ClaimCondition`.
+        
+        Now lets assume we want to deploy a new version specifying an additional field `platformFeeRecipient` in `SaleConfig`.
+        
+        ```jsx
+        struct SaleConfig {
+            address primarySaleRecipient;
+            address platformFeeRecipient;    // added in V1
+        }
+        ```
+        
+        Above change would result in a storage collision as `platformFeeRecipient` would overwrite the first field defined in `claimConditions`, which can lead to severe vulnerabilities. Similar issues exist in the other extensions of `/minting` and `/royalty`.
+        
+        **Remediation to Consider**
+        
+        Adapt storage layout of `/minting` and `/royalty` extensions to make them extendable and safe for future upgrades.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/116/commits/2042bd13ddef43325ff92211d1de9f48d2c57f32,https://github.com/thirdweb-dev/modular-contracts/pull/118/commits/e128861d5dd4ce911d2a7fefaca444093550080c</field>
+    <field name="content">
+        ## [M-7] `supportsInterface()` issues
+
+        Adhering to ERC165 standard is especially important for architectures such as the present Modular Contract Framework to guarantee compatibility between different extensions and core contracts. There are a few issues being encountered by not adhering to the [EIP165](https://eips.ethereum.org/EIPS/eip-165) specification.
+        
+        1. [ERC4906](https://eips.ethereum.org/EIPS/eip-4906) (MetadataUpdate event): Some ERC721 extensions that change metadata are not complying to ERC4906. See L-6.
+        2. [ERC2981](https://eips.ethereum.org/EIPS/eip-2981) (NFT royalty): All the core contract’s `supportsInterface` functions already comply to ERC2981 (returning true for interfaceId == `0x2a55205a`) even though they don’t support royalties by default. References:
+            - [ERC721CoreInitializable.sol#L100](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC721CoreInitializable.sol#L100)
+            - [ERC1155CoreInitializable.sol#L114](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC1155CoreInitializable.sol#L114)
+            - [ERC721Core.sol#L89](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC721Core.sol#L89)
+            - [ERC1155Core.sol#L113](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC1155Core.sol#L113)
+            
+            → Remediation: Remove `0x2a55205a` form the core contract’s `supportsInterface` functions 
+            
+        3. [ERC165](https://eips.ethereum.org/EIPS/eip-165) (supportsInterface): According to ERC165, `supportsInterface` must return true for interfaceId == `0x01ffc9a7`, meaning the contract supports ERC165. This is currently not the case for the ERC20Core’s contracts. References:
+            - [ERC20Core.sol#L111](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC20Core.sol#L111)
+            - [ERC20CoreInitializable.sol#L113](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC20CoreInitializable.sol#L113)
+            
+            → Remediation: Add `0x01ffc9a7` to the `supportsInterface` functions of above ERC20Core contracts.
+            
+        4. [ERC7572](https://eips.ethereum.org/EIPS/eip-7572) (contractURI): All the core contracts comply to ERC7572 but doesn’t return true for ERC7525 interface in supportsInterface. 
+        5. [ERC173](https://eips.ethereum.org/EIPS/eip-173) (Ownership standard): The ModularCore contract complies to ERC173 but doesn’t return true for ERC173 interface in supportsInterface.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/116/commits/0271998922c7095478cebb440912ab139d03bffe,https://github.com/thirdweb-dev/modular-contracts/pull/118/commits/5781db36f1aba94a4c3da0cb157d239b718b0c06</field>
+    <field name="content">
+        ## [L-1] `name` and `symbol` properties are not correctly initiated
+
+        In ERC20Core and ERC1155Core, the `name` and `symbol` parameters are passed to the constructor and are meant to be assigned to their respective `_name` and `_symbol` state variables. 
+        
+        ```jsx
+        // Set contract metadata
+        _name = _name;
+        _symbol = _symbol;
+        ```
+        
+        **Reference**: [ERC20Core.sol#L50-L51](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC20Core.sol#L50-L51)
+        
+        However, as shown above, `_name` is assigned to `_name` instead of the passed parameter `name`. Same goes for the `symbol` parameter. As a result, `name` and `symbol` are not set on contract deployment and remain empty. 
+        
+        This could potentially hinder other protocols or frontends from integrating with Thirdweb’s ERC20 and ERC1155 tokens.
+        
+        **Remediation to Consider**
+        
+        Assign the passed parameter `name` and `symbol` to `_name` and `_symbol`, respectively.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/116/commits/d5ad68136ccf0da3d89c54acc331a7a7727d3067,https://github.com/thirdweb-dev/modular-contracts/pull/116/commits/31039df9484a28e8c4861356c0a122ed5758f28c</field>
+    <field name="content">
+        ## [L-2] User must approve themselves to burn their own token
+
+In `burn()` function in `ERC20Core` and `ERC20CoreInitializable` contract
+
+```solidity
+    function burn(address from, uint256 amount, bytes calldata data) external {
+        _beforeBurn(from, amount, data);
+
+        _spendAllowance(from, msg.sender, amount);
+        _burn(from, amount);
+    }
+```
+
+**Reference:** [ERC20Core.sol#146-L151](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC20Core.sol#L146-L151)
+
+Notice here that the function will always decrease `from`'s allowance to caller. Even when the caller is also `from` , the function still decreases the allowance of themselves. As a consequence, in order to burn their own token, the caller must `approve()` to themselves first.
+
+**Remediations to Consider**
+
+Check if the caller is `from` , if it is, then the function should not decrease their allowance
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c38ec7f1963715bb0db5b02f988088ff5008cf3d</field>
+    <field name="content">
+        ## [L-3] Not including EIP712’s `eip712Domain()` function as a fallback function, lead to the function unreachable
+
+        In `getExtensionConfig` function in `minting/` contracts, it’s not including EIP712’s `eip712Domain()` function as a fallback function.
+        
+        As a result, `eip712Domain()` function can’t be called from the core contract, since it is not included as an allowed fallback function. 
+        
+        **Remediations to Consider**
+        
+        Consider including `eip712Domain()` as a fallback function in extension’s `getExtensionConfig()` function. More specifically, the extension contracts that need to be fixed will be `ClaimableERC20`, `ClaimableERC721`, `ClaimableERC1155`, `MintableERC20`, `MintableERC721`, `MintableERC1155`.  
+    </field>
+</item>
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">0271998922c7095478cebb440912ab139d03bffe</field>
+    <field name="content">
+        ## [L-4] Wrong requirement check in `initialize()` function
+
+In the core contracts, specifically `ERC20`/`721`/`1155Core.sol` and `ERC20`/`721`/`1155CoreInitializable.sol`, the `initialize()` functions contains the following check
+
+```solidity
+require(extensions.length == extensions.length);
+```
+
+**References**:
+
+[ERC20CoreInitializable.sol#L58](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC20CoreInitializable.sol#L58)
+
+[ERC721CoreInitializable.sol#L54](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC721CoreInitializable.sol#L54)
+
+[ERC1155CoreInitializable.sol#L60](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC1155CoreInitializable.sol#L60)
+
+[ERC20Core.sol#L56](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC20Core.sol#L56)
+
+[ERC721Core.sol#L48](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC721Core.sol#L48)
+
+[ERC1155Core.sol#L59](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/core/token/ERC1155Core.sol#L59)
+
+Obviously it will always pass this requirement. The intention here should be validating `extension’s` length and `extensionInstallData’s` length
+
+**Remediations to Consider**
+
+Make the following change to affected contracts:
+
+```diff
+-       require(extensions.length == extensions.length);
++       require(extensions.length == extensionInstallData.length);
+```
+    </field>
+</item>
+
+<item>
+    <field name="topic">Locked funds</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">49bb7ba0799e626d194a488e09b2a9947a5fceff</field>
+    <field name="content">
+        ## [L-5] Allowing core contracts to receive native tokens without any efficient way to take it out
+
+In `ModularCore` contract, funds can be received via:
+
+```solidity
+receive() external payable {}
+```
+
+[ModularCore.sol#L80](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/ModularCore.sol#L80)
+
+This will allow anyone sending native token directly to the contract. Currently there’s no use case for this feature. Because of that, when this contract holds native tokens, there’s no easy way to withdraw them. The protocol owner would need to install an extensions specifically for withdrawing those native tokens.
+
+**Remediations to Consider**
+
+Consider removing `receive()` in `ModularCore` contract.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/116/commits/bca2317838e51252026d91a29e41b377f22c3487,https://github.com/thirdweb-dev/modular-contracts/pull/118/commits/d6cff7d14aee05bdb42a31e2aff1739fd9e6ece0</field>
+    <field name="content">
+        ## [L-6] Not following ERC4906 in BatchMetadata and DelayedRevealBatchMetadata contracts
+
+[ERC4906](https://eips.ethereum.org/EIPS/eip-4906) is an extension of EIP721 and defines the events when the token’s metadata is changed. Specifically, when the metadata for a single token is changed it should emit:
+
+```jsx
+event MetadataUpdate(uint256 _tokenId);
+```
+
+and changing metadata for a range of tokens should emit:
+
+```jsx
+event BatchMetadataUpdate(uint256 _fromTokenId, uint256 _toTokenId);
+```
+
+The following `/metadata` contracts comply to ERC4906:
+
+- SimpleMetadataERC721: emits `MetadataUpdate` in `setTokenURI`
+- OpenEditionMetadataERC721: emits `BatchMetadataUpdate` in `setSharedMetadata`
+
+Whereas the following contracts don’t emit one of the above events and hence doesn’t comply to ERC4906:
+
+- DelayedRevealBatchMetadataERC721
+- BatchMetadataERC721
+
+Additionally, `0x49064906` should be added to `config.supportedInterfaces` for all the above contracts as mentioned in the standard:
+
+```jsx
+The supportsInterface method MUST return true when called with 0x49064906.
+```
+
+**Remediations to Consider**
+
+Emit `MetadataUpdate` or `BatchMetadataUpdate` in `DelayedRevealBatchMetadataERC721.uploadMetadata` and `BatchMetadataERC721.uploadMetadata` functions. Additionally, consider adding `0x49064906` to `config.supportedInterfaces`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/116/commits/48837310fa9fae6a9dc56a52e74658229ca062fe,https://github.com/thirdweb-dev/modular-contracts/pull/116/commits/34043912e9f0807fb651789d25caddde33b16424</field>
+    <field name="content">
+        ## [L-7] `tokenURI` should revert for invalid tokenIds
+
+As defined in [ERC721](https://eips.ethereum.org/EIPS/eip-721) standard, calling `tokenURI` with an invalid id should revert:
+
+```solidity
+    /// @notice A distinct Uniform Resource Identifier (URI) for a given asset.
+    /// @dev Throws if `_tokenId` is not a valid NFT. URIs are defined in RFC
+    ///  3986. The URI may point to a JSON file that conforms to the "ERC721
+    ///  Metadata JSON Schema".
+    function tokenURI(uint256 _tokenId) external view returns (string);
+```
+
+`ERC721Core.tokenURI` correctly reverts when used with the following extensions:
+
+- BatchMetadataERC721: `onTokenURI` reverts with `BatchMetadataNoMetadataForTokenId` for invalid ids.
+- DelayedRevealBatchMetadataERC721: `onTokenURI` reverts with `BatchMetadataNoMetadataForTokenId` for invalid ids.
+
+However, `ERC721Core.tokenURI` doesn’t revert when used with the following extensions:
+
+- SimpleMetadataERC721: `onTokenURI` returns an empty string for not existing ids.
+- OpenEditionMetadataERC721: `onTokenURI` returns a valid metadata JSON object.
+
+**Remediations to Consider**
+
+Consider reverting `onTokenURI` for SimpleMetadataERC721 and OpenEditionMetadataERC721 when provided id does not exist.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ec2b11b1e93a4146f89f0c1b978e13c4e127f00b</field>
+    <field name="content">
+        ## [L-8] `_validateClaimCondition()` returns an outdated `condition`
+
+In ClaimERC20/721/1155 contracts, `_validateClaimCondition` makes updates to `claimCondition` but doesn’t return the changed conditions:
+
+```solidity
+    function _validateClaimCondition(address _recipient, uint256 _amount, bytes32[] memory _allowlistProof)
+        internal
+        returns (ClaimCondition memory condition)
+    {
+        condition = _claimableStorage().claimCondition;
+        
+        ...
+        
+        _claimableStorage().claimCondition.availableSupply -= _amount;
+    }
+```
+
+**Reference**: [ClaimableERC20.sol#L225](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/extension/token/minting/ClaimableERC20.sol#L225)
+
+Notice here that `_claimableStorage().claimCondition.availableSupply` will be reduced at the end of the function, but the return parameter `condition` is assigned at the beginning. As a result, this function will return outdated `condition`, more specifically, outdated `condition.availableSupply`. In the current system, it will not affect anything but could potentially pose security risks in future updates.
+
+**Remediations to Consider**
+
+Make the assignment to the return parameter `condition` at the end of the function.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Locked funds</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">53120dd7cd1b11af6816d19d6ef24d8dd3e28997</field>
+    <field name="content">
+        ## [L-9] Native tokens can be locked in MintableERC20
+
+[MintableERC20.sol#L234](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/extension/token/minting/MintableERC20.sol#L234)
+
+In `MintableERC20._distributeMintPrice()` function, it doesn’t check if `msg.value` is zero when the currency is not the native token:
+
+```solidity
+	if (_currency == NATIVE_TOKEN_ADDRESS) {
+	    if (msg.value != _price) {
+	        revert MintableIncorrectNativeTokenSent();
+	    }
+	    SafeTransferLib.safeTransferETH(saleConfig.primarySaleRecipient, _price);
+	} else {
+	    SafeTransferLib.safeTransferFrom(_currency, _owner, saleConfig.primarySaleRecipient, _price);
+	}
+}
+```
+
+**Reference**: [MintableERC20.sol#L233-L235](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/extension/token/minting/MintableERC20.sol#L233-L235)
+
+Consequently, the caller can potentially loose their native tokens when accidentally passed to the mint call. 
+
+ 
+
+**Remediations to Consider**
+
+Consider adding a check `msg.value == 0` when the currency is not the native token in the `MintableERC20._distributeMintPrice()` function.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Reentrancy</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/117</field>
+    <field name="content">
+        ## [L-10] Core functions may be vulnerable to reentrancy when callbacks make an external call
+
+In ERC20/721/1155Core, functions that contain a `_before` hook may be vulnerable to an reentrancy attack. Take `ERC20Core.mint` for example:
+
+```jsx
+function mint(address to, uint256 amount, bytes calldata data) external payable {
+    _beforeMint(to, amount, data);
+    _mint(to, amount);
+}
+```
+
+Due to the nature of the `_before` hook, `_beforeMint` is called before the `_mint` function, potentially making an external call before the state in `_mint` is updated. This violates the CEI (Checks-Effects-Interact) pattern.
+
+**Remediation to Consider**
+
+Add a reentrance guard to the callback functions to avoid reentering into the core contract.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">f31b497986837980f60fa6fa339c44540d11d3f0</field>
+    <field name="content">
+        ## [Q-1] `batchMint` for `ERC1155Core` contract and `safeMint` for `ERC721Core` contract are currently not supported
+
+In ERC721Core contracts, there’s only the `mint()` function that can mint NFT for users. However, the `mint()` function doesn’t check if the receiver is a contract and whether it can receive an NFT. This can lead to tokens being locked in the receiver contract.
+
+In ERC1155Core contracts, there’s only the `mint()` function that can mint a ERC1155 token to users. However, the `mint()` function only supports minting a single tokenId. For the sake of usability and gas costs, a `batchMint()` function could be provided to mint multiple tokenIds.
+
+**Remediations to Consider**
+
+Consider adding `safeMint()` to `ERC721Core` and `ERC721CoreInitializable` contracts, and adding `batchMint()` to `ERC1155Core` and `ERC1155CoreInitializable` contracts.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">b83c4d9793af03148d3862fdfe28b22d62005bd9</field>
+    <field name="content">
+        ## [Q-2] Support for multiple `requiredInterfaceIds`
+
+Currently, an extension can only set a single `requiredInterfaceId`
+
+```solidity
+    function getExtensionConfig() external pure override returns (ExtensionConfig memory config) {
+        ...
+        
+        config.requiredInterfaceId = 0xd9b67a26; // ERC1155
+    }
+```
+
+**Reference**: [ClaimableERC1155.sol#L166](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/extension/token/minting/ClaimableERC1155.sol#L166)
+
+It could be useful for an extension to specify multiple interface ids, as e.g. the extension needs the core to support both ERC721 and ERC2981 for compatibility. However, currently only one `requiredInterfaceId` can be specified.
+
+**Remediations to Consider**
+
+To add more flexibility to the framework, consider adding support for specifying multiple `requiredInterfaceIds`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">992d846e362f132860a5d324a47f34aa3680d22c</field>
+    <field name="content">
+        ## [Q-3] Core contract implementations are not protected against initialization
+
+Core contracts such as `ERC20CoreInitializable`, `ERC721CoreInitializable`**,** `ERC1155CoreInitializable` are meant to be deployed using the Clone pattern. This means that the user deploys a Clone proxy that points to the core contract’s implementation.
+
+However, currently these core contracts can be deployed without being initialized and are also not protected against subsequent initialization. 
+
+This allows a malicious actor to take ownership of the core contract implementation by properly initializing the contract. As the owner, they can install a new extension containing selfdestruct logic. 
+
+It is important to note, since the [Ethereum Dencun upgrade](https://consensys.io/blog/ethereum-dencun-upgrade-explained-part-1), calling selfdestruct doesn’t destroy the contract’s bytecode anymore as long as it is not triggered in the same transaction as contract creation, only funds held in the contract can be sent to the chosen target. Hence, with the new changes implemented in the Dencun upgrade, a malicious attacker cannot pose any severe harm on user deployments.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Consistency</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">52cfd3436412ab87e91f376679fae1edc70af76f</field>
+    <field name="content">
+        ## [Q-4] MintableERC721 should have `getAllMetadataBatches` function
+
+`MintableERC721` contract is basically a combination of `ClaimableERC721` contract and `BatchMetadataERC721` contract. However, `MintableERC721` contract doesn’t contain `BatchMetadataERC721`’s `getAllMetadataBatches` function
+
+**Remediations to Consider**
+
+Consider adding `getAllMetadataBatches()` function to `MintableERC721` contract. This would also require to add it as an allowed callback function in `MintableERC721.getExtensionConfig()`
+    </field>
+</item>
+
+<item>
+    <field name="topic">Consistency</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">b7e8da36db450ec282898b4f63af2e0064a81e6c</field>
+    <field name="content">
+        ## [Q-5] Inconsistent `payable` tags
+
+Applying the payable tags in core contracts is not consistent to applying `payable` tags in the callback functions:
+
+- ERC721Core:
+    - `transferFrom` is payable but `beforeTransferERC721` callback is not
+    - `approve` is payable but `beforeApproveERC721` callback is not
+    - `burn` is not payable but `beforeBurnERC721` is
+- ERC20Core:
+    - `burn` is not payable but `beforeBurnERC20` callback is
+- ERC1155Core:
+    - `burn` is not payable but `beforeBurnERC1155` callback is
+    
+
+**Remediation to Consider**
+
+Apply `payable` only to function with a specific use case to receive native tokens.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Nitpicks</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">f5830a4a6cb366bb50481f5132fadfb66c372210</field>
+    <field name="content">
+        ## [Q-6] Nitpicks
+
+        1. In `ModularCore._installExtension` [L178](https://github.com/thirdweb-dev/modular-contracts/blob/3d914b73d719d5c3dd7dbb30b673aff4d32d7168/src/ModularCore.sol), `this` can be removed to avoid an external call. `supportInterface()` would need to be made public.
+            
+            ```diff
+            - if (!this.supportsInterface(config.requiredInterfaceId)) {
+            + if (!supportsInterface(config.requiredInterfaceId)) {
+            ```
+            
+        2. In `ERC20Core._beforeTransfer` [L228](https://github.com/thirdweb-dev/modular-contracts/blob/3d914b73d719d5c3dd7dbb30b673aff4d32d7168/src/core/token/ERC20Core.sol#L228), `data` param can be added to the callback for more flexibility.
+        3. In `OpenEditionMetadataERC721.setSharedMetadata` [L95-100](https://github.com/thirdweb-dev/modular-contracts/blob/3d914b73d719d5c3dd7dbb30b673aff4d32d7168/src/extension/token/metadata/OpenEditionMetadataERC721.sol#L95-L100), improve readability and gas consumption by making the following change:
+            
+            ```diff
+            -        OpenEditionMetadataStorage.data().sharedMetadata = SharedMetadata({
+            -            name: _metadata.name,
+            -            description: _metadata.description,
+            -            imageURI: _metadata.imageURI,
+            -            animationURI: _metadata.animationURI
+            -        });
+                           
+            +        OpenEditionMetadataStorage.data().sharedMetadata = _metadata;
+            ```
+            
+        
+        1. In [RoyaltyERC721.sol#L65](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/extension/token/royalty/RoyaltyERC721.sol#L65) and [RoyaltyERC1155.sol#L10](https://github.com/thirdweb-dev/modular-contracts/blob/e4005538d943afeaa516301984dfbd707c5169d3/src/extension/token/royalty/RoyaltyERC1155.sol#L10) the following line can be removed to save gas:
+            
+            ```diff
+                function getExtensionConfig() external pure virtual override returns (ExtensionConfig memory config) {
+            -       config.callbackFunctions = new CallbackFunction[](0);
+                    ...
+                }
+            ```
+            
+        
+        1. In `ClaimableERC20._validateClaimRequest` [L299](https://github.com/thirdweb-dev/modular-contracts/blob/3d914b73d719d5c3dd7dbb30b673aff4d32d7168/src/extension/token/minting/ClaimableERC20.sol#L299), it will revert with an underflow if `_amount` is > `availableSupply`. Consider reverting with a custom error when this is the case.
+        
+        1. In `ClaimableERC20._validateClaimRequest` [L272](https://github.com/thirdweb-dev/modular-contracts/blob/3d914b73d719d5c3dd7dbb30b673aff4d32d7168/src/extension/token/minting/ClaimableERC20.sol#L272), there is the following time range check:
+            
+            ```jsx
+            if (block.timestamp < _req.startTimestamp || _req.endTimestamp <= block.timestamp) {
+                revert ClaimableRequestExpired();
+            }
+            ```
+            
+            However, the error `ClaimableRequestExpired()` is misleading for the case of `block.timestamp < _req.startTimestamp`, as in this case the request is not expired.    
+    </field>
+</item>
