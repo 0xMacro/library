@@ -1,0 +1,75 @@
+<!-- @format -->
+
+<page
+  clientName="thirdweb"
+  reportDate="June 27th, 2024"
+  auditTitle="thirdweb A-19"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/modular-contracts"
+  repoCommitHash="3d914b73d719d5c3dd7dbb30b673aff4d32d7168"
+  passwordEncrypt="env:PAGE_PASS_THIRDWEB_19"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from May 23, 2024 to June 5, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the thirdweb team.</li>
+      <li>A audit handoff document provided through Notion.</li>
+    </ul>
+
+
+    </content-for>
+
+
+  <content-for name="source-code">
+    <p>We audited the following contracts:
+
+    <template type="file-hashes">
+        ae19e8e8d34f66705444640a7f44df186e4ebc4a0dc0073ed8311595f8aa48bf  src/ModularCore.sol
+        80d5a51c7be7a8e8350ba576606676fd0c6dec2c38671bea09dede195527afbe  src/ModularExtension.sol
+        fa701578242e6981ea365ee6a21ed7af8b2be5a90fc568a263e397d68b033401  src/core/token/ERC1155Core.sol
+        ef2297cca5d8dd17cea50f906545d145df687814b2172a3f93a60a50afb84702  src/core/token/ERC1155CoreInitializable.sol
+        691c47b18184241cd8dc4d314b65f4c956e555e8032ccbbf933deb83d4830e54  src/core/token/ERC20Core.sol
+        9f7181263dc594336382e162bc59176485c00a0f87d577bd507f7d134edb0ece  src/core/token/ERC20CoreInitializable.sol
+        c8c1085407680d200874fc97733d97f5cc6f11eda9fc0de266e0fb4469d14889  src/core/token/ERC721Core.sol
+        b333f9fa01d6a26a538a510b2bf13be48e2fdcb676d4af06f7835f09e0150382  src/core/token/ERC721CoreInitializable.sol
+        38cde7db577c5de04c585e4636303d35a99944534ee52106373fcdfbb7fee3de  src/extension/token/metadata/BatchMetadataERC1155.sol
+        2efa4fb0e5532f9f9aa1cf749fb02b567a4cd7b6fef6012f9ae73aa5c0aef9e8  src/extension/token/metadata/BatchMetadataERC721.sol
+        e2533589fcd64db50b36b90a8bd69aecf6788d7362cc271808f32a2791afa9c9  src/extension/token/metadata/DelayedRevealBatchMetadataERC721.sol
+        6d4f43a542d87116aa46743a64bf2d888810ed30340d8c7b9c487deb074afd8d  src/extension/token/metadata/OpenEditionMetadataERC1155.sol
+        215ac25d9202d502e69f0c01161fb5b5e267838068150412fa6e368df1d5e153  src/extension/token/metadata/OpenEditionMetadataERC721.sol
+        b6a07a2aeb0d118bd0332142c773f72cec20b7fbcaf9b405183745b7627f731c  src/extension/token/metadata/SimpleMetadataERC1155.sol
+        d745e7c4a2de0f4e2d33465ece610a40dcbcd4fa969eec3dc09a5a08096e63ea  src/extension/token/metadata/SimpleMetadataERC721.sol
+        2dd5152b98f99c021173fd61e69e4af969fd9d700c4a3d35f996d88f583186b3  src/extension/token/minting/ClaimableERC1155.sol
+        60c5979661a220233af66fe27ca66c1f24f8c5998fcb09746865489014af54db  src/extension/token/minting/ClaimableERC20.sol
+        a0a6daa24b6bcf2632f41d163e279e9d1ae5a54193a44d6817d3cc2a2ea72d59  src/extension/token/minting/ClaimableERC721.sol
+        a9d8f6b43a3e8a8cfff02a4628b928afb6635eecbc158955e466166b862d1d66  src/extension/token/minting/MintableERC1155.sol
+        f5f74c274ae587b35813b9b0cd166c1547b291749f16b223b1197877fd91fd58  src/extension/token/minting/MintableERC20.sol
+        74cc6f1e90d5dfc2b922e9843ff69363b138d3652330020021717900e9ece1da  src/extension/token/minting/MintableERC721.sol
+        8437a25e1b361f3293c6290a2444bd9109d07a9860249b9481ca90097ea8d897  src/extension/token/royalty/RoyaltyERC1155.sol
+        9c7f86f31a135bbd52f28b9f519f34ce8f24274261cebf2e86a846a145f86c7e  src/extension/token/royalty/RoyaltyERC721.sol
+        69a8bbb9ab8e7939c26f52923b4677e84b9fc95ad546c839780e8ba1bddef794  src/extension/token/transferable/TransferableERC1155.sol
+        95c2103f823e32f64071833594eb361d60f92cb48c016259eaee44aff1bdd507  src/extension/token/transferable/TransferableERC20.sol
+        d7f10ba2e6fe3fe742ed9a3fc6a66090ce42d44089cf3dbd15c4581f705acf43  src/extension/token/transferable/TransferableERC721.sol
+        7f49901663e38b816fe853c9eba5c5ad871f0a426bdd7b959a3ba5501d4e282c  src/callback/BeforeApproveCallbackERC20.sol
+        945e8a2b73e296964d0a5f921ec43d0e91f2419b8902d38244297537d6d8ec40  src/callback/BeforeApproveCallbackERC721.sol
+        d53d04e8023f85a76458ef05d46566a1844d0d4656f600054f37dd0419b5a034  src/callback/BeforeApproveForAllCallback.sol
+        e5055e7d0584b00a7e13972174843b53d6b204a977a34038387a703cd7c3a574  src/callback/BeforeBatchTransferCallbackERC1155.sol
+        e3cb2ca4a22b53fdde9877e7dc6ec54e8115ae0c9f0154a37c39a1b1851bed84  src/callback/BeforeBurnCallbackERC1155.sol
+        558fef840b3e9bd7b098b7a28c61989f1e7f182e47d7cdda4cf44f5e4d05ab79  src/callback/BeforeBurnCallbackERC20.sol
+        66272c6809acc3f0b50f29f5e755d2e3a8ace5e9bb85f1534798a60afd5070a4  src/callback/BeforeBurnCallbackERC721.sol
+        7e41e692a6ef0e9bd1f948b0873f354073e94ae42562b3e4f00af1b06fdebcbc  src/callback/BeforeMintCallbackERC1155.sol
+        7677068f4e8f69a489d2201496afbf63e117ed000ad3408b324582409c8952db  src/callback/BeforeMintCallbackERC20.sol
+        3530eca7d9ebfc56c73a5a9476470cb50369f629d25671cf42c4cc11436e0165  src/callback/BeforeMintCallbackERC721.sol
+        0c67c5b2a2ed2f14d07e37ad6fb50d300b575ba9cb475ae815ce8a82c39d11c4  src/callback/BeforeTransferCallbackERC1155.sol
+        830a7f789d884f3b6e6d4988ffabfe06c67dd81f2239b16733b5c4bc7fcd9db2  src/callback/BeforeTransferCallbackERC20.sol
+        14450e05178b5bdd2f5132e3ee086f71cab957b75dfb710e2b9a248022e4a8d7  src/callback/BeforeTransferCallbackERC721.sol
+        b1e82563f29831b90072c046f1a9542189b729cd91b227cc60efea327b25c788  src/callback/OnTokenURICallback.sol
+
+    </template>
+
+  </content-for>
+</page>
