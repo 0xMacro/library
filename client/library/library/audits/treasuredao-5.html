@@ -1,0 +1,65 @@
+<page
+  clientName="Treasure DAO"
+  reportDate="June 28, 2024"
+  auditTitle="TreasureDAO A-5"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/ghoul-sol/rideswap"
+  repoCommitHash="e78679cace09606e31a369bd2eadf85e804cb6dc"
+  passwordEncrypt="env:PAGE_PASS_TREASUREDAO_5"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 11, 2024 to June 19, 2024.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository.</li>
+  </ul>
+
+  <template type="audit-markdown">
+    ### Trust Model, Assumptions, and Accepted Risks (TMAAR)
+
+    - The project forked several contracts from Uniswap v2, v3, Aave, and uses an adapted version of Sushiswap’s Masterchef staking contract. The goal was to keep the code as close to the original version as possible, thus several best practices have not been applied, such as:
+        - state variables not marked as immutable
+        - using SafeMath, although Solidity version is ≥ 0.8.18
+        - not using custom errors
+    - There is a 0.3% fee on swaps. Fees are distributed as follows:
+        - during bondingCurve mode, all fees are going to `protocolFeeBeneficiary`
+        - afterwards, fees are split as follows: 0.14% to `protocolFeeBeneficiary`, 0.08% to `creator`, 0.08% to `feeDistributor`. The `feeDistributor` contract distributes the accumulated fees proportionally to the “founders” that bought meme coins during the bonding curve mode.
+    - Additionally, a `memeCreation` fee is taken on the creation of the pool.
+
+**Privileged Roles**
+
+- owner can change `memeCreation` fee in UniswapV2Factory contract.
+
+**Accepted Risks**
+
+- Some of the contracts don’t correctly work with non-standard ERC20 implementations (aka [weird ERC20](https://github.com/d-xo/weird-erc20))
+  </template>
+
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    6fa74163e8d66a95ee397f75949f6332e4a1a9e1d26dac9b761ad18e9522aceb  src/periphery/RideswapRouter.sol
+    4e4b9a26153ae5508472cb6b03ab6b8d6bbac57b6bf0f5803388ef480d9a6f8e  src/periphery/UniswapV2Router02.sol
+    326835ff89512b9d49f13571d68e5cf5aa517b27e8833dbe9d45c9bea3a966d8  src/rewards/BatchClaimRewards.sol
+    bc86d18e8ef0abb12936d5f5985f34a66941423cbd3b6878b446d831a866aade  src/rewards/FeeDistribution.sol
+    3d90650d845af58eca8a661c8b208a5128125bd1bdc6b3ddc824c13ea0638b09  src/rewards/RideIncentivesController.sol
+    1c503df946f83c2803818a580a4da0d212c7bb9a530fcb819c1dd287fc4d4fb0  src/rewards/RideRewardsPool.sol
+    7559f03018db7f6b8485f85763675fe089e87dee222dd87c7f19638bd887763b  src/token/NewRideToken.sol
+    e9124fc0507a578d47179298f2076cbf44437bd8146cd50e09eb0135dc4d8f4c  src/vesting/TreasuryVester.sol
+    b2b052d582cc974209bb515b73883c0cf009a17c3fb5899a5c00860716bc800b  src/core/Fees.sol
+    fa00d1ab0878af0cb3b9266ba891a484ff4dead4723a2d8c287ff11716742165  src/core/UniswapV2ERC20.sol
+    8ca2e3bcec60fe5193def6518489cbd8e8c62bae63cdda914925bec59497b35d  src/core/UniswapV2Factory.sol
+    cd18f45995742169c4408dbdf1b329b8482a45a696eea443292fc5f80b1d26e8  src/core/UniswapV2Pair.sol
+    405f9c027fd1ddd0a0e07284503c4c8178d764fef66e637b14857e7a9f4ce215  src/airdrop/RideAirdrop.sol
+  </template>
+</content-for>
