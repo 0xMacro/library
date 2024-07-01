@@ -1,0 +1,50 @@
+<page
+  clientName="Superstate"
+  reportDate="July 1st, 2024"
+  auditTitle="Superstate A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/superstateinc/onchain-redemptions"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="71f267f408eeb50fcca7a182217814a8f02e77dc"
+  repoCommitHashFinal="94e20a411aa2d388cc358b802f60b556fd19d500"
+  passwordEncrypt="env:PAGE_PASS_SUPERSTATE_1"
+  customRepoInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on June 18, 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+
+    </template>
+  </content-for>
+</page>
