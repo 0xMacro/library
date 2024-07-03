@@ -1,0 +1,35 @@
+<page
+  clientName="Book"
+  reportDate="July 3rd, 2024"
+  auditTitle="Book A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/book-io/token-bridge"
+  repoCommitHash="52f417b8f8b695ac0e71bdb32e92614641d13612"
+  repoCommitHashFinal="1af308f40094156a8a7974b245c57af997d16840"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_BOOK_1"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on June 27th, 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contract within this repository:</p>
+
+    <template type="file-hashes">
+        f6bcf6242f8c1b173a2204a130b91b0276830be15fca8a6d98eee8878d83fb31  bridge/evm/contracts/src/BookMintable.sol
+    </template>
+
+  </content-for>
+</page>
+
+
+
+
