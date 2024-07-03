@@ -1,0 +1,732 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/mintra-marketplace/launchpad/commit/d1b835c429bd25863f30730ba8c64c942c06ab2d,https://github.com/mintra-marketplace/launchpad/commit/3d6322c69a2269ccc18e866af1fdfdff89a0add4</field>
+    <field name="content">
+        ## [H-1] Minter must own both ERC20 and ERC721 even when `erc20AndErc721IsAnd == false`
+
+        [BaseCollection.sol#L181-L187](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L181-L187)
+        
+        In BaseCollection, there’s `additionalFeatures.erc20AndErc721IsAnd`variable that its purpose is for token-gated minting. More specifically:
+        
+        - If `erc20AndErc721IsAnd` == false, this means the minter only needs to satisfy either ERC20 holding requirement or ERC721 holding requirement
+        - if `erc20AndErc721IsAnd` == true, this means the minter MUST need to satisfy both ERC20 holding requirement and ERC721 holding requirement
+        
+        But in the code, when `erc20AndErc721IsAnd` == false, minter has to satisfy both requirements: 
+        
+        ```solidity
+        bool hasErc20Check = additionalFeatures.erc20TokenAddresses.length > 0;
+        bool hasErc721Check = additionalFeatures.erc721TokenAddresses.length > 0;
+        
+                
+        if (additionalFeatures.erc20AndErc721IsAnd) {
+            require(isERC20CheckSatisfied && isERC721CheckSatisfied, "Not enough ERC20 and ERC721 tokens");
+        } else {
+            if (hasErc20Check) {
+                require(isERC20CheckSatisfied, "Not enough ERC20 tokens");
+            }
+        
+            if (hasErc721Check) {
+                require(isERC721CheckSatisfied, "Not enough ERC721 tokens");
+            }
+        }
+        ```
+        
+        If `erc20AndErc721IsAnd` == false and `erc20TokenAddresses.length` > 0 and `erc721TokenAddresses.length` > 0, minter has to satisfy both requirements to pass.
+        
+        **Remediations to Consider**
+        
+        ```diff
+        } else {
+        -    if (hasErc20Check) {
+        -        require(isERC20CheckSatisfied, "Not enough ERC20 tokens");
+        -    }
+        -    if (hasErc721Check) {
+        -        require(isERC721CheckSatisfied, "Not enough ERC721 tokens");
+        -    }
+        
+        +		 require(isERC20CheckSatisfied || isERC721CheckSatisfied, "Not enough ERC20 or ERC721 tokens");
+        }
+        ``` 
+    </field>
+</item>
+
+<item>
+    <field name="topic">Locked Funds</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [M-1] `RoyaltySplitter` contract’s funds can be stuck forever if one receiver can’t hold native token
+
+        [RoyaltySplitter.sol#L54](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/RoyaltySplitter.sol#L54)
+        
+        In `distrubuteRoyalty()` function in the `RoyaltySplitter` contract, it will send native token to all receivers:
+        
+        ```solidity
+        function distrubuteRoyalty(address[] memory erc20Addresses) public payable nonReentrant {
+                ...
+            if (plsBalance > MIN_PLS) {
+                    (bool success,) = to[i].call{value: amount}("");
+                    require(success, "ETH_TRANSFER_FAILED");
+                                ...
+                }
+            }
+            ...
+        }
+        
+        ```
+        
+        If there’s an address in the `to` array that can’t receive native tokens, it will make the function reverted, which leads to all the funds held (including native token and ERC20s) in this contract being locked forever
+        
+        **Remediations to Consider**
+        
+        This issue can be resolved in different ways:
+        
+        1. Have an owner-controlled function that can change `to` and `amountBps` arrays. Note that this requires the contracts to be Ownable, adding centralization risks.
+        2. Adding a function where each recipient can withdraw it’s own share. Note that would increase complexity, as the contract would to keep track about the withdrawn amount of each recipient. 
+    </field>
+    <field name="response">
+        It is understood that the to address’s should be a EOA or compatible smart contract address.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/mintra-marketplace/launchpad/commit/9e74fcc5c462b069b345488f66390b8d39f9bf99,https://github.com/mintra-marketplace/launchpad/commit/511f422b7155065aeaa4090cf8aa50c8faf0fad0</field>
+    <field name="content">
+        ## [M-2] Not decreasing ERC1155’s `totalSupply` of tokenId when burning
+
+[ERC1155Collection.sol#L140-L145](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/ERC1155Collection.sol#L140-L145)
+
+In `ERC1155Collection` contract, we have a `tokenSupply` mapping variable, its purpose is to track the supply of each tokenId:
+
+```solidity
+    mapping(uint256 => uint256) public tokenSupply;
+```
+
+As per the definition, the token supply increases on minting and should be decreased on burn.
+
+However, in the `burn()` function, `tokenSupply` of the burned tokenId will not be decreased:
+
+```solidity
+function burn(uint256 _tokenId, uint256 _amount) external {
+    require(additionalFeatures.isBurnable, "Collection is not burnable");
+
+    require(balanceOf(msg.sender, _tokenId) >= _amount, "Token not owned");
+    _burn(msg.sender, _tokenId, _amount);
+}
+```
+
+This will lead to the `totalSupply` of each tokenId will be higher than the actual underlying total supply of that tokenId. As a consequence, minters are not being able to mint more tokens even though some tokens have been burned
+
+**Remediations to Consider**
+
+Decrease the token supply by the amount burned.
+
+```diff
+function burn(uint256 _tokenId, uint256 _amount) external {
+    require(additionalFeatures.isBurnable, "Collection is not burnable");
+
+    require(balanceOf(msg.sender, _tokenId) >= _amount, "Token not owned");
+    
++	  tokenSupply[_tokenId] -= _amount;
+
+    _burn(msg.sender, _tokenId, _amount);
+}
+```
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1bf64e2331a1522d9f2e906875cc0e83bf0d9619</field>
+    <field name="content">
+        ## [M-3] Large value of `MIN_PLS` can lead to locked funds in royalty splitter
+
+In `RoyaltySplitter.distributeRoyalty`, native tokens can only be distributed to defined recipients when the contract’s balance exceeds `MIN_PLS`. 
+
+```jsx
+if (plsBalance > MIN_PLS) {
+    for (uint256 i = 0; i < to.length; i++) {
+        uint256 amount = plsBalance * amountBps[i] / MAX_BPS;
+        ...
+
+```
+
+However, the constant `MIN_PLS` is set to `1000 ether`. 
+
+While this number might not be particular large when deployed on Pulsechain (1 PLS ~ $0.00005), it can get very large when the contracts are considered to be deployed on other chains. This can even lead to locked funds in the contract, as the amount is never reached. 
+
+**Remediation to Consider**
+
+Remove the check `plsBalance > MIN_PLS` entirely to allow native balance to be distributed in any case.-
+    </field>
+</item>
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/mintra-marketplace/launchpad/commit/2dd77938e4c87bef89987c615e53fe96e608ece8,https://github.com/mintra-marketplace/launchpad/commit/d2a8076a18738001ce1a430e30084a4cde47ce75</field>
+    <field name="content">
+        ## [L-1] No validation for `startOfMint` and `endOfMint`
+
+[BaseCollection.sol#L73](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L73)
+
+In BaseCollection’s `constructor()`, it doesn’t validate `startOfMint` and `endOfMint`. If incorrect values are provided, such as `startOfMint` > `endOfMint` or `endOfMint` > `block.timestamp`, invalid collections are deployed, where minting of tokens will revert.
+
+```solidity
+function verifyAndProcessPayment(uint256 _amount, address _tokenToPayIn) internal {
+    ...
+
+    if (additionalFeatures.isTimed) {
+        require(
+            block.timestamp >= additionalFeatures.startOfMint && block.timestamp <= additionalFeatures.endOfMint,
+            "Minting not started or ended"
+        );
+    }
+		
+		...
+```
+
+**Remediations to Consider**
+
+Consider adding proper validation for `startOfMint` and `endOfMint` when the collection are deployed.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6560c776d55ad505313a563466501e8c354cd884</field>
+    <field name="content">
+        ## [L-2] Minimum price of `100_000` can lead to unwanted high token price
+
+In BaseCollector’s `constructor()`, we have this check to make sure the listing price is not too small:
+
+[BaseCollection.sol#L103](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L103)
+
+```solidity
+for (uint256 i = 0; i < _priceListToken.length; i++) {
+    isFreeMint = false;
+
+@>  require(_priceListAmount[i] >= 100000, "Price too low");
+    price[_priceListToken[i]] = _priceListAmount[i];
+}	
+```
+
+However, some tokens have decimals set to `6` or smaller, which can make the minimum mint price higher than wanted:
+
+- For USDC which has decimals = 6 , `100_000` means 0.1 USD
+- For GeminiUSD which has decimals = 2, `100_000` means 1000USD
+
+**Remediations to Consider**
+
+Since this check doesn’t add much value, consider removing this line completely:
+
+```diff
+- require(_priceListAmount[i] >= 100000, "Price too low");
+```
+    </field>
+    <field name="response">
+        When we take fees we divide by 10,000 bps to calculate the fee. This is why the restriction is here.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Reentrancy</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/mintra-marketplace/launchpad/commit/2911aa944d519bc5e5302a05c2f12d50325ee516,https://github.com/mintra-marketplace/launchpad/commit/576e1dad589c759cbb6009d4fde0aae6f5809bec</field>
+    <field name="content">
+        ## [L-3] Not following the CEI pattern
+
+[ERC1155Collection.sol#L102](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/ERC1155Collection.sol#L102)
+
+[ERC1155Collection.sol#L128-L129](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/ERC1155Collection.sol#L128-L129)
+
+[ERC721Collection.sol#L120](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/ERC721Collection.sol#L120)
+
+In ERC721Collection and ERC1155Collection contracts, we have [`ERC721Collection.mint](http://ERC721Collection.mint)()`, `ERC1155Collection.mint()` and `ERC1155Collection.devMint()` functions that doesn’t follow CEI (Checks-Effects-Interact) pattern. Meaning that in `ERC721Collection.mint` for example, `amountMinted` is updated after calling `_safeMint` (which makes an external call). 
+
+Even though the function uses `nonReentrant` modifier, it can still lead to issues like view-only reentrancy attacks. 
+
+**Remediations to Consider**
+
+Follow best practices by adhering to the CEI pattern for aforementioned functions.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/mintra-marketplace/launchpad/commit/9061255d2740f58c7879f7a4a7260c6040e21d4e,https://github.com/mintra-marketplace/launchpad/commit/4a086b095ff6cac86b7b02441ba9ba761b102143,https://github.com/mintra-marketplace/launchpad/commit/0bb0dbd56ed36512526de16bbc116875ace894b9</field>
+    <field name="content">
+        ## [L-4] Market percentage can be set to a value exceeding `maxMarketPercent`
+        
+        EXPLANATION
+        
+        [LaunchpadFactory.sol#L81](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/LaunchpadFactory.sol#L81)
+        
+        In LauchpadFactory contract, we have a `setMarketPercent()` function:
+        
+        ```solidity
+        function setMarketPercent(uint256 _marketPercent) public onlyWizard {
+            require(_marketPercent >= 0 && _marketPercent <= 369, "Fee not in range");
+        
+            marketPercent = _marketPercent;
+        }
+        ```
+        
+        Notice here that LaunchpadFactory’s `marketPercent` can be set in [0, 369] range. But in BaseCollection’s `constructor()`, BaseCollection’s `marketPercent` can only be set in [0,225]:
+        
+        [BaseCollection.sol#L71](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L71)
+        
+        ```solidity
+        constructor(
+            string memory _name,
+            string memory _symbol,
+            string memory _baseURI,
+            address[] memory _priceListToken,
+            uint256[] memory _priceListAmount,
+            address _feeSplitterAddress,
+            uint256 _marketPercent,
+            bytes memory data
+        ) {
+            ...
+            require(_marketPercent >= 0 && _marketPercent <= 225, "Market percent not in range");
+        
+            ...
+        
+        ```
+        
+        As a result, if `marketPercent` in LaunchpadFactory is set in [226, 369], LaunchpadFactory can’t deploy any collections. 
+        
+        **Remediations to Consider**
+        
+        ```diff
+        function setMarketPercent(uint256 _marketPercent) public onlyWizard {
+        -   require(_marketPercent >= 0 && _marketPercent <= 369, "Fee not in range");
+        +   require(_marketPercent >= 0 && _marketPercent <= 225, "Fee not in range");
+        
+            marketPercent = _marketPercent;
+        }
+        ```     
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">9dd2d8e13733acc37f4692a94bf849d51b7c1d30</field>
+    <field name="content">
+        ## [L-5] Maximum token id is restricted to `10_000`
+
+In LaunchpadFactory’s `deployCollection`, there is the following check on the maximum tokenId allowed:
+
+```jsx
+require(_maxTokenId > 0 && _maxTokenId <= 10000, "maxTokenId not in range");
+```
+
+While a lot of NFT projects use a collection quantity of `10_000` tokens, there can be valid use cases where one wants to create collections consisting of more than `10_000` tokens, both for ERC721 and ERC1155. Restricting the `maxTokenId` to 10_000 unnecessarily limits the use case of those collections.
+
+**Remediation to Consider**
+
+Remove the upper limit of `10_000` for `_maxTokenId`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/mintra-marketplace/launchpad/commit/c06c931cfbb1d3cc46e571c4b1ec0043cbcd31c7,https://github.com/mintra-marketplace/launchpad/commit/7be2d145d7a9ed41d03356b84c4bd463ecad89e0</field>
+    <field name="content">
+        ## [L-6] Factory reporting misleading information for deployed collections
+
+[LaunchpadFactory.sol#L25-L28](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/LaunchpadFactory.sol#L25-L28)
+
+In the `LaunchpadFactory` contract, we have a `collections` mapping variable: 
+
+```solidity
+// mapping of collection addresses to their types
+mapping(address => CollectionType) public collections; 
+```
+
+Enum `CollectionType` looks like this:
+
+```solidity
+enum CollectionType {
+    ERC721,
+    ERC1155
+}
+```
+
+The default value for `CollectionType` is ERC721, which leads to reporting misleading information when calling the view function of `collections` mapping for addresses that have not been deployed via the factory. 
+
+**Remediations to Consider**
+
+Use a spacer value as a default type
+
+```diff
+enum CollectionType {
++   NO_OP,
+    ERC721,
+    ERC1155
+}
+```
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [L-7] Should use CREATE2 to avoid potential reorgs
+
+Since the code might be deployed to other chains, it should be considered to be reorgs protected.
+
+About reorgs: also known as block reorganization, reorgs occur when network nodes fall out of sync with each other, and two distinct chains of blocks are produced concurrently. **This may be due to a bug, network latency, or even malicious activity**. When nodes sync once again, one canonical version of the chain is kept, and the blocks included in the invalid ‘fork’ are ignored.
+
+Polygon historically got 157-block reorg, which is ~ 5 minutes: https://protos.com/polygon-hit-by-157-block-reorg-despite-hard-fork-to-reduce-reorgs/
+
+Reorg can happen when a new Collection contract is deployed, and plenty of minters are trying to mint as much as possible. The reorgs that happen will make the Collection contract get undeployed. Malicious users take advantage of that to deploy new Collection contracts with the same address, minter didn’t notice that and still trying to mint NFT, but now malicious users take profit for that instead of the victim project.
+
+**Remediations to Consider**
+
+The root cause of this issue is that people can have the ability to deploy the contract with identical addresses. This can be solved by using CREATE2 and a carefully done salt to deploy the contract 
+
+CREATE is a deploying method that the deployed contract address depend on the `msg.sender`'s address and `msg.sender`'s nonce:
+
+```diff
+new_address = hash(sender, nonce)
+```
+
+CREATE2 is a deploying method that the deployed contract address depend on the `msg.sender`'s address, an arbitrary salt, and the deployed contract’s bytecode:
+
+```diff
+new_address = hash(0xFF, sender, salt, bytecode)
+```
+
+Further reading: [https://docs.openzeppelin.com/cli/2.8/deploying-with-create2](https://docs.openzeppelin.com/cli/2.8/deploying-with-create2#create2)
+
+To make sure deployers can’t deploy a contract with collided address with each other, we must include deployer’s address into the salt
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a2ed80f9363dccfa10ea58f9c49b0f6c71255404</field>
+    <field name="content">
+        ## [Q-1] Burner must have to own the token in order to burn
+
+        [ERC721Collection.sol#L130-L135](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/ERC721Collection.sol#L130-L135)
+        
+        [ERC1155Collection.sol#L140-L145](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/ERC1155Collection.sol#L140-L145)
+        
+        In `ERC721Collection` contract, burners have to own the token in order to burn it. This can lead burners who have permission from other addresses, or have permission to use the burning token, to transfer it to their own wallet in order to `burn()` :
+        
+        ```solidity
+        function burn(uint256 tokenId) external {
+            require(additionalFeatures.isBurnable, "Collection is not burnable");
+            
+            // msg.sender must be token owner
+            require(ownerOf(tokenId) == msg.sender, "Token not owned");
+            _burn(tokenId);
+        }
+        ```
+        
+        The same issue appears in `ERC1155Collection`, the burner who has permission from another address need to transfer the tokens to their own wallet first in order to burn it:
+        
+        ```solidity
+        function burn(uint256 _tokenId, uint256 _amount) external {
+            require(additionalFeatures.isBurnable, "Collection is not burnable");
+        
+                // msg.sender must be token owner
+            require(balanceOf(msg.sender, _tokenId) >= _amount, "Token not owned");
+            _burn(msg.sender, _tokenId, _amount);
+        }
+        ```
+        
+        **Remediations to Consider**
+        
+        For `ERC721Collection`, consider putting burn permission for burners that have an allowance of the burning token, or burners that have permission to other addresses that hold the burning token. In `ERC721A` contract, there’s a function `function _burn(uint256 tokenId, bool approvalCheck)` that we can use for this case ([ERC721A.sol#L1130](https://github.com/chiru-labs/ERC721A/blob/c5bd8e1b1d845e321f35b69872597f308f455019/contracts/ERC721A.sol#L1130)). If `approvalCheck == true`, it will check if `msg.sender` has the allowance of the burning token or `msg.sender` has permission to other addresses that hold the burning token:
+        
+        ```diff
+        function burn(uint256 tokenId) external {
+            require(additionalFeatures.isBurnable, "Collection is not burnable");
+            
+        -   require(ownerOf(tokenId) == msg.sender, "Token not owned");
+        -   _burn(tokenId);
+        +   _burn(tokenId, true);
+        }
+        ```
+        
+        For `ERC1155Collection`, consider putting burn permission for the burner having permission to other addresses that hold the burning token. 
+        
+        ```diff
+        -	function burn(uint256 _tokenId, uint256 _amount) external {
+        +	function burn(uint256 _tokenId, uint256 _amount, address _burner) external {
+            require(additionalFeatures.isBurnable, "Collection is not burnable");
+            
+        -   require(balanceOf(msg.sender, _tokenId) >= _amount, "Token not owned");
+        +		require(_burner == msg.sender || isApprovedForAll(_burner, msg.sender), "Token not owned or approved");		
+        
+        -    _burn(msg.sender, _tokenId, _amount);
+        +    _burn(_burner, _tokenId, _amount);
+        }
+        ```
+    </field>
+</item>
+
+
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">12ff15fd58cd89d6b2e53a26510f6a2f0def4bc8</field>
+    <field name="content">
+        ## [Q-2] `tokenAddresses` and `tokenAmounts` array must have the same length at all case
+
+        In BaseCollection, the constructor checks that `erc20TokenAddresses == erc20TokenAmounts` and `erc721TokenAddresses == erc721TokenAmounts`.  However, this check is only done in the case `erc20AndErc721IsAnd == true`, but should be done in any case.
+        
+        [BaseCollection.sol#L80-L91](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L80-L91)
+        
+        **Remediations to Consider**
+        
+        ```diff
+        constructor(
+            string memory _name,
+            string memory _symbol,
+            string memory _baseURI,
+            address[] memory _priceListToken,
+            uint256[] memory _priceListAmount,
+            address _feeSplitterAddress,
+            uint256 _marketPercent,
+            bytes memory data
+        ) {
+            ...
+        
+        -   if (_additionalFeatures.erc20AndErc721IsAnd) {
+                require(
+                    _additionalFeatures.erc20TokenAddresses.length == _additionalFeatures.erc20TokenAmounts.length,
+                    "ERC20 list mismatch"
+                );
+                require(
+                    _additionalFeatures.erc721TokenAddresses.length == _additionalFeatures.erc721TokenAmounts.length,
+                    "ERC721 list mismatch"
+                );
+                
+        +   if (_additionalFeatures.erc20AndErc721IsAnd) {
+        
+                require(_additionalFeatures.erc20TokenAddresses.length > 0, "ERC20 list empty");
+                require(_additionalFeatures.erc721TokenAddresses.length > 0, "ERC721 list empty");
+            }
+        
+            ...
+        }
+        ```
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">9dd99cd6e646668d5a3c89cc61d6f2452683f84a</field>
+    <field name="content">
+        ## [Q-3] Add a convenient way to send native tokens to `RoyaltySplitter`
+
+        [RoyaltySplitter.sol#L47](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/RoyaltySplitter.sol#L47)
+        
+        Currently, the only way to send native token to `RoyaltySplitter` contract is by calling to `distrubuteRoyalty()` function:
+        
+        ```solidity
+        function distrubuteRoyalty(address[] memory erc20Addresses) public payable nonReentrant {
+            ...
+        }
+        ```
+        
+        **Remediations to Consider**
+        
+        Consider adding a `fallback` or `receive` function to the `RoyaltySplitter` contract in order to receive native token directly.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Missing Feature</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">c17326599086b89bc043c71582a0d5326e312fac</field>
+    <field name="content">
+        ## [Q-4] Consider adding ERC1555 token gating for minting collection
+
+        In `BaseCollection` contract, the collection owner can configure the contract to be ERC20 and ERC721 token-gated for minters when minting tokens. But currently, the contract doesn’t support ERC1155 token-gated. 
+        
+        **Remediations to Consider**
+        
+        For a more flexible contract, consider adding ERC1155 token-gated feature
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-5] View functions are redundant
+
+        [BaseCollection.sol#L229-L246](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L229-L246)
+        
+        In `BaseCollection` contract, `getAdditionalFeatures()` , `onAllowList()` , `getPrice()`  view functions can be removed because due to the public state variables, we have `additionalFeatures()`, `allowlist()`, `price()` view functions that return exactly the same value. 
+        
+        [ERC721Collection.sol#L169-L178](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/ERC721Collection.sol#L169-L178)
+        
+        In `ERC721Collection` contract, `name()` and `symbol()` don’t need to be overriden. Because ERC721Collection's `myName` and `mySymbol` have the same value as ERC721A’s `_name` and `_symbol`, ERC721A’s and ERC721Collection’s `name()` and `symbol()` functions return the same value
+        
+         
+        
+        **Remediations to Consider**
+        
+        Consider removing those unnecessary view functions
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">9639896246153991a2d1b2c13b1b5a61cd6b73d8</field>
+    <field name="content">
+        ## [Q-6] Consider using constant/immutable variables for magic number
+
+        On the following occurrences, a number is used instead of a constant:
+        
+        - [225](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L71) for max market percentage
+        - [100000](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L71) for minimum price
+        - [369](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/LaunchpadFactory.sol#L81) for max market percentage (should be 225, see L-4)
+        - [10000](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/LaunchpadFactory.sol#L114) for max token id
+        
+        **Remediations to Consider**
+        
+        To improve readability, consider using constants for the number mentioned above.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-7] Misleading name for `_maxTokenId`
+
+        In ERC721Collection, `_maxTokenId` is passed to the constructor and defined as follows:
+        
+        ```jsx
+        * @param _maxTokenId The maximum supply of tokens that can be minted for the collection. 
+        ```
+        
+        However, the name `_maxTokendId` implies, that this is the maximum number of token id that can be minted, rather than the maximum number of supply. It is verified in the `mint` function:
+        
+        ```jsx
+        require(supply + _amount <= maxTokenId, "Max maxTokenId reached");
+        ```
+        
+        As per above, `maxTokenId` is treated as the maximum allowed supply. This can create confusions amongst users, as tokens can be minted with `tokenIds > maxTokenId`. 
+        
+        **Remediation to Consider**
+        
+        Rename `_maxTokenId` to a more meaningful name such as `_maxTokenMinted`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Nitpicks</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-8] Nitpicks
+
+        1. In ERC721Collection and ERC1155Collection, `supportsInterface()` can be refactored to me more readable:
+            
+            ```diff
+            + return ERC2981.supportsInterface(interfaceId) || ERC721A.supportsInterface(interfaceId);
+            - return ERC2981.supportsInterface(interfaceId) ? true : ERC721A.supportsInterface(interfaceId);
+            ```
+            
+        
+        1. Currently, in the [BaseCollection.sol#L101](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L101) `constructor()`, `isFreeMint` variable gets set to `false` multiple times every loop:
+            
+            ```solidity
+            for (uint256 i = 0; i < _priceListToken.length; i++) {
+                isFreeMint = false;
+            
+                require(_priceListAmount[i] >= 100000, "Price too low");
+                price[_priceListToken[i]] = _priceListAmount[i];
+            }
+            ```
+            
+            Move `isFreeMint = false;` outside of the loop to save gas.
+            
+        
+        1. In `BaseCollection.withdraw()` function, a `payable` tag is not necessary, since this function doesn’t need to hold native token:
+            
+            ```diff
+            -    function withdraw(address _tokenAddress) external payable onlyOwner {
+            +    function withdraw(address _tokenAddress) external onlyOwner {
+                    ...
+            ```
+            
+        
+        1. In `BaseCollection.verifyAndProcessPayment()`, required ERC20 will be pulled from `msg.sender` to the contract first, and then distributed to `feeSplitterAddress` and `owner()` . We can reduce one external call here by sending ERC20 directly from `msg.sender` to `feeSplitterAddress` and `owner()`
+            
+            ```diff
+            -	    IERC20(_tokenToPayIn).safeTransferFrom(msg.sender, address(this), totalCost);
+            -	    IERC20(_tokenToPayIn).safeTransfer(feeSplitterAddress, launchpadFee);
+            -	    IERC20(_tokenToPayIn).safeTransfer(owner(), totalCost - launchpadFee);
+                    
+            +	    IERC20(_tokenToPayIn).safeTransferFrom(msg.sender, feeSplitterAddress, launchpadFee);
+            +	    IERC20(_tokenToPayIn).safeTransferFrom(msg.sender, owner(), totalCost - launchpadFee);
+            
+            ```
+            
+        
+        1. In BaseCollection, import of [Strings](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L5) and [ReentrancyGuard](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L7) is not used and can be removed
+        2. In BaseCollection, for [isERC20CheckSatisfied](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L153) and [isERC721CheckSatisfied](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/BaseCollection.sol#L155), it is not necessary to set default value.
+        3. Inaccurate natspec in ERC1155Collection:
+            - missing @param for [`_maxSupplytoken`](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/ERC1155Collection.sol#L59)
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="content">
+        ## [I-1] Max mint amount checks and token gating can be bypassed
+
+        [ERC721Collection](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/ERC721Collection.sol#L27) and [ERC1155Collection](https://github.com/mintra-marketplace/launchpad/blob/1120440473eb94fa01665deace8d4d89d0783c65/src/ERC1155Collection.sol#L28) use the var `maxMintableAmount` to restrict the number of tokens allowed to be minted per address. However, this check can be easily bypassed, as a malicious user can just [create as much addresses as they want](https://mirror.xyz/barsik.eth/Mj7oi7HuXsRR3eBV94dTVTmSH-Gd2MU-D4lV5zNvH5g). 
+        
+        Additionally, both ERC721 and ERC1155 collections implement token gating to restrict minting of tokens only to addresses holding certain tokens. This can also be easily bypassed by users utilizing flashloans to borrow assets.
+  </item>
