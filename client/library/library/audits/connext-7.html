@@ -1,0 +1,43 @@
+<page
+  clientName="Connext"
+  reportDate="July 3rd, 2024"
+  auditTitle="Connext A-7"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/BootNodeDev/arbitrum-bridge-erc7281-gateway"
+  repoCommitHash="98d7fee5777686e8064cd06c31d30f970673a300"
+  repoCommitHashFinal="94ca7b449493d320293e195da175210a4b8e620a"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_CONNEXT_7"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team between June 11th and June 14th, 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+      <li>Available project specification.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contract within this repository:</p>
+
+    <template type="file-hashes">
+        683894fa61b0e8f267965a33fb1b243134c6b588fb3ad1bc507fef13b2f870fc  src/L1ArbitrumEnabledXERC20.sol
+        86b983afa049161efe2341a48c438fadf8c77160b6550e9039d698645904d9c3  src/L1LockboxGateway.sol
+        942f4e6a52d9f220880adcac0b2a1c169aabc3a9e258624d0ef8f651c439ecf0  src/L1XERC20Adapter.sol
+        153133462821096ad233a4a46a4b4a480daf913817e2fabc754b3b242fb49350  src/L1XERC20Gateway.sol
+        f996733307eb5860ca5ce83ce2bb8529b68f45e2dae2ff08373fbf360a33a763  src/L2ArbitrumEnabledXERC20.sol
+        758dbd1d507499a34a9dbfdfdf5f3151885db933c5749f4c6f9c581471a9d46d  src/L2LockboxGateway.sol
+        b2c2fcfcda40d5daace56eafc1631e046c39d960027afff2d0c3bb349054e156  src/L2XERC20Gateway.sol
+        74e717a9f767ef5f982ff5b7e2dc40575f28011be4225052dc2f928a5f112c36  src/XERC20BaseAdapter.sol
+        6db9b89db6f313075811e8da27aa80402b252d80a9a613b30b50dca49109024f  src/XERC20BaseGateway.sol
+        e5b95030022142b9ee6c2c0d3252c33239b6db7fe7811a2342a666db1093b101  src/libraries/L1ArbitrumEnabled.sol
+        5a236700be7a34740cdb8a5a23112246777b0ca351633485249d23b0006c6f18  src/vendor/L2ArbitrumGateway.sol
+        9a191fd685bf8487cd89da0557679ab2e4b24281cd168606bfa4e91b4a86056d  src/vendor/L2CustomGateway.sol
+    </template>
+
+  </content-for>
+</page>
