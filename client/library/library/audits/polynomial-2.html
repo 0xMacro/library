@@ -1,0 +1,52 @@
+<page
+  clientName="Polynomial"
+  reportDate="July 8th, 2024"
+  auditTitle="Polynomial A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Polynomial-Protocol/polychain-deployment"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="3c09fa61dbd332c2b9566f2da90176ec5358d211"
+  finalRepoCommitHash="65e484b87d431d38f323472ceef083a76fce523a"
+  passwordEncrypt="env:PAGE_PASS_POLYNOMIAL"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on June 23rd 10th to June 24th 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+        ### Trust Model, Assumptions, and Accepted Risks (TMAAR)
+
+        Fee tiers are created by owner of polynomial, and each account requires the owners signature to update their fee tier. The owner is trusted to fairly distribute fee discounts described in fee tiers to appropriate accounts, and update account’s fee tiers appropriately. The fee tiers of an account is also expected to be updated frequently, on a 24 hour basis, and so fee tier updates signatures are expected to have a 24 hour expiry to prevent reusing an account’s beneficial fee tier. Polynomial is also expected to update an accounts fee tier if they do not do so themselves prior to trading.
+    </template>
+  </content-for>
+
+ 
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+      b800cbd543216636cddb992737594bb63595c9d65f85f1e224a364e2ac4d9a45  markets/perps-market/contracts/interfaces/IAsyncOrderModule.sol
+      32d2b8fd6e255e360ba4197755ea05d2526b80268541dd2259a4f4558c235326  markets/perps-market/contracts/interfaces/IFeeTierModule.sol
+      d1ee0e99ad6bea0c508521e12c87b202a3ff099b253b9b72936cf13c715de573  markets/perps-market/contracts/interfaces/IGlobalPerpsMarketModule.sol
+      1aea5418bde0dd1cc08ece2a56383ed18b869f7bed447acd1141d346e7ecece9  markets/perps-market/contracts/interfaces/IPerpsAccountModule.sol
+      80522909f01b8331a318488a1232b352f3042ac130a513f58aff2a07bbfa95b8  markets/perps-market/contracts/modules/AsyncOrderModule.sol
+      c76f87bd11b789e04bfc970dd79b808992151e4cabaafd183f785f5bd9059d8d  markets/perps-market/contracts/modules/FeeTierModule.sol
+      ba15951db3007e3049c4bde09992ca587cd61b8567340857091220120210619d  markets/perps-market/contracts/modules/PerpsAccountModule.sol
+      d6b18e3b6c76de58ddf1e24dff3e0ead23ab5053f80849e95d263aeda06b3cdc  markets/perps-market/contracts/storage/AsyncOrder.sol
+      791698aabd01764fb6b0c4d72687197cb63b4d40ef98fa0d3ec401ef7b58a7a2  markets/perps-market/contracts/storage/FeeTier.sol
+      50eb09b89db3a4b4f71e8ab2dc283e4e0cfb5af6ca536a51d3902c64b253d844  markets/perps-market/contracts/storage/GlobalPerpsMarketConfiguration.sol
+      27bf87e775af4d6ef427c0644d8078da2c751b0c50c58ca0180d84d279db6b3a  markets/perps-market/contracts/storage/PerpsAccount.sol
+    </template>
+
+  </content-for>
+</page>
