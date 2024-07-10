@@ -1,0 +1,66 @@
+<item>
+    <field name="topic">Error Recovery</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">91034cd69fe741fb99766cf7e876e96478d7ee91</field>
+    <field name="content">
+      ## [M-1] Redemption via the PositionManager may be blocked
+  
+      The Into the Block’s `PositionManager.sol` for the Reserve Protocol is private, however, it stores the basket nonce of the last time `assemble()` is called, which essentially mints rTokens in return for a basket of erc20 tokens. When `disassemble()` is called, this stored basket nonce is used to call [`redeemCustom()`](https://github.com/reserve-protocol/protocol/blob/master/contracts/p0/RToken.sol#L169-L255) on the rToken. This in turn calls [`quoteCustomRedemption()`](https://github.com/reserve-protocol/protocol/blob/master/contracts/p0/BasketHandler.sol#L494-L577) on the basket handler, which requires that the basket nonce used is ≥ the `lastCollateralized`:
+  
+      ```solidity
+      ...
+      require(
+        basketNonces[i] >= lastCollateralized && basketNonces[i] <= nonce,
+        "invalid basketNonce"
+      );
+      ...
+      ```
+      Reference: [BasketHandler.sol#L516-L519](https://github.com/reserve-protocol/protocol/blob/master/contracts/p0/BasketHandler.sol#L516-L519)
+  
+      In the case where a new basket is added, and is collateralized, it will set this lastCollateralized to the new baskets nonce. This could mean that a prior deposit may not be able to be redeemed, since the stored nonce used will fail the above check.  Typically this can be resolved by calling assemble again, depositing a small amount of assets, which would update the stored nonce to the correct value. However, the basket could have been updated in response to a default or black swan event, and the new basket could be collateral to make users whole, while freezing new issuance of rTokens. In this case, both `assemble()` and `disassemble()` would revert, and in order to redeem rTokens, they would need to be transferred out of the position manager to redeem with a proper basket nonce.
+  
+      **Remediations to Consider**
+  
+      Allow the basket nonce to be set, or used as a parameter in `disassemble()`, rather than using a potentially incorrect basket nonce for redemptions. 
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">91034cd69fe741fb99766cf7e876e96478d7ee91</field>
+    <field name="content">
+      ## [M-2] Potentially incorrect tokens and values used in `disassemble()`
+  
+      In the case where there are multiple baskets in an rToken, where they both are able to be redeemed from, then there are multiple valid basket nonces that can be used in  [`redeemCustom()`](https://github.com/reserve-protocol/protocol/blob/master/contracts/p0/RToken.sol#L169-L255). In the case of the Position Manager, it uses the most recent basket nonce when the last call to `assemble()` was made to make the call to `redeemCustom()`, but the value of the `expectedERC20sOut` is pulled by calling [`quote()`](https://github.com/reserve-protocol/protocol/blob/master/contracts/p0/BasketHandler.sol#L470-L492), which returns an array of ERC20’s for the current basket. Since the basket nonce used on the redemption is older in this case, it may have entirely different tokens that get redeemed, which would cause the balance checks to fail at the end of execution since the returned values would not , or alternatively the new basket could have the same tokens but in a differing order, which may cause the call to execute with mismatched values for `minAmounts`, and may complete execution while receiving less than the expected min amounts for certain tokens.
+  
+      **Remediations to Consider**
+  
+      There is no way to directly query the tokens from past basket nonces, you could store the array of ERC20s associated with a basket, or provide the array of `expectedERC20sOut` in the call to `dissessemble()`, to ensure `dissessemble()` executes as expected.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">91034cd69fe741fb99766cf7e876e96478d7ee91</field>
+    <field name="content">
+      ## [L-1] No way for vault to call `claimFees()`
+  
+      The [`claimFees()`](https://github.com/Se7en-Seas/boring-vault/blob/main/src/base/Roles/AccountantWithRateProviders.sol#L305-L340) function in `AccountantWithRateProviders.sol` is intended to be called by the vault associated with the accountant to claim maintenance and performance fees accrued over time. However, in order for the vault to make calls, the function signature needs to be setup in a decoder and sanitizer contract, and setup as a leaf in a merkle tree in `ManagerWithMerkleVerification.sol`, which it currently is missing a decoder and sanitizer with this signature, so is unable to make the call prevent fees from being collected.
+  
+      **Remediations to Consider**
+  
+      Add `claimFees()` to a decoder and sanitizer contract, and add a leaf that allows the vault to claim fees.
+  
+    </field>
+  </item>
+  
