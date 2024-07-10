@@ -1,0 +1,60 @@
+<page
+  clientName="Superstate"
+  reportDate="July 10th, 2024"
+  auditTitle="Superstate A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/superstateinc/ustb"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="6efadf608c4941a6ce63a770adfd68cf0160d673"
+  repoCommitHashFinal="8bf5b29b7eb670778aeedd53342bbce4551b1385"
+  customRepoInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on July 3rd to July 5th, 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within this repository:</p>
+    <template type="file-hashes">
+
+        e41afca834886506a5a708d57fc213cac8234e524c5fac8d9fe3453658f577a2  ./src/AllowList.sol
+        30022d6d06e5e0c8cdb8bf6e2439c404cb883fffb278027182aec3d2a9ad4e67  ./src/SuperstateToken.sol
+        5d0420e2d36ac8f1ad9d1a03788cad8ddb2932d6afd959f90f660deb0bf16356  ./src/USCC.sol
+        1f71630d3a4717176b7f96af9dfcbd1e8ed26a6ed55ce07ea050b919b38ef1eb  ./src/USTB.sol
+
+    </template>
+
+    <p>Additionally, the following deployment script was reviewed:</p>
+    <template type="file-hashes">
+
+        f1e821a8133c0440153b0a7f3b17edc9aa5199b83064bad34add7af6c629a744  ./script/DeployUsccScript.s.sol
+        
+    </template>
+  </content-for>
+</page>
