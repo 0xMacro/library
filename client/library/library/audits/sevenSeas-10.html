@@ -1,0 +1,50 @@
+<page
+  clientName="Seven Seas"
+  reportDate="July 10, 2024"
+  auditTitle="Seven Seas A-10"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="35433417a394c49538260f30b5d37ab3e8de99d1"
+  finalRepoCommitHash="14bd3471289c49484f56c87404489c7de52557e8"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on periodically from june 20th to july 8th 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+      ### Trust Assumptions:
+
+      Part of this audit investigated authorizing trusted protocols to call bulk deposit on the teller. Doing so allows the protocol to skip over the set share lock period that normal depositors experience. It is trusted that the protocols authorized to make bulk deposits cannot or are trusted to not maliciously use the lack of a share lock period, to arbitrage share price updates.
+    </template>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+      bd6d9dfa44f3eb1892b0fd1865556918d77b5660d18fc729c37b79e859f2a531  src/base/DecodersAndSanitizers/BridgingDecoderAndSanitizer.sol
+      1d4d53ddb56cbba71cd64f581910237977bb87968eaba625fa8a1ac19e8816c0  src/base/DecodersAndSanitizers/EtherFiLiquidEthDecoderAndSanitizer.sol
+      2f44f23d7c1a01701e4446d0e7eb83510d079a4ed3dce055b83108caea3dd053  src/base/DecodersAndSanitizers/PancakeSwapV3FullDecoderAndSanitizer.sol
+      df112acbbe4c3bc48645abdc008eaf0468e45575cab336453939a6079208f4ca  src/base/DecodersAndSanitizers/Protocols/CCIPDecoderAndSanitizer.sol
+      338232d68727bbc8c8f790995a97de8b6bc139a08b57e32614f8562d42a8e3c2  src/base/DecodersAndSanitizers/Protocols/ITB/ITBPositionDecoderAndSanitizer.sol
+      c8bd2c24f98cbfef98ca7fa15396054e9ffb4217bc9ca5f09c6f6b2a688183a1  src/base/DecodersAndSanitizers/Protocols/PancakeSwapV3DecoderAndSanitizer.sol
+      c2e1bec097d8ba7038371eb239125f28277ca310890dad8b1cfe6768c0f26606  src/base/DecodersAndSanitizers/Protocols/PendleRouterDecoderAndSanitizer.sol
+      29c261d40412922b7a9288c89533a08cfde065c3cb153ccdb68cc6efdd7643fc  src/base/DecodersAndSanitizers/Protocols/ArbitrumNativeBridgeDecoderAndSanitizer.sol
+      cd398597495709603bd365194aacf8351433a00d6ece76ea15e89099077a860f  src/base/Roles/CrossChain/CrossChainTellerWithGenericBridge.sol
+      07884e603f6c8ac9148cd3bcdda9d9bf1cd94b089d8b272b452494c7143e8894  src/base/Roles/TellerWithMultiAssetSupport.sol
+      731408dc5444a13052f61d2fd5501feb2dce900b30f9fd27deb86575d88cc6f5  src/interfaces/DecoderCustomTypes.sol
+    </template>
+
+  </content-for>
+</page>

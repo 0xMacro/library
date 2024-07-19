@@ -1,0 +1,201 @@
+<item>
+    <field name="topic">EIP integration</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">e3c5f82b751aabb62252413600193665c09e5277</field>
+    <field name="content">
+      ## [M-1] `SuperstateToken` is not EIP-2612 compliant
+  
+      In `SuperstateToken`, the `permit()` feature currently has some divergences from the EIP-2612 standard specification:
+  
+      - The `AUTHORIZATION_TYPEHASH` uses a different struct name.
+      
+          ```solidity
+          /// @dev The EIP-712 typehash for authorization via permit
+          bytes32 internal constant AUTHORIZATION_TYPEHASH =
+              keccak256("Authorization(address owner,address spender,uint256 amount,uint256 nonce,uint256 expiry)");
+          ```
+      
+          **Reference:** [SuperstateToken.sol#21-22](https://github.com/superstateinc/ustb/blob/6efadf608c4941a6ce63a770adfd68cf0160d673/src/SuperstateToken.sol#L21-L22)
+      
+      - The `permit` function parameters `amount` and `expiry` do not have the same parameter names.
+      
+          ```solidity
+          function permit(address owner, address spender, uint256 amount, uint256 expiry, uint8 v, bytes32 r, bytes32 s)
+          ```
+      
+          **Reference:** [SuperstateToken.sol#306](https://github.com/superstateinc/ustb/blob/6efadf608c4941a6ce63a770adfd68cf0160d673/src/SuperstateToken.sol#L306)
+      
+      - The `expiry` check will revert if it’s equal to `block.timestamp`.
+      
+          ```solidity
+          if (block.timestamp >= expiry) revert SignatureExpired();
+          ```
+      
+          **Reference:** SuperstateToken.sol#L309
+      
+          Different from what EIP-2612 states:
+      
+          > The current blocktime is less than or equal to `deadline`.
+          > 
+      
+          **Reference:** [EIP-2612#Specification](https://eips.ethereum.org/EIPS/eip-2612#specification)
+      
+  
+      This could cause external third-party integrators to fail to produce valid signatures to interact with `SuperstateToken` reverting on `permit()` calls and will need custom signature generation integration for this specific contract.
+  
+      **Remediations to Consider:**
+  
+      - Changing the function’s parameter `amount` and `expiry` to `value` and `deadline` correspondingly.
+      - Changing the `AUTHORIZATION_TYPEHASH` to
+      
+          ```solidity
+          keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+          ```
+      
+      - Updating the `expiry` check to allow `block.timestamp == expiry`.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">6e0d0a2da03f1117371fdfcff74dad4f09372b05</field>
+    <field name="content">
+      ## [Q-1] Redundant `_releaseEncumbrance()` execution for `transferFrom` calls with allowance only
+  
+      In `SuperstateToken.sol`, function `transferFrom()` checks the value of encumbered tokens that the intended `src` address has set to the corresponding `msg.sender`. If the `amount` to be transferred is higher than the encumbered balance the logic checks if the proper allowance is set to execute a standard ERC20 `transferFrom`.
+  
+      ```solidity
+      function transferFrom(address src, address dst, uint256 amount) public override returns (bool) {
+            uint256 encumberedToTaker = encumbrances[src][msg.sender];
+            // check src permissions if amount encumbered is less than amount being transferred
+            if (encumberedToTaker < amount && !hasSufficientPermissions(src)) {
+                revert InsufficientPermissions();
+            }
+      
+            if (amount > encumberedToTaker) {
+                uint256 excessAmount;
+                unchecked {
+                    excessAmount = amount - encumberedToTaker;
+                }
+                // Ensure that `src` has enough available balance (funds not encumbered to others)
+                // to cover the excess amount
+                if (availableBalanceOf(src) < excessAmount) revert InsufficientAvailableBalance();
+      
+                // Exceeds Encumbrance, so spend all of it
+                **_releaseEncumbrance(src, msg.sender, encumberedToTaker);**
+      
+                _spendAllowance(src, msg.sender, excessAmount);
+            } else {
+                _releaseEncumbrance(src, msg.sender, amount);
+            }
+      
+            ...
+      
+            return true;
+      } 
+      ```
+  
+      **Reference:** [SuperstateToken.sol#L224-259](https://github.com/superstateinc/ustb/blob/6efadf608c4941a6ce63a770adfd68cf0160d673/src/SuperstateToken.sol#L224-L259)
+  
+      However, this will execute `_releaseEncumbrance()` and emit `Release` even if this taker has no encumbered tokens. For example, all `transferFrom()` calls using allowances will render this behavior. Consider checking if `encumberedToTaker` is not equal to zero and calling `_releaseEncumbrance()` if so.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-2] Improper naming for `Permission` states
+  
+      In the `AllowList` contract, the `Permission` struct member names do not reflect the specific permission purpose of each permission state. Furthermore, the `isAllowed` does not specify that it uniquely represents the authorized bool for `USTB` contract. Similarly, the `state1` does not represent the `USCC` permission. Consider renaming these struct members to a more expressive name representing the proper authorization granted by them.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-3] `USCC` state lacks a specific setter function
+  
+      The`AllowList` currently contains the `setIsAllowed()` function to set the `isAllowed` bool for a specific `entityId`. However, there is no function to set the particular `state1` for the USCC contract. Although this state can be set through `setNthPermission()`, consider implementing a function to set this state to have a consistent interface.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8da2402683b33f1d00ae7721cf7a13d38f0a4043</field>
+    <field name="content">
+      ## [Q-4] Unnecessary unchecked counter increment
+  
+      [As of the solidity 0.8.22 version](https://soliditylang.org/blog/2023/10/25/solidity-0.8.22-release-announcement/), the compiler includes `unchecked` counter increments for `for` loops by default. Consider removing unnecessary gas optimizations for incrementing the counter in the `for` statement in functions `setEntityIdForMultipleAddresses()` and `setEntityPermissionAndAddresses()` in `Allowlist`.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">af5b6177fae23c74f23de147913af2a102cb1b44</field>
+    <field name="content">
+      ## [Q-5] Locking pragma version
+  
+      Currently, all contracts set the required version for solidity pragma to a minimum value but do not specifically lock it to a fixed compiler version:
+  
+      - `USTB` and `USCC` use `pragma solidity ^0.8.26`.
+      - `Allowlist` and `SuperstateToken` use `pragma solidity ^0.8.20`.
+  
+      Consider using a single and fixed pragma version as a best practice.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-6] Not using the latest stable release for OZ libraries
+  
+      Consider updating the OZ library to the latest stable release, 5.0.2, as it currently uses the 4.9.3 version.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3d2f53190fe34cd7aef9db299681079e0c589143</field>
+    <field name="content">
+      ## [Q-7] Unused parameter in the deployment script
+  
+      In `DeployUsccScript.s.sol`, the variable `permsImplementation` is currently not being used. Consider removing it.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">high</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-8] Implement a strategy for managing storage in upgradeable contracts
+  
+      `SuperstateToken`, `USCC`, and `USTB` are upgradeable contracts. However, the current implementation does not implement any strategy for preventing storage conflicts during future contract upgrades.
+  
+      Consider implementing storage gaps or unstructured storage pattern to facilitate contract maintenance in the future.
+    </field>
+  </item>
+  

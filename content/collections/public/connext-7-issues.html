@@ -1,0 +1,279 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">0cd80062e4a706a1f79674837e4ba73b07b95040</field>
+    <field name="content">
+      ## [C-1] XERC20 on L1 and L2 can be stolen up to the max mint limit
+
+      The `L1XERC20Gateway` contract allows **permissionless registration of multiple token pairs** meant to be supported for bridging. `L1XERC20Gateway` instance is allowed to mint and burn XERC20 tokens according to preconfigured limits. `L1XERC20Gateway` is configured with a call to `registerTokenOnL2` on an instance of the `L1ArbitrumEnabledXERC20` contract if XERC20 is just to be created or on an instance of the `L1XERC20Adapter` contract if the XERC20 token already exists. `L1XERC20Adapter`, even though a separate contract with a different contract address acts **as a stand-in for the XERC20** token. `L1XERC20Gateway`, when interacting with the instance of `L1XERC20Adapter`, will retrieve a reference to the underlying XERC20 token and perform corresponding operations (mint/burn) **directly with the XERC20 token**.
+  
+      A malicious attacker may exploit the current characteristics of the system to mint an unbacked amount of a particular XERC20 token up to the limit allowed for a particular gateway instance. To achieve this attacker may perform the following steps:
+  
+      1. `L1XERC20Gateway` is configured (`registerTokenOnL2` was called on A):
+          - l1Token: A - which is an instance of `L1ArbitrumEnabledXERC20` or `L1XERC20Adapter`
+          - l2Token: B - which is an instance of `L2ArbitrumEnabledXERC20`
+      2. Attacker creates 2 contracts:
+          - maliciousL1Token: C - which is an instance of `L1XERC20Adapter` for the same XERC20 used in contract A.
+          - maliciousL2Token: D - which is an instance of `L2ArbitrumEnabledXERC20` and under full control of the attacker.
+      3. The attacker registers the C/D token pair with the same `L1XERC20Gateway` that has the A/B token pair already registered.
+          - As a result of successful registration, `registerTokenFromL1()` is processed on the instance of `L2XERC20Gateway`, and `l1ToL2Token` mapping is updated to contain a C/D value pair.
+      4. Attacker mints/obtains an amount of token D up to the specified limit of `L1XERC20Gateway` for minting XERC20 referenced in token A.
+      5. The attacker invokes `L2XERC20Gateway:outboundTransfer()` for token C, resulting in the provided amount of token D being burned, and withdrawal is triggered on L1.
+      6. On L1 in `L1ArbitrumGateway:finalizeInboundTransfer()`, withdrawal is handled by the `L1XERC20Gateway` instance, and `L1XERC20Gateway:inboundEscrowTransfer()` is called for C token. Since C is an adapter, `getXERC20()` on C will be called, returning the same XERC20 token as the one used in token A. Since there are no additional checks, the attacker will receive a specified amount of valuable XERC20 tokens without providing any backing on L2.
+      
+          ```solidity
+          function _inboundEscrowTransfer(address _tokenOrAdapter, address _dest, uint256 _amount) internal virtual {
+              address _token = _tokenOrAdapter;
+      
+              if (addressIsAdapter(_tokenOrAdapter)) {
+                  _token = IXERC20Adapter(_tokenOrAdapter).getXERC20();
+              }
+              XERC20(_token).mint(_dest, _amount);
+          }
+          ```
+      
+  
+      *In summary, the attacker on L2 burns worthless D tokens to obtain a claim for C tokens on L1. However, on L1, a claim for C tokens is incorrectly accepted as a valid claim for valuable A tokens, allowing the attacker to steal A tokens.*
+  
+      Also, there exists an alternative exploit scenario
+  
+      *The attacker registers the C/D token pair on the* `L1XERC20Gateway` *gateway. The attacker on L1 mints worthless C tokens; it bridges them to L2 and obtains a claim to corresponding D tokens. However, since the D token contract is malicious and acts as an `IXERC20Adapter`, it returns XERC20 corresponding to a B token on the same gateway. This allows the attacker to mint valuable B tokens with worthless C tokens.*
+  
+      **Remediations to consider**
+  
+      - Do not allow permissionless token registrations on `L1XERC20Gateway`.
+      - Prevent multiple tokens from representing the same underlying token.
+    </field>
+    <field name="response">
+        Additional changes present in commit https://github.com/BootNodeDev/arbitrum-bridge-erc7281-gateway/pull/17/commits/3fa4e4cd440554f46d7b4c87feb142e707e01e6e
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [M-1] L1XERC20Gateway.forceRegisterTokenToL2() may brick bridge or perform unexpected mints/burns
+  
+  
+      `L1XERC20Gateway` inherits from the `L1CustomGateway` contract. The `forceRegisterTokenToL2()` function implementation provided by the `L1CustomGateway` is accessible only by the gateway owner.
+  
+      This function updates `l1ToL2Token` mapping on L1 and L2 through the corresponding counterparty gateway. Since this function does not perform thorough input validations, the caller/owner is responsible for providing correct input.
+  
+      If the caller/owner is compromised or performs an incorrect update using `forceRegisterTokenToL2()`, the bridge may stop working correctly. For example, it may set l2Token in the `l1ToL2Token`  mapping to a non-expected contract address.
+  
+      In addition, the `L1XERC20Gateway` contract owner, through the use of `forceRegisterTokenToL2()`, may register wrapper token (`IXERC20Adapter`) for existing tokens and create an alternative path for minting underlying tokens. This would allow the contract owner to perform the same actions as the attacker in the [C-1] issue.
+  
+      **Remediations to consider**
+  
+      - Use multi-sig or governance to protect owner privileges, or
+      - Disable `forceRegisterTokenToL2()` unless needed.
+    </field>
+    <field name="response">
+        Won't do. Multi-sig or governance are meant to be used as the owner of the L1XERC20Gateway.
+
+        L1XERC20Gateway is meant for being managed by a trusted entity, like the Arbitrum DAO, so the forceRegisterTokenToL2 is there as a safety net. If someone other than a token issuer miss-registered a token using an adapter, the forceRegisterTokenToL2 could be used for fixing the registration.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">DoS</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [M-2] XERC20 mint and burn limits may affect bridge operation
+  
+      For successful bridge operations, which include XERC20 tokens implemented by third parties, it is important that configured mint and burn limits for instances of custom gateways (`L1XERC20Gateway`, `L1LockboxGateway`, `L2XERC20Gateway`, `L2LockboxGateway`) are appropriate and flexible so as not to prevent normal bridge operation.
+  
+      Compromised or malicious XERC20 owner may change limits through `XERC20:setLimits()` and cause all bridge operations in previously mentioned gateway contracts to fail whenever one of these two functions is part of their execution trace:
+  
+      - `XERC20BaseGateway:_outboundEscrowTransfer()`
+      - `XERC20BaseGateway:_inboundEscrowTransfer()`
+  
+      As a result, bridging from L1 to L2 and vice versa, as well as unwrapping from the XERC20 to the base token, may not work, resulting in DoS.
+  
+      **Remediations to consider:**
+  
+      - Use multi-sig or governance to protect owner privileges.
+    </field>
+
+    <field name="response">
+        Won't do. Multi-sig or governance will be used as the owner of the L1XERC20Gateway.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">fbb173ef2231e7ba642b2d339dcec0d5f5fb6645</field>
+    <field name="content">
+      ## [L-1] Native token may get stuck in `L1XERC20Adapter` and `L1ArbitrumEnabledXERC20` contracts
+  
+      `L1XERC20Adapter.registerTokenOnL2()` and `L1ArbitrumEnabledXERC20.registerTokenOnL2()` functions accept native token in order to send to the gateway and router appropriate amounts defined by `valueForGateway` and `valueForRouter`, respectively:
+  
+      ```solidity
+      // L1ArbitrumEnabled
+      function _registerTokenOnL2(
+          address l2TokenAddress,
+          uint256 maxSubmissionCostForGateway,
+          uint256 maxSubmissionCostForRouter,
+          uint256 maxGasForGateway,
+          uint256 maxGasForRouter,
+          uint256 gasPriceBid,
+          uint256 valueForGateway,
+          uint256 valueForRouter,
+          address creditBackAddress
+      )
+          internal
+      {
+          IL1CustomGateway gateway = IL1CustomGateway(gatewayAddress);
+  
+          gateway.registerTokenToL2{ value: valueForGateway }(
+              l2TokenAddress, maxGasForGateway, gasPriceBid, maxSubmissionCostForGateway, creditBackAddress
+          );
+          IL1GatewayRouter(gateway.router()).setGateway{ value: valueForRouter }(
+              gatewayAddress, maxGasForRouter, gasPriceBid, maxSubmissionCostForRouter, creditBackAddress
+          );
+      }
+      ```
+  
+      However, if the native token amount provided exceeds the sum of `valueForGateway` and `valueForRouter` amounts, it will remain stuck in the contract, as there is no way to retrieve the excess amount. 
+  
+      **Remediations to Consider**
+  
+      - Add validation to check that the function’s `msg.value` is correct
+      
+          ```diff
+          function registerTokenOnL2(...)
+          {
+          +		require(msg.value == valueForGateway + valueForGateway, "WRONG_VALUE");
+      
+              _registerTokenOnL2(
+                  l2TokenAddress,
+                  maxSubmissionCostForGateway,
+                  maxSubmissionCostForRouter,
+                  maxGasForGateway,
+                  maxGasForRouter,
+                  gasPriceBid,
+                  valueForGateway,
+                  valueForGateway,
+                  creditBackAddress
+              );
+          }
+          ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [Q-1] XERC20BaseAdapter contract doesn’t expose all XERC20’s view functions
+  
+      `L1XERC20Adapter` contract specification in [docs](https://docs.google.com/document/d/1sjs27dnImOWLTfVwIEXbSYDi9GRByYoYEPffpUufzoA/edit#heading=h.7pr549nb7vxw) has the following:
+  
+      > Implements all the read-only functions of an XERC20 token which forwards the calls to the actual token related to this adapter, this would help a smoother integration with UI
+      > 
+  
+      However, the `XERC20BaseAdapter` contract does expose ALL of `XERC20`’s view functions. These are all the functions that the contract missed:
+  
+      - `XERC20`'s:
+          - `mintingMaxLimitOf()`
+          - `burningMaxLimitOf()`
+          - `mintingCurrentLimitOf()`
+          - `burningCurrentLimitOf()`
+          - `FACTORY()`
+          - `lockbox()`
+          - `bridges()`
+      - `ERC20Permit`'s:
+          - `nonces()`
+          - `DOMAIN_SEPARATOR()`
+      - `EIP712`'s:
+          - `eip712Domain()`
+      - `Ownable`'s:
+          - `owner()`
+  
+      **Remediations to consider**
+  
+      - Add missing view functions, or
+      - Update the docs and clarify what functions will be exposed.
+    </field>
+
+    <field name="response">
+        Addressed by updating the associated specification document.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6d9f114452451f0bab4fc14230fc5311ba4ff387</field>
+    <field name="content">
+      ## [Q-2] Incorrect documentation for finalizeInboundTransfer on L2
+  
+      Natspec for `L2XERC20Gateway.finalizeInboundTransfer()` indicates that if the corresponding L2 token is not yet deployed, it will deploy it. However, in the `L2XERC20Gateway` implementation, this scenario is handled by performing a withdrawal back to L1. Consider updating natspec to describe this specific behavior correctly.
+  
+      ```solidity
+         * @notice Mint on L2 upon L1 deposit.
+      => * If token not yet deployed and symbol/name/decimal data is included, deploys StandardArbERC20
+         * @dev Callable only by the L1ERC20Gateway.outboundTransfer method. For initial deployments of a token the L1
+         * L1ERC20Gateway
+      => * is expected to include the deployData. If not a L1 withdrawal is automatically triggered for the user
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7dc6d77e19b1269001aa469be89154cda12df2a4</field>
+    <field name="content">
+      ## [Q-3] Unnecessary Ownable in XERC20BaseAdapter
+  
+      XERC20BaseAdapter contract features Ownable OZ functionality. However, this functionality is never used.
+  
+      Consider removing it unless needed for specific use case.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Token standard</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [I-1] Fee on transfer and rebase tokens are not supported
+  
+      Fee on transfer and rebase tokens are not supported by the current implementation. Therefore, relevant actors should not register tokens with these incompatible behavior patterns.
+    </field>
+
+    <field name="response">
+        Wont do. This solution is not meant to support those kind of tokens. We may address this in future update.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use cases</field>
+    <field name="status">addressed</field>
+    <field name="commit">94ca7b449493d320293e195da175210a4b8e620a</field>
+    <field name="content">
+      ## [I-2] L1XERC20Gateway mint/burn limits should be set after successful XERC20 token registration
+  
+      In the `L1XERC20Gateway`, if mint/burn limits are set for a particular XERC20 token before it is registered, a malicious attacker may front-run token registration by registering an IXERC20Adapter wrapper for the same token. With successful wrapper token registration, the attacker may then mint the XERC20 token up to the approved limit for L1XERC20Gateway.
+  
+      Due to the above, the XERC20 registration procedure and the order of steps performed should be carefully considered.
+    </field>
+
+    <field name="response">
+        We have updated documentation to indicate additional security requirements.
+    </field>
+  </item>
+  

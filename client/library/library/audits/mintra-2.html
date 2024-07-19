@@ -1,0 +1,35 @@
+<page
+  clientName="Mintra"
+  reportDate="June 27, 2024"
+  auditTitle="Mintra 2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/mintra-marketplace/launchpad"
+  repoCommitHash="1120440473eb94fa01665deace8d4d89d0783c65"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 6, 2024 to June 10, 2024.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+  </ul>
+
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">\
+    0cce3fccf4b43e55d598c4aecbb56689b01ab34de35ebb5b02b0f7efde5c4af6  src/BaseCollection.sol
+    949a5d93d1a8d53a99b78f17dfaeb043bd1574326aa6371b2be5c7df1809919c  src/ERC1155Collection.sol
+    f2e8762cd979725865e8c5f4915c701122d8d253a588956391841f9a226546c0  src/ERC721Collection.sol
+    232e2ce54f86a4ca5c5081be7239c36bf9d01a4938153cbb9de6e85beb4a497d  src/LaunchpadFactory.sol
+    dd59166fae45fdd3c46d733ba03cf0d45226c0d246dbeae0b377d45dbd4c6b25  src/RoyaltySplitter.sol  
+  </template>
+</content-for>
