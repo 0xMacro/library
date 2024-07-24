@@ -1,0 +1,37 @@
+<page
+  clientName="Seven Seas"
+  reportDate="July 24, 2024"
+  auditTitle="Seven Seas A-13"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-governance"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="d01e831ac6a5ecf07ff2a0f5a67f3878d6a7fd93"
+  finalRepoCommitHash="d01e831ac6a5ecf07ff2a0f5a67f3878d6a7fd93"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on periodically from July 15th to July 23rd 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+      Additionally to to the scope of this audit, integration with VaultCraft vaults and their curve based gauge reward contracts was reviewed and found that existing ERC4626 and curve decoders and santizers could be safely used.
+    </p>
+
+    <template type="file-hashes">
+      3737bc9618eb0d2629f7e20fcae033578858bef23bfab214469fcfe629b2932d  src/base/DecodersAndSanitizers/Protocols/CamelotDecoderAndSanitizer.sol
+      3b83d0d572cebdead00d0b5d780660dec59e1f2859bf5de6ab60cb303f303704  src/base/DecodersAndSanitizers/Protocols/MerklDecoderAndSanitizer.sol
+      b59046a3f0772659bc4f9551d694034bb5a3e9db2006864cd90457fe654cec71  src/base/DecodersAndSanitizers/Protocols/CompoundV3DecoderAndSanitizer.sol
+    </template>
+
+  </content-for>
+</page>
