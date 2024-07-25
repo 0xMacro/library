@@ -1,0 +1,30 @@
+<item>
+  <field name="topic">Error Handling</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">366221ef2c2b8aca4b494652c35edfb543f9e691</field>
+  <field name="content">
+    ## [L-1] Vault should not be able to deploy velodrome pools
+
+    In `VelodromeDecoderAndSanitizer.sol`, the `mint()` function sanitizes the call to Velodrome’s `NonfungiblePositionManager`,  which is similar to UniswapV3’s manager but it takes an additional `sqrtPriceX96` parameter which if set attempts to create a pool using this price:
+
+    ```solidity
+     if (params.sqrtPriceX96 != 0) {
+          ICLFactory(factory).createPool({
+              tokenA: params.token0,
+              tokenB: params.token1,
+              tickSpacing: params.tickSpacing,
+              sqrtPriceX96: params.sqrtPriceX96
+          });
+      }
+    ```
+    Reference: [NonfungiblePositionManager.sol#L150-L157](https://github.com/velodrome-finance/slipstream/blob/main/contracts/periphery/NonfungiblePositionManager.sol#L150-L157)
+
+    This allows the vault to create a pool at a undeployed tick spacing for any price. The intended use case is to provide liquidity to existing liquid pools, not to create potentially illiquid pools.
+
+    **Remediations to Consider**
+
+    Sanitize the input to ensure `sqrtPriceX96` is zero to prevent creating a pool and providing liquidity to a new illiquid pool for any price.
+  </field>
+</item>
