@@ -1,0 +1,37 @@
+<page
+  clientName="Seven Seas"
+  reportDate="July 25, 2024"
+  auditTitle="Seven Seas A-14"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-governance"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="d0d0bc1dabd7977286f4e086d4a9b083e8332d3e"
+  finalRepoCommitHash="49ed602aca3e16ea3df039c8047398ac8af2667d"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on periodically from July 15th to July 23rd 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+      979c8f35f11a070b8ab2c63f8815954c052174e564e1c1f640034fba55365f0e  src/atomic-queue/AtomicQueue.sol
+      2a98a14da64f9a76563f36898f39cf6b1822ac1b8a6cf4569fb45f3204f217e0  src/atomic-queue/AtomicSolverV4.sol
+      86aed3487860efcfbf62ec3d1953c41e9efda6b168b2bf60ad8e75abea31e2ed  src/base/DecodersAndSanitizers/AerodromeDecoderAndSanitizer.sol
+      93956a4b479df36de17c3364cafb1773cbe4a9d8f0750b10baf2435de61bc962  src/base/DecodersAndSanitizers/Protocols/VelodromeDecoderAndSanitizer.sol
+    </template>
+
+  </content-for>
+</page>
