@@ -1,0 +1,47 @@
+<page
+  clientName="Polynomial"
+  reportDate="july 26, 2024"
+  auditTitle="Polynomial A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Polynomial-Protocol/bridging-receivers"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="62c40c25badd22043a0e0a7262d81d4bb26bec93"
+  finalRepoCommitHash="62c40c25badd22043a0e0a7262d81d4bb26bec93"
+  passwordEncrypt="env:PAGE_PASS_POLYNOMIAL"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on June 10th to June 12th 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+      96a174366a341d8bd107c0bc30111a5c121a642388bfb63a15cb859468dd4e1b  src/StakingBridgeReceiver.sol
+      967a49c6008c7059b268148a845846e973356cd4db14f1f63cbea8bed1c78c72  src/StakingBridgeReceiverUSDC.sol
+    </template>
+
+    <p>
+      Changes to the SocketDotTech repo were also reviewed to allow for bridging using permit
+    </p>
+
+    <template type="file-hashes">
+      8b6181029b114c810519bfe49ae716c44ea1da62e8026694f4417d4152bd6d57  contracts/bridge/Controller.sol
+      f95e92266da784882b9c821fb232a28aaa8c33aa552e2cd1934b72f01428d0f7  contracts/bridge/Vault.sol
+    </template>
+
+
+
+  </content-for>
+</page>
