@@ -1,0 +1,40 @@
+<page
+  clientName="Kwenta"
+  reportDate="August 12, 2024"
+  auditTitle="Kwenta A-16"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kwenta/paymaster"
+  repoCommitHash="ce5b0b11a84568269f410d4072106f03325df463"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_KWENTA_16"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from July 22 to July 25, 2024.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+  </ul>
+  
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    45643499f3f79b7ee8046a7ea76b069d7cd382644de84e05c9f793e0b0e8fe92  ./src/MarginPaymaster.sol
+    9e2caac280c27aeb61c09a21f70eecf943b13505a4bec07e5d73fdf4d45302c5  ./src/interfaces/external/IEngine.sol
+    50a282c824895ca4d7fcf7c232814210837c0822f96f081ed872eb6e68f45b81  ./src/interfaces/external/INftModule.sol
+    cf499ca86ad3304da0da9e68a0af0824f1c3b9f9c986fe4af1f896c5f7a3fc9b  ./src/interfaces/external/IPerpsMarketProxy.sol
+    4913b1537ce723f927224fca1d80d1ce34a11ddcb37d81346f8d58692f507024  ./src/interfaces/external/IUniswapV3Pool.sol
+    a93f9bf59f77910150c498217b8a8d997e41363ef72ce4fcef88780019bce5ba  ./src/interfaces/external/IV3SwapRouter.sol
+    aa1368a1534f0da91f88540ca2d911f3339e4903df32ad6106dca7c1f519b226  ./src/interfaces/external/IWETH9.sol
+  </template>
+</content-for>
+
+</page>
