@@ -1,0 +1,102 @@
+<page
+  clientName="Infinex"
+  reportDate="August 14, 2024"
+  auditTitle="Infinex A-5"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash1="bf5b1fbade08e501d6604b94249318bf815e71d9"
+  repoCommitHash2="950f3568622ba185aa01ae1a65f75804071a2b47"
+  repoCommitHashFinal="ecaeef63f11cdf5a3639837eefd8abef223b5b73"
+  customRepoInfo
+  customReviewInfo
+  passwordEncrypt="env:PAGE_PASS_INFINEX"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from July 12 to July 15, and July 26 to July 29 2024. 
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial) CCQ Recovery Sync:</b> </br>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial) Additional Account Changes:</b> </br>
+        <code>{{page.repoCommitHash2}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b> </br>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      The changes audited rely on the following assumptions specifically.
+      
+      ### CCQ Sync recovery address:
+
+      - Wormhole CCQ will provide the proper finality and expected data results from the query and transparently with the Base account.
+
+      ### Account changes
+
+      - Infinex client will properly handle account and beacon upgrades to avoid conflict with breaking changes in the Infinex Protocol Beacon. 
+      - The `AppRegistry` will be maintained with the correct and latest App Beacons of each App.
+            
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts for </br>
+      <b>CCQ Sync Recovery Address</b> within commit <code>{{page.repoCommitHash1}}</code>:
+    </p>
+     
+    <template type="file-hashes">
+      02641ece428a28654021472a9ee8a4575a37643d7d31cd0fe6cf09af83dbcf33  ./accounts/modules/AccountUtilsModule.sol
+      9333a6bd66e8500eec684faab5c92093429c21742103cd3428fb11b974957418  ./accounts/modules/RecoveryModule.sol
+      7c5a6dde338befc3983cf13fecf088e24347f05f431602ca7e3f08cf91c03305  ./accounts/utils/SecurityModifiers.sol
+      07afd734305b84623e91f09376f558127c87437fb01128e908d45f9ff2fdb3c6  ./storage/Recovery.sol
+      aba4a55086017628b140167cb28f00b2c5b04c0ae6c0fce10b291b8f59b8125c  ./beacons/InfinexProtocolConfigBeacon.sol
+      cab4d36d6c04c97bbdb0b543c0d6ef8adc6d5184f0981adfc8b68579946e0711  ./libraries/Error.sol
+      95a5de5cc2d7e792fef5b996ada4e2a4e9887f2f3c2405e938e9dd5bfd79cc28  ./libraries/WormholeQueryResponse.sol
+    </template>
+
+    <p>
+      <b>Additional Account Changes</b> within commit <code>{{page.repoCommitHash2}}</code>:
+    </p>
+      
+    <template type="file-hashes">
+      5ebd6e96612f378ec78736c20a3d5f8b0d8da2a95165545525c42facb1fb933e  ./accounts/modules/AppModule.sol
+      2f167b3c13ed7850e916a1d7659988ec2b2b64a616bcd8d78b3a4ef846c01b85  ./apps/AppRegistry.sol
+      f6955189a8d4ca58947d03d9f2fd1fbbfc977cf2f852725dcbbf62fc4ecd3e86  ./apps/base/AppAccountBase.sol
+      e0fb8426d02bbca775e77ec05b29d5ed891d8307ed53465a4799782df6f1bfd8  ./apps/base/AppBeaconBase.sol
+      f59d32943deedd34c62db6106602d0a880dd65df1db58f54050ee7d621b54c99  ./accounts/modules/BridgingModule.sol
+      c568de5259b28b310d1073209bfac6ebfbada7078700c9ced7b4984448529959  ./accounts/modules/RecoveryModule.sol
+      ebe425bbe76c00762f961e0de0fa5bdf78ebb5c2b1f4604827fbcff30c1213f1  ./beacons/InfinexProtocolConfigBeacon.sol
+      610764409311457584ceb24a9615098215eaa0dec6096d83791b585b4a9acdf3  ./integrations/BridgeIntegrations.sol
+      cab4d36d6c04c97bbdb0b543c0d6ef8adc6d5184f0981adfc8b68579946e0711  ./libraries/Error.sol
+    </template>                 
+       
+    <p>
+      Note: Currently the referenced repository is private, but there are plans to make it public in the future. 
+    </p>
+  </content-for>
+</page>
