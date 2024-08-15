@@ -1,0 +1,72 @@
+<item>
+  <field name="topic">Best practices</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">85b55522fd351e3e21684a560fdd62321d5bf658</field>
+  <field name="content">
+    ## [Q-1] Unnecessary encoding of empty `addressesFound`
+
+    In the `PendleRouterDecoderAndSanitizer`, `_sanitizeLimitOrderData()` contains code that tries to concatenate the `limitRouter` address value and named result variable `addressesFound`. At the place of invocation, `addressesFound` is not initialized, so `encodePacked()` call results in the same value as if `abi.encodePacked(limit.limitRouter)` was called.
+
+    ```solidity
+    function _sanitizeLimitOrderData(DecoderCustomTypes.LimitOrderData calldata limit)
+        internal
+        pure
+        virtual
+        returns (bytes memory addressesFound)
+    {
+        if (limit.limitRouter != address(0)) {
+            // Trying to fill limit orders.
+            addressesFound = abi.encodePacked(addressesFound, limit.limitRouter);
+        ...
+    }
+    ```
+
+    Consider changing line above to a more readable implementation with less gas overhead.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Best practices</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">2030e2f3b42937192e0dc3a7809aefb6f5efd725</field>
+  <field name="content">
+    ## [Q-2] Project setup should list all required environment variables
+
+    Currently, the project readme provides project setup instructions. However, some of the instructions are not up to date, and some information is missing. For example, the sample.env file, recommended to bootstrap .env secrets file, does not contain all required variables for the project test suite to pass without reverts due to missing environment variables.
+
+    For example, in addition to `MAINNET_RPC_URL`, which is already defined, `ARBITRUM_RPC_URL` and `BASE_RPC_URL` are also required. 
+
+    Consider updating README and sample.env with up-to-date project setup instructions.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Edge case</field>
+  <field name="content">
+    ## [I-1] Inadequate authorization may allow strategist to create unbacked shares
+
+    With additional new functionality introduced with `TellerDecoderAndSanitizer` contract, strategist may invoke `bulkDeposit()` and `bulkWithdraw()` on instances of `TellerWithMultiAssetSupport` contract which act as a gatekeepers for corresponding instances of `BoringVault`.
+
+    When this functionality is invoked on instances of Teller which are associated with different Vault that the one triggering the call everything works as expected. However, when it is allowed for the calling contract `BoringVault` to invoke `bulkDeposit()` on Teller instance associated with itself, it can reenter the contract and mint extra shares without any actual asset transfer.
+
+    Consider scenario:
+
+    1. Strategist configures vault to approve itself for max transfer of base asset.
+    2. Strategist calls `bulkDeposit()` on the vault's teller. When this call is executed it reenters the vault. When `vault.enter()` is called with deposit amount equal to amount of assets in the vault it doubles number of shares without changing underlying asset supply as `from == to`.
+    3. Strategist may then call `bulkWithdraw()`. When `bulkWithdraw()` is called with amount of shares equal to the half of the Vault's share supply, it receives whole asset balance back as other half is unbacked.
+    4. As half of the remaining shares are equal to the initial totalSupply of shares, the corresponding check in `ManagerWithMerkleVerification` is passed, even though there are no more assets in the vault.
+    
+        ```solidity
+        if (totalSupply != vault.totalSupply()) {
+            revert ManagerWithMerkleVerification__TotalSupplyMustRemainConstantDuringManagement();
+        }
+        ```
+    
+
+    For a malicious strategist to exploit this edge case, it is necessary for it get authorization to perform `bulkDeposit()` on the same instance of the vault as well as to perform `bulkWithdrawal()` with receiver being under its control. Since these permissions are currently monitored and carefully granted by the project team this is not exploitable.
+
+    However, in the future with potential decentralization efforts, end users should take this into consideration when granting permissions to strategists.
+  </field>
+</item>
