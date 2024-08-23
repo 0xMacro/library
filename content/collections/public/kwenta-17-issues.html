@@ -1,0 +1,78 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">223dab75b6983b613aa625b36f8eb76af46af6cc</field>
+    <field name="content">
+      ## [M-1] USDC tokens intended as rewards can be removed by the owner
+  
+      In `StakingRewardsV2.sol`, the `recoverERC20()` ****function allows the owner to retrieve `ERC20` tokens that may have accidentally been sent into the contract. Since `kwenta` tokens are held in the contract via staking or to distribute rewards, recovering `kwenta` tokens is prevented in `recoverERC20()`, so that these tokens cannot be stolen from stakers:
+  
+      ```solidity
+      /// @inheritdoc IStakingRewardsV2
+      function recoverERC20(address _tokenAddress, uint256 _tokenAmount) external onlyOwner {
+          if (_tokenAddress == address(kwenta)) revert CannotRecoverStakingToken();
+          emit Recovered(_tokenAddress, _tokenAmount);
+          IERC20(_tokenAddress).transfer(owner(), _tokenAmount);
+      }
+      ```
+      Reference: [StakingRewardsV2.sol#L709-L714](https://github.com/Kwenta/token/blob/38114f26b5cc19e59ab5ff78578855df7bc41f85/contracts/StakingRewardsV2.sol#L709-L714)
+  
+      With the addition of `USDC` rewards, now `USDC` will be held in the contract and distributed as rewards to stakers, which means in `recoverERC20()` is called with the `USDC` address, these tokens owed to stakers can be stolen. If all the `USDC` were to be taken from the contract, then calls to `_getReward()` would start to fail, as the contract would no longer have the balance to cover owed `USDC` rewards.
+  
+      **Remediations to Consider**
+  
+      Prevent `USDC` from being recovered via `recoverERC20()`
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Precision</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">f7054e9e07b4a65d88f27c05b6e81de253348a17</field>
+    <field name="content">
+      ## [M-2] Rounding errors can lead to more significant loss with USDC
+  
+      Currently precision loss occurs when setting the rewardRate in `notifyRewardAmount()`, since the set amount is divided by a `rewardsDuration`, where the remainder is lost:
+  
+      ```solidity
+      /// @inheritdoc IStakingRewardsV2
+      function notifyRewardAmount(uint256 _reward, uint256 _rewardUsdc)
+          external
+          onlyRewardsNotifier
+          updateReward(address(0))
+      {
+          if (block.timestamp >= periodFinish) {
+              rewardRate = _reward / rewardsDuration;
+              rewardRateUSDC = _rewardUsdc / rewardsDuration;
+          } else {
+              uint256 remaining = periodFinish - block.timestamp;
+  
+              uint256 leftover = remaining * rewardRate;
+              rewardRate = (_reward + leftover) / rewardsDuration;
+  
+              uint256 leftoverUsdc = remaining * rewardRateUSDC;
+              rewardRateUSDC = (_rewardUsdc + leftoverUsdc) / rewardsDuration;
+          }
+  
+          lastUpdateTime = block.timestamp;
+          periodFinish = block.timestamp + rewardsDuration;
+          emit RewardAdded(_reward, _rewardUsdc);
+      }
+      ```
+      Reference: [StakingRewardsV2.sol#L644-L666](https://github.com/Kwenta/token/blob/dualRewards/contracts/StakingRewardsV2.sol#L644-L666)
+  
+      The precision loss varies, based on reward and rewardsDuration, but is typically fairly negligible for tokens with 18 decimals. However, USDC has 6 decimals so this precision loss can lead to users losing out more substantial rewards, and having the excess dust locked in the contract.
+  
+      **Remediations to Consider**
+  
+      Multiply the rewards amount by some large number before dividing by the rewards duration, preserving the decimals, then divide out this number when used when calculating the `rewardPerToken()` in order to maintain a higher precision.
+      Note: this may require a reinitalizer function to update the current kwenta rewards rate to have the updated rate multiple.
+
+    </field>
+  </item>
+  
