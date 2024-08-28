@@ -1,0 +1,158 @@
+<item>
+    <field name="topic">Reentrancy</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">ecaeef63f11cdf5a3639837eefd8abef223b5b73</field>
+    <field name="content">
+      ## [L-1] Potential reentrancy in `finalizePurchasePatronNFTEther`
+  
+      In `PatronPurchaseForwarder` contract, the `finalizePurchasePatronNFTEther()` function, the logic order does not follow the Check-Effect-Interactions pattern, potentially allowing an external call to re-use a valid signature multiple times:
+  
+      ```solidity
+      (bool success,) = _purchaseVault.call{ value: msg.value }(""); 
+      if (!success) revert PurchaseError.ETHTransferFailed();
+  
+      PatronPurchaseForwarderStorage._setIdempotencyKeyUsed(_idempotencyKey, true);
+      ```
+  
+      **Remediations to Consider:**
+  
+      Although the `_purchaseVault` is a known and approved entity, consider setting the `idempotencyKey` before making any external calls.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">ecaeef63f11cdf5a3639837eefd8abef223b5b73</field>
+    <field name="content">
+      ## [L-2] The purchase app doesn’t support EIP712
+  
+      In PatronPurchaseForwarder, `finalizePurchasePatronNFTERC20` and `finalizePurchasePatronNFTEther` require a valid signature passed to the function. However, the current implementation uses a custom message format to calculate the hash rather then supporting EIP-712.
+  
+      **Remediation to Consider**
+  
+      Consider supporting signature creation according to the [**EIP712**](https://eips.ethereum.org/EIPS/eip-712) standard for better security and usability.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Naming Convention</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">ecaeef63f11cdf5a3639837eefd8abef223b5b73</field>
+    <field name="content">
+      ## [Q-1] Use consistent contract names for patron-purchase
+  
+      All the patron related contracts reside under the `patron-purchase` folder. However, they don’t use consistent names. `PurchaseApp` and `PurchaseAppBeacon` are not prefixed with “Patron”, but the other contracts are, such as **`Patron**PointOfPurchase`.
+  
+      Consider renaming PurchaseApp to PatronPurchaseApp and PurchaseAppBeacon to PatronPurchaseAppBeacon.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">ecaeef63f11cdf5a3639837eefd8abef223b5b73</field>
+    <field name="content">
+      ## [Q-2] Use local variable instead of accessing array element
+  
+      In `PatronPointOfPurchase.initialize()`, consider using the local variable `signer` instead of accessing the array element.
+  
+      ```solidity
+      PatronPointOfPurchaseStorage._setAuthorizedSigner(**_authorizedSigners[i]**, true);
+      ```
+  
+      **Reference**: [PatronPointOfPurchase.sol#L84](https://github.com/infinex-xyz/infinex-contracts/blob/7ab01b19d20e03ff991100d07414784e4f3a0ceb/src/apps/patron-purchase/PatronPointOfPurchase.sol#L84)
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        The main intent is to call this from the app account, where the recipient is set as the main account in the purchase app which is the intended caller/recipient. In most cases the caller is should be agnostic.
+    </field>
+    <field name="content">
+      ## [Q-3] Add `msg.sender` to `SuccessfulPatronNFTPurchase` event
+  
+      **Reference**: [PatronPointOfPurchase.sol#L299](https://github.com/infinex-xyz/infinex-contracts/blob/7ab01b19d20e03ff991100d07414784e4f3a0ceb/src/apps/patron-purchase/PatronPointOfPurchase.sol#L299), [PatronPointOfPurchase.sol#L383](https://github.com/infinex-xyz/infinex-contracts/blob/7ab01b19d20e03ff991100d07414784e4f3a0ceb/src/apps/patron-purchase/PatronPointOfPurchase.sol#L383)
+  
+      In PatronPointOfPurchase, `finalizePurchasePatronNFTERC20` and `finalizePurchasePatronNFTEther` emit a `SuccessfulPatronNFTPurchase` event. 
+  
+      **Remediation to Consider**
+  
+      Consider adding `msg.sender` to the event, allowing to track where the request is coming from.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">ecaeef63f11cdf5a3639837eefd8abef223b5b73</field>
+    <field name="content">
+      ## [Q-4] Authorized vaults can not be removed
+  
+      In the `PatronPointOfPurchase` contract, the `setAuthorizedPurchaseVault()` function sets the authorized vaults where funds are forwarded. However, unlike `setAuthorizedSigner()` and `setAuthorizedPurchaseToken()` functions, this one doesn’t support removing authorized vaults. 
+  
+      ```solidity
+      function setAuthorizedPurchaseVault(uint8 _vaultId, address _vaultAddress) external onlyOwner {
+          if (_vaultAddress == address(0)) revert PurchaseError.ZeroAddress();
+          emit AuthorizedPurchaseVaultSet(_vaultId, _vaultAddress);
+          PatronPointOfPurchaseStorage._setAuthorizedPurchaseVault(_vaultId, _vaultAddress);
+      }
+      ```
+  
+      **Reference:** [PatronPointOfPurcharse.sol#L408-412](https://github.com/infinex-xyz/infinex-contracts/blob/7ab01b19d20e03ff991100d07414784e4f3a0ceb/src/apps/patron-purchase/PatronPointOfPurchase.sol#L408-L412)
+  
+      Consider allowing removing authorized vaults.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Upgrade Process</field>
+    <field name="impact">medium</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        We will not update it regularly. We would do a manual reinitialize for any new storage or functionality.
+    </field>
+    <field name="content">
+      ## [Q-5] No `reinitialize()` method
+  
+      The `PatronPointOfPurchase` and `PatronPurchaseVault` upgradable contracts lack a reinitialize function. If future upgrades require a reinitialization procedure, the current logic will not allow it, and an additional upgrade step or manual reinitialization would be needed to achieve a complete upgrade. This could potentially leave the contracts in an undesired state. Consider adding the reinitialization logic calls to be implemented by future upgrades.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        For the way the platform will call this function, we will first transfer eth to the app account using `transferEthToApp` on the main account (app module) and then call `purchasePatronNFTEther` on the app account. It is not intended to be called directly.
+    </field>
+    <field name="content">
+      ## [Q-6] `purchasePatronNFTEther` could be `payable`
+  
+      The `purchasPatronNFTEther()` function in the `PurchaseApp` is currently not payable, requiring ETH to be sent before calling the function. Consider making this function `payable` to support making this call and providing the required `_purchaseTotalAmount` of native assets within one operation.
+    </field>
+  </item>
+  
