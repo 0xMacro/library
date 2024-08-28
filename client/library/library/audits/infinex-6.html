@@ -45,8 +45,8 @@
       ### Patron Purchase App:
 
       - Purchase tokens will be authorized by the contract owner.
-      - The contract will solely handle the receipt data storage, process the payment and ensure its signature is not replayable.
-      - The authorized signature data will be validated off-chain.
+      - The Purchase App will handle the receipt data storage, process the payment and ensure its signature is is valid and not replayable.
+      - Signature creation happens entirely off-chain and it is assumed that the proper data (`nftQuantity`, `recipient`, and `vestingTier`) is signed.
             
     </template>
   </content-for>
