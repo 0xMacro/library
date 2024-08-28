@@ -1,0 +1,173 @@
+<item>
+    <field name="topic">Signatures</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [L-1] Signatures do not use a domain separator
+  
+      The current signature verification scheme, verifies the correct targe `chainId` is provided in the message data but has no domain separator specified in [EIP712](https://eips.ethereum.org/EIPS/eip-712#definition-of-domainseparator). This means that if this contract is re-used in the same chain, all previous valid signatures would be replayable in different contracts, as they do not include the intended verifying contract address, version and name. Consider using EIP712 signature validation.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Edge Case</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3dc15bac175c5e1c6d6e18daa2d1df51b2ee2034</field>
+    <field name="content">
+      ## [L-2] Users can call `bridge()` and mistakenly lock their assets
+  
+      In `AvaxBridge.sol`, `bridge()` function can be called by any user, locking their tokens in the contract. Since the intended use case is to distribute and migrate tokens as protocol, consider adding an `onlyOwner` modifier to this function to avoid this case. 
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unused Code</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-1] Unused encoded message parameters
+  
+      The current `sigData` message has the following encoded parameters:
+  
+      ```solidity
+      uint64 oracleQuantity = 0;
+      uint64 id;
+      uint32 ts;
+      uint64 fromAddr;
+      uint64 symbolRaw;
+      uint8 chainId;
+      address toAddress;
+      ```
+  
+      **Reference:** [AvaxBridge.sol#L820-826](https://github.com/ORANGEWEB3/orange-sc/blob/2a3f3e490434966b1db23ea9714a464f575e94f9/contracts/AvaxBridge.sol#L820-L826)
+  
+      However, parameters `fromAddr` and `symbolRaw` are currently not used by the bridge/claim logic. Consider removing these unused parameters and adapting the signature generation to this.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3dc15bac175c5e1c6d6e18daa2d1df51b2ee2034</field>
+    <field name="content">
+      ## [Q-2] Burn address on withdrawal can be hardcoded
+  
+      The `BridgeDeposit` contract, intended to receive and burn users’ tokens, allows the owner to transfer them to any arbitrary address. Consider hardcoding the burn address in the withdraw function to disallow the owner from arbitrarily or atomically transferring tokens in the deposit function.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3dc15bac175c5e1c6d6e18daa2d1df51b2ee2034</field>
+    <field name="content">
+      ## [Q-3] Solidity pragma is not fixed
+  
+      The current `AvaxBridge` solidity pragma version is set to `^0.6.12`. Consider using the same specific solidity version as the deployed reference codebase `v0.6.12`. Also, consider setting the same specific EVM version to `istambul`.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3dc15bac175c5e1c6d6e18daa2d1df51b2ee2034</field>
+    <field name="content">
+      ## [Q-4] Immutable and constant variables
+
+      Variables `rfox` and `chainId` can be marked as immutable, as they are only being set in the contract’s constructor during deployment.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unused Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3dc15bac175c5e1c6d6e18daa2d1df51b2ee2034</field>
+    <field name="content">
+      ## [Q-5] Remove unused code
+  
+      The following code is not being used in `AvaxBridge` contract and can be removed:
+  
+      - abstract contract `ApproveAndCallFallBack` is not being inherited from or implemented.
+      - `onlyOracle` modifier is not being used.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3dc15bac175c5e1c6d6e18daa2d1df51b2ee2034</field>
+    <field name="content">
+      ## [Q-6] Documentation and naming are outdated
+  
+      As its name suggests, the `AvaxBridge` contract was previously used to bridge and claim tokens through off-chain signatures. However, the current intended use case is not transparent with the current comments and function description, and some functions are missing NatSpecs comments. Consider adding and updating comments to the current intended use case.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3dc15bac175c5e1c6d6e18daa2d1df51b2ee2034</field>
+    <field name="content">
+      ## [Q-7] Impossible comparison statement
+  
+      While checking each signature validity on each provided `signatures` parameter, the logic iterates over all and verifies breaks if the `numberSigs` is higher or equal than hardcoded `10`.
+  
+      ```solidity
+      for (uint8 i = 0; i < signatures.length; i++) {
+          address potential = _getSigner(message, signatures[i]);
+  
+          // Check that they are an oracle and they haven't signed twice
+          if (oracles[potential] && !signed[td.id][potential]) {
+              signed[td.id][potential] = true;
+              numberSigs++;
+  
+              if (numberSigs >= 10) {
+                  break;
+              }
+          }
+      }
+      ```
+  
+      **Reference:** [AvaxBridge.sol#L878-890](https://github.com/ORANGEWEB3/orange-sc/blob/2a3f3e490434966b1db23ea9714a464f575e94f9/contracts/AvaxBridge.sol#L878-L890)
+  
+      However, `numberSigs` will never be higher than `10` as it is always incremented by one and checked after that, and the length of the `signatures` parameter is required to be `<= 10`. 
+  
+      ```solidity
+      require(
+          signatures.length <= 10,
+          "Maximum of 10 signatures can be provided"
+      );
+      ```
+  
+      **Reference:** [AvaxBridge.sol#L869-872](https://github.com/ORANGEWEB3/orange-sc/blob/2a3f3e490434966b1db23ea9714a464f575e94f9/contracts/AvaxBridge.sol#L869-L872)
+  
+      Consider changing the comparison statement to `numberSigs == 10`.
+  
+
+    </field>
+  </item>
+  
