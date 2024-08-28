@@ -1,0 +1,346 @@
+<item>
+    <field name="topic">Sanity Checks</field>
+    <field name="impact">medium</field>
+    <field name="chance">na</field>
+    <field name="status">ack</field>
+    <field name="response">
+        We have moved to a posture where an appBeacon is valid only if it is in the AppRegistry. 
+        This makes it easy to reason about whether an AppBeacon is valid or not. 
+        In addition, this makes it so that we can execute all the deployment steps for adding a new AppBeacon version without breaking any of the platform functionality.    
+    </field>
+    <field name="content">
+      ## [M-1] App accounts can be deployed with an old beacon
+  
+      In `AppModule`, `deployAppAccounts` is called to deploy a new app account. Inside the function, `isValidAppBeacon` is called to check if the provided `appBeacon` address is registered and valid. However, the function `isValidAppBeacon` was recently changed and doesn’t check against the `latestAppBeacon` anymore.
+  
+      ```diff
+      function isValidAppBeacon(address _appBeacon) external view returns (bool) {
+      -    return appBeacons[_appBeacon] && IAppBeaconBase(_appBeacon).getLatestAppBeacon() == _appBeacon;
+      +    return appBeacons[_appBeacon]
+      }
+      ```
+  
+      **Reference:** [AppRegistry.sol#L48-L50](https://github.com/infinex-xyz/infinex-contracts/blob/81e91e0e5e71d04e31985830bc63698c21b0eb6a/src/apps/AppRegistry.sol#L48-L50)
+  
+      This allows for deploying app accounts with an outdated `appBeacon` as long as the `appBeacon` is still registered in the AppRegistry.
+  
+      **Remediation to Consider**
+  
+      Preventing app accounts deployment with an outdated `appBeacon` by undoing the above change.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Upgrade Process</field>
+    <field name="impact">medium</field>
+    <field name="chance">na</field>
+    <field name="status">ack</field>
+    <field name="response">
+        Yes that is what we're currently doing. Our upgrade process involves doing these steps atomically:
+        Upgrade to new beacon, upgrade account version, reinitialize legacy account if necessary.
+    </field>
+    <field name="content">
+      ## [M-2] Protocol Beacon breaking changes can prevent modules from working correctly
+  
+      With the latest changes on Infinex contracts, [PR #169](https://github.com/infinex-xyz/infinex-contracts/pull/169) introduces some [changes](https://github.com/infinex-xyz/infinex-contracts/pull/169/files#diff-7b2d36f3ba79ae7191d44abd2affbaebdda4f587ff93eedbb4ceb4ab154c04d0) in the `InfinexProtocolConfigBeacon` including breaking changes such as renaming getters and adding configuration variables and constants for bridging directly using CCTP and syncing the funds recovery address cross-chain, as mentioned in the PR’s description:
+  
+      > It has some breaking changes on the InfinexBeacon but that's fine because it'll only be used by new accounts (since we are only upgrading the beacon when we upgrade the account version), and I've confirmed with the platform that they aren't reading any of the functions that are getting changed.
+      > 
+  
+      It is not an issue if the new beacon is only used by new accounts. However, this is not enforced and the following misconfigurations can occur that will break functionality:
+  
+      1. An account owner (sudoKey) can upgrade to a new beacon without upgrading to a new account implementation, causing the following functions to revert:
+          - `BridgingModule:bridgeUSDCWithWormholeEVM()` as the `isSupportedWormholeChainId()` was renamed to `isSupportedEVMWormholeChainId()`.
+          - `BridgingModule:bridgeUSDCWithCCTPSolana()` as the `getSolanaCCTPDestinationDomain()` is no longer in the contract.
+          - `RecoveryModule:recoverUSDCToEVMChain()` will revert as the `getMinimumUSDCBridgeAmount()` is no longer in the contract, as the new account implementation uses `solanaCCTPDestinationDomain` public variable getter.
+      2. An account owner (sudoKey) can upgrade to a new implementation without upgrading to a new beacon causing the following functions to revert in addition to the previously mentioned functions:
+          - `BridgingModule:bridgeUSDCWithCCTPEVM()` will revert as CCTP bridging was added in the latest beacon version.
+          - `RecoveryModule.syncFundsRecoveryAddressWithCCQ()` will revert as the public constant `WORMHOLE_CORE` was added in the latest beacon version.
+  
+      Essentially rendering some module’s functions non-usable and forcing the account to be upgraded to a compatible version.
+  
+      **Remediations to Consider:**
+  
+      The following remediations can be made to prevent the above scenarios correspondingly:
+  
+      1. Automatically upgrade to a new beacon when upgrading the account’s implementation and,
+      2. Allow upgrading to a new beacon only if the beacon is compatible with the current implementation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Specification</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b26b0705fbdcf005d9672d0948c559d8ad2669e</field>
+    <field name="content">
+      ## [M-3] App beacon `lastImplementation` is not immutable
+  
+      With the latest App beacon release, specifically In [PR165](https://github.com/infinex-xyz/infinex-contracts/pull/165/), the app address implementation of each beacon was intended to be set as an immutable parameter. This was done by removing the address setter `setLatestAppImplementation()`.
+  
+      ```diff
+      -    /**
+      -    * @notice Sets the latest app implementation address.
+      -    * @param _latestAppImplementation The address of the latest implementation for the app.
+      -    */
+      -   function setLatestAppImplementation(address _latestAppImplementation) external onlyOwner {
+      -       if (_latestAppImplementation == address(0)) revert ZeroAddress();
+      -       emit LatestAppImplementationSet(_latestAppImplementation);
+      -       appBeaconConfig.latestAppImplementation = _latestAppImplementation;
+      -   }
+      ```
+  
+      This would guarantee the App implementation address’s compatibility with a given App Beacon. 
+  
+      However, since the `appBeaconConfig` is a storage variable. App Beacon contracts inherent in the `AppBeaconBase` contract could implement a setter and change the implementation address.
+  
+      ```solidity
+      abstract contract AppBeaconBase is IAppBeaconBase, ERC165, Ownable2Step {
+          AppBeaconConfig public appBeaconConfig;
+      ```
+  
+      **Reference:** [AppBeaconBase.sol#L28-29](https://github.com/infinex-xyz/infinex-contracts/blob/950f3568622ba185aa01ae1a65f75804071a2b47/src/apps/base/AppBeaconBase.sol#L28-L29)
+  
+      ```solidity
+      struct AppBeaconConfig {
+          string appName;
+          address latestAppImplementation;
+          address latestAppBeacon;
+      }
+      ```
+  
+      **Reference:** [IAppBeaconBase.sol#L19-23](https://github.com/infinex-xyz/infinex-contracts/blob/950f3568622ba185aa01ae1a65f75804071a2b47/src/interfaces/apps/base/IAppBeaconBase.sol#L19-L23)
+  
+      Since the App deployment and predict address results rely only on the `_appBeacon` address input but utilize the `latestAppImplementation`, not making it explicitly immutable would restrain the user’s control over the deployed apps. 
+  
+      **Remediations to Consider:**
+  
+      Consider declaring the `latestAppImplementation` as an immutable address variable.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sanity Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">This has been done intentionally to preserve the functionality of syncing the funds recovery address even if multiple exist. Since we might enable setting multiple funds recovery addresses in the future.</field>
+    <field name="content">
+      ## [L-1] No result length check for the `ethQueryResponse` result
+      The `syncFundsRecoveryAddressWithCCQ()` function decodes the `ethQueryResponse` result as an address after verifying only one result exists and ensuring the expected signature selector and contract address match the request's data, along with some other validations.
+  
+      ```solidity
+      if (ethQueryResponse.result.length != 1) {
+          revert Error.UnexpectedResultLength();
+      }
+      WormholeQueryResponse.validateBlockNum(ethQueryResponse.blockNum, Recovery._getLastRecoveryAddressSetBlock());
+      WormholeQueryResponse.validateBlockTime(ethQueryResponse.blockTime, block.timestamp - 12 hours);
+      if (ethQueryResponse.requestFinality.length != 9
+        || keccak256(ethQueryResponse.requestFinality) != keccak256("finalized")) {
+          revert Error.InvalidBlockFinality();
+      }
+      address[] memory expectedContractAddresses = new address[](1);
+      expectedContractAddresses[0] = address(this);
+      bytes4[] memory expectedFunctionSignatures = new bytes4[](1);
+      expectedFunctionSignatures[0] = IRecoveryModule.getFundsRecoveryAddress.selector;
+      WormholeQueryResponse.validateEthCallData(ethQueryResponse.result[0], expectedContractAddresses, expectedFunctionSignatures);
+  
+      (address fundsRecoveryAddress) = abi.decode(ethQueryResponse.result[0].result, (address));
+      ```
+  
+      **Reference:** [RecoveryModule.sol#L101-115](https://github.com/infinex-xyz/infinex-contracts/blob/bf5b1fbade08e501d6604b94249318bf815e71d9/src/accounts/modules/RecoveryModule.sol#L101-L115)
+  
+      However, the `result[0]` length is not being validated. Although the current `getFundsRecoveryAddress()` implementation returns a unique address. If Base’s account changes the function structure and returns multiple values, the `abi.decode()` method will decode and parse the first returned address, potentially allowing the function returned values to be changed without reverting.
+  
+      **Remediations to Consider:**
+  
+      Consider ensuring the `result[0].length == 32`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sanity Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b50616530f592e53afdb63c699eb087b174be7d7</field>
+    <field name="content">
+      ## [L-2] Lack of `calldata` length validation
+  
+      To validate that the proper function call data was used in the cross-chain query, the `syncFundsRecoveryAddressWithCCQ()` uses the `WormholeQueryResponse.validateEthCallData()` library method (from [Wormhole SDK QueryResponse.sol contract](https://github.com/wormhole-foundation/wormhole-solidity-sdk/blob/6794b67548e7b53b3006d60c0aef6a0591fa43e7/src/QueryResponse.sol#L578-L624)) to check that:
+  
+      1. The expected address is the same as the Account in the destination chain since all accounts are deployed to the same address.
+      2. The call data function selector matches the `getFundsRecoveryAddress.selector`.
+  
+      ```solidity
+      address[] memory expectedContractAddresses = new address[](1);
+      expectedContractAddresses[0] = address(this);
+      bytes4[] memory expectedFunctionSignatures = new bytes4[](1);
+      expectedFunctionSignatures[0] = IRecoveryModule.getFundsRecoveryAddress.selector;
+      WormholeQueryResponse.validateEthCallData(ethQueryResponse.result[0], expectedContractAddresses, expectedFunctionSignatures);
+      ```
+  
+      **Reference:** [RecoveryModule.sol#L109-113](https://github.com/infinex-xyz/infinex-contracts/blob/bf5b1fbade08e501d6604b94249318bf815e71d9/src/accounts/modules/RecoveryModule.sol#L109-L113)
+  
+      However, the `EthCallData` result’s calldata length is not verified to match the payload for the `getFundsRecoveryAddress` call. Although unlikely, a function signature clash could cause a different function to render the same `bytes4` signature.
+  
+      **Remediations to Consider:**
+  
+      Consider asserting the `calldata` in the `EthCallData.result` is only 4 bytes.
+  
+      Note: This will not completely mitigate function signature collision, as the hashed function name alone can generate a signature clash. However, it will add an additional security layer to ensure transparency with the current Account code version and specification.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Cross-chain</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">9dfd7ff693c8db44c39fc9b55b39578fa95468c6</field>
+    <field name="content">
+      ## [L-3] Setting Base block number in non-Base accounts
+  
+      The `Recovery` module data layout now includes a new storage parameter, which saves the block number on which the `fundsRecoveryAddress` was set.
+  
+      ```solidity
+      struct Data {
+          address fundsRecoveryAddress;
+          uint256 lastRecoveryAddressSetBlock;
+      }
+      ```
+  
+      **Reference:** [Recovery.sol#L8-11](https://github.com/infinex-xyz/infinex-contracts/blob/bf5b1fbade08e501d6604b94249318bf815e71d9/src/accounts/storage/Recovery.sol#L8-L11)
+  
+      This value is later used in the `RecoveryModule` to verify the `ethQueryResponse.blockNum` is higher than the set number.
+  
+      ```solidity
+      WormholeQueryResponse.validateBlockNum(ethQueryResponse.blockNum, Recovery._getLastRecoveryAddressSetBlock());
+      ```
+  
+      **Reference:** [RecoveryModule.sol#L104](https://github.com/infinex-xyz/infinex-contracts/blob/bf5b1fbade08e501d6604b94249318bf815e71d9/src/accounts/modules/RecoveryModule.sol#L104)
+  
+      However, this value can be set using two different entry points: one using `block.number` and the other using the responses `ethQueryResponse.blockNum`. Since the `block.number` parameter varies from chain to chain, and specifically, the Base’s block number is numerically lower than most of the other supported chains. Comparing this value as a minimum bound will not give any assurance on the contract’s storage state.
+  
+      **Remediations to Consider:**
+  
+      - Using the `block.number` in `syncFundsRecoveryAddressWithCCQ()` setter function too.
+      
+          ```solidity
+          function syncFundsRecoveryAddressWithCCQ(bytes memory _response, IWormhole.Signature[] memory _signatures)
+              external
+              requiresTrustedRecoveryKeeper
+              nonReentrant
+          {	
+              ...
+          
+              WormholeQueryResponse.validateBlockNum(block.number, Recovery._getLastRecoveryAddressSetBlock());
+          
+              ...
+              _setFundsRecoveryAddress(fundsRecoveryAddress, block.number);
+          }
+          ```
+      
+      - Implementing checks to verify whether this value was set using the `ethQueryResponse.blockNum` or `block.number`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Data Consistency</field>
+    <field name="impact">low</field>
+    <field name="chance">na</field>
+    <field name="status">fixed</field>
+    <field name="commit">69fa2664373045893944f0de55332e35b426f083</field>
+    <field name="content">
+      ## [L-4] `predictAppAccountAddress()` can return available for deprecated accounts with valid beacon
+  
+      App account deployment now includes an arbitrary input `salt` parameter which can also be used to predict a deterministic address where that app account will be deployed with `create2`.
+  
+      ```solidity
+      function predictAppAccountAddress(address _appBeacon, bytes32 _salt) external view returns (address newAppAccount, bool isAvailable) {
+          IInfinexProtocolConfigBeacon protocolConfigBeacon = Account._infinexProtocolConfig();
+          IAppRegistry appRegistry = IAppRegistry(protocolConfigBeacon.appRegistry());
+          if (_appBeacon == address(0)) revert Error.NullAddress();
+          if (!appRegistry.isValidAppBeacon(_appBeacon)) revert Error.InvalidAppBeacon();
+  
+          address latestAppImplementation = IAppBeaconBase(_appBeacon).getLatestAppImplementation();
+          newAppAccount = Create2.computeAddress(_salt, keccak256(_getProxyBytecode(latestAppImplementation)));
+          isAvailable = App._getAppBeacon(newAppAccount) == address(0);
+      }
+      ```
+  
+      **Reference:** [AppModule.sol#L63-72](https://github.com/infinex-xyz/infinex-contracts/blob/82013e32438de4bf03a35b72050daf0300421d5c/src/accounts/modules/AppModule.sol#L63-L72)
+  
+      However, if an account with a valid beacon was deployed and later deprecated, the `predictAppAccountAddress()` will incorrectly return the predicted app’s address as available if the beacon is still valid. This could mistakenly be used to call the `deployAppAccount()`, expecting it to deploy an account while reverting in the `create2` call as this address will contain code.
+  
+      **Remediations to Consider:**
+  
+      Consider checking if the predicted address has code and returning false in`isAvailable`.
+    </field>
+  </item>
+  
+
+<item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">86aba996b7c3d75344381268e185be850376ad72</field>
+    <field name="content">
+      ## [Q-1] Using constants instead of magic numbers
+  
+      Consider using a constant or variable for the `timestamp` validation block time in `syncFundsRecoveryAddressWithCCQ()`.
+  
+      ```solidity
+      WormholeQueryResponse.validateBlockTime(ethQueryResponse.blockTime, block.timestamp - 12 hours);
+      ```
+  
+      **Reference:** [RecoveryModule.sol#L105](https://github.com/infinex-xyz/infinex-contracts/blob/bf5b1fbade08e501d6604b94249318bf815e71d9/src/accounts/storage/Recovery.sol#L8-L11)
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant Code</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">We want to keep the standard string comparison check even if the constraints of this function mean they're not needed. </field>
+    <field name="content">
+      ## [Q-2] Unnecessary length check in `requestFinality`
+      
+      In the function `syncFundsRecoveryAddressWithCCQ()`, we have this check to make sure `ethQueryResponce.requestFinality` is equal to `finalized` :
+  
+      ```solidity
+      if (ethQueryResponse.requestFinality.length != 9
+       || keccak256(ethQueryResponse.requestFinality) != keccak256("finalized")) {
+          revert Error.InvalidBlockFinality();
+      }
+      ```
+  
+      **Reference**: [RecoveryModule.sol#L106](https://github.com/infinex-xyz/infinex-contracts/blob/bf5b1fbade08e501d6604b94249318bf815e71d9/src/accounts/modules/RecoveryModule.sol#L106)
+  
+      The `ethQueryResponse.requestFinality.length != 9` check is unnecessary here. Even if the caller (`TrustedRecoveryKeeper`) is manipulated and brute-forcing successfully with a `requestFinality` that its hash is still equal to `keccak256("finalized")`, the `requestFinality` is still included previously in the digest hash to verify the wormhole’s signature in `WormholeQueryReponse.verifyQueryResponseSignatures()`.
+  
+      **Remediations to Consider**
+  
+      Consider removing this check.
+  
+      ```diff
+      -    if (ethQueryResponse.requestFinality.length != 9 || keccak256(ethQueryResponse.requestFinality) != keccak256("finalized")) {
+      +    if (keccak256(ethQueryResponse.requestFinality) != keccak256("finalized")) {
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">86aba996b7c3d75344381268e185be850376ad72</field>
+    <field name="content">
+      ## [Q-3] Inconsistent Wormhole default destination ID retrieval
+  
+      In `RecoveryModule`, functions `syncFundsRecoveryAddressWithCCQ()` and `bridgeUSDCWithWormholeForRecovery()` use the default destination Wormhole chain ID to verify funds recovery address sync and bridge USDC to the main account correspondingly. However, `bridgeUSDCWithWormholeForRecovery()` function fetches this value through the Infinex Protocol Beacon. This differs from the `syncFundsRecoveryAddressWithCCQ()` function, which uses the stored `defaultDestinationWormholeChainId` in the Bridge storage layout.
+  
+      Consider using a consistent chain ID retrieval for both functions.
+    </field>
+  </item>
