@@ -1,0 +1,264 @@
+<item>
+    <field name="topic">Integration</field>
+    <field name="impact">spec</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">dc9e86f3f8f9df1694e6aefa4906a7d9685e2bad</field>
+    <field name="content">
+      ## [M-1] `postOp` will revert for any `accountId` with zero withdrawable margin
+  
+      When executing the `postOp()` logic, the `MarginPaymaster` contract will attempt to pull assets from the user’s withdrawal margin if he does not have available `USDC` tokens. To handle all potential revert scenarios, the `withdrawFromMargin()` function checks that the proper `accountId` is used and that the paymaster contract has the `*PERPS_MODIFY_COLLATERAL_PERMISSION`* permission. After access control checks, the available withdrawal margin is checked and function execution returns if negative.
+  
+      ```solidity
+      int256 withdrawableMargin = perpsMarketSNXV3.getWithdrawableMargin(
+          accountId
+      );
+  
+      if (withdrawableMargin < 0) return 0;
+      ```
+  
+      **Reference:** [MarginPaymaster.sol#L392-396](https://github.com/Kwenta/paymaster/blob/ce5b0b11a84568269f410d4072106f03325df463/src/MarginPaymaster.sol#L392-L396)
+  
+      However, if the account's available margin is zero, the function will not return, and it will attempt to execute a `modifyCollateral()` call with a zero amount:
+  
+      ```solidity
+      uint256 withdrawableMarginUint = uint256(withdrawableMargin);
+  
+      uint256 amountToPullFromMargin = min(
+          sUSDToWithdrawFromMargin,
+          withdrawableMarginUint
+      );
+  
+      // pull sUSD from margin
+      perpsMarketSNXV3.modifyCollateral(
+          accountId,
+          sUSDId,
+          -int256(amountToPullFromMargin)
+      );
+      ```
+  
+      **Reference:** [MarginPaymaster.sol#L397-409](https://github.com/Kwenta/paymaster/blob/ce5b0b11a84568269f410d4072106f03325df463/src/MarginPaymaster.sol#L397-L409)
+  
+      This will cause the `perpsMarketSNXV3.modifyCollateral()` to revert with an [`InvalidAmountDelta` error](https://github.com/Synthetixio/synthetix-v3/blob/d05cb56fd23f50ebe1a6572a6d4494802b4e03eb/markets/perps-market/contracts/modules/PerpsAccountModule.sol#L52), causing the `postOp()` to revert.
+  
+      **Remediations to Consider:**
+  
+      Consider returning `0` if the available withdrawal margin is ≤ `0` when verifying the `withdrawableMargin` value.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec breaking</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">fd27f92297981b1044411a455384ca30fa5915a4</field>
+    <field name="content">
+      ## [M-2] Transactions with a wrong `accountId` ownership will be incorrectly sponsored
+  
+      In the MarginPaymaster contract, the function `withdrawFromMargin()` is responsible for recouping the transaction cost from the associated account’s collateral. When retrieving the owner of the corresponding account fails, it falls back to functionality that tries to withdraw assets from the first account associated with a particular user.
+  
+      ```solidity
+      if (accountId != 0) {
+          // check if the account Id is valid
+          try snxV3AccountsModule.ownerOf(accountId) returns (address owner) {
+              // only allow the owners accounts to subsidise gas
+              if (owner != sender) return 0;
+          } catch {
+              // set accountId to zero, and then check if the sender has an account on-chain
+              accountId = 0;
+          }
+      }
+      ```
+  
+      **Reference:** [MarginPaymaster.sol#L366-375](https://github.com/Kwenta/paymaster/blob/ce5b0b11a84568269f410d4072106f03325df463/src/MarginPaymaster.sol#L366-L375)
+  
+      However, when retrieving the owner of the provided account does not fail, but instead returns a different owner, execution returns immediately instead and does not try to withdraw assets from the first account associated with a particular user.
+  
+      As a result, if the caller provides the account of a different user, they will never be charged gas transaction costs. Instead, MarginPaymaster will be incorrectly sponsoring these transactions.
+  
+      **Remediations to Consider**
+  
+      - Make the following change in `if` branch
+      
+          ```diff
+          - if (owner != sender) return 0;
+          + if (owner != sender) accountId = 0;
+          ```
+      
+          Reference: [MarginPaymaster.sol#L370](https://github.com/Kwenta/paymaster/blob/ce5b0b11a84568269f410d4072106f03325df463/src/MarginPaymaster.sol#L370)
+      
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [L-1] Paymaster may drain user assets with an unexpected value of `percentageMarkup` configuration setting
+  
+      In the MarginPaymaster contract, the owner may set and update the percentageMarkup value using `setPercentageMarkup()`. Currently, there is no input value restriction, and high values for `percentageMarkup` will result in charging the user more than expected.
+  
+      Therefore, if a high `percentageMarkup` value is set accidentally or intentionally by a compromised contract owner, it may drain the smart account’s balance and free-to-withdraw margin from an associated account on the SNXV3 perp market.
+  
+      **Remediations to Consider**
+  
+      - Add restrictions and corresponding checks on `percentageMarkup` value initialization and updates.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">be6ff039e15e10b7a625ec67e89f9673305e5e00</field>
+    <field name="content">
+      ## [Q-1] Missing event emission for important state updates
+  
+      Several important state-changing functions do not emit events.
+  
+      - `setPercentageMarkup()`
+      - `setAuthorizer()`
+  
+      **Remediations to Consider**
+  
+      - Add corresponding events for easier off-chain tracking and monitoring.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d310c41348b717cec070ae5b0351164e77fd963f</field>
+    <field name="content">
+      ## [Q-2] Redundant hashing in `getHash()` function
+  
+      The `getHash()` function uses both `paymasterAddress` and `address(this)` as hash inputs. However, these two variables should have the same value, making the encoding of both redundant.
+  
+      ```solidity
+          return
+              keccak256(
+                  abi.encode(
+                      ...
+                      uint256(bytes32(paymasterAddress)),
+                      ...
+                      address(this)
+                  )
+              );
+      ```
+  
+      **Reference**: [MarginPaymaster.sol#L120-L136](https://github.com/Kwenta/paymaster/blob/ce5b0b11a84568269f410d4072106f03325df463/src/MarginPaymaster.sol#L120-L136)
+  
+      **Remediations to Consider**
+  
+      Consider validating that parsed `paymasterAddress` is equal to `address(this)` and removing one of those two from the input for hashing.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4cc79985cbdcbabda1f811978ad0542bf75e251c</field>
+    <field name="content">
+      ## [Q-3] Set `depositToEntryPoint()` to be `payable`
+  
+      Currently, to deposit funds to the `EntryPoint` contract, it is necessary first to send specific amount of native token directly to the `MarginPaymaster` contract, and then call `MarginPaymaster.depositToEntryPoint()` function.
+  
+      However, by adding `payable` modifier to the `depositToEntryPoint()` function, funds can be deposited in one transaction.
+  
+      Consider updating `depositToEntryPoint()` function signature in the following way:
+  
+      ```diff
+      -    function depositToEntryPoint(uint256 amount) external onlyOwner {
+      +    function depositToEntryPoint(uint256 amount) payable external onlyOwner {
+      ```
+  
+      **Reference**: [MarginPaymaster.sol#L258](https://github.com/Kwenta/paymaster/blob/ce5b0b11a84568269f410d4072106f03325df463/src/MarginPaymaster.sol#L258)
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">addressed</field>
+    <field name="response">No logic change, added natspec</field>
+    <field name="content">
+      ## [Q-4] Making the amount of USDC swapped configurable in `swapUSDCToETH()` function for more flexible swapping
+  
+      Currently, the `swapUSDCToETH()` function swaps **all** of the USDC in the `MarginPaymaster` contract to ETH. 
+  
+      Consider adding`usdcAmount` as an argument in the `swapUSDCToETH()` function for more flexible swapping and having less risk, making the Uniswap pool volatile from swapping with the huge amount
+  
+      **Reference**: [MarginPaymaster.sol#L250](https://github.com/Kwenta/paymaster/blob/ce5b0b11a84568269f410d4072106f03325df463/src/MarginPaymaster.sol#L250)
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Integration</field>
+    <field name="impact">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-5] Not using the latest Entrypoint version
+  
+  
+      The current `MarginPaymaster` contract is designed to use the Entrypoint version 0.6.0, released in April 2023. Some major optimizations and changes were deployed with the latest 0.7.0 version, as explicitly described in the [release notes](https://github.com/eth-infinitism/account-abstraction/releases/tag/v0.7.0), while some were optimizing Paymaster integrations and solving potential issues.
+  
+      Consider upgrading the Entrypoint version to 0.7.0.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-6] `_zapIn()` is not used, so it can be removed
+  
+      The `MarginPaymaster` contract inherits the `Zap` contract, which contains 2 internal functions:
+  
+      - `_zapIn()` , and
+      - `_zapOut()`
+  
+      However, `MarginPaymaster` only uses `_zapOut()`.
+  
+      Consider removing the `_zapIn()` function as it is not used.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Interoperability</field>
+    <field name="content">
+      ## [I-1] External integrations may cause MarginPaymaster to stop functioning
+  
+      The MarginPaymaster relies on USDC and Synthetix v3 perpetual market module to calculate and pull assets on the operation sender’s behalf. Both external parties can prevent this contract from working:
+  
+      - `USDC` blacklisting the MarginPaymaster address or the sender.
+      - Synthetix governance disabling the feature flag for the perps market module.
+  
+      This will essentially cause all `UserOp` signed with this paymaster as a target to not be executed
+  
+      
+    </field>
+  </item>
+  
