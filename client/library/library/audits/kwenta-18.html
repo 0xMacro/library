@@ -1,0 +1,39 @@
+<page
+  clientName="Kwenta"
+  reportDate="September 02, 2024"
+  auditTitle="Kwenta 18"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kwenta/zkVIP"
+  repoCommitHash="0da22f4ccf3d1d4bc58c50ea62ccf68e5c906ffc"
+  finalRepoCommitHash=""
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_KWENTA_18"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from August 12th to August 23rd, 2024.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+  </ul>
+  
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    efc8c57b9e402b32ee628cdbef71bbb513e9ab667b1a1ecea76c9f051f73d2e6  contract/contracts/FeeModule.sol
+    4404a920303e69ec59406819b275bbec296b8837545d030a8917e4c6bc81392d  contract/contracts/FeeReimbursementApp.sol
+    9168c76e0fbb37b35a346005c3e87846d7e376ceeb091f4769ddeafdee1414ee  contract/contracts/FeeReimbursementClaim.sol
+    55db6eb7e98d65176ed25574ef7da4bfd0c4cc813b99f2618fd52cc1ba111bbd  circuit/opv2_volume_fee_circuit.go
+    9daa2d02dca81c54df4525581110cf7e4e1fa0af4624b3f2ffe10caa03990c3f  common/common.go
+  </template>
+</content-for>
+
+</page>
