@@ -69,19 +69,19 @@
       Karak contracts are upgradeable, which should always be considered with caution, but it is important to be aware that active changes are planned, and so should be watched in case the contracts update its interface or introduces an exploit. 
   
     </field>
+      
+  </item>
 
-    <item>
-        <field name="topic">Trust Assumption</field>
-        <field name="content">
-          ## [I-3] Strategists are trusted to set a reasonable gas limit when bridging
-      
-          When bridging assets, a min gas limit parameter is typically required which is the gas limit used to execute the transaction on destination chain. If the min gas limit provided is not sufficient to executed the desired transaction, it may not be able to be executed leaving any ETH or tokens attempted to be bridged potentially stuck. It is expected that when strategists set this value it will be set correctly so it will execute as expected.
-      
-          Alternatively the min gas limit is used by some protocols, like [Scroll](https://github.com/scroll-tech/scroll-contracts/blob/2ac4f3f7e090d7127db4b13b3627cb3ce2d762bc/src/L1/L1ScrollMessenger.sol#L342-L348),  to charge a fee to cover the execution cost. If it is set to be much larger than required, additional unnecessary fees will be charged.
-      
-          Strategists should simulate the desired transactions to determine the gas used, adding a buffer to ensure it will execute.
-        </field>
-      </item>
-      
+  <item>
+    <field name="topic">Trust Assumption</field>
+    <field name="content">
+      ## [I-3] Strategists are trusted to set a reasonable gas limit when bridging
+  
+      When bridging assets, a min gas limit parameter is typically required which is the gas limit used to execute the transaction on destination chain. If the min gas limit provided is not sufficient to executed the desired transaction, it may not be able to be executed leaving any ETH or tokens attempted to be bridged potentially stuck. It is expected that when strategists set this value it will be set correctly so it will execute as expected.
+  
+      Alternatively the min gas limit is used by some protocols, like [Scroll](https://github.com/scroll-tech/scroll-contracts/blob/2ac4f3f7e090d7127db4b13b3627cb3ce2d762bc/src/L1/L1ScrollMessenger.sol#L342-L348),  to charge a fee to cover the execution cost. If it is set to be much larger than required, additional unnecessary fees will be charged.
+  
+      Strategists should simulate the desired transactions to determine the gas used, adding a buffer to ensure it will execute.
+    </field>
   </item>
   
