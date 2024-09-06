@@ -1,0 +1,58 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Aug 15, 2024"
+  auditTitle="Seven Seas A-16"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="e12c1e320cca1169c9785a8c7d424c38fca8d688"
+  finalRepoCommitHash="529cc81f988384fc85758eea39398232b5aba56d"
+  passwordEncrypt="env:PAGE_PASS_SEVENSEAS"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from August 20th to August 22nd 2024 and from September 4th to September 4th 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      - Strategists are trusted to set gas limits appropriately when bridging assets on any of the integrated bridging protocols.
+     </template>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the changes for the following contracts in <a href="https://github.com/Se7en-Seas/boring-vault/pull/88">PR 88</a>.
+    </p>
+
+    <template type="file-hashes">
+      08a51bb6b8aab413a6a6726c5104ab577fbdc14aca268afe476e88095f635f1e  src/base/DecodersAndSanitizers/Protocols/KarakDecoderAndSanitizer.sol
+      d07ccddf90e42d9807ec27b1e52ce018445a7df569f433e08433741267f37793  src/base/DecodersAndSanitizers/Protocols/PendleRouterDecoderAndSanitizer.sol
+      dacebb25bfec2dfb839dd914c3ffe637854274a4b574d6b512b104d4fccdf87d  src/base/DecodersAndSanitizers/Protocols/PumpStakingDecoderAndSanitizer.sol
+      7de7b24297baa896181a39d69ffba2c16b98b7d68e376af0dd54000b380e2cb8  src/base/DecodersAndSanitizers/PumpBtcDecoderAndSanitizer.sol
+      4eda5706aa9499c3f21aa6b195630fcbf379d9d21a98dfddc2d065836c579026  src/base/DecodersAndSanitizers/SymbioticVaultDecoderAndSanitizerFull.sol
+      24e975b9f3eff98d7da65fe343c32b84dd51b23f20615992e497ac5d0b496a8a  src/base/Drones/BoringDrone.sol
+      7d8ced9634a9ffdcdd1782692708ce34baf4925cc1e61604ba85669c225e7df0  src/base/Drones/DroneLib.sol
+    </template>
+
+    <p>
+      We also audited the changes for the following bridge integration contracts in the <a href="https://github.com/Se7en-Seas/boring-vault/commits/dev/september-2024/">September branch</a>.
+    </p>
+
+    <template type="file-hashes">
+      36d82f4d596965288d39d98adfda17d1ba0805e30ed11335cc1dd23646e8c5bd  src/base/DecodersAndSanitizers/BaseDecoderAndSanitizer.sol
+      249dce81e0ecbc9f861e961408c1baa813266fa7bd43ebc424f1f430501fe30c  src/base/DecodersAndSanitizers/BridgingDecoderAndSanitizer.sol
+      c55dbf8e886f25a38e0d2b69f050294dbb590cc7fc76e08242a9b0a0768b2ac5  src/base/DecodersAndSanitizers/Protocols/LineaBridgeDecoderAndSanitizer.sol
+      7999ce0221b646a9ddc28425d301c5e4cbf6324239574d723b05f4759df29cf1  src/base/DecodersAndSanitizers/Protocols/MantleStandardBridgeDecoderAndSanitizer.sol
+      8a40a94925316027c6b6f26245de9c36348945c237bf07e60f2b126645cf5a00  src/base/DecodersAndSanitizers/Protocols/ScrollBridgeDecoderAndSanitizer.sol
+
+    </template>
+
+  </content-for>
+</page>
