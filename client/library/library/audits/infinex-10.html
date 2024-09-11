@@ -1,0 +1,77 @@
+<page
+  clientName="Infinex"
+  reportDate="September 6, 2024"
+  auditTitle="Infinex A-10"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="c8b36a87ad611e2a9ea74d5ba6dbc9cc258b052a"
+  repoCommitHash1="69973d8c98a7a13a36ec73ef72463a156c9112ac"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on September 6, 2024. With no issues identified within the reviewed scope. 
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Distribution, ERC2771 base addition and KeeperManager):</b> </br>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Points update):</b> </br>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      The changes audited rely on the following assumptions specifically.
+      
+      ### GP distribution
+      - The `claim()` execution and input correctness are trusted by the authorized keepers.
+      - The owner can withdraw the governance points tokens from the contract at discretion.
+
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts:</br>
+    </p>
+     
+    <template type="file-hashes">
+      98a4a337236b64d8997c266dbc066a8cb1e22aac897a7ecc4359aea8b2ec08fa  ./src/access/KeeperManager.sol
+      6227044df8b2a666933e11406f75b9788217d0da69d4b48222b4ffa7c7543240  ./src/forwarder/ERC2771Base.sol
+      1196e82200605155e3e34c99d069ae32ed8c1adf22e9f10beffee3a60a158679  ./src/governance/GPDistributor.sol      
+    </template>     
+
+    <p>
+      <br>
+      And, the following for the Points update:</br>
+    </p>
+
+    <template type="file-hashes"></template>
+    4f566dafd39c4d7bb6e30892446bd916ac44994f08e8fc0f17542cc139808133  ./src/governance/GovernancePoints.sol
+    </template>       
+    <p>
+      Note: Currently the referenced repository is private, but there are plans to make it public in the future. 
+    </p>
+  </content-for>
+</page>
