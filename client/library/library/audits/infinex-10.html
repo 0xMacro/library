@@ -12,7 +12,7 @@
   customReviewInfo
 >
   <content-for name="schedule">
-    The security audit was performed by the Macro security team on September 6, 2024. With no issues identified within the reviewed scope. 
+    The security audit was performed by the Macro security team on September 6, 2024. 
   </content-for>
 
   <content-for name="repo-info">
@@ -44,8 +44,9 @@
       The changes audited rely on the following assumptions specifically.
       
       ### GP distribution
-      - The `claim()` execution and input correctness are trusted by the authorized keepers.
-      - The owner can withdraw the governance points tokens from the contract at discretion.
+      - `authorizedKeepers` are trusted actors that will not execute the `claim()` function maliciously.
+      - `authorizedKeepers` should verify the input validity, the contract will verify the replayability with an arbitrary input nonce.
+      - The `owner` can withdraw the governance points tokens from the contract at discretion if needed.
 
     </template>
   </content-for>
