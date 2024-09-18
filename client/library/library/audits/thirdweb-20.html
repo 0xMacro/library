@@ -1,0 +1,89 @@
+<!-- @format -->
+
+<page
+  clientName="thirdweb"
+  reportDate="September 18th, 2024"
+  auditTitle="thirdweb 20"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/contracts-pay-gateway"
+  repoUrl2="https://github.com/thirdweb-dev/modular-contracts"
+  repoUrl3="https://github.com/thirdweb-dev/contracts"
+  repoCommitHash1="c6bb7a3a3c13702e96aab521ab772fcb0b594603"
+  repoCommitHash2="7f81f044c0ac5a7404758b79976494d74ad359e9"
+  repoCommitHash3="3ebee4863397814e2e5bcfc1151a930e4a1dbc4d"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_THIRDWEB_20"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from August 26, 2024 to September 2, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the thirdweb team.</li>
+      <li>A audit handoff document provided through Notion.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+  
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl2}}" target="_blank">
+          {{page.repoUrl2.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>{{page.repoCommitHash2}}</code>
+      </li>
+
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl3}}" target="_blank">
+          {{page.repoUrl3.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>{{page.repoCommitHash3}}</code>
+      </li>
+  
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>We audited the following contracts within the <i>{{page.repoUrl.split('/').slice(-1)[0]}}</i> repository:</p>
+    <template type="file-hashes">
+        ab939f88ab89ca88ca4b3a22f74653f2cd5258d400e361621d6798fc3145dbec  src/PayGateway.sol
+        6be9d6785e0461ffef65d09e12b8c560b78d15a1b32d0961a608ea24531f5981  src/PayGatewayModule.sol
+    </template>
+
+    <p>We audited the following contracts within the <i>{{page.repoUrl2.split('/').slice(-1)[0]}}</i> repository:</p>
+    <template type="file-hashes">
+        da674d302d9d8d743c117854b15ad381d87b9d8e1c6da878dfa195dfce2547d6  src/module/token/royalty/RoyaltyERC1155.sol
+        e5c293447a409b2c81edc02e04008e2622ed6be29945da4bda35df1f686db9aa  src/module/token/royalty/RoyaltyERC721.sol
+        cd3132e2e2f58ca0f232d2b12b3cecc1877bf446a1faec0a3ffc79ee2a407b7d  src/module/token/transferable/CreatorTokenERC20.sol
+    </template>
+
+    <p>We audited the following contracts within the <i>{{page.repoUrl3.split('/').slice(-1)[0]}}</i> repository:</p>
+    <template type="file-hashes">
+        9cbca7a210bf1064b5c072f4d19f702d006e0af57b946ca5c765d610f7ab47ca  contracts/prebuilts/account/non-upgradeable/Account.sol
+        a1ea8c1164053156d9e8532e53e4526b7d901525fd403078588695b5256807e5  contracts/prebuilts/account/non-upgradeable/AccountFactory.sol
+        a3c9e5587189eeb6df5dddd69875aaef046e02fa1a38a5b38d9fa0ad501e1302  contracts/prebuilts/account/managed/ManagedAccount.sol
+        66c65fd1e99179013483250549fda4f5acd517a9d24f278bf91a0c6e610425d3  contracts/prebuilts/account/managed/ManagedAccountFactory.sol
+    </template>
+  </content-for>
+</page>
