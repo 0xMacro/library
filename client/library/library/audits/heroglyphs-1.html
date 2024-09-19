@@ -1,0 +1,37 @@
+<page
+  clientName="Heroglyphs"
+  reportDate="September 19, 2024"
+  auditTitle="Heroglyphs A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/HeroglyphEVM/GuessOurBlock"
+  repoCommitHash="d359658e2f5b9929b51968a6395c197b93c44e74"
+  passwordEncrypt="env:PAGE_PASS_HEROGLYPHS_1"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from September 11 to 17, 2024.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+      <li>An accessible README.md file of documentation.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    71d69cd93ba024a327ee8721f188cd9d9c84a47ba4dfa204dcb3c106d2b0ddec  ./src/GuessOurBlockReceiver.sol
+    712d6b7b3796033d07276335432d833c2ca21679a668fc7599bbb8b927969496  ./src/GuessOurBlockSender.sol
+    543173692119eb3c58c16b505db91333dd6f209ca0a634edc6ead639bc0a826a  ./src/IGuessOurBlock.sol
+    9947d094f003f659ed13f71077ffd3c230d663c6330badd1be47589ec6f6be66  ./src/dripVaults/BaseDripVault.sol
+    81bee6b248cda22298e082d27c175c2a24d0ea5477f6b3d2eeca9a1dfa45ca5c  ./src/dripVaults/IDripVault.sol
+    31ddee0eacd6a073af60f666199a66302f09816fb3ebec97ccf36d2390ea9f76  ./src/dripVaults/implementations/AaveVault.sol
+    c46cb2a7bb654052f5d7a2ff24e2169246cc09796276ef8c7ad8a2bcbd72227e  ./src/dripVaults/implementations/apxETHVault.sol
+  </template>
+</content-for>
