@@ -1,0 +1,284 @@
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-pay-gateway/pull/8/commits/436188390396a70b6ac262c33f4a36ad9874a3c2</field>
+    <field name="content">
+        ## [M-1] Missing return value check on low-level `call`
+
+        In PayGatewayModule’s `initiateTokenPurchase`, native tokens are directly forwarded to the `forwardAddress` when `directTransfer` is set.
+        
+        ```jsx
+        if (req.directTransfer) {
+            if (_isTokenNative(req.tokenAddress)) {
+                req.forwardAddress.call{ value: sendValue }("");
+        ```
+        
+        **Reference**: [PayGatewayModule.sol#L225](https://github.com/thirdweb-dev/contracts-pay-gateway/blob/c6bb7a3a3c13702e96aab521ab772fcb0b594603/src/PayGatewayModule.sol#L225)
+        
+        However, the return value is not checked on the `.call` function, which can lead to unwanted behavior in case the call function returns false. 
+        
+        **Remediations to Consider**
+        
+        Consider checking the return value of the `.call` function accordingly or use `SafeTransferLib.safeTransferETH`
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/143</field>
+    <field name="content">
+        ## [M-2] `MANAGER_ROLE` is not allowed to set transfer policy
+
+        In RoyaltyERC721, RoyaltyERC1155, and CreatorTokenERC20, the `MANAGER_ROLE` can set the  validator address via the `setTransferValidator` function. However, the `MANAGER_ROLE` is not permissioned to set transfer policies, this is because of the validator’s implementation, where only the owner, admin, or contract itself is allowed to set policies, see `_requireCallerIsNFTOrContractOwnerOrAdmin` [here](https://github.com/limitbreakinc/creator-token-standards/blob/main/src/utils/CreatorTokenTransferValidator.sol#L1391). As a result, while the `MANAGER_ROLE` can set the validator’s address, only the Core’s `owner` can configure transfer policies on this validator, such as whitelisting or blacklisting accounts.
+        
+        In particular, this can lead to problems where ownership wants to be renounced from the Core contract in order to remove upgradeability, but the possibility to configure transfer policies want to be maintained. 
+        
+        **Remediations to Consider**
+        
+        `hasRole` function could be implemented in the modules so that it returns true for accounts having the `MANAGER_ROLE` assigned.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-pay-gateway/pull/8/commits/7b4dcb4de9e3c15cc3b307df2de6ba00df45ad1c</field>
+    <field name="content">
+        ## [L-1] `isProcessed` function isn’t callable
+
+        In PayGatewayModule, the external `isProcessed` function is used to check if a given `transactionId` has been used. Given the modular contract pattern, a function needs to be set in the `fallbackFunctions` array in order to be callable. This is not the case with the `isProcessed` function and thus it can’t be called.
+        
+        **Remediations to Consider**
+        
+        Add isProcessed function to the `fallbackFunctions` array.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-pay-gateway/pull/8/commits/49319ce2bc69df5d9fd51871c1f61b51d98ec9ce</field>
+    <field name="content">
+        ## [L-2] Native tokens might remain in the contract on `initiateTokenPurchase`
+
+        In PayGatewayModule’s `initiateTokenPurchase`, when `directTransfer = true` and `_istTokenERC20 = true`, tokens are transferred to the contract and approved to the `forwardAddress`. However, if native tokens are sent with the call (`msg.value > 0`), they won’t be forwarded and remain in the contract.
+        
+        **Remediations to Consider**
+        
+        When `directTransfer = true` and `_istTokenERC20 = true`, enforce that no native tokens are sent with the call (`msg.value == 0`).
+    </field>
+</item>
+
+<item>
+    <field name="topic">Error Handling</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-pay-gateway/pull/8/commits/0bbccf7eec696f9afa4380096f31fc23e62d284f</field>
+    <field name="content">
+        ## [L-3] `PayGatewayMismatchedValue` error is thrown with wrong parameters
+
+        In PayGatewayModule’s `initiateTokenPurchase`, an error is thrown when `sendValue` is smaller than `req.tokenAmount`:
+        
+        ```jsx
+        if (sendValue < req.tokenAmount) {
+            revert PayGatewayMismatchedValue(sendValue, req.tokenAmount);
+        }
+        ```
+        
+        **Reference**: [PayGatewayModule.sol#L219](https://github.com/thirdweb-dev/contracts-pay-gateway/blob/c6bb7a3a3c13702e96aab521ab772fcb0b594603/src/PayGatewayModule.sol#L219)
+        
+        The declaration of the error is:
+        
+        ```jsx
+        error PayGatewayMismatchedValue(uint256 expected, uint256 actual);
+        ```
+        
+        As per above definition, the first parameter provided should be the expected value (= `req.tokenAmount`) and the second parameter provided should be the actual value (`= sendValue`). However, the error is thrown with the values in reverse order.
+        
+        **Remediations to Consider**
+        
+        Reverse the parameters to throw the error according to the defintion.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/150/commits/d48280c29a479839d2a1ee03679d1547ca7d89a0</field>
+    <field name="content">
+        ## [L-4] Wrong function selector returned for the transfer validation function
+
+        In CreatorTokenERC20, the function `getTransferValidationFunction()` is implemented to return the function selector for the transfer validation function:
+        
+        ```jsx
+        function getTransferValidationFunction() external pure returns (bytes4 functionSignature, bool isViewFunction) {
+            functionSignature = bytes4(keccak256("validateTransfer(address,address,address,uint256, uint256)"));
+        }
+        ```
+        
+        **Reference**: [CreatorTokenERC20.sol#L94](https://github.com/thirdweb-dev/modular-contracts/blob/7f81f044c0ac5a7404758b79976494d74ad359e9/src/module/token/transferable/CreatorTokenERC20.sol#L94)
+        
+        However, the string being used to calculate the signature contains a space between the last two parameters, causing to return an incorrect function selector.
+        
+        **Remediations to Consider**
+        
+        Remove the space between the last two parameters.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Consistency</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-pay-gateway/pull/8/commits/1ddba5071c302a04dd8f983b293f39e8be9c3ab1</field>
+    <field name="content">
+        ## [Q-1] Outdated storage position name
+
+        The **Payments**Gateway has been recently renamed to **Pay**Gateway including its references. However, in PayGatewayModule.sol, the storage location is still referring to **Payments** instead of **Pay**.
+        
+        ```jsx
+        library PayGatewayModuleStorage {
+            /// @custom:storage-location erc7201:payments.gateway.module
+            bytes32 public constant PAYMENTS_GATEWAY_EXTENSION_STORAGE_POSITION =
+                keccak256(abi.encode(uint256(keccak256("payments.gateway.module")) - 1)) & ~bytes32(uint256(0xff));
+        ```
+        
+        **Reference**: [PayGatewayModule.sol#L14-L16](https://github.com/thirdweb-dev/contracts-pay-gateway/blob/c6bb7a3a3c13702e96aab521ab772fcb0b594603/src/PayGatewayModule.sol#L14-L16)
+        
+        Additionally, the error definition `PaymentsGatewayMsgValueNotZero` is still referring to the old name.
+        
+        **Remediations to Consider**
+        
+        For consistency sake, update all above mentioned occurrences to the new name.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Readability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-pay-gateway/pull/8/commits/d5dc53eddf11efc282efdbe47c8c065eb2c91775</field>
+    <field name="content">
+        ## [Q-2] Redundant check for `msg.value` < `tokenAmount`
+
+        In PayGatewayModule’s `initiateTokenPurchase` function, there is the following check for `msg.value`:
+        
+        ```jsx
+        if (_isTokenNative(req.tokenAddress)) {
+            if (msg.value < req.tokenAmount) {
+                revert PayGatewayMismatchedValue(req.tokenAmount, msg.value);
+            }
+        }
+        ```
+        
+        **Reference**: [PayGatewayModule.sol#L202-L204](https://github.com/thirdweb-dev/contracts-pay-gateway/blob/c6bb7a3a3c13702e96aab521ab772fcb0b594603/src/PayGatewayModule.sol#L202-L204)
+        
+        A few lines further down, there is a similar check:
+        
+        ```jsx
+        if (_isTokenNative(req.tokenAddress)) {
+            sendValue = msg.value - totalFeeAmount;
+        
+            if (sendValue < req.tokenAmount) {
+                revert PayGatewayMismatchedValue(sendValue, req.tokenAmount);
+            }
+        }
+        ```
+        
+        **Reference**: [PayGatewayModule.sol#L215-L221](https://github.com/thirdweb-dev/contracts-pay-gateway/blob/c6bb7a3a3c13702e96aab521ab772fcb0b594603/src/PayGatewayModule.sol#L215-L221)
+        
+        As the second check always covers the first one (they are the same when `totalFeeAmount` is 0), the first check is redundant and can be removed.
+        
+        **Remediations to Consider**
+        
+        To improve readability, remove the first check.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/150/commits/990fb1290950f0181a60f5eddf480809b77e8be6</field>
+    <field name="content">
+        ## [Q-3] Move interface identifier for ERC165 to Core
+
+        All core token implementation (ERC20Core, ERC721Core, and ERC1155Core) support ERC165 and thus return true for the ERC165 interface id in their `supportsInterface` function:
+        
+        ```jsx
+        function supportsInterface(bytes4 interfaceId) public view returns (bool) {
+            return interfaceId == 0x01ffc9a7 // ERC165 Interface ID for ERC165
+            ...
+        ```
+        
+        As the Core contract by itself already implements the `supportsInterface` function, this check can be moved to the Core’s `supportsInterface` function and removed from all the Core’s token implementations.
+        
+        **Remediations to Consider**
+        
+        Move the ERC165 interface ID check from the Core’s token implementations to the Core contract itself.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Interfaces</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [Q-4] Add encode functions to IInstallationCallback
+
+        `encodeBytesOnInstall` and `encodeBytesOnUninstall` has been added to all modules implementing the `onInstall`/`onUninstall` functions.
+        
+        **Remediations to Consider**
+        
+        Consider adding those two functions to the IInstallationCallback interface to improve integration experience.
+    </field>
+    <field name="response">
+        `encodeBytesOnInstall` can have different function parameters across modules
+     </field>
+</item>
+
+<item>
+    <field name="topic">Interfaces</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/150/commits/f221ce15eaadc69c2c3564f6b04fe5f777980463</field>
+    <field name="content">
+        ## [Q-5] Royalty modules should inherit ICreatorToken interface
+
+        RoyaltyERC721 and RoyaltyERC1155 both implement all necessary functions of ICreatorToken interface, but don’t inherit from it. This is in contrast to the CreatorTokenERC20 module, which inherits the ICreatorToken interface.
+        
+        Additionally, for all three modules, consider adding ICreatorToken to the `supportedInterfaces` in `getModuleConfig()`.
+        
+        **Remediations to Consider**
+        
+        Consider changing RoyaltyERC721 and RoyaltyERC1155 to inherit from ICreatorToken interface and add it to the `supportedInterfaces` array.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-pay-gateway/pull/8/commits/507164254db2a4d83027662a446725744439a1e2,https://github.com/thirdweb-dev/modular-contracts/pull/150/commits/bfcbf0d3811f7de258d393adf2a58c7a7761ce05</field>
+    <field name="content">
+        ## [Q-6] Nitpicks
+
+        1. In PayGatewayModule.sol, incorrect comment on [L53](https://github.com/thirdweb-dev/contracts-pay-gateway/blob/c6bb7a3a3c13702e96aab521ab772fcb0b594603/src/PayGatewayModule.sol#L53): the @param tag is still referring to `feeBPS`. 
+        2. In PayGatewayModule.sol, missing @param tag for newly added `directTransfer` flag on [L81](https://github.com/thirdweb-dev/contracts-pay-gateway/blob/c6bb7a3a3c13702e96aab521ab772fcb0b594603/src/PayGatewayModule.sol#L81)
+        3. In the [readme](https://github.com/thirdweb-dev/contracts-pay-gateway/tree/c6bb7a3a3c13702e96aab521ab772fcb0b594603?tab=readme-ov-file#features) of the PayGateway, it refers to `TransferStart` and `TransferEnd` event, but it should be `TokenPurchaseInitiated` and `TokenPurchaseCompleted` events.
+        4. In ERC20Core.sol, unused import of ReentrancyGuard on [L8](https://github.com/thirdweb-dev/modular-contracts/blob/7f81f044c0ac5a7404758b79976494d74ad359e9/src/core/token/ERC20Core.sol#L8).
+        5. When using “named return variables” as in the function definition of `getTransferValidator()` in RoyaltyERC721, RoyaltyERC1155, and CreatorTokenERC20, values need to be assigned to the return variable but there is no need to return the value itself, e.g. see [here](https://github.com/thirdweb-dev/modular-contracts/blob/c5e23c8e1d0bd1139731a34509b42bd17abe5906/src/module/token/royalty/RoyaltyERC721.sol#L214-L215).
+    </field>
+</item>
