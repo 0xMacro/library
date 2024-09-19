@@ -5,13 +5,35 @@
   auditVersion="1.0.0"
   repoUrl="https://github.com/infinex-xyz/infinex-contracts"
   repoCommitHash="70eda956c977c6a795a754a804e389c620e909de"
-  finalRepoCommitHash="12ae44dfa6d34543d67a8c254befe6e47bbe2c04"
+  finalRepoCommitHash="f0eda8e1b51f409aef04dd82d8bfc512479825f1"
   layout="/library/audits/_layout.html"
+  customRepoInfo
 >
 
 <content-for name="schedule">
   The security audit was performed by the Macro security team from August 20th to August 23rd, 2024.
 </content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Initial):</b> </br>
+      <code>{{page.repoCommitHash}}</code>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Final):</b> </br>
+      <code>{{page.finalRepoCommitHash}}</code>
+    </li>
+  </ul>
+</content-for>
+
+
+
 
 <content-for name="spec">
 
