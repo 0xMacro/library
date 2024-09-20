@@ -43,12 +43,19 @@
       <li class="text-xl">
         <a href="#source-code" class="hover:underline">Source Code</a>
       </li>
-      <li class="text-xl">
-        <a href="#issue-list" class="hover:underline">Issue Descriptions and Recommendations</a>
-      </li>
+      <if cond="issues.length > 0">
+        <li class="text-xl">
+          <a href="#issue-list" class="hover:underline">Issue Descriptions and Recommendations</a>
+        </li>
+      </if>
       <li class="text-xl">
         <a href="#security-levels" class="hover:underline">Security Levels Reference</a>
       </li>
+      <if cond="issues.length > 0">
+        <li class="text-xl">
+          <a href="#issues" class="hover:underline">Issue Details</a>
+        </li>
+      </if>
       <if cond="page.appendixLinks">
         <for let="[href, title] of page.appendixLinks.split(';;').map(x => x.split('::'))">
           <li class="text-xl">
@@ -74,66 +81,69 @@
 
     <p><b class="text-red-500">Disclaimer:</b> While Macro’s review is comprehensive and has surfaced some changes that should be made to the source code, this audit should not solely be relied upon for security, as no single audit is guaranteed to catch all possible bugs.</p>
   </section>
+  
+    <section id="overall" class="Copy min-h-page py-16 print:pt-12 print:pb-0 print:pagebreak">
+      <h2>Overall Assessment</h2>
+    <if cond="issues.length > 0">
+      <p>The following is an aggregation of issues found by the Macro Audit team:</p>
 
-  <section id="overall" class="Copy min-h-page py-16 print:pt-12 print:pb-0 print:pagebreak">
-    <h2>Overall Assessment</h2>
-
-    <p>The following is an aggregation of issues found by the Macro Audit team:</p>
-
-    <div class="mt-8 -mx-4 overflow-x-auto sm:mx-0">
-      <div class="inline-block min-w-full py-2 align-middle">
-        <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
-          <thead>
-            <tr>
-              <th
-                scope="col"
-                class="py-3.5 pl-4 sm:pl-0 pr-3 text-right font-medium text-gray-900 dark:text-gray-300 dark:text-gray-300"
-              >
-                Severity
-              </th>
-              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
-                Count
-              </th>
-              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
-                Acknowledged
-              </th>
-              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
-                Won't Do
-              </th>
-              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
-                Addressed
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
-            <for let="severity of 'CHMLQIG'.split('')">
-              {{var subset = issues.filter(i => i.severity === severity)}}
-              <if cond="subset.length > 0">
-                <tr>
-                  <td class="whitespace-nowrap pl-4 sm:pl-0 py-4 pr-3  font-medium text-gray-900 dark:text-gray-300 text-right">
-                    {{Issues.severityNames[severity]}}
-                  </td>
-                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
-                    {{subset.length}}
-                  </td>
-                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
-                    {{subset.filter(i => i.status === 'ack').length || '-'}}
-                  </td>
-                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
-                    {{subset.filter(i => i.status === 'wontdo').length || '-'}}
-                  </td>
-                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
-                    {{subset.filter(i => Issues.isAddressed(i.status)).length || '-'}}
-                  </td>
-                </tr>
-              </if>
-            </for>
-          </tbody>
-        </table>
+      <div class="mt-8 -mx-4 overflow-x-auto sm:mx-0">
+        <div class="inline-block min-w-full py-2 align-middle">
+          <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
+            <thead>
+              <tr>
+                <th
+                  scope="col"
+                  class="py-3.5 pl-4 sm:pl-0 pr-3 text-right font-medium text-gray-900 dark:text-gray-300 dark:text-gray-300"
+                >
+                  Severity
+                </th>
+                <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                  Count
+                </th>
+                <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                  Acknowledged
+                </th>
+                <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                  Won't Do
+                </th>
+                <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                  Addressed
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+              <for let="severity of 'CHMLQIG'.split('')">
+                {{var subset = issues.filter(i => i.severity === severity)}}
+                <if cond="subset.length > 0">
+                  <tr>
+                    <td class="whitespace-nowrap pl-4 sm:pl-0 py-4 pr-3  font-medium text-gray-900 dark:text-gray-300 text-right">
+                      {{Issues.severityNames[severity]}}
+                    </td>
+                    <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                      {{subset.length}}
+                    </td>
+                    <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                      {{subset.filter(i => i.status === 'ack').length || '-'}}
+                    </td>
+                    <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                      {{subset.filter(i => i.status === 'wontdo').length || '-'}}
+                    </td>
+                    <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                      {{subset.filter(i => Issues.isAddressed(i.status)).length || '-'}}
+                    </td>
+                  </tr>
+                </if>
+              </for>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+      <p>{{page.clientName}} was quick to respond to these issues.</p>
+    </if> <else>
+      <p>No issues or discrepancies were identified within the defined scope of this audit.</p>
+    </else>
 
-    <p>{{page.clientName}} was quick to respond to these issues.</p>
   </section>
 
   <section id="specification" class="Copy min-h-page py-16 print:pt-12 print:pb-0">
@@ -188,43 +198,45 @@
     </else>
   </section>
 
-  <section id="issue-list" class="py-12 min-h-page print:pb-0 print:pagebreak">
+  <if cond="issues.length > 0">
+    <section id="issue-list" class="py-12 min-h-page print:pb-0 print:pagebreak">
 
-    <div class="Copy">
-      <h2>Issue Descriptions and Recommendations</h2>
+      <div class="Copy">
+        <h2>Issue Descriptions and Recommendations</h2>
 
-      <p>Click on an issue to jump to it, or scroll down to see them all.</p>
-    </div>
+        <p>Click on an issue to jump to it, or scroll down to see them all.</p>
+      </div>
 
-    <ul class="mt-8 list-style-none space-y-2">
-      {{var doubleDigits = issues.some(i => +i.tag.split('-')[1] >= 10)}}
-      <for let="issue of issues">
-        <li>
-          <a href="#{{issue.tag}}" class="flex hover:opacity-75">
-            <div
-              class="w-7 h-7 flex-center flex-shrink-0 rounded-sm font-medium font-ui {{
-                issue.severity === 'C' ? 'bg-gray-800 dark:bg-black text-white dark:text-white' :
-                issue.severity === 'H' ? 'bg-red-400 dark:text-black' :
-                issue.severity === 'M' ? 'bg-yellow-400 dark:text-black' :
-                issue.severity === 'L' ? 'bg-yellow-200 dark:text-black' :
-                issue.severity === 'Q' ? 'bg-blue-300 dark:text-black' :
-                'bg-gray-200 dark:text-black'
-              }} {{
-                Issues.isAddressed(issue.status) ? 'line-through' : ''
-              }} {{
-                doubleDigits ? 'text-[0.6rem]' : 'text-xs'
-              }}"
-            >
-              {{issue.tag}}
-            </div>
-            <h2 class="IssueTitle pl-3 text-lg font-medium">
-              {{AuditMarkdown.renderInlineContent(issue.title)}}
-            </h2>
-          </a>
-        </li>
-      </for>
-    </ul>
-  </section>
+      <ul class="mt-8 list-style-none space-y-2">
+        {{var doubleDigits = issues.some(i => +i.tag.split('-')[1] >= 10)}}
+        <for let="issue of issues">
+          <li>
+            <a href="#{{issue.tag}}" class="flex hover:opacity-75">
+              <div
+                class="w-7 h-7 flex-center flex-shrink-0 rounded-sm font-medium font-ui {{
+                  issue.severity === 'C' ? 'bg-gray-800 dark:bg-black text-white dark:text-white' :
+                  issue.severity === 'H' ? 'bg-red-400 dark:text-black' :
+                  issue.severity === 'M' ? 'bg-yellow-400 dark:text-black' :
+                  issue.severity === 'L' ? 'bg-yellow-200 dark:text-black' :
+                  issue.severity === 'Q' ? 'bg-blue-300 dark:text-black' :
+                  'bg-gray-200 dark:text-black'
+                }} {{
+                  Issues.isAddressed(issue.status) ? 'line-through' : ''
+                }} {{
+                  doubleDigits ? 'text-[0.6rem]' : 'text-xs'
+                }}"
+              >
+                {{issue.tag}}
+              </div>
+              <h2 class="IssueTitle pl-3 text-lg font-medium">
+                {{AuditMarkdown.renderInlineContent(issue.title)}}
+              </h2>
+            </a>
+          </li>
+        </for>
+      </ul>
+    </section>
+  </if>
 
   <section id="security-levels" class="Copy min-h-page py-12 print:pb-0 print:pagebreak">
     <h2>Security Level Reference</h2>
@@ -340,71 +352,74 @@
     </div>
   </section>
 
-  <section id="issues" class="py-12 min-h-page print:pb-0 print:pagebreak">
-    <div class="Copy">
-      <h2>Issue Details</h2>
-    </div>
-    <for let="issue of issues">
-      {{var doubleDigits = +issue.tag.split('-')[1] >= 10}}
-      {{var isAddressed = Issues.isAddressed(issue.status)}}
-      <section id="{{issue.tag}}">
-        <div class="mt-12 pt-12 border-t dark:border-gray-600/25"></div>
-        <div class="flex">
-          <a
-            href="#{{issue.tag}}"
-            class="group w-10 h-10 flex-center flex-shrink-0 rounded-sm font-medium font-ui {{
-              issue.severity === 'C' ? 'bg-gray-800 dark:bg-black text-white dark:text-white' :
-              issue.severity === 'H' ? 'bg-red-400 dark:text-black' :
-              issue.severity === 'M' ? 'bg-yellow-400 dark:text-black' :
-              issue.severity === 'L' ? 'bg-yellow-200 dark:text-black' :
-              issue.severity === 'Q' ? 'bg-blue-300 dark:text-black' :
-              'bg-gray-200 dark:text-black'
-            }} {{
-              isAddressed ? 'line-through' : ''
-            }} {{
-              doubleDigits ? 'text-xs' : 'text-sm'
-            }}"
-          >
-            <span class="group-hover:hidden">{{issue.tag}}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden group-hover:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-  <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-</svg>
-          </a>
-          <h2 class="IssueTitle mt-1 pl-3 text-xl sm:text-2xl font-bold">
-            {{AuditMarkdown.renderInlineContent(issue.title)}}
-          </h2>
-        </div>
+  <if cond="issues.length > 0">
+    <section id="issues" class="py-12 min-h-page print:pb-0 print:pagebreak">
+      <div class="Copy">
+        <h2>Issue Details</h2>
+      </div>
 
-        <if cond="page.issueSummaryFormat === 'table'">
-          <include src="./library/audits/_issue-summary-table.html" locals="{ issue }"/>
-        </if>
-        <else>
-          <include src="./library/audits/_issue-summary-bar.html" locals="{ issue }"/>
-
-          <if cond="issue.status !== 'informational' && issue.statusNote">
-            <div class="p-4 relative z-10 -mt-1 dark:border-gray-600 bg-zinc-100 dark:bg-[#222] text-sm nopagebreak">
-              {{issue.statusNote}}
+        <for let="issue of issues">
+          {{var doubleDigits = +issue.tag.split('-')[1] >= 10}}
+          {{var isAddressed = Issues.isAddressed(issue.status)}}
+          <section id="{{issue.tag}}">
+            <div class="mt-12 pt-12 border-t dark:border-gray-600/25"></div>
+            <div class="flex">
+              <a
+                href="#{{issue.tag}}"
+                class="group w-10 h-10 flex-center flex-shrink-0 rounded-sm font-medium font-ui {{
+                  issue.severity === 'C' ? 'bg-gray-800 dark:bg-black text-white dark:text-white' :
+                  issue.severity === 'H' ? 'bg-red-400 dark:text-black' :
+                  issue.severity === 'M' ? 'bg-yellow-400 dark:text-black' :
+                  issue.severity === 'L' ? 'bg-yellow-200 dark:text-black' :
+                  issue.severity === 'Q' ? 'bg-blue-300 dark:text-black' :
+                  'bg-gray-200 dark:text-black'
+                }} {{
+                  isAddressed ? 'line-through' : ''
+                }} {{
+                  doubleDigits ? 'text-xs' : 'text-sm'
+                }}"
+              >
+                <span class="group-hover:hidden">{{issue.tag}}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden group-hover:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+    </svg>
+              </a>
+              <h2 class="IssueTitle mt-1 pl-3 text-xl sm:text-2xl font-bold">
+                {{AuditMarkdown.renderInlineContent(issue.title)}}
+              </h2>
             </div>
-          </if>
-        </else>
 
-        <div class="mt-8 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>
+            <if cond="page.issueSummaryFormat === 'table'">
+              <include src="./library/audits/_issue-summary-table.html" locals="{ issue }"/>
+            </if>
+            <else>
+              <include src="./library/audits/_issue-summary-bar.html" locals="{ issue }"/>
 
-        <if cond="issue.response">
-          <div class="mt-8 Copy dark:border-gray-600">
-            <div class="-mb-4 text-sm uppercase font-medium text-green-800 dark:text-green-500 print:text-gray-800">
-              <span class="py-1 px-2 inline-block rounded bg-green-200/25 dark:bg-green-800/25">
-                Response by {{page.clientName}}
-              </span>
-            </div>
-            <blockquote class="Copy ClientResponse">
-              {{AuditMarkdown.renderIssueContent(issue.response)}}
-            </blockquote>
-          </div>
-        </if>
-      </section>
-    </for>
-  </section>
+              <if cond="issue.status !== 'informational' && issue.statusNote">
+                <div class="p-4 relative z-10 -mt-1 dark:border-gray-600 bg-zinc-100 dark:bg-[#222] text-sm nopagebreak">
+                  {{issue.statusNote}}
+                </div>
+              </if>
+            </else>
+
+            <div class="mt-8 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>
+
+            <if cond="issue.response">
+              <div class="mt-8 Copy dark:border-gray-600">
+                <div class="-mb-4 text-sm uppercase font-medium text-green-800 dark:text-green-500 print:text-gray-800">
+                  <span class="py-1 px-2 inline-block rounded bg-green-200/25 dark:bg-green-800/25">
+                    Response by {{page.clientName}}
+                  </span>
+                </div>
+                <blockquote class="Copy ClientResponse">
+                  {{AuditMarkdown.renderIssueContent(issue.response)}}
+                </blockquote>
+              </div>
+            </if>
+          </section>
+        </for>
+    </section>
+  </if>
 
   <yield name="appendix" />
 
