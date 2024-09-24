@@ -1,0 +1,59 @@
+<page
+  clientName="Infinex"
+  reportDate="September 24, 2024"
+  auditTitle="Infinex 7"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  repoCommitHash="c3fd93d90458f9219a28cbf77fb6fa5ef1814309"
+  finalRepoCommitHash="79a8827b4fe2d960de5f33d154011d5eb437945d"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_INFINEX_7"
+
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from August 15th to August 21st, 2024 and from September 11th to September 13rd, 2024.
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Initial):</b> </br>
+      <code>{{page.repoCommitHash}}</code>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Final):</b> </br>
+      <code>{{page.finalRepoCommitHash}}</code>
+    </li>
+  </ul>
+</content-for>
+
+
+
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+  </ul>
+
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    34a9d677cef81939da9b4da78d93327f8435737807c282ac28e47212cbbe55f4  infinex-contracts/src/patron/PatronDistributor.sol
+    7be5ebef7526dc11f57e0278224366bdaa61de4f00ee5be7194f90874ad00815  infinex-contracts/src/patron/PatronDistributorStorage.sol
+  </template>
+</content-for>
+
+</page>
