@@ -1,0 +1,50 @@
+<page
+  clientName="Dorge"
+  reportDate="October 3rd, 2024"
+  auditTitle="Dorge A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thierbig/dorge"
+  repoCommitHash="e9eb891dbbd2885d0e9a81ff398287dbcecd7ea7"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_DORGE_3"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from October 1st, 2024 to October 2nd, 2024.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions on Discord with the {{page.clientName}} team.</li>
+      <li>Technical documentation provided by {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank">
+        {{page.repoUrl.split('/').slice(-1)[0]}}
+      </a>
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash:</b>
+      <code>{{page.repoCommitHash}}</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contract within this repository:</p>
+
+  <template type="file-hashes">
+    a3a8310c76ac54af0c7ce9c17f6db598da167969e2ebb8bb7307fc1ba58d0680  token-contracts/src/PresaleCurvedVesting.sol  
+  </template>
+
+
+</content-for>
+
