@@ -1,0 +1,100 @@
+<!-- @format -->
+
+<page
+  clientName="thirdweb"
+  reportDate="October 7th, 2024"
+  auditTitle="thirdweb 21"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thirdweb-dev/modular-contracts"
+  repoUrl2="https://github.com/thirdweb-dev/contracts"
+  repoCommitHash1="c121e8eb762b9b85eb45aaca1f65345a236669ff"
+  repoCommitHash2="60c8b9baee0f032933db43b4307799b20377df91"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_THIRDWEB_21"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from September 18, 2024 to September 25, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the thirdweb team.</li>
+      <li>A audit handoff document provided through Notion.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+  
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl2}}" target="_blank">
+          {{page.repoUrl2.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>{{page.repoCommitHash2}}</code>
+      </li>
+  
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>We audited the changes related to <a href="https://github.com/thirdweb-dev/modular-contracts/pull/163" target="_blank">PR 163</a> on the following contracts within the <i>{{page.repoUrl.split('/').slice(-1)[0]}}</i> repository:</p>
+    <template type="file-hashes">
+        c6e79c7016e6270eb38da1a8b02c1ce7be31a94e49ac519f83dcf5699f8776f0  src/Core.sol
+
+        690637685184aee1605f04c612905dd40996b9887f15c93d0f4c2c29dd582d74  src/callback/BeforeMintCallbackERC1155.sol
+        30831f3dd22472e689f86ba1a27eef0a2e5a58380329aed63251a0bf08419918  src/callback/BeforeMintCallbackERC721.sol
+        f4922acc117b7a73d1fbdc943739559acf86122997f3e84e0b9a6d2b7a857b2b  src/callback/BeforeMintWithSignatureCallbackERC1155.sol
+        cdf312524a2361d6580516eaa05e667de865cb8c57fde8069738591a6375453f  src/callback/BeforeMintWithSignatureCallbackERC20.sol
+        f407f758eebb58dbfbba6b1f1cd524164bd69925d9f6910b67abba497e56e143  src/callback/BeforeMintWithSignatureCallbackERC721.sol
+        7db96264c40a69608e4599a5c1156e736b038d33ceaab08fe619f140ea1c11d3  src/callback/BeforeTransferCallbackERC1155.sol
+        2050b85cdb54cd9b5c4f7b3b15cc3b7950950d33d76c6b1011bfabf7eeb680c8  src/callback/UpdateMetadataCallbackERC1155.sol
+        f6cc58b9573ae5d97c7abb9211033a1156c2ff9ccab537f6e402e576a72276fb  src/callback/UpdateMetadataCallbackERC721.sol
+        e0164741c9f6df0224a16ed448d884d302b3808e48718964a8d69bea6f1712f2  src/callback/UpdateTokenIdERC1155.sol
+
+        f35c44157859ac6daa14e3061e36165eb42e4c9bcab1f9c5d168831e8f651d5b  src/core/token/ERC1155Base.sol
+        a09e1501b554379b7e61be33e64528f5150bd5bdd8fcb3c00d885cf46b73c38f  src/core/token/ERC1155Core.sol
+        345484d6226558fe7b0d8d5bab0cc94fec5d3800c3ce77194630900dd73bbd30  src/core/token/ERC1155CoreInitializable.sol
+        2916be4f254aece5ee0313df511b11ede1f3be7557113613d2abfdbe82979847  src/core/token/ERC20Base.sol
+        7bea91cea4854234f8f302677dc2cce9ba2cb5927ea6c6828902aa49f47a4ebd  src/core/token/ERC20Core.sol
+        84d67bc5c33cfeff3aecd1ed9a1cba08d21db36358d9924e7035f3e2be538b82  src/core/token/ERC20CoreInitializable.sol
+        cab9df14c4feca238efb1648f475c558414dca1db9df5925ff35b31cfea5d52a  src/core/token/ERC721Base.sol
+        4d8c90c73db1878d6cd5745f9d376227fd17994be03d77ae0dfadf1ee1a692d9  src/core/token/ERC721Core.sol
+        212c612d0246960ea0c611fa7106c1584331bdffe91a17882a3cc560f5cfd5e7  src/core/token/ERC721CoreInitializable.sol
+
+        cd1b49a0262f20f4977b469d69eb6cba169f79df3b469d54fc697310b2d3975a  src/module/token/metadata/BatchMetadataERC1155.sol
+        6b0c267125da46c86c976a3dc72389528d0fc0ccba00a77d38927bcbb711d8d4  src/module/token/metadata/BatchMetadataERC721.sol
+        88b5ddd46c4c7d1654aa6d5dc9287e6658055844fe69e5cde62ea148bdc5669e  src/module/token/metadata/OpenEditionMetadataERC721.sol
+
+        1b9a52972e15f1b0eb2f7a378daf7a0b02702176952973966a7a7d6bfe936d1c  src/module/token/minting/ClaimableERC1155.sol
+        c8f420d3b3719a39cadaf773bdaabc5bd51958dd2a3370ba199dc31736ffa030  src/module/token/minting/ClaimableERC20.sol
+        6de66eb9736b396503eb49e5cb76a7076f5ca3275af1b2e45c0dae7252cf608c  src/module/token/minting/ClaimableERC721.sol
+        eb79d8f5fd4f5b37570ed1b1c779d6f0896ae3c0478b952b5dc7115100d2ec60  src/module/token/minting/MintableERC1155.sol
+        182698707d160cae2e1a699095b4635424fd5eef995c2f06177f4b8289608602  src/module/token/minting/MintableERC20.sol
+        2f216c68735748bc219ff97d0239d29f91e4a18007768ed2c39c522338739796  src/module/token/minting/MintableERC721.sol
+
+        24def5ac023b0da33e5b53e18d8987d99e25ba06511d51b440ce2795468c3527  src/module/token/tokenId/SequentialTokenIdERC1155.sol
+
+    </template>
+
+    <p>We audited the changes related to non-standard token decimals handling on the following contracts within the <i>{{page.repoUrl2.split('/').slice(-1)[0]}}</i> repository:</p>
+    <template type="file-hashes">
+        d85414df4b5fd5c70d0f42a4b759c5dcb81bdda8b65043ff3b695ed4cea6af6c  contracts/prebuilts/account/token-paymaster/TokenPaymaster.sol
+    </template>
+
+  </content-for>
+</page>
