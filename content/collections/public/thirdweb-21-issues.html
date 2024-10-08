@@ -1,0 +1,246 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/173/commits/0e580cd492e7871c238e466425051f961a28d298</field>
+    <field name="content">
+        ## [H-1] ClaimableERC20 and MintableERC20 modules incorrectly handle tokens with decimals other than 18
+
+        ClaimableERC20 and MintableERC20 modules were recently updated to calculate the mint price by dividing `pricePerUnit` by 1e18.
+        
+        ```jsx
+        function beforeMintWithSignatureERC20(address _to, uint256 _amount, bytes memory _data, address _signer)
+            external
+            payable
+            virtual
+            override
+            returns (bytes memory)
+        {
+            ...
+        >>  _distributeMintPrice(msg.sender, _params.currency, (_amount * _params.pricePerUnit) / 1e18);
+        }
+        ```
+        
+        **Reference**: [ClaimableERC20.sol#L216](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/module/token/minting/ClaimableERC20.sol#L216)
+        
+        This approach works correctly if the specified currency uses 18 decimal representation. However, the price calculation becomes inaccurate when dealing with currencies that have a different number of decimals.
+        
+        Consider a scenario where the specified currency is USDC, which only has 6 decimals. The `pricePerUnit` will be expressed using the 6-decimal representation, but it's still divided by 1e18. Consequently, the calculated mint price will be significantly lower than intended.
+        
+        **Remediation to Consider**
+        
+        Instead of using a hardcoded 1e18 divisor, consider using the decimals value of the specified currency.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Upgradability</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/173/commits/a58c5733598b5521cfa6390cfed89bd40c4dd574</field>
+    <field name="content">
+        ## [H-2] Claimable modules lead to storage collisions when being updgraded
+
+        Modules use the [“Namespaced Storage Layout”](https://eips.ethereum.org/EIPS/eip-7201) to prevent collisions between different modules as well as between the modules and the core contracts. However, this doesn’t protect against storage collisions between different version upgrades of the same module.
+        
+        ClaimableERC20/721/1155 were recently updated to include a `maxMintPerWallet` param in the ClaimCondition struct:
+        
+        ```jsx
+            struct ClaimCondition {
+                uint256 availableSupply;       // slot 1
+                bytes32 allowlistMerkleRoot;   // slot 2
+                uint256 pricePerUnit;          // slot 3
+                address currency;              // slot 4
+        >>      uint256 maxMintPerWallet;      // slot 5
+                uint48 startTimestamp;
+                uint48 endTimestamp;
+                string auxData;
+            }
+        ```
+        
+        **Reference**: [ClaimableERC20.sol#L75](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/module/token/minting/ClaimableERC20.sol#L75)
+        
+        The ClaimCondition is set in the storage using the following layout:
+        
+        ```
+        struct Data {
+            // sale config: primary sale recipient, and platform fee recipient + BPS.
+            ClaimableERC20.SaleConfig saleConfig;
+            // claim condition
+            ClaimableERC20.ClaimCondition claimCondition;
+            // UID => whether it has been used
+            mapping(bytes32 => bool) uidUsed;
+            // address => how many tokens have been minted
+            mapping(address => uint256) totalMinted;
+        }
+        ```
+        
+        **Reference**: [ClaimableERC20.sol#L21-L30](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/module/token/minting/ClaimableERC20.sol#L21-L30)
+        
+        This change is considered an unsafe storage layout change, since an upgrade would overwrite subsequent parameters. This can lead to severe vulnerabilities such as unintentionally setting wrong values for claim conditions or breaking the module’s functionality at all. 
+        
+        **Remediation to Consider**
+        
+        Consider changing the storage layout so that upgrades can be made in a safe way. E.g. only add new params at the end of the storage layout or define a new storage layout for each version that reads from a separate storage slot.
+    </field>
+    <field name="response">
+        The contracts are not deployed to mainnet/prod yet, so restructuring the storage layout will not lead to storage collisions as of now.
+     </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/commit/5a9083462650282ef7d0bb796455ca1dc0559111,https://github.com/thirdweb-dev/modular-contracts/blob/5a9083462650282ef7d0bb796455ca1dc0559111/src/module/token/metadata/BatchMetadataERC721.sol#L202</field>
+    <field name="content">
+        ## [H-3] BatchMetadata modules may apply `baseURI` to incorrect token ids
+
+        ERC721Base and ERC1155Base added support for `updateMetadataERC721` and `updateMetadataERC1155` callbacks, respectively. This allows for setting the `baseURI` on the `mint` and `mintWithSignature` functions.
+        
+        The callback and thus the respective BatchMetadata module is called when a `baseURI` is provided, otherwise the callback is skipped:
+        
+        ```jsx
+        function mint(address to, uint256 amount, string calldata baseURI, bytes calldata data) external payable {
+            uint256 tokenId = _nextTokenId();
+        >>  if (bytes(baseURI).length > 0) {
+                _updateMetadata(to, tokenId, amount, baseURI);
+            }
+            _beforeMint(to, tokenId, amount, data);
+            _safeMint(to, amount, "");
+        }
+        ```
+        
+        **Reference**: [ERC721Base.sol#L191](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/core/token/ERC721Base.sol#L191)
+        
+        This approach allows minting tokens without invoking the BatchMetadata module by leaving the `baseURI` empty. In such cases, the `tokenId` in ERC721Base or ERC1155Base increments, while the `nextTokenIdRangeStart` in the module's storage remains at `0`. As a result, when a token is subsequently minted with a provided `baseURI`, the metadata is incorrectly applied to `tokenId = 0` instead of the newly minted `tokenId`. 
+        
+        For example, imagine 100 NFTs are minted for ERC721Base without a `baseURI`. Then, 1 NFT is minted with a `baseURI` of `ipfs://base/`, intended to apply to `tokenId = 100`. However, this doesn't happen as expected. Because the module wasn't informed of the 100 previously minted NFTs and the `nextTokenIdRangeStart` is still 0, it mistakenly applies the provided `baseURI` to `tokenId = 0`.
+        
+        **Remediation to Consider**
+        
+        Consider changing the logic in the BatchMetadata modules, so that the metadata is correctly applied to the provided token range.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/pull/173/commits/9954d2be42d77d3eb6871ad6263049955e4cb479</field>
+    <field name="content">
+        ## [M-1] The SequentialTokenIdERC1155 module fails to apply the correct tokenId when installed after initial minting
+
+        SequentialTokenIdERC1155 increments the `tokenId` when a value of `uint.max` is passed to `updateTokenIdERC1155`. This works well when the module is installed before minting the first token, but can lead to unwanted behavior if installed at a later point. 
+        
+        Consider a scenario where 10 tokens (range 0-9) have been already minted by ERC1155Core, and only then the SequentialTokenIdERC1155 is installed. The `nextTokenId` in SequentialTokenIdERC1155 would start from id 0 (instead of 10), which is not the desired behavior. Instead, it should increment the value from the most recent tokenId.
+        
+        **Remediation to Consider**
+        
+        Add a `onInstall` function to the module to allow setting the `nextTokenId` accordingly.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Frontrunning</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts/pull/660/commits/d5cec9ed080c9919aa15d98524477c114604d489</field>
+    <field name="content">
+        ## [M-2] Paymaster is vulnerable to a sandwich attack when refilling the deposit on EntryPoint
+
+        In TokenPaymaster’s `_postOp` function, `refillEntryPointDeposit` is called to refill the deposit on EntryPoint with the Paymaster’s token balance. If the EntryPoint balance falls below the `minEntryPointBalance` threshold, tokens are swapped to wei using Uniswap:
+        
+        ```jsx
+        if (currentEntryPointBalance < tokenPaymasterConfig.minEntryPointBalance) {
+            uint256 swappedWeth = _maybeSwapTokenToWeth(token, _cachedPrice);
+            unwrapWeth(swappedWeth);
+            entryPoint.depositTo{value: address(this).balance}(address(this));
+        }
+        ```
+        
+        **Reference**:  [TokenPaymaster.sol#L178-L182](https://github.com/thirdweb-dev/contracts/blob/60c8b9baee0f032933db43b4307799b20377df91/contracts/prebuilts/account/token-paymaster/TokenPaymaster.sol#L178-L182)
+        
+        In `_maybeSwapTokenToWeth`, the `amountOutMin` is calculated to provide slippage protection for the Uniswap swap operation.
+        
+        ```jsx
+        uint256 amountOutMin = addSlippage(tokenToWei(tokenBalance, quote), uniswapHelperConfig.slippage);
+        ```
+        
+        **Reference**: [UniswapHelper.sol#L55](https://github.com/thirdweb-dev/contracts/blob/60c8b9baee0f032933db43b4307799b20377df91/contracts/prebuilts/account/utils/UniswapHelper.sol#L55)
+        
+        The TokenPaymaster’s implementation has been recently changed to support tokens with decimals < 18. However, this is not considered in the calculation of the `amountOutMin` value. Consequently, the `amountOutMin` calculated might be significant lower than what is required for sufficient slippage protection.
+        
+        Let’s consider a scenario where USDC is used (decimal: 6) for the payment token. In this case, the calculated `amountOutMint` would be by a magnitude of 10^12 (10^18-6) smaller than what is  required, effectively removing slippage protection. 
+        
+        This makes the swap operation vulnerable to a sandwich attack, meaning that the Paymaster potentially receives much less WETH for the amount of tokens provided.
+        
+        **Remediation to Consider**
+        
+        Consider the token’s decimal value when calculating the `amountOutMin` value.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts/pull/660/commits/2289ed200dcf12ef117aeb2435a12cd51730efad</field>
+    <field name="content">
+        ## [L-1] TokenPaymaster doesn’t support tokens with decimal > 18
+
+        The TokenPaymaster contract was modified to accommodate tokens with decimals other than 18:
+        
+        ```jsx
+        uint256 tokenAmount = weiToToken(preChargeNative, cachedPriceWithMarkup) / (10 ** (18 - _tokenDecimals));
+        ```
+        
+        **Reference**: [TokenPaymaster.sol#L131](https://github.com/thirdweb-dev/contracts/blob/60c8b9baee0f032933db43b4307799b20377df91/contracts/prebuilts/account/token-paymaster/TokenPaymaster.sol#L131)
+        
+        While this implementation works for tokens with decimals ≤ 18, it fails for tokens with decimals > 18. In such cases, the transaction would revert, rendering the Paymaster contract non-functional.
+        
+        **Remediation to Consider**
+        
+        - Modify the implementation to correctly handle tokens with decimals > 18, or
+        - add a check in the constructor to revert if a token with decimals > 18 is provided
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/commit/57659628871c40497984e19035f364c53a14efcf</field>
+    <field name="content">
+        ## [Q-1] FallbackFunction array of Claimable modules can be reduced
+
+        For ClaimableERC20/721/1155, the FallbackFunction array is defined with a size of 5, but only needs to hold 4 elements. Consider reducing the size of the array to 4.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Nitpicks</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/modular-contracts/commit/7437f5b2af625aff1957dbc6145ad9370b3e452b</field>
+    <field name="content">
+        ## [Q-2] Nitpicks
+
+        Natspec is missing or incorrect on the following occurrences: 
+        
+        - missing natspec for `_startTokenId` param [here](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/callback/BeforeMintCallbackERC721.sol#L24) and [here](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/callback/BeforeMintWithSignatureCallbackERC721.sol#L27)
+        - missing natspec for `_id` param [here](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/callback/BeforeMintWithSignatureCallbackERC1155.sol#L27)
+        - missing natspec for `deadline`, `v`, `r`, `s` params [here](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/core/token/ERC20Base.sol#L238)
+        - outdated natspec for `ClaimSignatureParamsERC20` [here](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/module/token/minting/ClaimableERC20.sol#L92-L99)
+        - outdated natspec for `ClaimParamsERC20` [here](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/module/token/minting/ClaimableERC20.sol#L107-L110)
+        - incorrect natspec for `beforeMintWithSignatureERC20` [here](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/module/token/minting/ClaimableERC20.sol#L200). It misses natspec for all the params and incorrectly says  “*for the ERC20Core.mint*” instead of “*ERC20Core.mintWithSignature*”
+        - incorrect natspec [here](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/module/token/minting/ClaimableERC721.sol#L22). It mentions “*platform fee recipient + BPS*”, but this is not used anymore.
+        - obsolete natspec for recipient [here](https://github.com/thirdweb-dev/modular-contracts/blob/c121e8eb762b9b85eb45aaca1f65345a236669ff/src/module/token/minting/MintableERC20.sol#L52).
+    </field>
+</item>
