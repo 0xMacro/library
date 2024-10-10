@@ -1,0 +1,30 @@
+<item>
+    <field name="topic">Unnecessary Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">12ae44dfa6d34543d67a8c254befe6e47bbe2c04</field>
+    <field name="content">
+      ## [Q-1] `NotAPowerOfTwo` error is not used
+  
+      In the `ICardRun` interface contract, the `NotAPowerOfTwo` custom error is defined. However, it is not used in the `CardRun` contract.
+      
+      Consider removing this unnecessary custom error.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">12ae44dfa6d34543d67a8c254befe6e47bbe2c04</field>
+    <field name="content">
+      ## [G-1] `cards` array can be declared as a fixed-size array of 16
+  
+      In the `CardRun` contract, the `cards` array in the `CardPackData` struct is declared as a dynamic-length array. However, the array will always have 16 elements in it, hence it would be better to declare it as a fixed-size array of 16.
+      
+      This change can reduce gas costs by approximately 22,000 for each requestPackOpening function call.
+  
+    </field>
+  </item>
+  

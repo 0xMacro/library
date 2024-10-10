@@ -1,0 +1,87 @@
+<item>
+    <field name="topic">Protocal Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Se7en-Seas/boring-vault/pull/75/commits/54dba7cca13bfcc55bfe147d5c2028c889a6332b,https://github.com/Se7en-Seas/boring-vault/pull/75/commits/77b7ae8a31c6fbab114218d97946b1cd90315ddf</field>
+   
+    <field name="content">
+      ## [H-1] ETH sent into BoringPuppet is unrecoverable
+  
+      `BoringPuppet.sol` is a contract intended to be controlled by the boring vault and used as a alternate address, used for varying purposes while interacting with protocols, like bypassing point reward caps or user deposit caps. It is relatively simple, allowing the boring vault to call any function via it’s callback, forwarding value sent into the call:
+  
+      ```solidity
+      /**
+       * @notice This contract in its current state can only be interacted with by the BoringVault.
+       * @notice The real target is extracted from the call data using `extractTargetFromCalldata()`.
+       * @notice The puppet then forwards
+       */
+      fallback() external payable onlyBoringVault {
+          // Extract real target from end of calldata
+          address target = PuppetLib.extractTargetFromCalldata();
+  
+          // Forward call to real target.
+          // TODO we could do some verification of `target`, but if it is wrong then it should just revert when it tries to make the call.
+          target.functionCallWithValue(msg.data, msg.value);
+      }
+      ```
+      Reference: [BoringPuppet.sol#L36-L48](https://github.com/Se7en-Seas/boring-vault/blob/9aaebb2686a4ef40536376a9a603586dbd7aec3e/src/base/Puppets/BoringPuppet.sol#L36-L48)
+  
+      This fallback function is the only means that the puppet can make calls, and is limited to only sending ETH equal to the amount sent in on that call, since it uses `msg.value`.
+  
+      The only other function in the contract is a `receive()` function, which handles the case where ETH is sent directly into the contract without any additional calldata. One intent of having this `receive()` function is to allow the puppet to receive ETH as a reward for protocols that offer it, say for staking. If ETH is sent to the contract, however, there is no way to move the ETH out, since its fallback function only forwards the value sent in. This would cause any ETH rewards to be stuck in the contract forever.
+  
+      **Remediations to Consider**
+  
+      Either:
+  
+      - Add a withdraw function to the puppet that only the boring vault can call
+      - Specify a value in the additional data sent into the `fallback()` call, like is done with the target address, rather than use `msg.value`.
+      - Direct any ETH received to the Boring Vault
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      ## [I-1] Symbiotic contracts are only on testnet and unaudited
+  
+      Symbiotic vault contracts are currently only deployed on the Holesky testnet, and their audit reports do not cover them or the associated protocol contracts. This could mean there is a audit pending and may change when deployed to mainnet, caution and re-review is advised once that occurs. Notably the vault contracts do not utilize the symbiotic collateral contracts that it’s documentation claims it will use, so it is possible the underlying token deposited into these vaults will be updated to use their associated collateral token.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      ## [I-2] Karak will update to allow delegation
+  
+      Boring vaults intend to interact with Karak contracts by using the [`KarakDecoderAndSanitizer`](https://github.com/Se7en-Seas/boring-vault/blob/a0b17c344a0b7996fad7709a0b432d9b2cc680ea/src/base/DecodersAndSanitizers/Protocols/KarakDecoderAndSanitizer.sol) which will interact with the [`DelegationSupervisor`](https://github.com/karak-network/v1-contracts-public/blob/main/src/DelegationSupervisor.sol) and [`VaultSupervisor`](https://github.com/karak-network/v1-contracts-public/blob/main/src/VaultSupervisor.sol) contracts. However, currently there is no way to actually delegate shares like the DelegateSupervisor’s name would suggest. There is a comment in the VaultSupervisor that implies this will be changed in a future update:
+  
+      ```solidity
+       // Increase shares delegated to operator
+       // TODO: to be enabled in the next version when delegation is activated
+       //self.delegationSupervisor.increaseDelegatedShares(staker, vault, shares);
+      ```
+      Reference: [VaultSupervisor.sol#L274-L276](https://github.com/karak-network/v1-contracts-public/blob/18ab80f7d6c650dd62f570891546c1d47d08afc3/src/VaultSupervisor.sol#L274-L276)
+  
+      Karak contracts are upgradeable, which should always be considered with caution, but it is important to be aware that active changes are planned, and so should be watched in case the contracts update its interface or introduces an exploit. 
+  
+    </field>
+      
+  </item>
+
+  <item>
+    <field name="topic">Trust Assumption</field>
+    <field name="content">
+      ## [I-3] Strategists are trusted to set a reasonable gas limit when bridging
+  
+      When bridging assets, a min gas limit parameter is typically required which is the gas limit used to execute the transaction on destination chain. If the min gas limit provided is not sufficient to executed the desired transaction, it may not be able to be executed leaving any ETH or tokens attempted to be bridged potentially stuck. It is expected that when strategists set this value it will be set correctly so it will execute as expected.
+  
+      Alternatively the min gas limit is used by some protocols, like [Scroll](https://github.com/scroll-tech/scroll-contracts/blob/2ac4f3f7e090d7127db4b13b3627cb3ce2d762bc/src/L1/L1ScrollMessenger.sol#L342-L348),  to charge a fee to cover the execution cost. If it is set to be much larger than required, additional unnecessary fees will be charged.
+  
+      Strategists should simulate the desired transactions to determine the gas used, adding a buffer to ensure it will execute.
+    </field>
+  </item>
+  

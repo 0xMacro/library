@@ -1,0 +1,372 @@
+<item>
+    <field name="topic">Protocol Integration</field>
+    <field name="impact">high</field>
+    <field name="impactNote">
+        After carefully reviewing the apxETH contract, the `withdrawalPenalty` fee variable (initially set to 30000) was set to 0 after deployment.
+    </field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a6cd40af679bf5cae9e8cdf0973980be60c4381b</field>
+    <field name="response">
+        After verifying the contract & docs, there is no fee on exit (redeeming) from apxETH vault since it returns in pxETH. pxETH is the one with the withdrawal fee (pxETH → ETH)
+        https://dinero.xyz/docs/fees
+
+        But for:
+        - Efficiency & cleaner code-base: less operation to do.
+        - Better UX: user are still inside the yield pool.
+        - Security: withdrawal fee can be modified by owner.
+
+        We are sending apxETH back to the user instead of pxETH.
+    </field>
+    <field name="content">
+      ## [H-1] `apxETHVault` does not consider redemption fees and uses maximum amounts on each withdrawal
+  
+      The `apxETHVault.sol` contract, a variant of a drip vault integrating with Dinero Pirex ETH, uses the native asset deposits with the auto compounding flag true to accrue yield while holding the GOB lot until a winning block, with a previously set guess to be mined by a Heroglyphs validator.
+  
+      ```solidity
+      function _afterDeposit(uint256 _amount) internal override {
+          pirexEth.deposit{ value: _amount }(address(this), true);
+      }
+      ```
+  
+      **Reference:** apxETHVault.sol#L37-39
+  
+      When a winning block is selected, the vault is migrated, or a user claims a winning guess, the GOB contract will withdraw from the vault, which in turn executes the `_beforeWithdrawal()` logic in the apxETHVault contract:
+  
+      ```solidity
+      function _beforeWithdrawal(address _to, uint256 _amount) internal override {
+          **uint128 exitedPx = uint128(apxETH.redeem(apxETH.maxRedeem(address(this)), address(this), address(this)));**
+          uint256 interestInPx;
+          uint256 cachedTotalDeposit = getTotalDeposit();
+  
+          **uint256 amountInPx = apxETH.convertToShares(_amount);**
+          uint256 exitedInETH = apxETH.convertToAssets(exitedPx);
+  
+          //Shares scales down, in full exit, we might find less than the total deposit
+          if (exitedInETH > cachedTotalDeposit) {
+              interestInPx = apxETH.convertToShares(exitedInETH - cachedTotalDeposit);
+          }
+  
+          _transfer(address(pxETH), rateReceiver, interestInPx);
+          _transfer(address(pxETH), _to, amountInPx);
+  
+          if (cachedTotalDeposit - _amount != 0) {
+              apxETH.deposit(pxETH.balanceOf(address(this)), address(this));
+          } else {
+              // Transfer the remaining balance of pxETH to the rateReceiver, left over from shares conversion
+              _transfer(address(pxETH), rateReceiver, pxETH.balanceOf(address(this)));
+          }
+      }
+      ```
+  
+      **Reference:** apxETHVault.sol#L41-63
+  
+      However, the logic does not consider the `apxETH → pxETH` redeem fees, currently set [at 0,03%](https://github.com/dinero-protocol/pirex-eth-contracts/blob/e47ad01799271071b0ae561b15fb70754eef50c0/src/AutoPxEth.sol#L94-L98) (but can be changed by the Pirex ETH owner). This causes some undesired outcomes:
+  
+      As the Vault redeems the maximum balance (`maxRedeem()`) on each withdrawal:
+  
+      - If a `validator` and `treasury` fee are set, each withdrawal will pay for the 0,03% of the total.
+      - Each time a user claims a different winning bet, the vault will pay a 0,03% fee on the total assets held by the Vault, including different block and unallocated assets.
+  
+      Additionally, depending on how much yield has been accrued between deposits and withdrawals:
+  
+      - If the yield accrued exceeds the equivalent fee, the rewards will cover the fee, and the Heroglyph interest will be lower than expected.
+      - If the yield is insufficient to cover the fees, the contract will revert as the `amountInPx` is calculated using `_amount` and not the balance received after redeeming.
+  
+      Note that not accounting for the actual received balances could cause rounding issues to deny withdrawals. For example, the current `test_onRun_thenFlowWorks()` test in `GOBPxETHE2E.t.sol` currently reverts when updating the vault since the asset-to-share conversion of the total deposits has a `1` wei less discrepancy with the redeemed balance.
+
+      **Remediations to Consider:**
+  
+      - Only redeem the desired amount and verify the received `pxETH`.
+      - Use and transfer `apxETH` and allow the end receiver to handle redeem or withdrawal fees.
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Integration</field>
+    <field name="impact">high</field>
+    <field name="chance">na</field>
+    <field name="status">fixed</field>
+    <field name="commit">dad11ca1f4bed0f99839c345d4b8713371a3e92f</field>
+    <field name="content">
+      ## [H-2] Aave vault can not be migrated
+  
+      When a Vault migration is initiated through the `updateVaultDrip()` ownable function, all the current deposits are withdrawn to the treasury address to properly handle withdrawal delays and move the assets to the new vault:
+  
+      ```solidity
+      function updateDripVault(address _dripVault) external onlyOwner {
+              ...
+  
+          uint256 totalDeposit = dripVault.getTotalDeposit();
+          dripVault.withdraw(treasury, totalDeposit);
+  
+          ...
+      }
+      ```
+  
+      **Reference:** GuessOurBlockReceiver.sol#L209-221
+  
+      In `AaveVault.sol`, the `_beforeWithdrawal()` function withdraws the maximum withdrawal value from the pool to calculate the interest and then re-supply the difference between the total deposits and the amount.
+  
+      ```solidity
+      function _beforeWithdrawal(address _to, uint256 _amount) internal override {
+          **uint128 exited = uint128(aaveV3Pool.withdraw(address(weth), type(uint256).max, address(this)));**
+  
+          uint256 cachedTotalDeposit = getTotalDeposit();
+          uint256 interest = exited - cachedTotalDeposit;
+  
+          **aaveV3Pool.supply(address(weth), cachedTotalDeposit - _amount, address(this), 0);**
+  
+          weth.withdraw(_amount + interest);
+  
+          _transfer(address(0), rateReceiver, interest);
+          _transfer(address(0), _to, _amount);
+      }
+      ```
+  
+      **Reference:** AaveVault.sol#L40-52
+  
+      Since [Aave V3 pools require the amount to be different from zero](https://github.com/aave/aave-v3-core/blob/6d6fa53d360b43f492ff5b3c7033f95aee4f1335/contracts/protocol/libraries/logic/ValidationLogic.sol#L71) in the `supply()` validation logic, the contract will revert with error code “26,” representing an invalid amount. If the initial vault is set to use the `AaveVault` implementation, any attempt to update the vault will result in a revert.
+  
+      **Remediations to Consider:**
+  
+      Verify if the total amount was used in `withdraw()` and skip the `supply()` call if so.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Migration</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">f7adccbbc3a76295a91d573227f5861f6347d61b</field>
+    <field name="content">
+      ## [M-1] Vault migration mid-state could render the receiver app to always revert
+  
+      When calling the `updateDripVault()` ownable function, the total deposits corresponding to the lot will be withdrawn to the `treasury` address, as mentioned in the comments, due to some vault drips' withdrawal delays.
+  
+      ```solidity
+       function updateDripVault(address _dripVault) external onlyOwner {
+          if (permanentlySetDripVault) revert CanNoLongerUpdateDripVault();
+          if (_dripVault == address(0)) revert DripVaultCannotBeZero();
+  
+          uint256 totalDeposit = dripVault.getTotalDeposit();
+          dripVault.withdraw(treasury, totalDeposit);
+  
+          dripVault = IDripVault(_dripVault);
+          isMigratingDripVault = true;
+  
+          emit DripVaultUpdated(_dripVault);
+          emit DripVaultMigrationStarted();
+      }
+      ```
+  
+      **Reference:** GuessOurBlockReceiver.sol#L209-221
+  
+      This function will set the `isMigratingDripVault` bool to true. However, no checks in `_lzReceive()` consider this variable, potentially causing the newly updated vault to revert if a block wins and the contract attempts to withdraw fees or pay the winner.
+  
+      **Remediations to Consider**
+  
+      Consider checking the `isMigratingDripVault` and returning early if it’s set to true.
+    
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">medium</field>
+    <field name="chance">na</field>
+    <field name="status">fixed</field>
+    <field name="commit">926f197a6ba8380b046cfbfb6fde926e338b9f74</field>
+    <field name="content">
+      ## [M-2] `lzEndpointReceiverId`
+  
+      As per the [LayerZero V2 documentation](https://docs.layerzero.network/v2/developers/evm/technical-reference/integration-checklist#avoid-hardcoding-layerzero-endpoint-ids), the endpoint IDs should not be hard coded, and access control setters should be used to prevent potential integrator changes from breaking the application.
+  
+      **Remediations to Consider:**
+  
+      Consider implementing an `onlyOwner` setter for the `lzEndpointReceiverId`.
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Grief</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">f7adccbbc3a76295a91d573227f5861f6347d61b</field>
+    <field name="content">
+      ## [L-1] Including the same ticker multiple times will cross-chain repeated messages
+  
+      In `GuessOurBlockSender` the `latestMintedBlock` is checked against the passed `_blockNumber` and returns early if higher.
+  
+      ```solidity
+      function onValidatorTriggered(uint32, uint32 _blockNumber, address _validatorWithdrawer, uint128 _heroglyphFee)
+          external
+          override
+          onlyRelay
+      {
+          // return instead a revert for gas optimization on Heroglyph side.
+          if (latestMintedBlock > _blockNumber) return;
+   
+          ...  
+      }
+      ```
+  
+      **Reference:** GuessOurBlockSender.sol#L30-47
+  
+      However, since each Heroglyph validated block can include in the graffiti the same ticker multiple times, it could cause the `onValidatorTriggered()` function to be called multiple times with the same block, sending a cross-chain message that will return early as the block will be completed on the first call. 
+  
+      **Remediations to Consider:**
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Configuration</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">243e0d3d91b3baeff547f4a6ae7e0628c4f2dc5b</field>
+    <field name="content">
+      ## [L-2] Potential owner misconfigurations
+  
+      Two potential owner configuration setters could cause undesired revert scenarios, breaking the contract:
+  
+      Configuring `minimumBlockAge` to zero:
+  
+      - This would allow an actor to front-run the LZ message delivery with the won block and place bets that will instantly win. Rendering the bet odds and guess unfair.
+  
+      Configuring `groupSize` variable to zero will:
+  
+      - `_lzReceive()` to revert in #114:
+      
+          ```solidity
+          uint32 blockNumberTail = blockNumber - (blockNumber % groupSize);
+          ```
+      
+      - `_guess()` to revert on the `_isValidTailBlockNumber()` check in line #98:
+      
+          ```solidity
+          return _tailBlockNumber % groupSize == 0;
+          ```
+      
+      **Remediations to Consider:**
+  
+      Consider having minimum bound values for these configuration setters. 
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">90dd8a3f6454bf66a7b2972abc3781276c6bf007</field>
+    <field name="response">
+        We are aware that changing this value might bring unfair situation, but to be safe that the price stays affordable, we going to make it editable by owner.
+    </field>
+    <field name="content">
+      ## [Q-1] `fullWeightCost` can be immutable
+  
+      In `GuessOurBlock` sender, the variable `fullWeightCost` can be declared immutable since it’s only set in the constructor.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ac56829fa8cefc6b81599c0544c89f623cff411c</field>
+    <field name="content">
+      ## [Q-2] Replace magic numbers with constants
+  
+      The `GuessOurBlockReceiver` contract logic has the guess weight unit value hardcoded as `1e18` when calculating the `guessWeight` and `reducedLot`: 
+  
+      ```solidity
+  
+      uint128 guessWeight = uint128(Math.mulDiv(_nativeSent, **1e18**, fullWeightCost));
+      ```
+  
+      **Reference:** GuessOurBlockReceiver.sol#L88
+  
+      ```solidity
+      if (blockMetadata.totalGuessWeight < **1e18**) {
+         uint128 reducedLot = uint128(Math.mulDiv(winningLot, blockMetadata.totalGuessWeight, **1e18**));
+      ```
+  
+      **Reference:** GuessOurBlockReceiver.sol#L133-134
+  
+      Consider declaring a constant variable for this to increase readability and make its usage straightforward. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">b32ca571ca30c2d4b3457987a01cbe9b49549453</field>
+    <field name="content">
+      ## [Q-3] Using `safeTransfer()`
+  
+      In `BaseDripVault.sol` contract, the `_transfer()` internal function is used to transfer native assets or ERC20 tokens depending on the `_asset` address input:
+  
+      ```solidity
+      function _transfer(address _asset, address _to, uint256 _amount) internal {
+          if (_amount == 0) return;
+  
+          if (_asset == address(0)) {
+              (bool success,) = _to.call{ value: _amount }("");
+              if (!success) revert FailedToSendETH();
+          } else {
+              IERC20(_asset).transfer(_to, _amount);
+          }
+      }
+      ```
+  
+      **Reference:** BaseDripVault.sol#L39-48
+  
+      This function uses the standard `IERC20.transfer()`. Consider using `safeTransfer()` instead to handle potential non-standard transfers, such as token transfers that do not revert to failed transfers.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">31298b331b1e3ce57f50e358ff2c66aab92a9624</field>
+    <field name="content">
+      ## [Q-4] Unnecessary `receive()` function
+  
+      In `GuessOurBlockReceiver.sol` contract, the `receive()` function allows the `dripVault` to send native assets back again to the contract.
+  
+      ```solidity
+      receive() external payable {
+          if (msg.sender != address(dripVault)) revert InvalidSender();
+      }
+      ```
+  
+      However, the logic will always withdraw to the proper end without going to the `GuessOurBlockReceiver`. The `claim()` function will send the assets directly to the user. When executing the `lzReceive()` logic or claiming, they are sent to other addresses (validator, treasury, or claimants), not back to this contract. Consider removing this logic, as it’s unnecessary with the current vaults and logic.
+     
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Configuration</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">af82e1e9108fc27bb96d591723f4775d8a129a2c</field>
+    <field name="content">
+      ## [Q-5] No `treasury` address setter
+  
+      In `GuessOurBlockReceiver.sol` contract, the `treasury` address variable is only set in the constructor. Although not explicitly immutable, this address can not be changed by any method. Consider having an `onlyOwner` function that allows this address to be updated in case of a potential misconfiguration or migration of treasury or marking this address as immutable.
+       
+    </field>
+  </item>
+  
