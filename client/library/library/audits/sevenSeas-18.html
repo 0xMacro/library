@@ -1,0 +1,88 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Oct 14, 2024"
+  auditTitle="Seven Seas A-18"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="ec74b24330a1d7b144dc397c1c20c76e3d6fc460"
+  finalRepoCommitHash="be0c22f5e2f356a0b7d471f40cfc8f1e69a6c163"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from Oct 13th to Oct 14th 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+   
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the changes for the following contracts in <a href="https://github.com/Se7en-Seas/boring-vault/pull/139">PR 139</a> as well as a review of the safety of integrating with usual money contracts.
+    </p>
+
+    <template type="file-hashes">
+      66c6bc3ad3909f7c5eb87600d96b34c5db2ecabace8ceb722fdbebabade465f1  src/base/DecodersAndSanitizers/Protocols/UsualMoneyDecoderAndSanitizer.sol
+      54a1139d43210eee0c64c60172fbd9ea45fb6e22b4ccacb01550897cd15fdb9c  src/base/DecodersAndSanitizers/EtherFiLiquidUsdDecoderAndSanitizer.sol
+    </template>
+
+
+
+    <p>
+      Additionally, the SatLayer protocol was reviewed and its associated decoder from <a href="https://github.com/Se7en-Seas/boring-vault/pull/135">PR 135</a> was audited.
+    </p>
+
+    <template type="file-hashes">
+      d9c6eb28f54a0b0663b24500183b64abfa5b3e951560172b33abd11c2e8ed6e8  src/base/DecodersAndSanitizers/Protocols/SatlayerStakingDecoderAndSanitizer.sol
+      119466decbcb9a9cbf77822ff91ed1b5699f2e2c44bdd214c0865ace188d5ebd  src/base/DecodersAndSanitizers/PointFarmingDecoderAndSanitizer.sol
+    </template>
+
+    <p>
+      Additionally, the Bitcorn protocol was reviewed and its associated staking decoder from <a href="https://github.com/Se7en-Seas/boring-vault/pull/134">PR 134</a> was audited.
+    </p>
+
+    <template type="file-hashes">
+      7f8ad1b46dd44e04aa9045cbe541c6d4035e2fef68b153780469870043efc0d6  src/base/DecodersAndSanitizers/Protocols/CornStakingDecoderAndSanitizer.sol
+      119466decbcb9a9cbf77822ff91ed1b5699f2e2c44bdd214c0865ace188d5ebd  src/base/DecodersAndSanitizers/PointFarmingDecoderAndSanitizer.sol
+    </template>
+
+    <p>
+      Additionally, the Frax staking was reviewed and its associated staking decoder from <a href="https://github.com/Se7en-Seas/boring-vault/pull/127">PR 127</a> was audited.
+    </p>
+
+    <p>
+      Additionally, the BoringVault Withdrawal Queue and Solver from <a href="https://github.com/Se7en-Seas/boring-vault/pull/130">PR 130</a> was audited.
+    </p>
+
+    <template type="file-hashes">
+      22cb9ca512a20abad78c4003085b3206ce3931c364eb2132f7e431e76f8fc13b  src/base/Roles/BoringQueue/BoringOnChainQueue.sol
+      5ec66a43fae691e62bafc816951bb78bb91c604d9417f8598fd93427f2addd53  src/base/Roles/BoringQueue/BoringOnChainQueueWithTracking.sol
+      e304f4a60e1b66f9acf8ba2b5546ea38b4082832ef4f77b0ed6946613e97b4ca  src/base/Roles/BoringQueue/BoringSolver.sol
+      a4fcf8547590d051a745fddac0f003364f49b3364028694eb8cd46b1a7a0a3dd  src/base/Roles/BoringQueue/IBoringSolver.sol
+    </template>
+
+    <template type="file-hashes">
+      153a24b13e96d3f3826196e40de79bfa8183615daf75a4a06fb95a7855d24560  src/base/DecodersAndSanitizers/Protocols/FraxDecoderAndSanitizer.sol
+      2807965e2b0341ebc401f03a1c73da0593058fa29ec0894368adb57601700364  src/base/DecodersAndSanitizers/StakingDecoderAndSanitizer.sol
+    </template>
+
+    <p>
+      Additionally, Lido wstETH bridging was reviewed and its associated bridging decoder from <a href="https://github.com/Se7en-Seas/boring-vault/pull/126">PR 126</a> was audited.
+    </p>
+
+    <template type="file-hashes">
+      3f2d9547ccdd9f096393f4dfa7eb1091b213dae9d4f4fdeba4dc141ba46d56d4  src/base/DecodersAndSanitizers/Protocols/LidoStandardBridgeDecoderAndSanitizer.sol
+      1c0619fc811d6eb2472c7b5c39f70b4e9ab4d4610acb9e5ee65e9629a0a2f5b8  src/base/DecodersAndSanitizers/BridgingDecoderAndSanitizer.sol
+    </template>
+
+    <p>
+      Additionally, we reviewed the use of Elixir withdrawals using the Ethena decoder defined in <a href="https://github.com/Se7en-Seas/boring-vault/pull/133">PR 133</a> as well as a review of the safety of integrating with usual money contracts.
+    </p>
+
+  </content-for>
+</page>
