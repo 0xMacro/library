@@ -72,12 +72,12 @@ Every EOA on the Ethereum blockchain is controlled by a unique private key, whic
 
 To initiate a transaction, the user constructs a **transaction object** that encapsulates the details of their intent. This data object typically includes the following fields:
 
-- **to**: The recipient's address.
-- **value**: The amount of Ether to transfer.
-- **data**: Input data for the contract, accessible during execution as 'calldata'.
-- **gasLimit**: The maximum amount of gas that can be consumed by the transaction.
-- **nonce**: A counter that ensures each transaction is unique, critical for preventing replay attacks.
-- **maxFeePerGas** and **maxPriorityFeePerGas**: Specify the maximum fees the user is willing to pay per unit of gas, including a tip to validators for transaction prioritization.
+- `to`: The recipient's address.
+- `value`: The amount of Ether to transfer.
+- `data`: Input data for the contract, accessible during execution as 'calldata'.
+- `gasLimit`: The maximum amount of gas that can be consumed by the transaction.
+- `nonce`: A counter that ensures each transaction is unique, critical for preventing replay attacks.
+- `maxFeePerGas` and `maxPriorityFeePerGas`: Specify the maximum fees the user is willing to pay per unit of gas, including a tip to validators for transaction prioritization.
 
 ### 2. Choosing a Nonce
 
@@ -93,7 +93,7 @@ Some common uses of nonces include:
 - Smart contracts can implement their own internal nonce systems (for example, nonces are often used to safely support off-chain signatures).
 - Some Ethereum Improvement Proposals (EIPs), such as **Account Abstraction**, introduce contract-level nonces.
 
-For this discussion, we'll focus on the **nonce** field maintained by the EVM for each address.
+For this discussion, we'll focus on the **nonce** field maintained by the EVM for each EOA address.
 
 <aside>EOA only have two onchain fields: The account nonce, and the account's Ether balance.</aside>
 
@@ -102,7 +102,8 @@ For EOAs, the nonce acts as a **transaction counter**, reflecting the number of 
 This mechanism is critical for preventing double-execution of transactions, as it ensures that a given nonce can only be used once. Additionally, it allows users to submit multiple transactions simultaneously by specifying an increasing sequence of nonce values. This guarantees that transactions, if accepted, are executed in the correct order (though not all transactions are guaranteed to be executed).
 
 <aside>
-**Speeding up transactions:**
+
+💡 **Speeding up transactions**
 
 Sometimes, users may find that their transaction is taking longer to be confirmed than desired, often due to insufficient priority fees. To expedite the process, users have the option to 'speed up' the transaction by submitting a new transaction **with the same nonce**, but a higher `maxPriorityFeePerGas` !
 
@@ -124,7 +125,9 @@ Once created, the signature is then added to the transaction object, resulting i
 
 ### 4. Submitting the transaction
 
-Once the signed transaction object is submitted to a node, the node performs several initial validation checks, including:
+Once signed, *someone* needs to send the transaction to the blockchain. It doesn't really matter who – whether it's a wallet, frontend dApp JavaScript, or a backend server – since no one can tamper with the transaction object once it's signed.
+
+Although it doesn't matter who *sends* the transaction, it *does* matter who **receives** it. The receiver must be a node, which will then perform several initial validation checks. This includes checks such as:
 
 - Is the transaction well-formed?
 - Is the signature valid?
@@ -149,13 +152,13 @@ As the transaction is processed, various parts of the Ethereum **world state** m
 
 A crucial feature of EVM transactions is their atomic execution—it's an "all or nothing" process. If the execution reverts, the EVM discards all changes made during that call, including contract state updates, Ether balance adjustments, and logs.
 
-<aside>There's one state change that persists even when an EOA call reverts: the Ether spent on gas. While other state changes are rolled back, the gas used for executing the transaction is still consumed. This occurs because once the network confirms a transaction, all nodes must execute it—even if only to determine it should revert. Consequently, the sender is charged for the computational resources used.</aside>
+<aside>Even when an EOA call reverts, **gas spent does not revert.** While other state changes are rolled back, the gas used for executing the transaction is still consumed. This occurs because once the network confirms a transaction, all nodes must execute it—even if only to determine it should revert. Consequently, the sender is charged for the computational resources used.</aside>
 
 After a transaction is executed by the network, users can query nodes to get a **transaction receipt**. This receipt, created right after execution, serves as confirmation that the transaction was processed by the network and includes several fields, such as:
 
-- **status**: A binary value indicating success (1) or failure (0) of the EOA call
-- **gasUsed**: The number of gas units consumed by the transaction
-- **logs**: An array of the logs emitted during the transaction
+- `status`: A binary value indicating success (1) or failure (0) of the EOA call
+- `gasUsed`: The number of gas units consumed by the transaction
+- `logs`: An array of the logs emitted during the transaction
 
 ### 5. Waiting for the Result
 
