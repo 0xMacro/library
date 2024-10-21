@@ -60,13 +60,13 @@ Every data write begins with a transaction, and every transaction begins with an
 
 At a high level, the steps to calling a function onchain are:
 
-<toc>Building the Transaction</toc>
-<toc>Choosing a Nonce</toc>
-<toc>Signing the Transaction</toc>
-<toc>Submitting the Transaction</toc>
-<toc>Waiting for the Result</toc>
+1. <toc> Building the Transaction</toc>
+2. <toc> Choosing a Nonce</toc>
+3. <toc> Signing the Transaction</toc>
+4. <toc> Submitting the Transaction</toc>
+5. <toc> Waiting for the Result</toc>
 
-### Building & Signing the Transaction
+### 1. Building the Transaction
 
 Every EOA on the Ethereum blockchain is controlled by a unique private key, which is used to sign transactions on behalf of that account. To initiate a transaction, the user constructs a **transaction object** that encapsulates the details of their intent. This object typically includes the following fields:
 
@@ -79,7 +79,7 @@ To initiate a transaction, the user constructs a **transaction object** that enc
 - **nonce**: A counter that ensures each transaction is unique, critical for preventing replay attacks.
 - **maxFeePerGas** and **maxPriorityFeePerGas**: Specify the maximum fees the user is willing to pay per unit of gas, including a tip to validators for transaction prioritization.
 
-### Choosing a Nonce
+### 2. Choosing a Nonce
 
 The term **'nonce'** appears in various contexts within Ethereum and the broader EVM ecosystem, and its meaning can shift subtly depending on context.
 
@@ -110,7 +110,7 @@ When validators see a transaction with the same nonce but a higher fee, they typ
 
 </aside>
 
-### Signing the Transaction
+### 3. Signing the Transaction
 
 Once all values are chosen for the transaction object, it's time to send it to the blockchain:
 
@@ -122,7 +122,7 @@ Once all values are chosen for the transaction object, it's time to send it to t
 
 Once created, the signature is then added to the transaction object, resulting in the final form of the request: a *signed* transaction that is ready to be submitted to the network.
 
-### Submitting the transaction
+### 4. Submitting the transaction
 
 Once the signed transaction object is submitted to a node, the node performs several initial validation checks, including:
 
@@ -157,7 +157,7 @@ After a transaction is executed by the network, users can query nodes to get a *
 - **gasUsed**: The number of gas units consumed by the transaction
 - **logs**: An array of the logs emitted during the transaction
 
-### Waiting for the Result
+### 5. Waiting for the Result
 
 When an EOA interacts with a smart contract via transaction, developers often seek the return value. Unlike traditional programming, submitting a EOA-to-contract call doesn't produce an immediate result. This is because transactions must be mined into a block before execution. If we executed the code upon transaction submission, our results wouldn't account for potential changes in the world state prior to mining. Account balances and contract data can—and often do—shift between transaction submission and mining.
 
