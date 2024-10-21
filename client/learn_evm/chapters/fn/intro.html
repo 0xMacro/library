@@ -14,7 +14,7 @@ When interacting with the Ethereum blockchain, an external user typically engage
 Most interactions with the blockchain, whether querying its state or modifying it, involve executing smart contract code—typically through **function calls**. For example:
 
 - **Checking** your USDC token balance requires calling `balanceOf(addr)` - with your address - on the [USDC contract](https://etherscan.io/token/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48).
-    - Note that this can be done via both methods: Making an offchain query, and also within a transaction.
+    - Note that this can be done via both methods: As an offchain query, and also within a transaction.
 - **Transferring** your USDC to another address requires calling `transfer(toAddr, amount)` on that same contract.
     - This **can only** be done in a transaction; an offchain query is read-only, so it cannot update the state of the chain.
 
