@@ -1,0 +1,38 @@
+<page
+  clientName="Kwenta"
+  reportDate="October 28, 2024"
+  auditTitle="Kwenta 19"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kwenta/zkVIP"
+  repoCommitHash="73ffbef6231961f544c25af5a8c50e3cf0b1fc07"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team intermittently from September 17th to October 14rd, 2024.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+  </ul>
+  
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    5082f1dedcb7c581b99f87c4336a9a20599ad0ca75dd7c9e21b0edad5afda4b9  src/Engine.sol
+    14042b48c58925b435663e2c07f8cc61fd4a19866c38fd1aa057834ccbb94d8f  src/interfaces/IEngine.sol
+    85158737721025ad0b68df492320f3f4884a834bc1007a2f1232cf9c8956375b  src/utils/EIP7412.sol
+    0ad320f1e04ebaa1b1ba5374ef566cc8dd706ea549eb87ba702d0c2e88572c33  src/utils/MulticallablePayable.sol
+    c441dd5f0408a1a160332ce8a511683cceaf1251504f99ab4d2b0f5fabdb8a5e  src/utils/MulticallerWithSender.sol
+    d43c312e64ab4bf8b2b265f29bc1423705ae4f4552200ca541b556e0c904aa9a  src/utils/zap/Zap.sol
+  </template>
+</content-for>
+
+</page>
