@@ -1,0 +1,84 @@
+<page
+  clientName="Infinex"
+  reportDate="October 22, 2024"
+  auditTitle="Infinex 13"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  layout="/library/audits/_layout.html" 
+  repoDiff="https://github.com/infinex-xyz/infinex-contracts/compare/ecaeef6..be7ddb0"
+  repoCommitHash1="ecaeef63f11cdf5a3639837eefd8abef223b5b73"
+  repoCommitHash2="be7ddb099466f3b0f6f2318be378e6bfa0697b3d"
+  customRepoInfo
+  customReviewInfo
+  passwordEncrypt="env:PAGE_PASS_INFINEX_13"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from October 16, 2024 to October 18, 2024. 
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoDiff}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit hash of the last main account audit (Infinex-5):</b> </br>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Latest commit hash at the time of the audit: </b> </br>
+        <code>{{page.repoCommitHash2}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts:</br>
+    </p>
+     
+    <template type="file-hashes">
+        01915d6fab4e7a8748214de1f2edc45b3b438446e943c3f5f7431be8e0927591  src/interfaces/non-standard-erc721s/ICryptoPunks.sol
+        9671c40d17fb784b65d376b7f60216fdc655ede76ae9f2c54d219b5b885103bf  src/interfaces/non-standard-erc721s/IEtherRocks.sol 
+    </template>     
+
+    <p>
+        <br>
+        And we audited the update of the following contracts:</br>
+      </p>
+       
+      <template type="file-hashes">
+        9dcb821d7f898779474770af98f5a6bbd9de31f9a6610f70355e128fa38029e8  src/accounts/modules/AppModule.sol
+        1e42e73a9ffd4515bd49e97be7beaab1748045bf75ac874596fa7db411c7c9fb  src/accounts/modules/BaseModule.sol
+        a41b64f41fc834b49161558b1d3af5fecd966d51953ddb181eceff21fa5f27d1  src/accounts/modules/RecoveryModule.sol
+        999e0d7c2bbd3a6de6431c6bcd47158eb73eaf3d0b3b01aada10ce8f16c1e2ee  src/accounts/modules/WithdrawModule.sol
+        02641ece428a28654021472a9ee8a4575a37643d7d31cd0fe6cf09af83dbcf33  src/accounts/modules/AccountUtilsModule.sol
+        246704d480ac812c1d729dc68345dc415d80bc36e8572cbded606fe28324c21a  src/accounts/storage/Account.sol
+        4823614863254c55d2fc7e63b9887686cca6ac8fc14c7ac8a32aaca7e264d1ab  src/accounts/storage/EIP712.sol
+        b4177aa5ae5d56cac6c05bbbfea50211b6acc2c95325c235cb18e90cdbfe30fb  src/accounts/storage/SecurityKeys.sol
+        89ae343855cf4a6803c23866baf14281e033d62548f586a8e150ed84c474be84  src/accounts/utils/WithdrawUtil.sol
+        281e9a775c0e52976ccd6d2c76922b9044c20454f6cba45cb8d631e33ececf7a  src/account-factory/AccountFactory.sol
+        ff49f22e3e1d9f0159339dae60967efb0e9b32053ccce34ead62afc3e736dd73  src/account-factory/AccountFactoryError.sol
+        dec550c3e6699265eb81cabb9201f344e7e533f625002b0cbac809ed5faa836a  src/account-factory/IAccountFactory.sol
+        29af28c299cce72ff8086a9c3ee77366e5e0ab327298d51f90a64d9848f1b8f0  src/interfaces/accounts/IAppModule.sol
+        b795a9e7cb6b7ed6271a266645ea0ab52058f82a280b6681fd0caacad5636433  src/interfaces/accounts/IRecoveryModule.sol
+        febf7cec47c0d5122df98a41d2367a6dbda686dad96258897c832aedf64614f6  src/interfaces/accounts/IWithdrawModule.sol
+        8335a7cc052a5b1d684a9f7f3433f6743cb834b328c7eebca961a2fb5913c528  src/interfaces/accounts/IAccountUtilsModule.sol
+        e34c1fe9ec8011d08042d3e181e5c4cebee14df7c75dfa18b0a9efeb4d9b6a96  src/interfaces/accounts/IBaseModule.sol
+        73087e5dec58f5247ebae80543d99b09bd0efe56eefe5d155ca6e9c0799bc9c3  src/libraries/Error.sol
+      </template>  
+
+  </content-for>
+</page>
