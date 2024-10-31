@@ -1,0 +1,48 @@
+<page
+  clientName="Zora"
+  reportDate="Sept 6, 2024"
+  auditTitle="Zora A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/ourzora/zora-protocol"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="54d6af614e22857c61672f53e80a6f04b729b04e"
+  repoCommitHashFinal="461d3ba2f82a1e1a96bf6788f20367204edb1af5"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from May 22nd, 2024 to May 28th, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        The Mints token contract itself is non-upgradeable, and assuming the set redeem handler for a token is immutable, users should always be able to receive the same or an expected amount of ETH or Tokens from redeeming relative to what they paid to mint.
+
+        The Mints Manager is upgradable has the permission create new types of Mints tokens, as well as set the mints token that is available to be minted for a specific payment type. The current default ETH Mints token is currently used to by integrated Zora collections to determine the protocol fees for each Mint, which can be changed.
+        
+        The owner of the Mints Manager has the ability to upgrade it, as well as create and set default tokens, adjusting the price to purchase mints for any payment type, as well as set the protocol fee to mint on associated collections. The owner is trusted to set the cost of of Mints tokens to be reasonable to not adversely effect Zora collections, as well as to only upgrade the Mints Manager to benefit the protocol and/or its users.
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+        c3e1c9f211903aaafcd26beed434c3dfc3042ab08121712dcf5cce0d3b75f418  packages/mints/src/BaseRedeemHandler.sol
+        c81a9c28c39f71149e9aa75df0fa7793d05c8be9b7f23304e5dc2469a7442cd6  packages/mints/src/ICollectWithZoraMints.sol
+        ba816ffa0994145980a098df6d150e01fadd2b13d64b2ace7a33516a2ecdf40d  packages/mints/src/IMintWithMints.sol
+        6eab9a2c0c578ba9b07799576385dd15b62d044577e79095a21f9d1e5c456125  packages/mints/src/MintsManagerStorageBase.sol
+        7852877fb6d80a1352ac4cf5d02611d49c21c1a2d5bfda7a9846aa78ceec5c21  packages/mints/src/MintsStorageBase.sol
+        198d87871978d2c8ede370485ef15b74ab7393b4e17e276cf2f92f88291fcfde  packages/mints/src/ZoraMints1155.sol
+        e27877c4c285233f85baecf639a04b29f1166d016176957d98859fc96707bd99  packages/mints/src/ZoraMintsManager.sol
+        70fb73ab1eac6f674dd37d2670041815fb1fbebd950af406d3a5f7f8ded25f02  packages/mints/src/ZoraMintsManagerImpl.sol
+        660399506c4d9f974abe0e6fbc22b10af8b5f013b324a623f575af7a333fb569  packages/mints/src/ZoraMintsTypes.sol
+    </template>
+
+  </content-for>
+</page>

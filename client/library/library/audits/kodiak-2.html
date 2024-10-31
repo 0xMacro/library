@@ -1,0 +1,34 @@
+<page
+  clientName="Kodiak-2"
+  reportDate="October 1st, 2024"
+  auditTitle="Kodiak A-2"
+  auditVersion="1.1.0"
+  repoUrl="https://github.com/Kodiak-Finance/kodiak-token-factory-contracts"
+  repoCommitHash="0732ff09ce149dfc004e99b7d80cc772d5116e0a"
+  repoCommitHashFinal="1f3ee9b8f6841c44f68810deee21e94b0378e09a"
+  passwordEncrypt="env:PAGE_PASS_KODIAK_2"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit performed by the Macro security team lasted 4 audit days, from August 30th till September 5th, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contract within this repository:</p>
+
+    <template type="file-hashes">
+        a402e38a3e78e7c710a4a21954591f7dc3f635826f6e659050b68c60f7492cc1  src/libraries/PandaMath.sol
+        544f82e3cb0444a121c32088268fea1af6ccaa793d1b159cab633a32947025e5  src/panda/PandaFactory.sol
+        9ba9835627437321fea5c39a62eae686a70160c08440d11efe26e02b0fe87c5d  src/panda/PandaPool.sol
+        5548d1045ea1bd28204aa488a928e5012087b7fe0067c2bec3860042c9f02aaa  src/panda/PandaToken.sol
+    </template>
+
+  </content-for>
+</page>

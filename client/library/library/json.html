@@ -1,0 +1,22 @@
+{{var sortedAudits = AuditMarkdown.sortByAndTransformDate(collection('audit-works'))}}
+{{JSON.stringify(sortedAudits.map(audit => {
+  var match = audit.report.match('/library/audits/([^)]+)')
+  return {
+    title: audit.title,
+    subtitle: audit.subtitle,
+    date: audit.date,
+    about: audit.about && AuditMarkdown.renderIssueContent(audit.about),
+    reportUrl: `https://0xmacro.com${audit.report}`,
+    vendorLogoUrl: audit.logo && `https://0xmacro.com/library/vendor/${audit.logo}`,
+
+    issues: match && (() => {
+      var output = {}
+      var issues = collection(`public/${match[1]}-issues`).map(Issues.normalize)
+      for (let severity of 'CHMLQGI'.split('')) {
+        var subset = issues.filter(i => i.severity === severity)
+        output[severity] = subset.length
+      }
+      return output
+    })()
+  }
+}), null, 2)}}
