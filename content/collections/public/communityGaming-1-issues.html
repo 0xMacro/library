@@ -221,11 +221,11 @@
     <field name="content">
       ## [Q-1] Extra inheritance of ERC20
   
-      [`Token.sol`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Token.sol) and [`PredictionCredits.sol`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/PredictionCredits.sol) inherit both [`ERC20`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol) and [`ERC20Permit`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC20Permit.sol) however `ERC20Permit` already inherits `ERC20`, so it is unnecessary.
+      [`PredictionCredits.sol`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/PredictionCredits.sol) inherits both [`ERC20`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol) and [`ERC20Permit`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC20Permit.sol) however `ERC20Permit` already inherits `ERC20`, so it is unnecessary.
   
       **Remediations to Consider**
   
-      Remove the inheritance of ERC20 for both `Token.sol` and `PredictionCredits.sol`.
+      Remove the inheritance of ERC20 for `PredictionCredits.sol`.
     </field>
   </item>
   
