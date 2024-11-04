@@ -1,0 +1,114 @@
+<page
+  clientName="Superstate"
+  reportDate="November 10th, 2024"
+  auditTitle="Superstate 3"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+
+  repoUrl1="https://github.com/superstateinc/liquidation-contracts"
+  repoCommitHash1="02f6e9c8b8e92dfff120f3ab6cc63424a744986b"
+  repoCommitHashFinal1="05a0fa05ae95edf820e6ea1a95f6b852c634a4bf"
+
+  repoUrl2="https://github.com/superstateinc/onchain-redemptions"
+  repoCommitHash2="d607456f578236ecf80f46a1c2c2346d0b21f61d"
+  repoCommitHashFinal2="323b2f6ec1c0eaff5e58f2864026bb110babdb79"
+
+  repoUrl3="https://github.com/superstateinc/ustb"
+  repoCommitHash3="32ed47cd744b1cdde66e31212f96cd0198e4ac3e"
+  repoCommitHashFinal3="60b5592259bd8f17313cdf9d214e947cccc08138"
+  customRepoInfo
+
+  passwordEncrypt="env:PAGE_PASS_SUPERSTATE_3"
+
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on October 25th to October 29th, 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+        <a href="{{page.repoUrl1}}" target="_blank"> Liquidation contract repository </a>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal1}}</code>
+      </li>
+    </ul>
+
+    <ul>
+        <a href="{{page.repoUrl2}}" target="_blank"> Onchain Redemptions repository </a>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash2}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal2}}</code>
+      </li>
+    </ul>
+
+    <ul>
+        <a href="{{page.repoUrl3}}" target="_blank"> USTB repository </a>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash3}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal3}}</code>
+      </li>
+    </ul>
+
+<!-- 
+  </content-for>
+
+  <content-for name="repo-info"></content-for>
+
+  </content-for>
+
+  <content-for name="repo-info"></content-for> -->
+
+  </content-for>
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within these repositories:</p>
+    <template type="file-hashes">
+
+      68a6ab14035646e04bb90a5b60315834661822acb0fbff8ab5c31f0d3cf45f2c  liquidation-contracts/src/MorphoLiquidationV1.sol
+      
+      5ce0785ff6aadeb2277b45fb6c8757a3c50185a68c67766bde35d4f139632ae7  onchain-redemptions/src/oracle/SuperstateOracle.sol
+      
+      f88122b1786b08aa5ad6ba232d720e2f0f1f83b289d102f539395c7a76fc6fea  ustb/src/SuperstateToken.sol
+
+    </template>
+
+    <p>Additionally, the following deployment script was reviewed:</p>
+    <template type="file-hashes">
+      e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ustb/script/v2/DeployAndUpgradeUsccScriptV2.s.sol
+      e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ustb/script/v2/DeployAndUpgradeUstbScriptV2.s.sol
+        
+    </template>
+  </content-for>
+</page>
+
+
+
+
+
+
+
