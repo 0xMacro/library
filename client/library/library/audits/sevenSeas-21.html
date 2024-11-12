@@ -1,0 +1,34 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Nov 12, 2024"
+  auditTitle="Seven Seas A-19"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="0cc4bc900058a7dfba89e9bc7bfdf61998b7af67"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on Nov 11, 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+   
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the decoder allowing for Boring Vaults to deposited ETH in return for Etherfi's WeETH on Base. This is intended to be done by interacting with Etherfi's <a href="https://basescan.org/address/0xc38e046dFDAdf15f7F56853674242888301208a5#readProxyContract"> EtherfiL2ModeSyncPoolETH </a> contract. Changes reviewed based on <a href="https://github.com/Se7en-Seas/boring-vault/pull/165">PR 165</a>.
+    </p>
+
+    <template type="file-hashes">
+      db48c4b1e0ce8bcf6aee0a16dcf5165a8cffa00e8da7150a861dd1a0289e3900  src/base/DecodersAndSanitizers/Protocols/WeEthDecoderAndSanitizer.sol
+      4f85cf7d51071cd76fd96dac3cfe26b7ec1d362b38c3997b64f375d6877fbec1  src/base/DecodersAndSanitizers/WeEthFullDecoderAndSanitizer.sol
+    </template>
+
+  </content-for>
+</page>
