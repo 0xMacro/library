@@ -1,0 +1,149 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        Superstate has a Circle mint account, where we can always redeem 1 USDC for 1 USD
+    </field>
+    <field name="content">
+      ## [M-1] USDC exchange rate assumed to be 1:1 with USD
+  
+      In the `redeem()` function, when calculating the `USDC` amount out in return for the `ustbInAmount` input, the chainlink feed price for the USTB/USD pair is directly used as the USDC price, assuming a pegged exchange ratio with USD.
+  
+      ```solidity
+      (bool isBadData,, uint256 usdPerUstbChainlinkRaw) = _getChainlinkPrice();
+      if (isBadData) revert BadChainlinkData();
+  
+      // converts from a USTB amount to a USD amount, and then scales back up to a USDC amount
+      uint256 usdcOutAmount =
+          (ustbInAmount * usdPerUstbChainlinkRaw * USDC_PRECISION) / (CHAINLINK_FEED_PRECISION * USTB_PRECISION);
+      ```
+  
+      **Reference:** [Redemption.sol#L177-182](https://github.com/superstateinc/onchain-redemptions/blob/94c3abcf4061096eff6a7d5763fac9edaa548027/src/Redemption.sol#L177-L182)
+  
+      However, in abnormal market conditions, this 1:1 ratio can change and has changed before, potentially allowing external actors to execute arbitrage operations and profit from this indirect hardcoded value. Depending on the direction of de-peg, actors could receive more USDC than they should, allowing them to profit from external opportunities or users could end up with a lower exchange rate than what they should have received.
+  
+      **Remediations to Consider**
+  
+      - Consider implementing a price feed for USDC and use it as a reference to calculate the amount out in `redeem()` and `maxUstbRedemptionAmount()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="statusNote">
+        This specific Chainlink Oracle feed uses 6 decimals. Since the logic now uses the `CHAINLINK_FEED_DECIMALS` the deployed contract will accrue for any decimal value correctly.    </field>
+    <field name="commit">3710c8899decb4277b0cbcdaf3d7614117bcd7e3</field>
+    <field name="content">
+      ## [M-2] Incorrect validation for USTB price feed data
+  
+      In the `_getChainlinkPrice()` function when performing validation, `_isBadData` is determined using following expression:
+  
+      ```solidity
+      (, int256 _answer,, uint256 _chainlinkUpdatedAt,) =
+                  AggregatorV3Interface(CHAINLINK_FEED_ADDRESS).latestRoundData();
+      
+      // If data is stale or below first price, set bad data to true and return
+      // 10_000_000 is $10.000000 in the oracle format, that was our starting NAV per Share price for USTB
+      // The oracle should never return a price much lower than this
+      _isBadData = _answer <= 7_000_000 || ((block.timestamp - _chainlinkUpdatedAt) > maximumOracleDelay);
+      ```
+  
+      **Reference:** [Redemption.sol#L142-148](https://github.com/superstateinc/onchain-redemptions/blob/94c3abcf4061096eff6a7d5763fac9edaa548027/src/Redemption.sol#L142-L148)
+  
+      Part of the validation `_answer <= 7_000_000` implicitly assumes that `_answer` is a number with 6 decimal places of precision.
+  
+      However, most of the non-ETH pairs return values with 8 decimal places of precision, while price feeds with ETH pairs have 18 decimal places of precision. As a result, if the USTB chainlink feed is indeed 8 decimal places of precision due to the incorrect assumption, this validation will be incorrect. For example, even if the result from the price feed is $0.08, it will still pass the validation.
+  
+      **Remediations to consider**
+  
+      - Take into account `CHAINLINK_FEED_PRECISION` for USTB feed when evaluating `_answer` price data.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">6a3576a73284ed714267ea9c234b30b89fb1cb87</field>
+    <field name="content">
+      ## [Q-1] Contract could have a pause function
+  
+      Although the `Redemption` contract can be indirectly paused or stopped by setting the `maximumOracleDelay` to zero or withdrawing all assets as an admin, consider adding pause features and checks to allow admin control and user transparency on potential contract states and unwanted external financial scenarios where redemptions should not be executed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3710c8899decb4277b0cbcdaf3d7614117bcd7e3</field>
+    <field name="content">
+      ## [Q-2] Using constant variables for magic numbers
+  
+      In the `_getChainlinPrice()` function, the answer value comparison is hard coded to *7_000_000* as safety insurance. Consider having a constant variable for this value to avoid having magic numbers. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1ad21f3e607bac3dba180b368e41fe59a6963b75</field>
+    <field name="content">
+      ## [Q-3] Withdrawing max USDC not possible
+  
+      Compound supports withdrawing the whole balance when `type(uint256).max` is provided as an amount to withdraw. However, in the admin callable `withdraw()` function, there is a validation that prevents this feature from being utilized:
+  
+      ```solidity
+      if (balance < amount) revert InsufficientBalance();
+      ```
+  
+      **Reference:** [Redemption.sol#L206](https://github.com/superstateinc/onchain-redemptions/blob/94c3abcf4061096eff6a7d5763fac9edaa548027/src/Redemption.sol#L206)
+  
+      As a result, withdrawals of max amounts may leave dust amounts of USDC in the Compound contract.
+  
+      **Remediations to consider**
+  
+      - Skip token balance validation when the provided token is a `COMPOUND` token and leave it to underlying Compound contract implementation to generate an error in case the requested amount is too big.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        Not an issue for us and may change in future version.
+    </field>
+    <field name="content">
+      ## [Q-4] Admin is always the withdrawer and depositor
+  
+      In `withdraw()` and `deposit()` functions, corresponding `Withdraw()` and `Deposit()` events are emitted. Both of these events, when emitted, set withdrawer and depositor values to `msg.sender`, which for both functions is unchangeable `ADMIN`. Since no added value exists in including fixed values within events, consider removing withdrawer and depositor arguments from these two events. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Third-party Integration</field>
+    <field name="resposne">This is ok, if Compound is paused then our contract is effectively paused.</field>
+    <field name="content">
+      ## [I-1] Compound supply and withdrawal can be paused
+  
+      The Redemption contract integrates with Compound Comet contracts to supply and withdraw assets, generating yield with the USDC deposited in the contract and withdrawing it when users execute `redeem()`. It is worth noticing that Compound contracts can pause both supply and withdrawal via the Pause guardian, a governance-elected entity. If paused, the contract will be stale, disallowing the user’s redemption and protocol’s deposit and withdrawals.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="resposne">Not an issue. NAV/S price is always trailing. i.e. If you use this contract on Wednesday afternoon, you get Tuesday’s NAV/S price. This is because TradFi NAV/S is calculated following the time period, not during or before it.</field>
+    <field name="content">
+      ## [I-2] Onchain redemptions may provide a trading advantage
+  
+      Since on-chain redemptions are available even when traditional markets are closed (e.g., weekends, holidays), any market-generating event that could reduce USTB's NAV on the following trading day could be a front-ran on-chain by the users through this redemption contract.
+    </field>
+  </item>
+  
