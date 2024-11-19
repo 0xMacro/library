@@ -1,0 +1,44 @@
+<item>
+    <field name="topic">protocol design</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7cfb2f1bb2447bd0f60ecc1b29feec597bcce8e5</field>
+    <field name="content">
+      ## [L-1] Bulk deposits and withdrawals are not pauseable
+  
+      In **TellerWithMultiAssetSupport.sol, the `deposit()` and `depositWithPermit()` functions are prevented if the teller is paused, however the `bulkDeposit()` and `bulkWithdraw()` functions are not restricted when the teller is paused. The initial intent was that these bulk functions would only be called by trusted entities, like solvers, so it made sense to allow for these functions to execute even when paused. In the case of `bulkDeposit()`, it skips over setting a share lock for the address receiving the shares, which is a desired outcome for some trusted protocols that want to integrate with these vaults. If authorization to call `bulkDeposit()` is given to these protocols, it makes sense for these functions to be paused as well, since interaction is no longer solely operated by limited entities, and pausing these functions may be required.**
+  
+      **Remediations to Consider**
+  
+      Add checks if the teller is paused for both `bulkDeposit()` and `bulkWithdraw()`. 
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">14bd3471289c49484f56c87404489c7de52557e8</field>
+    <field name="content">
+      ## [L-2] CCIP events benefit from being indexed
+  
+      In `CrossChainTellerWithGenericBridge.sol` the events MessageSent and MessageReceived are emitted when sending or receiving a message:
+  
+      ```solidity
+       event MessageSent(bytes32 messageId, uint256 shareAmount, address to);
+       event MessageReceived(bytes32 messageId, uint256 shareAmount, address to);
+      ```
+      Reference: [**CrossChainTellerWithGenericBridge.sol#L13-L14**](https://github.com/Se7en-Seas/boring-vault/blob/a8b684e502f09016b5bcffebe6f6a56db3c862c1/src/base/Roles/CrossChain/CrossChainTellerWithGenericBridge.sol#L13-L14)
+  
+      The `messageId` and `to` address are not `indexed`, which may make it more difficult for off chain application to get relevant bridging information for a user or messageId. 
+  
+      **Remediations to Consider**
+  
+      Add `indexed` to the `messageId` and `to` event params.
+  
+    </field>
+  </item>
+  

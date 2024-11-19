@@ -1,0 +1,50 @@
+<page
+  clientName="Dorge"
+  reportDate="July 29th, 2023"
+  auditTitle="Dorge A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/thierbig/dorge"
+  repoCommitHash="7d14048d6935b633d945c668e90f2a5a83bccea2"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_DORGE_1"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from July 22, 2024.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+    <li>Technical documentation provided by {{page.clientName}} team.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank">
+        {{page.repoUrl.split('/').slice(-1)[0]}}
+      </a>
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash:</b>
+      <code>{{page.repoCommitHash}}</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contract within this repository:</p>
+
+  <template type="file-hashes">
+    d74aa35009b14d35e208aa5aa119ba9730c68fa877476a79ea2198843b93b0b9  ./src/PresaleLinearVesting.sol
+  </template>
+
+
+</content-for>
+

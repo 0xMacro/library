@@ -1,0 +1,140 @@
+<page
+  clientName="Infinex"
+  reportDate="June 19, 2024"
+  auditTitle="Infinex A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash1="14218c87930338f4cd58e2b89f4a52c1efde1c09"
+  repoCommitHash2="09847d2b2af18bd9cf38094a0eb060b2aa3c15f4"
+  repoCommitHash3="1b112c1f418d0ebbdd27fa955577fe16211f9621"
+  repoCommitHashFinal="893720bd4233746e80fdbf072f7c4f17020287d8"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from May 9 to May 22 2024. 
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hashes (Initial for each scope):</b>
+        <ul>
+        <li>Account Apps: <code>{{page.repoCommitHash1}}</code> </li>
+        <li>Curve App Integration: <code>{{page.repoCommitHash2}}</code> </li>
+        <li>Governance Points update: <code>{{page.repoCommitHash3}}</code> </li>
+        </ul>
+      </li>
+
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+     
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+
+      ### Withdrawals
+
+      - Sudo Keys can withdraw to dedicated withdrawal addresses.
+      - Adding new withdrawal addresses to allowlist with 24 hours delay.
+      - Recovery address is always in allowlist.
+
+      ### GovernancePoints
+
+      - Only authorized minter can mint and burn tokens (governance points).
+      - Only authorized transferer can transfer tokens (governance points) when `authorizedTransfersOnly` flag is enabled.
+      - Owner can add/remove authorized minter and transferer.
+
+      ### CurveApp
+
+      - Only supports new factory pools and doesn’t integrate with older pools.
+      - Operational Keys are allowed to execute allowed Curve pools swaps and withdraw assets to main account.
+
+      ### AppAccounts
+
+      - Sudo Keys can create and deprecate app accounts.
+      - Operational Keys can transfer tokens between main and app accounts.
+            
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts for <br>
+      <b>Account App</b> within commit <code>{{page.repoCommitHash1}}</code>:
+    </p>
+     
+    <template type="file-hashes">
+      f152119fa2802a63f6d80816cc4f43c00902c7b2e49ba831237a595395dd6357  ./src/accounts/AccountFactory.sol
+      1209e686205d878bdc37a47ba58c150dfef41591568d46f2a013ee49e137a718  ./src/accounts/modules/AccountUtilsModule.sol
+      a8a0b5d5e905ef67802509f34dc65105ece46ec273880fc62eb2a2c29dd01e62  ./src/accounts/modules/AppModule.sol
+      b5eea1cca201bc7f713797a21d0afaf4b98f7c9c6351f8ba6ea6db6ca5cce9fc  ./src/accounts/modules/BaseModule.sol
+      e1e02bf5dc9fad21689e9a67e75f4fdefd65c77bb830e406e20db162d83146d7  ./src/accounts/modules/BridgingModule.sol
+      fecb1e896f5e2b55adf6a5656aa4255d0ad63d3e4b8ad7577edb61b24a19c76a  ./src/accounts/modules/RecoveryModule.sol
+      2727580e11626c438cb9a088878b52c7443773d5f89d52c68d21a4426a4a19b6  ./src/accounts/modules/WithdrawModule.sol
+      b324ad05c22dc05d086b2047c84da78cd4fd13277b6b4f76cfecf7c25072d691  ./src/accounts/storage/Account.sol
+      1cb535366cf674da1c44ceb713249ca63315ddf5e928ec959ed527d0921ba9bf  ./src/accounts/storage/App.sol
+      cc8f253b656a46d605b53e1e19664448d4560d412032913383641d7861abe188  ./src/accounts/storage/Bridge.sol
+      00922e211d9cb73dbfb374910cf05cc52b8c11618e3d903d730e9c7d4a7a2e1d  ./src/accounts/storage/EIP712.sol
+      c68ccdd0fb870aa3d7a7932004d7a9c4ddf07a8020ccee35d19cc499c7922296  ./src/accounts/storage/Recovery.sol
+      e0a356558af9c23344a6db8433c35fe440ceb91112f57bac28479befacf74f1e  ./src/accounts/storage/SecurityKeys.sol
+      be22a9a04acba1c3f05f42c7a7b370cfa72e4ddac133ff76eeab7fa7a00a348b  ./src/accounts/storage/Withdrawal.sol
+      e6f4420118e4b841d54a2e31f65af8905c86f01068bba4270efdca2f867c0e98  ./src/accounts/utils/AccountConstants.sol
+      47f7d9e0aef9cb95b439fdff5d01c232528650d5f62d29c86f4fcb67135f8c42  ./src/accounts/utils/RequestTypes.sol
+      2e75ab375d273880ec4349a1a29c2574121a2a83b45718589ea00cac971c63dc  ./src/accounts/utils/SecurityModifiers.sol
+      1bd4c68e2156418d96113544d581d2421472744ce7d0c26b8d38aa0a11a938cd  ./src/accounts/utils/WithdrawUtil.sol
+      e4ddc89589b0c217a3546ae9228220d7166c81603b08d2c3cbb1337047b40e9d  ./src/apps/AppAccountFactory.sol
+      6274e58ac2ad448a032a4ba4eaefd0cc819e58930b668ddcd624856d99261e00  ./src/apps/AppRegistry.sol
+      e75c520c5c7535653e3c37c31b6e485d37264a3dcc536e05bbf5c57096c88082  ./src/apps/base/AppAccountBase.sol
+      7f6021aeeea19488421fc1fba9d8fd074b61f1f9ed26f9f2ffb1a5209e9b1dcb  ./src/apps/base/AppBase.sol
+      b45c7e576dce18bbbd27a2efef6fa9c0844699b63d6575f700950acf7f057aa8  ./src/apps/base/AppBeaconBase.sol
+      dd45c2f083064d67444dea1e8bd1703e4e37dfb9f8e679f19b3b8863458e56aa  ./src/apps/base/AppERC2771Context.sol
+      f080cb7d93f1197150a490292cdc52765c35cb61fc195d2379f8b7eebf1e5f5b  ./src/apps/base/AppSecurityModifiers.sol     
+    </template>
+
+    <p>
+      <b>Curve Integration App</b> within commit <code>{{page.repoCommitHash2}}</code>:
+    </p>
+      
+    <template type="file-hashes">
+      ef6ec02abefa31e36d3747118c3ecc730144f763a03076852d60dda36c6dbd27  ./src/apps/curve/CurveAppError.sol
+      c6a920d2d0fe4f3763c34dc37affd273bf96ed410a3ba23f2fc37773f9e67230  ./src/apps/curve/CurveStableSwapApp.sol
+      30ad6beebc3aff724c946ea30fb73b91506a962232c67a4452825eb971f49a9c  ./src/apps/curve/CurveStableSwapAppBeacon.sol    
+    </template>                 
+
+    <p>
+      <b>Governance Points</b> update within commit <code>{{page.repoCommitHash3}}</code>:
+    </p>
+
+    <template type="file-hashes">
+      54fc8812732a6b4d08eeda5bcf6cfa0bc7622656e5d6b76f19d80c36d4b4964b  ./src/governance/GovernancePoints.sol
+      7722f934a5fcde4c1cc46f3b22dcf95fc085da07842659311642d56c35bba4db  ./src/governance/GovernancePointsStorage.sol    
+    </template>  
+    
+     
+    <p>
+      Note: Currently the referenced repository is private, but there are plans to make it public in the future. 
+    </p>
+ 
+
+
+  </content-for>
+</page>

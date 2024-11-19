@@ -1,0 +1,379 @@
+<item>
+    <field name="topic">Frontrunning</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">50614e4714d7454bc380b1be670ad51a03a094af</field>
+    <field name="content">
+      ## [H-1] Recover methods do not have sufficient slippage protection
+  
+      In `CurveStableSwapApp.recoverTokenToUSDC`, the provided `_fromToken` is swapped to USDC by using the following `exchange` call:
+  
+      ```solidity
+      // swap to USDC, take the current rate (dy) as the min amount
+      uint256 receivedAmount = ICurveStableSwapNG(poolData.pool).exchange(
+          poolData.fromTokenIndex,
+          poolData.toTokenIndex,
+          balance,
+          ICurveStableSwapNG(poolData.pool).get_dy(poolData.fromTokenIndex, poolData.toTokenIndex, balance)  // @audit the exchange will happen regardless how much the minimum amount is (get_dy)
+      );
+      ```
+  
+      **Reference**: [CurveStableSwapApp.sol#L154-L159](https://github.com/infinex-xyz/infinex-contracts/blob/09847d2b2af18bd9cf38094a0eb060b2aa3c15f4/src/apps/curve/CurveStableSwapApp.sol#L154-L159)
+  
+      For slippage protection, the last parameter specifies the minimum amount of USDC that must be returned, otherwise the function will revert. This minimum amount is obtained by calling the `get_dy` call, which returns the amount of USDC tokens using the current exchange rate. The issue here is that for an imbalanced pool, this received amount can be very low, but the exchange call would still succeed.  
+  
+      Let us consider a Curve pool with 100 DAI and 100 USDC (1:1 ratio).
+  
+      1. A user wants to recover his token to USDC by exchanging his DAI balance. Meaning if the user has 18 DAI deposited, he would receive 18 USDC assuming the pool is balanced.
+      2. Transaction 1: An attacker front-runs the transaction and swaps his 80 DAI to receive 80 USDC. The pool is now in an imbalanced state with a 1:9 ratio:
+          - *20 USDC.*
+          - *180 DAI.*
+      3. Transaction 2: The user's transaction is executed, and `recoverTokenToUSDC` is called. 
+          - As the pool is in an imbalanced state with a 1:9 ratio, calling the exchange function will cause the user to give 18 DAI to receive only 2 USDC back (instead of 18 USDC as when the pool is balanced).
+      4. Transaction 3: The attacker backruns the transaction and makes profits by selling USDC in return for DAI.
+  
+      The above scenario shows that the user suffers from significant loss due to the lack of sufficient slippage protection. In addition, proper slippage protection is also missing for `recoverUSDCFromLP` and `recoverTokenFromLP` functions.
+  
+      **Remediation to Consider**
+  
+      To eliminate the risk of such an attack, the minimum amount should be specified by the caller instead of using the amount returned by `get_dy`. Correspondingly, consider adding a minimum amount value provided by the caller for `recoverUSDCFromLP` and `recoverTokenFromLP` functions.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust Assumption</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">7799e3d68024f016f4a88a70493861275833f34e</field>
+    <field name="content">
+      ## [H-2] Operation keys can transfer tokens to an arbitrary address
+  
+      In `CurveStableSwapApp.sol`, authorized operations parties can perform specific interactions with Curve such as exchange, add, and remove liquidity with stable swap pools. For example, an operation key can `addLiquidity()` to a Curve pool specified in `_pool` address:
+  
+      ```solidity
+      function addLiquidity(address _pool, address[] calldata _tokens, uint256[] calldata _amounts, uint256 _minLPAmount)
+          external
+          nonReentrant
+          requiresAuthorizedOperationsParty
+      {
+          // approve the pool to add the tokens as liquidity
+          for (uint256 i = 0; i < _tokens.length; i++) {
+              IERC20(_tokens[i]).approve(_pool, _amounts[i]);
+          }
+          // provide the liquidity
+          uint256 lpAmount = ICurveStableSwapNG(_pool).add_liquidity(_amounts, _minLPAmount);
+          emit LiquidityAdded(_pool, _amounts, lpAmount);
+  
+          // Curve only allows 0 to amount approvals, so reset approval to 0
+          for (uint256 i = 0; i < _tokens.length; i++) {
+              IERC20(_tokens[i]).approve(_pool, 0);
+          }
+      } 
+      ```
+  
+      **Reference**: [CurveStableSwapApp.sol#L71-L88](https://github.com/infinex-xyz/infinex-contracts/blob/09847d2b2af18bd9cf38094a0eb060b2aa3c15f4/src/apps/curve/CurveStableSwapApp.sol#L71-L88)
+  
+      However, there are no checks to ensure the address passed as `_pool` is a valid Curve contract. Malicious Operation Keys could deploy a contract that implements the `add_liquidity()` function and use it to drain all token balances. This breaks the trust assumption on Operation Keys and potentially allows any logic to be executed with arbitrary token approvals. 
+  
+      In addition, this can also be exploited from `exchange()`, `removeSingleTokenLiquidity()` and `removeSpecificLiquidity()` functions.
+  
+      **Remediations to Consider**
+  
+      Consider checking whether the pool address given is a legitimate Curve pool by verifying it through the `curveStableswapFactoryNG` in the beacon.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Storage Collision</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ef5eda1b6fa502c22eb4cab33e17f649d591b877</field>
+    <field name="content">
+      ## [M-1] Potential storage collision between Account and App
+  
+      Each account module listed under `/accounts/modules` has its own storage space that is defined in the corresponding library in `/storage`. This is necessary to avoid any storage collisions between different modules. However, for the new `AppModule`, this assumption doesn’t hold. The `AppModule` uses the storage slot defined in `/storage/App.sol`:
+  
+      ```solidity
+      bytes32 s = keccak256(abi.encode("io.infinex.AccountStorage"));
+      ```
+  
+      **Reference**: [App.sol#L26](https://github.com/infinex-xyz/infinex-contracts/blob/14218c87930338f4cd58e2b89f4a52c1efde1c09/src/accounts/storage/App.sol#L26)
+  
+      As seen above, it uses “io.infinex.AccountStorage” for the storage slot, which is the same slot defined in `/storage/Account.sol` used by the `AccountUtilsModule`.
+  
+      For the current implementation, this is not necessarily an issue as the data used in App.sol consists only of a mapping, which stores the mappings data in different storage slots anyway. However, this could become a serious issue if additional elements are added to the App’s Data struct in future releases.
+  
+      **Remediation to Consider**
+  
+      Use a separate storage slot for the `AppModule`, i.e. “io.infinex.App”.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Case</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">44d73bab400eae1004f97784bfe47e1247473aea</field>
+    <field name="content">
+      ## [M-2] Deployed Apps can not be deprecated
+  
+      In `AppModule`, once an App is deployed, there is no way to remove it from the allowed `appAccountsToAppBeacons` mapping. This allows an authorized operation party to send assets even if this app is no longer supported or intended to be used.
+  
+      If an app implementation is broken, assets can still be sent mistakenly and lost.
+  
+      **Remediations to Consider:**
+  
+      Consider adding a function to remove existing apps as a Sudo Key.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">8aed6d2ef06fada8412ad9036789c427fc987dc1</field>
+    <field name="content">
+      ## [M-3] Withdrawal delay is not working as intended
+
+      WithdrawalModuleV1 adds a mandatory delay for adding new withdrawal addresses. It is initially set to 24 hours but will be allowed to change to a higher value in future implementations.
+  
+      As we can see in `Withdrawal._setAllowlistedWithdrawalAddress()`, it sets the corresponding `allowlistedWithdrawalAddressesValidFrom` to `block.timestamp + data.allowlistDelay`:
+  
+      ```solidity
+      if (_status) {
+          uint256 validFrom = block.timestamp + data.allowlistDelay;
+      emit AllowlistedWithdrawAddressSetWithDelay(_allowlistedWithdrawalAddress, validFrom);
+          data.allowlistedWithdrawalAddressesValidFrom[_allowlistedWithdrawalAddress] = validFrom;
+      ```
+  
+      **Reference:** [Withdrawal.sol#L69-L72](https://github.com/infinex-xyz/infinex-contracts/blob/18d2f2fb261370d2b1886e67b48f7c8335cff584/src/accounts/storage/Withdrawal.sol#L69-L72)
+  
+      However, the issue arises in the `_isAllowlistedWithdrawalAddress()` internal function used to verify if an allowlisted address is a valid withdrawal address, as the check on L45 compares the mapping value with `block.timestamp + 24 hours`. As a result, there is no 24 hours delay as intended, but instead withdrawals can happen immediately after the withdrawal address is set.
+  
+      ```solidity
+      function _isAllowlistedWithdrawalAddress(address _withdrawalAddress) internal view returns (bool) {
+          Data storage data = getStorage();
+          if (data.allowlistedWithdrawalAddressesValidFrom[_withdrawalAddress] == 0) {
+              return false;
+          }
+          return data.allowlistedWithdrawalAddressesValidFrom[_withdrawalAddress] < block.timestamp + 24 hours;
+      }
+      ```
+  
+      **Reference:** [Withdrawal.sol#L40-L46](https://github.com/infinex-xyz/infinex-contracts/blob/18d2f2fb261370d2b1886e67b48f7c8335cff584/src/accounts/storage/Withdrawal.sol#L40-L46)
+  
+      **Remediations to Consider**
+  
+      Consider removing the additional 24 hours on [L45](https://github.com/infinex-xyz/infinex-contracts/blob/18d2f2fb261370d2b1886e67b48f7c8335cff584/src/accounts/storage/Withdrawal.sol#L45) and only using `block.timestamp` in `_isAllowlistedWithdrawalAddress()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">c9133b078888273445c9070bcfe8b1d8a02b0980</field>
+    <field name="content">
+      ## [L-1] `recoverTokenToUSDC` can revert with out of balance depending on the pool exchange rate
+  
+      In `CruveStableSwappApp` contract, the function `recoverTokenToUSDC()` first fetches the `_fromToken` balance, then exchanges it to USDC, and finally transfers the USDC balance to the main account:
+  
+      ```solidity
+          function recoverTokenToUSDC(address _fromToken) public nonReentrant requiresAuthorizedRecoveryParty {
+              uint256 balance = IERC20(_fromToken).balanceOf(address(this));
+              ICurveAppBeacon appBeacon = ICurveAppBeacon(AppBase._getAppBeacon());
+              address USDC = appBeacon.USDC();
+              ICurveAppBeacon.PoolData memory poolData = appBeacon.getPoolDatafromTokens(_fromToken, USDC, balance);
+              IERC20(_fromToken).approve(poolData.pool, balance);
+              // swap to USDC, take the current rate (dy) as the min amount
+              uint256 receivedAmount = ICurveStableSwapNG(poolData.pool).exchange(
+                  poolData.fromTokenIndex,
+                  poolData.toTokenIndex,
+                  balance,
+                  ICurveStableSwapNG(poolData.pool).get_dy(poolData.fromTokenIndex, poolData.toTokenIndex, balance)
+              );
+              emit TokensExchanged(poolData.pool, poolData.fromTokenIndex, poolData.toTokenIndex, balance, receivedAmount);
+              // Curve only allows 0 to amount approvals, so reset approval to 0
+              IERC20(USDC).approve(poolData.pool, 0);
+  
+              emit TokensRecoveredToMainAccount(USDC, receivedAmount);
+              // transfer USDC to mainAccount
+              _transferToMainAccountERC20(USDC, balance);
+          }
+      ```
+  
+      **Reference**: [CurveStableSwapApp.sol#L147-L167](https://github.com/infinex-xyz/infinex-contracts/blob/09847d2b2af18bd9cf38094a0eb060b2aa3c15f4/src/apps/curve/CurveStableSwapApp.sol#L147-L167)
+  
+      However, the amount used in `_transferToMainAccountERC20()` is the initial balance of the `_fromToken`; if the exchange rate returned differs from a 1:1 conversion, this function will revert, preventing a recovery party from executing this function properly.
+  
+      ***Note: This function used the `receivedAmount` variable but was changed in** https://github.com/infinex-xyz/infinex-contracts/commit/c9133b078888273445c9070bcfe8b1d8a02b0980*.
+  
+      **Remediations to Consider:**
+  
+      Consider using the `receivedAmount` variable returned from the `exchange()` call or the `USDC` balance as other recovery functions do.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Case</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2d3e0c08e0447fc396ac0d655fec09c2ef1621e8</field>
+    <field name="content">
+      ## [L-2] Valid withdrawal address can be overridden and reset
+  
+      Once a sudo key sets an address using `setAllowlistedWithdrawalAddress()` and the corresponding `allowlistDelay` has elapsed, this address can be used as a valid target for withdrawing assets within an account. However, if `setAllowlistedWithdrawalAddress()` is called with the same address, the delay period resets. This action renders the address invalid for withdrawals until the delay period has passed again.
+  
+      **Remediations to Consider**
+  
+      Consider checking whether the corresponding value of the `_allowlistedWithdrawalAddress` already has a value different from `0` and revert if so.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Locked funds</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">e46cdb46aee4f349401e196b353e621173ce0572</field>
+    <field name="content">
+      ## [Q-1] App Accounts can receive tokens but may not have the ability to withdraw them
+  
+      The `AppModule` defines functions for transferring tokens to underlying app accounts, specifically:
+  
+      - `transferEthToApp`
+      - `transferERC20TokenToApp`
+      - `transferERC721TokenToApp`
+  
+      However, the `AppAccountBase`, used by the app accounts, doesn’t implement any function for withdrawing tokens or transferring them back to the main account. This could potentially result in tokens becoming locked in the app accounts.
+  
+      **Remediation to Consider**
+  
+      Add appropriate functions to `AppAccountBase` that allow users to either withdraw tokens or to transfer them back to the main account. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Case</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a5272a7ab2fc531b0004e0fbba9c7619efe10d82</field>
+    <field name="content">
+      ## [Q-2] Accounts can hold ERC721 but no ERC1155 tokens
+  
+      Both the main account and app accounts inherit from `ERC721Holder`, allowing them to receive ERC721 tokens. However, currently, the accounts don’t support receiving ERC1155 tokens.
+  
+      **Remediation to Consider**
+  
+      Support receiving ERC1155 tokens by inheriting from `ERC1155Holder` in addition to `ERC721Holder` for both the `BaseModule` and `AppAccountBase`.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">6c08f2be4a3815e7724e98042aa0bf992c498dda</field>
+    <field name="content">
+      ## [Q-3] App Accounts can not update to a new beacon
+  
+      `AppBeacon` contract stores the `latestAppBeacon` in its storage, initially as their own address, but can be updated by the beacon owner. However, there are no functions that allow an App to update the `appBeacon` address, this parameter is only set during initialization. Consider adding functions in the `AppAccountBase` to fetch and update the beacon address from the current beacon.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">wontdo</field>
+    <field name="response">This is intended in order to reduce coupling between the AppAccountFactory and AppRegistry</field>
+    <field name="content">
+      ## [Q-4] Valid beacon checks can be included in the `AppAccountFactory` logic
+  
+      Currently, the `AppRegistry` is used to check whether the passed `appBeacon` is valid directly in the `AppModule` contract used in the Main Account. This allows external actors to directly call the `AppAccountFactory` and deploy Apps. Although this does not imply a real impact, it could create false, corrupted contracts using Infinex's legitimate factory. Consider having the `AppRegistry` checks in the `AppAccountFactory`. 
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">9e60d960257df46c134e4c1d24202bc4efc7eaa7</field>
+    <field name="content">
+      ## [Q-5] Apps native transfers could revert in future Account upgrades
+  
+      `AppAccountBase._transferToMainAccountEther()` function uses the `.transfer()` built-in method to transfer native assets to the main account address. This hardcodes **2300** gas to the call. Although, with the current proxy `fallback()` and implementation `receive()`, this function does not revert, consider using a low-level call to prevent this from changing in the future if new logic is added.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1accbe587e25e5e064474cf9e9f9a7ceff9e3d77</field>
+    <field name="content">
+      ## [Q-6] Curve App executes redundant approvals
+  
+      Most function in this App implementation perform a similar logic scheme:
+  
+      1. `approve()` a specific amount or entire balance to the pool.
+      2. Interact with Curve pools.
+      3. Reset approval by calling `approve()` with a zero amount. 
+  
+      Although this does not pose any security issue, there are a couple of consistency issues with the codebase and how allowances should work:
+  
+      - Since an exact amount is used in `approve()` and functions in the pool transfer this same amount, the allowance is reset to zero without the need to change it back, slippage and other exchange conditions are checked after the assets are transferred into the pool and therefore there is no real need to reset allowances to zero. This applies to `exchange()` and `addLiquidity()` functions.
+      - For removing liquidity, functions `_removeSingleTokenLiquidity()` and `_removeSpecificLiquidity()` interact with NG Curve pools through [`remove_liquidity_one_coin()`](https://github.com/curvefi/stableswap-ng/blob/12a0c7df1fc490ff8e5a977a0cbadf86f1351c8f/contracts/main/CurveStableSwapNG.vy#L689-L723) and [`remove_liquidity_imbalance()`](https://github.com/curvefi/stableswap-ng/blob/12a0c7df1fc490ff8e5a977a0cbadf86f1351c8f/contracts/main/CurveStableSwapNG.vy#L728-L802) both functions internally call [`_burnFrom`](https://github.com/curvefi/stableswap-ng/blob/12a0c7df1fc490ff8e5a977a0cbadf86f1351c8f/contracts/main/CurveStableSwapNG.vy#L1567-L1571) to use the sender’s specified amount, since this function does not need or use allowance, the contract is approving the pool tokens unnecessarily potentially allowing this function to burn and spend the amount, rendering a double of the desired amount. Note that this is currently not possible with Curve pools but the allowance is unnecessarily approved.
+      - Specifically in [`recoverTokenToUSDC()`](https://github.com/infinex-xyz/infinex-contracts/blob/e46cdb46aee4f349401e196b353e621173ce0572/src/apps/curve/CurveStableSwapApp.sol#L137-L157) the logic first calls approve using [`_fromToken`](https://github.com/infinex-xyz/infinex-contracts/blob/e46cdb46aee4f349401e196b353e621173ce0572/src/apps/curve/CurveStableSwapApp.sol#L142), but resets the approval on [`USDC`](https://github.com/infinex-xyz/infinex-contracts/blob/e46cdb46aee4f349401e196b353e621173ce0572/src/apps/curve/CurveStableSwapApp.sol#L152) token to zero afterward. Even if the `exchange()` is used to get USDC tokens, USDC pool allowance is never changed in this function logic and therefore it’s not needed to be set to zero.
+  
+      Lastly, NG pools do not have any zero allowance requirement to execute approvals, as it can be seen in the [CurveStableSwapNG](https://github.com/curvefi/stableswap-ng/blob/12a0c7df1fc490ff8e5a977a0cbadf86f1351c8f/contracts/main/CurveStableSwapNG.vy#L1605-L1619) contract.
+  
+      Consider removing unnecessary approvals with zero value and approvals for removing liquidity functions.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Duplicate Code</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">Currently we only validate whether it is an allowlisted address, which will also cover 0 address (will always be 0), in the next feature, there will be functions that can withdraw to non-allow listed addresses, in which case the 0 check in those functions are important</field>
+    <field name="content">
+      ## [Q-7] Duplicated check can be implemented in shared function
+  
+      All withdrawal functions ensure the `withdrawalAddress` input parameter is different from `address(0)` in their corresponding withdrawal asset type internal function. This check could be moved to the `_validateWithdrawalAddress()` function to avoid duplicated code.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">50614e4714d7454bc380b1be670ad51a03a094af</field>
+    <field name="content">
+      ## [Q-8] No support for selecting a specific pool when multiple pools are available for a token pair
+  
+      In CurveStableSwapApp, `recoverTokenToUSDC` and `recoverTokenFromLP` use the app beacon’s `getPoolDatafromTokens` to retrieve the pools address via `find_pool_for_coins`:
+  
+      ```jsx
+      poolData.pool = ICurveStableSwapFactoryNG(curveStableswapFactoryNG).find_pool_for_coins(_fromToken, _toToken);
+      ```
+  
+      **Reference**: [CurveStableSwapAppBeacon.sol#L60](https://github.com/infinex-xyz/infinex-contracts/blob/09847d2b2af18bd9cf38094a0eb060b2aa3c15f4/src/apps/curve/CurveStableSwapAppBeacon.sol#L60)
+  
+      The function `find_pool_for_coins`, when called without a specified index, always returns the pool's address stored at index 0. However, there may be multiple pools available for the specified token pair that offer better exchange rates.
+  
+      **Remediation to Consider**
+  
+      Consider adding an index parameter to `getPoolDatafromTokens` and passing it along to `find_pool_for_coins`. This would allow users to recover from a specific pool.
+    </field>
+  </item>
+  

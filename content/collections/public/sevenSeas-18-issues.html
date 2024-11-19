@@ -1,0 +1,54 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">8656f849440017b1f4d2a30b684c03211655cd5d</field>
+    <field name="content">
+      ## [H-1] Users can bypass withdrawal queue
+  
+      [`BoringOnChainQueue.sol`](https://github.com/Se7en-Seas/boring-vault/blob/ec74b24330a1d7b144dc397c1c20c76e3d6fc460/src/base/Roles/BoringQueue/BoringOnChainQueue.sol) allows users to request to withdraw BoringVault shares for accepted withdrawal assets, although there is a waiting period before the request can be fulfilled. Requests are intended to be fulfilled by users or solvers via the [`solveOnChainWithdraws()`](https://github.com/Se7en-Seas/boring-vault/blob/ec74b24330a1d7b144dc397c1c20c76e3d6fc460/src/base/Roles/BoringQueue/BoringOnChainQueue.sol#L431-L473) function.
+  
+      The [`BoringSolver.sol`](https://github.com/Se7en-Seas/boring-vault/blob/ec74b24330a1d7b144dc397c1c20c76e3d6fc460/src/base/Roles/BoringQueue/BoringSolver.sol) contract can fulfill more complex solves and has permission to make [`bulkWithdrawal()`](https://github.com/Se7en-Seas/boring-vault/blob/ec74b24330a1d7b144dc397c1c20c76e3d6fc460/src/base/Roles/TellerWithMultiAssetSupport.sol#L419-L436) and [`bulkDeposit()`](https://github.com/Se7en-Seas/boring-vault/blob/ec74b24330a1d7b144dc397c1c20c76e3d6fc460/src/base/Roles/TellerWithMultiAssetSupport.sol#L401-L417) calls on Boring Vaults which allows them to fulfill withdrawals for users in the withdrawal queue.
+  
+      The execution path for the BoringSolver is to call an initial external function it initiate the required solve type, like [`boringRedeemMintSolve()`](https://github.com/Se7en-Seas/boring-vault/blob/ec74b24330a1d7b144dc397c1c20c76e3d6fc460/src/base/Roles/BoringQueue/BoringSolver.sol#L60-L75), which then calls solveOnChainWithdrawals on the queue with the required `solveData`, with the `BoringOnChainQueue` calling back [`boringSolve()`](https://github.com/Se7en-Seas/boring-vault/blob/ec74b24330a1d7b144dc397c1c20c76e3d6fc460/src/base/Roles/BoringQueue/BoringSolver.sol#L121-L147) to complete the solve using the initially passed in `solveData`.
+  
+      However, `boringSolve()` is an external function that has no explicit permission guard, and assumes the caller is the queue:
+  
+      ```solidity
+      function boringSolve(
+          address initiator,
+          address boringVault,
+          address solveAsset,
+          uint256 totalShares,
+          uint256 requiredAssets,
+          bytes calldata solveData
+      ) external requiresAuth {
+          if (initiator != address(this)) revert BoringSolver___WrongInitiator();
+  
+          address queue = msg.sender;
+  
+          SolveType solveType = abi.decode(solveData, (SolveType));
+  
+          if (solveType == SolveType.BORING_REDEEM) {
+              _boringRedeemSolve(queue, solveData, boringVault, solveAsset, totalShares, requiredAssets);
+          } else if (solveType == SolveType.BORING_REDEEM_MINT) {
+              _boringRedeemMintSolve(queue, solveData, boringVault, solveAsset, totalShares, requiredAssets);
+          } else {
+              // Added for future protection, if another enum is added, txs with that enum will revert,
+              // if no changes are made here.
+              revert BoringSolver___FailedToSolve();
+          }
+      }
+      ```
+      Reference: [BoringSolver.sol#L121-L147](https://github.com/Se7en-Seas/boring-vault/blob/ec74b24330a1d7b144dc397c1c20c76e3d6fc460/src/base/Roles/BoringQueue/BoringSolver.sol#L121-L147)
+  
+      Any contract/eoa can pass the `initiator` as the BoringSolver contract address, send into the contract the desired boringVault shares and make use of it permission to withdraw via either solve type and get around the withdrawal delay.
+      Users could leverage this and frontrun/backrun share price updates to immediately benefit without being required to hold onto shares long term. 
+  
+      **Remediations to Consider**
+  
+      Require the caller of `boringSolve()` to be a trusted withdrawal queue to prevent any user from taking advantage of `BoringSolver` permissions.
+    </field>
+  </item>
+  

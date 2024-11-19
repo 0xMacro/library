@@ -1,0 +1,57 @@
+<page
+  clientName="Inverter "
+  reportDate="July 19th, 2024"
+  auditTitle="Inverter A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/InverterNetwork/contracts"
+  repoCommitHash="149fc638e602573217cb6037fb32dc232a9e0cba"
+  repoCommitHashFinal="8ddf548bcc75671834f95173c2c01f06de738d36"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from April 15th, 2024 to May 24th, 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contract within this repository:</p>
+
+    <template type="file-hashes">
+        27bf857f46137c3b0ee47a9a236dc7982f6454906f3af2162db7fce4a04bbef1  src/external/fees/FeeManager_v1.sol
+        4987cb7b3bf2930337f674baa284408ff6af9967ffedb7791dcdf84ab3b51c48  src/external/forwarder/TransactionForwarder_v1.sol
+        0655f2e00ee00ee51bc22407315077fba1d10e2b9008ab7837d12e0cb657a03f  src/external/governance/Governor_v1.sol
+        0e000d86ccbd8047fd7d431624184f4346ce8be85954c941a192c8971bd69c9d  src/factories/ModuleFactory_v1.sol
+        35bfc1358a0b4306730bf4cb457bf8b46e00eccce1ab74910800020832d6d61b  src/factories/OrchestratorFactory_v1.soll
+        c63be01e903c4208127e8bec6df3b5fdf2697fff55a53998a85e10cf32968555  src/modules/authorizer/role/AUT_Roles_v1.sol
+        47a070d7fb15e83f6e92cc835a73d400c5b70a7d8eb5f8cabf8282f835dfe413  src/modules/authorizer/role/AUT_TokenGated_Roles_v1.sol
+        b55becbd59c5b723013d3637360b64b744c36340ae4aedd99f553d5d50d1997f  src/modules/base/Module_v1.sol
+        c4b2eab0c6427d4ba9d125c168be7c69e652d3f806edd3f4ca1f430354d990bc  src/modules/fundingManager/bondingCurve/FM_BC_Bancor_Redeeming_VirtualSupply_v1.sol
+        99f14a78ac35fb76daa1ac245577f95324bd57a9e3fa95bf38aebbd1a61ddfb4  src/modules/fundingManager/bondingCurve/abstracts/BondingCurveBase_v1.sol
+        4a27092edc417d1cdf2a18e69025577c0054e8757173c2aa46b9d1623871a3df  src/modules/fundingManager/bondingCurve/abstracts/RedeemingBondingCurveBase_v1.sol
+        db1fc70f9a6d360d43c4ae348f9b20562d10a875155bdaa087cd4b02ed9fa793  src/modules/fundingManager/bondingCurve/abstracts/VirtualCollateralSupplyBase_v1.sol
+        807b6abb68d9fa589423f2ac7d7ef93b91162e10b8cce3498f9efb41c6953348  src/modules/fundingManager/bondingCurve/abstracts/VirtualIssuanceSupplyBase_v1.sol
+        e8d9f5464a800fd2a8b131d17f87fb786ebea6c9c4bc0f31cb3fd7719b7d0ed4  src/modules/fundingManager/bondingCurve/formulas/BancorFormula.sol
+        c7dda64262aba978fd14efc44cd0cd50b4c79876c6984546dbc73c130c4b35ec  src/modules/fundingManager/bondingCurve/formulas/Utils.sol
+        92b745d20adb479250b762a94f26f9a6fba955b1b726d2100e0b6f70469f1549  src/modules/fundingManager/bondingCurve/tokens/ERC20Issuance_v1.sol
+        0b7ec654efffe79260c4258475f141935eeb6a5402feb64350a018e2f81fe52f  src/modules/lib/LibMetadata.sol
+        1d9e4b5bf317d54a6e8631533ef4d2078383b4b8012c4004b704e54944c64d99  src/modules/lib/SafeMath.sol
+        8bc3dc0e4a9c71a15560137bdbd26ba336d9f007acc53928f0a149da718e83ad  src/modules/logicModule/LM_PC_KPIRewarder_v1.sol
+        00f0267caed2def72fc1cd62c0729ef3ef85bd1a710f8025276186d35d69c804  src/modules/logicModule/LM_PC_Staking_v1.sol
+        923f4d38c0e26ff6924a73f0612b418e7d84f8ef39eb977dbc4b233354d0cd79  src/modules/logicModule/abstracts/ERC20PaymentClientBase_v1.sol
+        518718596ab0b20ff6ff4e187e8a1abf7772fc6e7393bd166961fc3a85997622  src/modules/logicModule/abstracts/oracleIntegrations/UMA_OptimisticOracleV3/OptimisticOracleIntegrator.sol
+        e34967c7b7d34116b57ee78f1f4a52ed580a36e4215ddaca133345292009165a  src/modules/paymentProcessor/PP_Simple_v1.sol
+        0373fa097e087e962f96faa6c739b430f9fe62d5b3275a3fcce0dfd69cd8edec  src/modules/paymentProcessor/PP_Streaming_v1.sol
+        8eaa212f78a1d0215d27dd36426c36141fdb8696064b85cfd4b8152a3fdf4db5  src/orchestrator/Orchestrator_v1.sol
+        b5aaffe2234703355ce69d7fb7b6eb9ef60866c74fde0f702fb644fbf3d4e430  src/orchestrator/abstracts/ModuleManagerBase_v1.sol
+        6bb530a482334855300f5709ca7f9dad1d7f0057159fec3b0cc503ef86df50f9  src/proxies/InverterBeaconProxy_v1.sol
+        3705fa0ab2febb1afcaf61d521f1151d289f09c1e3e5851710dd78c81d17d5f5  src/proxies/InverterBeacon_v1.sol
+    </template>
+
+  </content-for>
+</page>

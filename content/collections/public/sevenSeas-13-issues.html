@@ -1,0 +1,57 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">21f88f72d4b97f9958b7977fdde9d98425864db7</field>
+    <field name="content">
+      ## [M-1] Incorrect decoding of path
+  
+      In [CamelotDecoderAndSanitizer.sol](https://github.com/Se7en-Seas/boring-vault/blob/97cac85c5c99b39dbd9310f0147f7867928aa4dd/src/base/DecodersAndSanitizers/Protocols/CamelotDecoderAndSanitizer.sol)'s `exactInput()` function  it sanitizes the inputs to swap on Camelot by interacting with its swap router:
+  
+      ```solidity
+      function exactInput(DecoderCustomTypes.ExactInputParams calldata params)
+          external
+          pure
+          virtual
+          returns (bytes memory addressesFound)
+      {
+          // Nothing to sanitize
+          // Return addresses found
+          // Determine how many addresses are in params.path.
+          uint256 chunkSize = 23; // 3 bytes for uint24 fee, and 20 bytes for address token
+          uint256 pathLength = params.path.length;
+          if (pathLength % chunkSize != 20) revert CamelotDecoderAndSanitizer__BadPathFormat();
+          uint256 pathAddressLength = 1 + (pathLength / chunkSize);
+          uint256 pathIndex;
+          for (uint256 i; i < pathAddressLength; ++i) {
+              addressesFound = abi.encodePacked(addressesFound, params.path[pathIndex:pathIndex + 20]);
+              pathIndex += chunkSize;
+          }
+          addressesFound = abi.encodePacked(addressesFound, params.recipient);
+      }
+      ```
+      Reference: [CamelotDecoderAndSanitizer.sol#L28-L47](https://github.com/Se7en-Seas/boring-vault/blob/97cac85c5c99b39dbd9310f0147f7867928aa4dd/src/base/DecodersAndSanitizers/Protocols/CamelotDecoderAndSanitizer.sol#L28-L47)
+  
+      Camelot is similar to uniswapV3, with one key distinction, there aren’t separate pools for pairs based on the fee/tick spacing. This means paths used to define swaps do not require to specify a fee which would typically determine the pool used for the swap. So when sanitizing the path, the chunk size is 20, not 23, since only addresses are included in the path.
+  
+      **Remediations to Consider**
+  
+      Handle the path sanitization without handling for pool fees.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">21f88f72d4b97f9958b7977fdde9d98425864db7</field>
+    <field name="content">
+      ## [Q-1] Misnamed Camelot position manager
+  
+      In [CamelotDecoderAndSanitizer.sol](https://github.com/Se7en-Seas/boring-vault/blob/97cac85c5c99b39dbd9310f0147f7867928aa4dd/src/base/DecodersAndSanitizers/Protocols/CamelotDecoderAndSanitizer.sol), the value `velodromeNonFungiblePositionManager` should be renamed to `camelotNonFungiblePositionManager` as that is the protocol being interacted with.
+  
+    </field>
+  </item>
+  

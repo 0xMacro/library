@@ -1,0 +1,185 @@
+<page title="How EVM Function Calls Work" layout="/chapters/_layout.html">
+
+<div class="prose">
+
+<template type="learn-evm-markdown">
+
+# How EVM Function Calls Work
+
+When interacting with the Ethereum blockchain, an external user typically engages in one of two activities:
+
+1. **Querying the State of the Chain**: This involves retrieving information about the current state of the blockchain, such as checking account balances or the status of a smart contract. These queries are considered offchain operations because they do not alter the blockchain's state and can be executed locally or through a node without requiring blockchain consensus.
+2. **Submitting a Transaction**: This is an on-chain activity because it involves creating a transaction that, if validated and confirmed, modifies the state of the blockchain. Examples include transferring Ether, executing smart contract functions, or interacting with decentralized applications (dApps).
+
+Most interactions with the blockchain, whether querying its state or modifying it, involve executing smart contract code—typically through **function calls**. For example:
+
+- **Checking** your USDC token balance requires calling `balanceOf(addr)` - with your address - on the [USDC contract](https://etherscan.io/token/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48).
+    - Note that this can be done via both methods: As an offchain query, and also within a transaction.
+- **Transferring** your USDC to another address requires calling `transfer(toAddr, amount)` on that same contract.
+    - This **can only** be done in a transaction; an offchain query is read-only, so it cannot update the state of the chain.
+
+## Overview
+
+In this section we're going to cover the process in which these functions get called. Specifically we will learn:
+
+- <toc>How Offchain Queries Work</toc>
+- <toc>How EOA Contract Calls Work</toc>
+- <toc>How Contract-to-Contract Calls Work</toc>
+
+## How Offchain Queries Work
+
+Querying a blockchain's current state involves requesting data from nodes. These **read-only operations** include tasks such as:
+
+- **Read ops:** Checking account balances and current token prices.
+- **Write ops (simulated):** Running a state-updating function call to see if it reverts or not. This is useful for sanity-checking a call before going through the ceremony of creating & sending a transaction.
+
+<aside>When simulating a smart contract function using eth_call, you can set the sender address to whatever you want!</aside>
+
+In either case, you are essentially asking the blockchain to provide a snapshot of its current state without making any changes.
+
+In Ethereum, this is done by sending requests to nodes using **JSON-RPC**, the protocol that Ethereum clients use to communicate. Since no changes are being made to the blockchain, these requests do not consume gas, and thus do not require a transaction, a signature, nor ETH.
+
+### Execution
+
+Two commonly used read-only **JSON-RPC endpoints** are:
+
+- **`eth_getBalance`**: Retrieves an account's Ether balance.
+- **`eth_call`**: Executes a **smart contract function call** locally, without submitting a transaction or altering the blockchain state.
+
+When a node receives an `eth_call` request, it runs that function **on its current blockchain state.**
+
+There is no security or consensus protocol for RPC calls. If you build a system around them, keep in mind you're trusting the node to behave honestly and return the correct values.
+
+<aside>A node's current state, honest or not, *may* be out of sync with the network. Perhaps not by much, but it's still possible!</aside>
+
+## How EOA Contract Calls Work
+
+Reading from the chain is useful, but only because you can write data to it in the first place.
+
+Every data write begins with a transaction, and every transaction begins with an Externally Owned Account (EOA).
+
+At a high level, the steps to calling a function onchain are:
+
+1. <toc> Building the Transaction</toc>
+2. <toc> Choosing a Nonce</toc>
+3. <toc> Signing the Transaction</toc>
+4. <toc> Submitting the Transaction</toc>
+5. <toc> Waiting for the Result</toc>
+
+### 1. Building the Transaction
+
+Every EOA on the Ethereum blockchain is controlled by a unique private key, which is used to sign transactions on behalf of that account.
+
+To initiate a transaction, the user constructs a **transaction object** that encapsulates the details of their intent. This data object typically includes the following fields:
+
+- `to`: The recipient's address.
+- `value`: The amount of Ether to transfer.
+- `data`: Input data for the contract, accessible during execution as 'calldata'.
+- `gasLimit`: The maximum amount of gas that can be consumed by the transaction.
+- `nonce`: A counter that ensures each transaction is unique, critical for preventing replay attacks.
+- `maxFeePerGas` and `maxPriorityFeePerGas`: Specify the maximum fees the user is willing to pay per unit of gas, including a tip to validators for transaction prioritization.
+
+### 2. Choosing a Nonce
+
+The term **'nonce'** appears in various contexts within Ethereum and the broader EVM ecosystem, and its meaning can shift subtly depending on context.
+
+Generally, a nonce represents an **only-increasing** counter such that **any given value can never be used twice**.
+
+For example, if your EOA submits a transaction with a nonce value of `200`, and that transaction gets included in a block, then **no other transaction** can ever use a nonce of `200` (or any value below it) - it will automatically get rejected.
+
+Some common uses of nonces include:
+
+- The EVM maintains a nonce for each address (explained in detail below).
+- Smart contracts can implement their own internal nonce systems (for example, nonces are often used to safely support off-chain signatures).
+- Some Ethereum Improvement Proposals (EIPs), such as **Account Abstraction**, introduce contract-level nonces.
+
+For this discussion, we'll focus on the **nonce** field maintained by the EVM for each EOA address.
+
+<aside>EOA only have two onchain fields: The account nonce, and the account's Ether balance.</aside>
+
+For EOAs, the nonce acts as a **transaction counter**, reflecting the number of transactions sent from the account. When a user submits a transaction, the nonce specified in the transaction must match the account's current nonce. If there's a mismatch, the transaction will be rejected. Once the transaction is processed and included in a block, the nonce increments by one, indicating the account has executed another transaction.
+
+This mechanism is critical for preventing double-execution of transactions, as it ensures that a given nonce can only be used once. Additionally, it allows users to submit multiple transactions simultaneously by specifying an increasing sequence of nonce values. This guarantees that transactions, if accepted, are executed in the correct order (though not all transactions are guaranteed to be executed).
+
+<aside>
+
+💡 **Speeding up transactions**
+
+Sometimes, users may find that their transaction is taking longer to be confirmed than desired, often due to insufficient priority fees. To expedite the process, users have the option to 'speed up' the transaction by submitting a new transaction **with the same nonce**, but a higher `maxPriorityFeePerGas` !
+
+When validators see a transaction with the same nonce but a higher fee, they typically prefer it over the original, effectively *overriding* the old transaction with the new one. And thanks to how nonces work, the original is effectively canceled.
+
+</aside>
+
+### 3. Signing the Transaction
+
+Once all values are chosen for the transaction object, it's time to send it to the blockchain:
+
+- The object is serialized using Recursive Length Prefix (RLP) encoding, a method used in Ethereum for encoding both transactions and blocks.
+- The serialized data is then signed using the Elliptic Curve Digital Signature Algorithm (ECDSA). This process produces three values—v, r, and s—which make up the transaction's signature.
+    - The private key of the EOA is the key used to sign this data.
+    - Interestingly, the sender's 'from' address is not explicitly included in the transaction object. Instead, it is derived from the signature and transaction data using cryptographic techniques.
+    - The v component also includes the chain ID, a safeguard introduced in **EIP-155** to prevent replaying the same transaction on other EVM-compatible chains.
+
+Once created, the signature is then added to the transaction object, resulting in the final form of the request: a *signed* transaction that is ready to be submitted to the network.
+
+### 4. Submitting the transaction
+
+Once signed, *someone* needs to send the transaction to the blockchain. It doesn't really matter who – whether it's a wallet, frontend dApp JavaScript, or a backend server – since no one can tamper with the transaction object once it's signed.
+
+Although it doesn't matter who *sends* the transaction, it *does* matter who **receives** it. The receiver must be a node, which will then perform several initial validation checks. This includes checks such as:
+
+- Is the transaction well-formed?
+- Is the signature valid?
+- Does the account have enough Ether to cover the transaction?
+- Is the “nonce” correct for the account?
+
+If these checks are successful, the node generates a **transaction hash**, which serves as a unique identifier for the transaction. This hash is immediately returned to the caller, confirming that the transaction has been received and initially validated. The transaction is then added to the node's **mempool** and propagated to other nodes, where validators can choose to include it in an upcoming block.
+
+The transaction hash can be used to monitor the status of the transaction as it waits for inclusion in a block. The time it takes for the transaction to be mined depends on factors like the priority fee and current network conditions, and it's possible that the transaction may never be included.
+
+When the transaction is included in a block, the EVM executes its contents. If the `to` address belongs to an EOA (Externally Owned Account), no contract code runs. However, if the `to` address is a smart contract, the EVM executes the code at that address using the transaction's parameters, such as:
+
+- The sender's address
+- The amount of Ether sent
+- Any calldata necessary for contract execution
+
+As the transaction is processed, various parts of the Ethereum **world state** may be updated. For example, changes could occur in Ether balances, contract storage, and logs. However, if the transaction **reverts** (fails), all state changes are discarded. Common reasons a transaction may revert include:
+
+- Using more gas than the transaction's `gasLimit` allows
+- Triggering the **REVERT** opcode (e.g., due to a failed `require(...)` check in Solidity)
+- Executing an invalid opcode or operation (e.g., due to insufficient data inputs)
+
+A crucial feature of EVM transactions is their atomic execution—it's an "all or nothing" process. If the execution reverts, the EVM discards all changes made during that call, including contract state updates, Ether balance adjustments, and logs.
+
+<aside>Even when an EOA call reverts, **gas spent does not revert.** While other state changes are rolled back, the gas used for executing the transaction is still consumed. This occurs because once the network confirms a transaction, all nodes must execute it—even if only to determine it should revert. Consequently, the sender is charged for the computational resources used.</aside>
+
+After a transaction is executed by the network, users can query nodes to get a **transaction receipt**. This receipt, created right after execution, serves as confirmation that the transaction was processed by the network and includes several fields, such as:
+
+- `status`: A binary value indicating success (1) or failure (0) of the EOA call
+- `gasUsed`: The number of gas units consumed by the transaction
+- `logs`: An array of the logs emitted during the transaction
+
+### 5. Waiting for the Result
+
+When an EOA interacts with a smart contract via transaction, developers often seek the return value. Unlike traditional programming, submitting a EOA-to-contract call doesn't produce an immediate result. This is because transactions must be mined into a block before execution. If we executed the code upon transaction submission, our results wouldn't account for potential changes in the world state prior to mining. Account balances and contract data can—and often do—shift between transaction submission and mining.
+
+By delaying execution until block inclusion, Ethereum ensures consistent state execution. The return value becomes accessible through the **transaction receipt** only after the block is mined and the EVM executes the function call.
+
+For developers who need immediate results (e.g., to make decisions based on the outcome), they can use `eth_call` to simulate the call locally. This method executes the function without submitting an actual transaction. However, it's crucial to note that the result of this simulation might differ from the on-chain result of submitting the transaction.
+
+**Impact on web3 applications**
+
+One of the key challenges in developing frontend web3 applications is effectively communicating transaction status to users after submission. Given the unpredictable confirmation time—or the possibility that a transaction might not be confirmed at all—developers must implement robust mechanisms to keep users informed.
+
+This process typically involves displaying pending or loading indicators to signal that the transaction is still in progress. Additionally, developers need to poll the network until the transaction has been confirmed. Fortunately, many web3 libraries offer tools to streamline these tasks. For example, `web3.js` provides a `sendTransaction` method that allows developers to enqueue code that will execute once the transaction receipt is available.
+
+## How Contract-to-Contract Calls Work
+
+One of the most powerful features of the Ethereum Virtual Machine (EVM) is the ability for smart contracts to call other contracts. This capability enables **composability**, allowing complex interactions between different decentralized applications (dApps) and protocols. For example, a contract can call another contract to perform actions like token transfers, execute logic on a decentralized exchange (DEX), or interact with lending protocols. This flexibility is what makes Ethereum's ecosystem highly modular and interconnected.
+
+If you need to execute multiple contract calls together and ensure that they happen **atomically**—meaning all the calls succeed or all fail—you can write a contract that makes these calls. This way, if any call within the sequence fails, the entire operation reverts, ensuring that no partial changes are made. This is particularly useful for scenarios like complex swaps, batch transactions, or multi-step interactions across protocols.
+
+When you look at a transaction on a block explorer like Etherscan, you'll typically see the initial call made by an EOA at the top level. Any additional calls made by that contract to other contracts are displayed as “internal transactions”. Note that LearnEVM *does not* use this naming convention to avoid confusion with Solidity's unrelated `internal` keyword. Instead, we call them “contract-to-contract calls”.
+
+<aside>While we've stated that all changes are discarded when a call reverts, this doesn't necessarily apply to every change within the entire transaction. Picture this scenario: an EOA calls contract A, which then calls contract B. If contract B's call reverts, it doesn't automatically cause the entire transaction to fail. Contract A can catch this revert and decide to continue with its own logic. As a result, if contract A handles the failure gracefully, the transaction may still complete successfully, allowing any changes made by contract A to persist.</aside>

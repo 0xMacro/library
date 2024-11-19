@@ -1,0 +1,234 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/superstateinc/onchain-redemptions/commit/440150e7503a71283aa9f92296fe6e4d629f9b3a</field>
+    <field name="content">
+      ## [H-1] Redemption fee is not charged
+  
+      A new feature in the `Redemption` contract introduces a redemption fee. The redemption fee is initially set through the initializer, can be updated using `setRedemptionFee()`, and can be calculated using `calculateFee()`. In addition, in the `calculateUstbIn()`, the redemption fee is considered when calculating how much USTB token the user may need to provide to obtain the desired USDC amount.
+  
+      However, the redemption process flow, which includes `RedemptionIdle.redeem()` and `RedemptionYield.redeem()` together with underlying `Redemption.calculateUsdcOut()`, does not consider the redemption fee at all. As a result, a redemption fee would not be charged in contradiction to the system specification and contract configuration.
+  
+      **Remediations to Consider**
+  
+      - Apply redemption fee in `Redemption.calculateUsdcOut()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">94070156fe9920cea0399cd24f12c1275d7e3821</field>
+    <field name="content">
+      ## [H-2] Token access constraints not respected in subscribe()
+  
+      In the `SuperstateToken` contract, a new feature allows an end user to mint superstate tokens using `subscribe()`. This function takes in stablecoins and mints SuperstateToken in the proper amount for the `msg.sender`, depending on the current Net Asset Value per Share. `SuperstateToken`, part of a regulation-compliant system, has extra token access constraints that allow only preapproved addresses to obtain tokens. These constraints are enforced in the internal mint wrapper function `_mintLogic()`. This function is used by `mint()` and `bulkMint()` owner-accessible functions. 
+  
+      ```solidity
+      function _mintLogic(address dst, uint256 amount) internal {
+          if (!hasSufficientPermissions(dst)) revert InsufficientPermissions();
+  
+          _mint(dst, amount);
+          emit Mint(msg.sender, dst, amount);
+      }
+      ```
+  
+      However, `subscribe()`, which is publicly accessible, does not call `_mintLogic()` but calls directly the underlying `_mint()` function, which skips permission checking. As a result, non-approved addresses may obtain SuperstateToken in contradiction with system specifications.
+  
+      **Remediations to Consider**
+  
+      - Replace in `subscribe()` call to `_mint()` with a call to the `_mintLogic()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/superstateinc/onchain-redemptions/commit/b56e6797999260b3b10e6ad7066a567b375f0857</field>
+    <field name="content">
+      ## [M-1] Redemption fee amount incorrectly calculated
+  
+      In the `Redemption` contract, `calculateUstbIn()` function calculates how much superstate token should be provided to obtain the desired amount of USDC tokens in return. As part of the calculation, the redemption fee is also considered.
+  
+      ```solidity
+      function calculateUstbIn(uint256 usdcOutAmount)
+        public
+        view
+        returns (uint256 ustbInAmount, uint256 usdPerUstbChainlinkRaw)
+        {
+            if (usdcOutAmount == 0) revert BadArgs();
+  
+            **uint256 usdcOutAmountWithFee = usdcOutAmount + calculateFee(usdcOutAmount);**
+  
+            (bool isBadData,, uint256 usdPerUstbChainlinkRaw_) = _getChainlinkPrice();
+            if (isBadData) revert BadChainlinkData();
+  
+            usdPerUstbChainlinkRaw = usdPerUstbChainlinkRaw_;
+  
+            ustbInAmount = (usdcOutAmountWithFee * CHAINLINK_FEED_PRECISION * SUPERSTATE_TOKEN_PRECISION)
+                / (usdPerUstbChainlinkRaw * USDC_PRECISION);
+        }
+      ```
+  
+      However, the redemption fee is incorrectly calculated. Currently, a fee is applied to the net amount of USDC instead of the gross amount of USDC. As a result, the final result underestimates the redemption fee amount. In addition, when invoking redemption with the result of `calculateUstbIn()`, the user will receive less than the desired `usdcOutAmount`.
+  
+      **Remediations to Consider**
+  
+      - Update `calculateUstbIn()` implementation to apply fee on gross USDC amount.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/superstateinc/onchain-redemptions/commit/b56e6797999260b3b10e6ad7066a567b375f0857</field>
+    <field name="content">
+      ## [L-1] Rounding issues may result in bad UX
+  
+      In the `Redemption` contract, the `calculateUstbIn()` function calculates the necessary superstate token amount to be provided to receive the desired amount of USDC.
+  
+      ```solidity
+      ustbInAmount = (usdcOutAmountWithFee * CHAINLINK_FEED_PRECISION * SUPERSTATE_TOKEN_PRECISION)
+          / (usdPerUstbChainlinkRaw * USDC_PRECISION);
+      ```
+  
+      However, due to integer division and rounding `ustbInAmount` may underestimate the necessary superstate token amount to be provided to retrieve the desired amount of USDC. As a result, users may receive less than they initially asked for. On the user side, this would require a more complex integration implementation to handle this edge case.
+  
+      **Remediations to Consider**
+  
+      - Implement rounding up in `calculateUstbIn()` so that the user receives the desired amount of USDC when redeeming.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d2bf51e06d6e3baafc7236b01890264a0dcf5a44</field>
+    <field name="content">
+      ## [L-2] Inadequate check for validating proper subscription configuration
+  
+      In the `SuperstateToken` contract, the `_requireOnchainSubscriptionsEnabled()` function verifies necessary dependencies for enabling subscriptions. This includes verifying that the `superstateOracle`, which provides real-time NAVS price, is configured and set.
+  
+      ```solidity
+      function _requireOnchainSubscriptionsEnabled() internal view {
+          if (superstateOracle == address(0)) revert OnchainSubscriptionsDisabled();
+      }
+      ```
+  
+      However, this check skips to validate that `maximumOracleDelay` is also set and has a value greater than 0. In cases when `maximumOracleDelay` is not configured or has a default value of 0, subscriptions will also not work, as Oracle data will always be treated as stale data.
+  
+      **Remediations to Consider**
+  
+      - Include in `_requireOnchainSubscriptionsEnabled()` check that `maximumOracleDelay` is appropriately configured.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">add3883b24ffe8bfbc561ab5907657898064484d</field>
+    <field name="content">
+      ## [Q-1] Unnecessary backward compatibility for Allowlist implementation
+  
+      The latest, version 2 of `Allowlist` system component, diverges significantly in the implementation from the previous version. Storage layout, permission handling, and function interface differ. In addition, v2 of Allowlist is upgradeable, while version 1 wasn’t.
+  
+      However, version 2 of `Allowlist` tries to maintain backward interface compatibility even though it isn’t an end user-facing system component but rather a wrapped component used by the Superstate token contract and by the internal management system.
+  
+      Due to the above, maintaining backward compatibility seems unnecessary. Consider removing unnecessary Allowlist version 1 features and code for the benefit of a more clean version 2 Allowlist implementation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/superstateinc/onchain-redemptions/commit/9c9db7b596811cfc53f31cd6c33e9c0ffb9b8848</field>
+    <field name="content">
+      ## [Q-2] Set the `redemptionFee` variable type to uint256
+
+      In the `Redemption` contract, the `redemptionFee` is defined as uint96. If, in the next upgrade, a new variable is smaller than uint256 and can fit in the same slot, it may not require an update to the storage gap. However, if it is bigger, it will require a new slot and storage gap update.
+  
+      To reduce potential storage layout slot misalignment in future upgrades, consider using `uint256` for `redemptionFee` instead of `uint96`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">add3883b24ffe8bfbc561ab5907657898064484d</field>
+    <field name="content">
+      ## [Q-3] Extra Ownable features present in Redemption and Allowlist contracts
+  
+      The `Redemption` and `Allowlist` contracts inherit from `OwnableUpgredeable`. As a result, they contain the unnecessary functionality of `renounceOwnership()`.
+  
+      Consider overriding it and reverting whenever it is called so it is clear that it is not supported.
+    </field>
+    <field name="response">
+      Additional changes in commit: https://github.com/superstateinc/onchain-redemptions/commit/7187bdfa59dab79cfba58dd341aa7a946b45771e
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">07a82dbcc6e21b7494fb47a12ee90ef38f07cab9</field>
+    <field name="content">
+      ## [Q-4] Improve natspec documentation
+  
+      Consider updating natspec documentation in the following cases:
+  
+      - In the `SuperstateToken`, the natspec for the `setOracle()` function refers to the old, now obsolete, `updateOracle()` function. Consider updating the natspec to keep it up to date.
+      - In the `Redemption` contract, `withdraw()` is an abstract function, and `withdrawToSweepDestination()` relies on it. Since these functions are critical, add natspec documentation that concrete implementation of `withdraw()` in child functions should implement proper access control.
+    </field>
+    <field name="response">
+      Additional changes in commit: https://github.com/superstateinc/onchain-redemptions/commit/233128c10fd54852d7bbdcefb522e45085a59bab
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/superstateinc/onchain-redemptions/commit/29797399a35c2f086f4f9ead5b386f53ff00de5d</field>
+    <field name="content">
+      ## [Q-5] Add validation for sweepDestination address
+  
+      In the `Redemption` contract, the `sweepDestination` variable represents the address where the contract owner-controlled `withdrawToSweepDestination()` will send the requested amount of USDC tokens. This variable is configured in `initialize()` and can be updated using `setSweepDestination()`.
+  
+      However, the underlying implementation in `_setSweepDestination()` does not have a check that the provided address value for `sweepDestination` is valid and not 0 address.
+  
+      To prevent asset loss, consider adding a zero address check for `sweepDestination`, similar to what is done in `SuperstateToken`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="content">
+      ## [I-1] Centralization risk
+  
+      The `Superstate` system is a centralized system with various regulatory compliance requirements. A multi-sig account that is an authorized party in the system has extensive privileges that control all assets through configuration and privileged operations.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="content">
+      ## [I-2] Stablecoins used with a hardcoded peg to USD
+  
+      Various contracts within the `Superstate` system, such as `Superstate.sol` and `Management.sol`, are implemented with hardcoded peg between USD and configured stablecoins. This is an explicit assumption within the system and an acceptable risk to the system owners. Even though potential malicious end users may attempt to exploit de-peg events, all system users are KYC, and the likelihood of this happening is minimal.
+    </field>
+  </item>
+  
