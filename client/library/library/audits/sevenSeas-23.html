@@ -1,0 +1,44 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Nov 27, 2024"
+  auditTitle="Seven Seas A-22"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="c94d843a6e5d11b91f73f8e27c6b856d52ba8003"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on Nov 27th, 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+      
+      ## Trust Assumptions:
+
+      AaveRewardsController: Is upgradeable so could potentially update logic and introduce vulnerabilities, caution is advised, however aave is a trusted entity across the ecosystem.
+
+      Lombard’s LBTC and cbBTCPMM: Both are upgradeable and owned by the same EOA owner, with recent updates and pending ownership transfers to a 3/5 safe. Caution is advised and we suggest waiting until ownership transfer occurs before moving funds in.
+     
+    </template>
+   
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the AaveV3 and LombardBtc decoders, allowing boring vaults to claim rewards with AaveV3, as well as mint LBTC and swap CBBTC for LBTC. Changes reviewed from <a href="https://github.com/Se7en-Seas/boring-vault/pull/166">PR 161</a>.
+    </p>
+
+    <template type="file-hashes">
+      6aba013ae79d99a03ae1a3c2bb55f81ca35498059554d9aa580d6ae40cc6c2d2  src/base/DecodersAndSanitizers/Protocols/LombardBtcMinterDecoderAndSanitizer.sol
+      a36ba3738a89c16052c8dd8c45fea4bee907726eda16d4dfed33b8ce57c89661  src/base/DecodersAndSanitizers/Protocols/AaveV3DecoderAndSanitizer.sol
+    </template>
+
+  </content-for>
+</page>
