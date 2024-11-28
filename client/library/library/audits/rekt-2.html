@@ -1,0 +1,45 @@
+<page
+  clientName="Rekt"
+  reportDate="Nov 26, 2024"
+  auditTitle="Rekt A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/x-hzc/rekt"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="a4c5f57e855a80555c0840e88d3c4d9a869f4d2f"
+  finalRepoCommitHash="543308281b7f947c7f5078952aa668b7722e1aef"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on Nov 12, 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+      
+
+      ### Trusted Entities:
+
+      - Owner: RektClaimUpgradeable’s owner has the permission to withdraw all tokens, pause claiming, set the token being claimed, and set the signer. They are trusted to only make these calls when necessary and in the benefit of the protocol.
+      - Signer: RektClaimUpgradeable’s signer is set by the owner and has the ability to sign Claim requests. It is trusted they only sign valid requests for what users are owed.
+      - Upgrader: Can upgrade RektClaimUpgradeable’s logic. Is trusted to only do so when necessary and to benefit the protocol.
+
+    </template>
+   
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      The audit was performed on the RektClaimUpgradeable contract allowing for users to claim Rekt tokens rewarded to them.
+    </p>
+
+    <template type="file-hashes">
+      66c4f958df090b6370f49b0eb240c77149046f6f143ed72cd6a2782923c187b2  contracts/RektClaimUpgradable.sol  
+    </template>
+
+  </content-for>
+</page>

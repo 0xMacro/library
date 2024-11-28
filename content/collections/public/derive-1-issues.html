@@ -1,0 +1,140 @@
+<item>
+    <field name="topic">Edge case</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a1750b6a46a34ac3b5e6459dea620da7475bb2db</field>
+    <field name="content">
+        ## [L-1] Direct transfers of tokens to the contract bypass voting power transfer
+
+The `StakedDeriveToken` contract overrides the `_update()` function used on each transfer to skip the voting units transfer on the contract to handle the deallocation and redemption logic properly with the adjusted end amounts:
+
+```solidity
+function _update(address from, address to, uint amount) internal override {
+  require(from == address(0) || transferWhitelist[from] || transferWhitelist[to], TransferNotAllowed());
+  // We explicitly skip the ERC20VotesUpgradeable._update() call here as we want to preserve votes for tokens
+  // that are allocated to usages
+  ERC20Upgradeable._update(from, to, amount);
+  if (from == address(0)) {
+    uint supply = totalSupply();
+    uint cap = _maxSupply();
+    if (supply > cap) {
+      revert ERC20ExceededSafeSupply(supply, cap);
+    }
+  }
+
+  // We don't want to transfer voting units when allocating/deallocating, and instead handle those cases manually.
+  // Note: we have to manually transfer voting units whenever funds are sent to the
+  if (to == address(this) || from == address(this)) return;
+
+  _transferVotingUnits(from, to, amount);
+}
+```
+
+**Reference:** [StakedDeriveToken.sol#L455-473](https://github.com/derivexyz/derive-governance/blob/55a86af8f7ea3ad4402faf5929e635d714597bb1/src/token/StakedDeriveToken.sol#L455-L473)
+
+However, if a user directly transfers their `stDRV` tokens to the contract address, not through the intended allocate or redeem functions, they will lose their tokens but retain their voting power, as the `_transferVotingUnits` call is skipped. This renders an edge case where users maintain their voting power without the tokens in their balance. It’s worth pointing out that these votes can not be delegated as the `_getVotingUnits` works as intended.
+
+**Remediations to Consider:**
+
+Consider ensuring the origin of the transfer is the contract on the early return in `_update()` by checking the reentrancy guard is entered:
+
+```solidity
+    if ((to == address(this) && ReentrancyGuardUpgradeable._reentrancyGuardEntered())
+      || from == address(this)) return; 
+```
+    </field>
+    <field name="response">
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a1750b6a46a34ac3b5e6459dea620da7475bb2db</field>
+    <field name="content">
+        ## [Q-1] Optimize logic case in `getDeriveByVestingDuration()`
+
+        In `StakedDeriveToken`, `getDeriveByVestingDuration()` logic could include the equality on line 123 to avoid unnecessary code execution. Since the `duration == maxRedeemDuration` also can be calculated with this simple operation:
+        
+        ```diff
+            // capped to maxRedeemDuration
+        --  if (duration **>** maxRedeemDuration) {
+        ++  if (duration **>=** maxRedeemDuration) {
+                  return amount * maxRedeemRatio / 100;
+                }
+        ```
+        
+        **Reference:** [StakedDeriveToken.sol#L123-125](https://github.com/derivexyz/derive-governance/blob/55a86af8f7ea3ad4402faf5929e635d714597bb1/src/token/StakedDeriveToken.sol#L123-L125)
+    </field>
+    <field name="response">
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a1750b6a46a34ac3b5e6459dea620da7475bb2db</field>
+    <field name="content">
+        ## [Q-2] Hardcoding constant values
+
+        Throughout the`StakedDeriveToken`contract, numerous literal numeric values are used as coefficients. To enhance code readability, consider defining these as named constants:
+        
+        - `200` used on [L189](https://github.com/derivexyz/derive-governance/blob/55a86af8f7ea3ad4402faf5929e635d714597bb1/src/token/StakedDeriveToken.sol#L189)*.*
+        - `100` on [L124](https://github.com/derivexyz/derive-governance/blob/55a86af8f7ea3ad4402faf5929e635d714597bb1/src/token/StakedDeriveToken.sol#L124), [L130](https://github.com/derivexyz/derive-governance/blob/55a86af8f7ea3ad4402faf5929e635d714597bb1/src/token/StakedDeriveToken.sol#L130), and [L172](https://github.com/derivexyz/derive-governance/blob/55a86af8f7ea3ad4402faf5929e635d714597bb1/src/token/StakedDeriveToken.sol#L172).
+        - `10000` used on [L432](https://github.com/derivexyz/derive-governance/blob/55a86af8f7ea3ad4402faf5929e635d714597bb1/src/token/StakedDeriveToken.sol#L432)*.*
+    </field>
+    <field name="response">
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-3] Unnecessary use of `SafeERC20` library
+
+        The `_convert` and `_finalizeRedeem` functions use `safeTransferFrom` and `safeTransfer` to transfer `deriveToken` to and from the user. However, since `deriveToken` is a standard ERC20 token that behaves as intended, using SafeERC20 for these transfers is unnecessary. Moreover, directly using `transfer` and `transferFrom` instead of their "safe" versions reduces gas costs.
+    </field>
+    <field name="response">
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a1750b6a46a34ac3b5e6459dea620da7475bb2db</field>
+    <field name="content">
+        ## [Q-4] `convertTo` cannot be called by contracts
+
+        The `convertTo` function explicitly prevents contracts from calling it:
+        
+        ```jsx
+          function convertTo(uint amount, address to) external override nonReentrant {
+        >>    require(address(msg.sender).code.length == 0, CannotConvertToFromSmartContract());
+              _convert(amount, to);
+          }
+        ```
+        
+        **Reference**: [StakedDeriveToken.sol#L239](https://github.com/derivexyz/derive-governance/blob/55a86af8f7ea3ad4402faf5929e635d714597bb1/src/token/StakedDeriveToken.sol#L239)
+        
+        Restricting the convertTo function to EOAs only and not allowing any contracts such as smart accounts from calling it is an unnecessary limitation. Consider removing the above require statement.
+    </field>
+    <field name="response">
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Edge case</field>
+    <field name="content">
+        ## [I-1] Redemption logic is sequence-dependent
+
+        When initiating a redeem call through `redeem()`, the contract stores in an array, each pending redemption later to be finalized by its index location through `finalizeRedeem()` and `cancelRedeem()`. These functions rely on order execution, and if multiple calls are included in the same block with valid indexes, they could be reorganized with a different execution order than expected.
+    </field>
+    <field name="response">
+    </field>
+  </item>
