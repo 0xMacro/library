@@ -1,0 +1,90 @@
+<page
+  clientName="River"
+  reportDate="December 3, 2024"
+  auditTitle="River A-8"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/LiquiFi/vesting-contracts-v1"
+  repoCommitHash1="a3fb570e4bdf9e3c889ea2fc5da2d883a4f6dc4e"  
+  repoCommitHash2="883b14f8279ebab454076e3c94bf8b8c3abfb4e5"
+  repoCommitHash3="b3626867eba5c43049f88132aa040732d3ee53c5"
+  passwordEncrypt="env:PAGE_PASS_RIVER_1"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from October 24 to 31, 2024.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Token changes):</b> </br>
+      <code>{{page.repoCommitHash1}}</code>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (MerkleDrop):</b> </br>
+      <code>{{page.repoCommitHash2}}</code>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (RewardsDistribution V2):</b> </br>
+      <code>{{page.repoCommitHash3}}</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository.</p>
+
+  <p>Token Changes (<code>{{page.repoCommitHash1}}</code>):</p>
+
+  <template type="file-hashes">
+    f59e24b075faedf4122bdbf8e5e0270d2492304a922c9cea1961fa4732bd4c7d  ./src/tokens/lock/ILock.sol
+    1ac232c03126c99ded3247867ccbb187485af4d57a90baa2ccc37446606d9c88  ./src/tokens/lock/LockBase.sol
+    d9934664f3b9acd4000d46b3632a0152c806ecb1a23bde3a6db3a647e5c89251  ./src/tokens/lock/LockFacet.sol
+    322317689ef981bd8c19bb083f2f419c30f91ed575d321e18bafb244097e9f9a  ./src/tokens/lock/LockStorage.sol
+    c222a02756b1a49061984690e0d30c2948a874ecc0cdc59b422887ba9218616d  ./src/tokens/river/base/IOptimismMintableERC20.sol
+    430e4b262f9c1b7cc688febc727ce882c051bf54ac37ab570ed397d5739501b2  ./src/tokens/river/base/ISemver.sol
+    fb55232c38d34e1555d4f984d3788818439c2baab6b2a2b1bc4d6757537e0b4f  ./src/tokens/river/base/River.sol
+    4f80543002fdfa74f7dec3aa65ee045451b19f36e878141e83b28d84751d50ef  ./src/tokens/river/base/delegation/IMainnetDelegation.sol
+    ae08207f8e9e6d061c70becb828d2d2b41c8834f6cb8beb4c56e49de8264e786  ./src/tokens/river/base/delegation/MainnetDelegation.sol
+    eb7bcd2a684b9609d043877fd0c20f341e91a47efd2afb22a4d4dd9a122be0bd  ./src/tokens/river/base/delegation/MainnetDelegationBase.sol
+    a8a17529bec7f6d43a1dbdd18c316d3e46aedb5455f7d156d021cd8e5f4dc0cd  ./src/tokens/river/base/delegation/MainnetDelegationStorage.sol
+  </template>
+
+  <p>Merkle Drop (<code>{{page.repoCommitHash2}}</code>):</p>
+
+  <template type="file-hashes"> 
+    6a64173cdd60f5b0811bb5f441c1796f8e2526a3150d7b4a54d677ce3014890a  ./src/tokens/drop/DropFacet.sol
+    45c6dff5dd8a77d798243ae9d1cf2f3834a5f7294950115c586550a122204fef  ./src/tokens/drop/DropFacetBase.sol
+    493ee2cb2a5eb231d90473b6ab05df86af2a9c4dc20552b34eaaef17744d8baf  ./src/tokens/drop/DropStorage.sol
+    4fea15e3c6806774e0e026e42a848e3d50bee7d2ae26e7a78932ca07123e93a5  ./src/tokens/drop/IDropFacet.sol
+  </template>
+
+  <p>Rewards Distribution V2 (<code>{{page.repoCommitHash3}}</code>):</p>
+
+  <template type="file-hashes">
+    8fe84be4e34aa3ce71135cfa9dba5393e48a81099a01c793f52280e63895bc22  ./src/base/registry/facets/distribution/v2/DelegationProxy.sol
+    14e1744971f1c459927e50c324e3e319afa3d17660defd3b3078c80db525fc91  ./src/base/registry/facets/distribution/v2/IRewardsDistribution.sol
+    b74f478491d88e832a6f318e1a225338e0903ef6e9d188239f6938f13aabe41c  ./src/base/registry/facets/distribution/v2/RewardsDistribution.sol
+    daee6fdf98830b92b6a4c90e9210d312c9dbdbe44d5951764ccf5d5d8bd725ee  ./src/base/registry/facets/distribution/v2/RewardsDistributionBase.sol
+    d7cd783dcb1425a3c78e73112cd4a81dfe527b430668a8ab520128e38cf5f091  ./src/base/registry/facets/distribution/v2/RewardsDistributionStorage.sol
+    be9a36a9df289f5ff564087abc9f9fe60bf3856d3577f6ba29a4a418a0881b81  ./src/base/registry/facets/distribution/v2/StakingRewards.sol
+  </template>
+
+
+</content-for>
