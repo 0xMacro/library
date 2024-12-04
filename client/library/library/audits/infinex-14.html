@@ -6,19 +6,31 @@
   repoUrl="https://github.com/infinex-xyz/infinex-contracts"
   layout="/library/audits/_layout.html" 
   repoCommitHash1="4f3f116579b91a9b25e0304fa0cff4f46c786357"
-  repoCommitHashFinal="v9c0ce9080df23d460d27ec057b13c9a38e1f1d17"  
+  repoCommitHash2="9ad2835d989960b09d07fc4cb3aab874e7d65253"
+  repoCommitHashFinal="v9c0ce9080df23d460d27ec057b13c9a38e1f1d17"
+  repoCommitHashFinal2="67829a7e4d34b877c3f2473c65489bb69f974fb9" 
   passwordEncrypt="env:PAGE_PASS_INFINEX_14"
   customRepoInfo
   customReviewInfo
 >
   <content-for name="schedule">
-    The security audit was performed by the Macro security team on November 27, to 29 2024. 
+    The security audit was performed by the Macro security team and conducted in two separate parts, with the ownership changes reviewed on October 31st 2024, and the rest on November 27, to 29 2024. 
   </content-for>
 
   <content-for name="repo-info">
     <ul>
       <li>
         <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Ownership Commit Hash  (Initial):</b> </br>
+        <code>{{page.repoCommitHash2}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Ownership Commit Hash (Final):</b> </br>
+        <code>{{page.repoCommitHashFinal2}}</code>
       </li>
 
       <li class="break-words break-all">
@@ -30,6 +42,7 @@
         <b>Commit Hash (Final):</b> </br>
         <code>{{page.repoCommitHashFinal}}</code>
       </li>
+      
     </ul>
   </content-for>
 
