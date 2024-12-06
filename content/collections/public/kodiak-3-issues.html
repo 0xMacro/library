@@ -1,0 +1,301 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Kodiak-Finance/kodiak-core/pull/106</field>
+    <field name="content">
+      ## [M-1] KodiakFarm can be initialized multiple times
+  
+      In the `KodiakFarm` contract, the `initialize()` function is expected to be executed only once to perform an important initial contract setup. This setup includes setting the owner, corresponding factory and `factoryOwner`, and various reward configuration parameters. To prevent multiple calls, initialize checks if `stakingToken` is already set; if not, it sets it and allows initial configuration.
+  
+      ```solidity
+        function initialize(
+            address _owner,
+            address _stakingToken,
+            address[] memory _rewardTokens,
+            address[] memory _rewardManagers,
+            uint256[] memory _rewardRates,
+            bytes calldata /*_data*/
+        ) external nonReentrant {
+            require(address(stakingToken) == address(0), "Farm: Already initialized");
+            stakingToken = IERC20(_stakingToken);
+            ...
+        }
+      ```
+  
+      However, neither the current implementation nor its caller in `FarmFactory.deployFarm()` checks if the provided `_stakingToken` is a non-zero address. Due to this, a malicious user may deploy a new KodiakFarm through the factory, which will be registered with KodiakFarm but may have a different factory value and corresponding factory owner. In addition, a malicious user may change the owner of previously created KodiakFarm instances without proper `_stakingToken` set.
+  
+      This can be achieved by calling  `FarmFactory.deployFarm()` with 0 address for `_stakingToken`, followed by the direct call to `KodiakFarm.initialize()` on a specific KodiakFarm instance.
+  
+      **Remediations to Consider**
+  
+      - Add input validation to check if `_stakingToken` is a non-zero address.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Token standards</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Kodiak-Finance/kodiak-core/pull/106</field>
+    <field name="content">
+      ## [L-1] Use TransferHelper for stakingToken transfers
+  
+      With the most recent changes in the `KodiakFarm` contract, the `stakingToken` address value is not guaranteed to be a token address under Kodiak system control. As a result, the `stakingToken` implementation may not comply with the ERC20 standard implementation.
+  
+      For example, an operation may succeed when a token transfer fails as it returns a false value, which is not handled in the `_withdrawLocked()` implementation.
+  
+      **Remediations to Consider**
+  
+      - Use TransferHelper for staking token transfers, which is similar to how reward token transfers are currently handled.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Kodiak-Finance/kodiak-core/pull/106</field>
+    <field name="content">
+      ## [Q-1] Skip 0 reward token transfers
+  
+      In the `KodiakFarm` contract, the `_getReward()` internal function processes and transfers token rewards. Processing is performed within a loop and involves unnecessary transfer calls even when the reward amount is 0.
+  
+      ```solidity
+      function _getReward(address user) internal updateRewardAndBalance(user, true) returns (uint256[] memory rewards_before) {
+          require(!rewardsCollectionPaused, "Farm: Rewards emergency paused, use emergencyWithdraw if necessary");
+  
+          // Update the rewards array and distribute rewards
+          rewards_before = new uint256[](rewardTokens.length);
+  
+          for (uint256 i = 0; i < rewardTokens.length; i++) {
+              rewards_before[i] = rewards[user][i];
+              rewards[user][i] = 0;
+              TransferHelper.safeTransfer(rewardTokens[i], user, rewards_before[i]);
+              emit RewardPaid(user, rewards_before[i], rewardTokens[i]);
+          }
+  
+          lastRewardClaimTime[user] = block.timestamp;
+      }
+      ```
+  
+      To reduce fault probability (tokens that revert on a 0 amount transfer) and gas cost, consider skipping 0 amount token transfers with a corresponding check within the loop.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [Q-2] Use OZ Ownable instead of custom OwnableUninitialized
+
+      The `KodiakIslandStorage` contract inherits from the custom `OwnableUninitialized` implementation. On the other hand, `KodiakFarm` is already relying on OZ’s Ownable, which is already a standard for simple access control implementation.
+  
+      Consider replacing the custom implementation with the OZ’s Ownable in `KodiakIslandStorage` implementation for consistency and easier future maintenance.
+    </field>
+    <field name="response">
+        This is ok, the custom OwnableUnitiatilized is used to effectively rename the owner to “manager” and could be useful in future upgrades to separate owner / manager etc - will leave as is.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Kodiak-Finance/kodiak-core/pull/106</field>
+    <field name="content">
+      ## [Q-3] Unnecessary check in `setLockedStakeTimeForMinAndMaxMultiplier()`
+  
+      In the `KodiakFarm` contract, there is now an unnecessary check in the `setLockedStakeTimeForMinAndMaxMultiplier()` function due to recent updates.
+  
+      ```solidity
+      require(_lock_time_for_max_multiplier >= 1, "Mul max time must be >= 1");
+      ```
+  
+      This check is unnecessary since two subsequent checks have already enforced it.
+  
+      ```solidity
+      require(_lock_time_min >= 1, "Mul min time must be >= 1");
+      require(_lock_time_for_max_multiplier >= _lock_time_min, "Mul max time must be >= min time");
+      ```
+  
+      Consider removing it.
+    </field>
+    <field name="response">
+        Fixed by removing: `require(_lock_time_min >= 1, "Mul min time must be >= 1");`
+
+        Since `lock_time_min = 0` is actually a valid case.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [Q-4] Hardcoded constant values across contracts
+  
+      1. The `xKDK:mint()` literal constant value of 100e6 ether enforces the maximum total supply of the `xKDK` token. This constant is meant to match the value of the `KDK:MAX_SUPPLY` constant, which currently has the same value of 100e6 ether.
+      
+          However, since `KDK.sol` will be deployed in the future and the total supply may change from the one planned, consider making the limit value in `xKDK:mint()` admin configurable to prevent divergence.
+      
+      2. In the `KodiakIsland`, `KodiakIslandWithStorage`, and `KodiakIslandWithRouter` contracts, multiple functions use the literal constant value of 10000 in checks and calculations.
+      
+          Consider replacing this with BPS_PRECISION or FEE_PRECISION constant.
+    </field>
+    <field name="response">
+        Related to `xKDK.mint()` this is fine - business decision, won’t change it by an order of magnitude or more, better to have it be immutable.
+
+        Related to 10000 constant, also fine - tried it the other way and found that 10000 next to variables called `xyzBPS` is more readable than calling it `BPS_PRECISION`
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Kodiak-Finance/kodiak-core/pull/106</field>
+    <field name="content">
+      ## [Q-5] Missing function declarations in IXKDToken interface
+  
+      The `IXKdkToken` interface does not declare two recently added functions accessible to the contract owner. On the other hand, `updateWhitelister()`, also an admin function, is present.
+  
+      - setKdkAddress()
+      - mint()
+  
+      Consider updating the interface with two corresponding function declarations.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Kodiak-Finance/kodiak-core/pull/106</field>
+    <field name="content">
+      ## [Q-6] Update docs
+
+      1. `KodiakFarm`'s top-level contract natspec documenting capabilities for `factoryOwner` are inadequate as they do not mention that `factoryOwner` is practically a super admin, with a super set of privileges available to the owner and token reward managers.
+      2. There is an obsolete inline comment in `stakeLocked()` **function referencing the old variable `source_address`
+      
+          ```solidity
+          // Pull the tokens from the source_address
+          TransferHelper.safeTransferFrom(address(stakingToken), user, address(this), liquidity);
+          ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Kodiak-Finance/kodiak-core/pull/106</field>
+    <field name="content">
+      ## [Q-7] Unnecessary imports
+
+      1. The `FarmFactory` contract imports and inherits the `ReentrancyGuard` contract. However, these contract features are not used. Consider removing them.
+      2. The `KodiakIslandStorage` contract imports the test artifact `forge-std/console.sol`. Consider removing it from production deployments.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Kodiak-Finance/kodiak-core/pull/106</field>
+    <field name="content">
+      ## [Q-8] Missing indexed attribute for events in KodiakFarm
+
+      In the `KodiakFarm`, the following events would benefit from having indexed attributes:
+  
+      - RewardPaid - token_address
+      - RewardRateUpdated - token
+      - RewardManagerSet - token
+      - Recovered - destination_address, token
+      - RewardsPeriodRenewed - token
+      - GreylistSet - _address
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/Kodiak-Finance/kodiak-core/pull/106</field>
+    <field name="content">
+      ## [I-1] Centralization risks
+  
+      Kodiak’s FarmFactory owner has extensive privileges for each deployed KodiakFarm instance. FarmFactory owner privileges are superset of the KodiakFarm owner privileges and related reward token managers for the particular KodiakFarm instance. The only exception related to available privileges, is that only the KodiakFarm owner may invoke `startFarm()` function.
+  
+      These privileges provide factory owner with the following capabilities:
+  
+      - Can pause withdrawals indefinitely (`setWithdrawalsPaused(true)`)
+      - Can pause rewards collection (`setRewardsCollectionPaused(true)`)
+      - Can pause staking (`setStakingPaused(true)`)
+      - Could effectively lock user funds by pausing all operations
+      - Can modify reward duration (`setRewardsDuration`)
+      - Can affect reward calculations by changing multipliers
+      - Can modify lock time parameters affecting reward calculations
+      - Can set reward rates to zero
+      - Can change reward token managers
+      - Can selectively block users via greylisting (`setGreylist`)
+      - Can force unlock all stakes (`setStakesUnlocked(true)`)
+      - Can recover reward tokens, effectively stopping rewards
+  
+      The factory owner controls the contract's operation and user assets. While some of these powers are necessary for emergencies, they represent a significant centralization risk. Users should know that their funds could be temporarily frozen or their rewards manipulated if the factory owner is compromised.
+  
+      Recommended improvements include:
+  
+      1. Adding timelocks for emergency actions
+      2. Implementing parameter change limits
+      3. Adding fail-safe withdrawal mechanisms (releasing assets after some time automatically, even if withdrawals are still disabled)
+    </field>
+    <field name="response">
+        Upon review - we decided to decentralize further and remove the “factoryOwner” role entirely.  Now, all controls are done by the farmOwner, which is the farm deployer - there is no control over the farms by “factoryOwner” (i.e. Kodiak team).
+
+        Also, acknowledging that the ability to permanently lock user’s funds via setting withdrawalsPaused is too big of a risk to our users, especially when there is no control over who is deploying the farm and the security characteristics of the farm Owner.  Therefore, the ability to lock user withdrawals by pausing has been removed entirely.
+
+        We consider it an acceptable centralization risk for users to forfeit reward tokens as long as the stake can be withdrawn no matter what. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="content">
+      ## [I-2] Unexpected slippage calculation in worstAmountOut()
+  
+      In the `KodiakIslandWithRouter` contract, `worstAmountOut()` calculates min output amount for the default slippage check. The system will stop processing the transaction if the provided min amount out is less or equal to the calculated one. It will revert with an indication to the manager to provide a more appropriate minimum amount out value.
+  
+      However, there is an implementation error in how worstAmountOut is calculated. In the implementation, `slippageBPS` (default value 5%) is applied directly to the `avgSqrtPriceX96` (average square root price) instead of the price itself. As a result, the calculated worstAmountOut would be less than the expected value.
+  
+      For example, with a price of 4.0 (as defined in `test_WorstAmountOut_BasicZeroForOne` test) and slippage of 1000 (or 10%) worstAmountOut should be 3.6 for a provided amount of 1e18. However, the calculated value by the current implementation is 3.24, which is incorrect.
+  
+      **Remediations to Consider**
+  
+      - Update the implementation and corresponding test to apply slippageBPS to the `averageSqrtPriceX96` properly. Consider applying a sqrt of slippageBPS to `avgSqrtPriceX96` instead of directly applying slippageBPS.
+    </field>
+    <field name="response">
+        Not an issue, aware and intentional that the slippage applies to sqrtP rather than P - decided to keep it simple rather than apply too many transformations as its intended to be a backstop (and cleaner as it’s the dimension in which the univ3 logic operates).
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="content">
+      ## [I-3] getAvgPrice() may unexpectedly revert and affect executiveRebalanceWithRouter()
+  
+      In the `KodiakIslandWithRouter` contract, `getAvgPrice()` retrieves TWAP from the Uniswap V3 pool. This function is called from `executiveRebalanceWithRouter()` with the `compounderSlippageInterval` variable, which the manager can configure. The `compounderSlippageInterval` defines the interval value for the TWAP.
+  
+      However, when `compounderSlippageInterval` is greater than the oldest observation on the oracle, `pool.observe()` call in `getAvgPrice()` will fail causing `executiveRebalanceWithRouter()` not to be able to execute successfully.
+  
+      **Remediations to Consider**
+  
+      - Use the try/catch mechanism to fail gracefully in situations when the oracle is not yet ready to provide TWAP (inadequate cardinality or interval out of range)
+    </field>
+    <field name="response">
+        No need to (spend extra gas) to have graceful fallback logic since this would just fail on simulation with the error msg, and in this case since `executiveRebalanceWithRouter` cannot be called with all the adequate protections that choices are to either wait to have adequate recent pricing to have a good twap, or call executiveRebalance which doesn’t have a twap based protection.
+    </field>
+  </item>
+  
