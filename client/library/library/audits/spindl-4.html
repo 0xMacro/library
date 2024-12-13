@@ -1,0 +1,43 @@
+<page
+  clientName="Spindl"
+  reportDate="December 13th, 2024"
+  auditTitle="Spindl A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/spindl-xyz/spindl-protocol"
+  repoCommitHash="6ae74b28ca50a57436b7a7aa5a4006199742f689"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_SPINDL_4"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from December 2, 2024 to December 6, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      Spindl’s long-term goal is to build an attribution system native to Web 3 and how Web 3 developers perceive the world. 
+      That means using a mix of off-chain and on-chain data to correctly measure the user’s journey toward a dApp, and their monetization and engagement once there. 
+      Since this is a very nascent industry where business models have not coalesced, 
+      the Spindl referral and rewards system does the bounty/revenue-share calculation off-chain in order to provide the app developer or marketer the maximum flexibility when it comes to incentivizing user growth. 
+      Eventually, the attribution function will very likely live fully (or more fully) on-chain in a more decentralized and trustless manner. 
+    </template>
+  </content-for>
+
+
+  <content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    91d9a1a645a162b301efc7c71e1d22db0ff392b380764307bf87783724586738  contracts/CampaignBalance.sol
+    4113d4b9a9c567758da0c94123d1cd771ed973306ddc4a5396052414545bb553  contracts/FlywheelCampaigns.sol
+    594d3653757dd255992ac20fe20cea77629fe22323438c1d9ef153f8d64ba269  contracts/FlywheelPublisherRegistry.sol
+  </template>
+</content-for>
+
+</page>
