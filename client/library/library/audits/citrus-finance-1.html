@@ -1,0 +1,31 @@
+<page
+  clientName="Citrus Finance"
+  reportDate="December 09, 2024"
+  auditTitle="Citrus Finance A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/citrus-finance/citrus-safe-modules"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="0d6b674819b54f6b836430dc92eae16e6d35777e"
+  repoCommitHashFinal="b847a0b073a495c2fa02a08c95d605f91e81cb5e"
+  issueSummaryFormat="table"
+  passwordEncrypt="env:PAGE_PASS_CITRUS_FINANCE_1"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from December 6, 2024 to December 9, 2024.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available public documentation and provided docs for the specific release.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the messaging layer contracts within this repository:</p>
+    <template type="file-hashes">
+        5e3e9d4f8c94985b668a5ee5031ad80edb01d5f82bc1b5dcde0df12c5a6efb4f  src/GlobalModule.sol
+        0b30c709dbffdd4185a022c39864c0ee1135a11dee7cd8e7a047aec431aa11f3  src/ModuleSetup.sol
+        4e3e619b92dac7655fb24d4c18d097e825d6d5adc4b939986b6f8b013252dbca  src/interfaces/ISafe.sol
+    </template>
+</page>
