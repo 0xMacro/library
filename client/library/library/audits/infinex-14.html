@@ -1,0 +1,122 @@
+<page
+  clientName="Infinex"
+  reportDate="December 5, 2024"
+  auditTitle="Infinex A-14"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash1="4f3f116579b91a9b25e0304fa0cff4f46c786357"
+  repoCommitHash2="9ad2835d989960b09d07fc4cb3aab874e7d65253"
+  repoCommitHashFinal="0e142681656af4854ca5eeef5421da5612230b92"
+  repoCommitHashFinal2="67829a7e4d34b877c3f2473c65489bb69f974fb9"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team and conducted in two separate parts, with the ownership changes reviewed on October 31st 2024, and the rest on November 27, to 29 2024. 
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Ownership Commit Hash  (Initial):</b> </br>
+        <code>{{page.repoCommitHash2}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Ownership Commit Hash (Final):</b> </br>
+        <code>{{page.repoCommitHashFinal2}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b> </br>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b> </br>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+      
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      The changes audited rely on the following assumptions specifically.
+      
+      ### Cosigning
+
+      The CoSigning key set in the Infinex Config Beacon acts as a trusted entity that generates specific user signatures used as a double verification along with a valid sudo key's signature. 
+      This entity can not interact with any user account unless a valid Sudo key signs the specific withdraw or transfer request.
+      
+      ## Change summary
+      **Recovery Module**
+      - `modifyFundsRecoveryAddress()` - allows the recovery address to be updated.
+
+      **Withdraw Module**
+      - `recoverERC721ABatch()` - recovers multiple ERC721As to the recovery address.
+      - `recoverNonStandardNFT()` - recovers non-standard NFTs to the recovery address.
+
+      **Transfer Module**
+      - `transferEther()` - transfers Ether to a destination address with platform co-signing.
+      - `transferERC20()` - transfers ERC20 tokens to a destination address with platform co-signing.
+      - `transferERC721()` - transfers ERC721 tokens to a destination address with platform co-signing.
+      - `transferERC721ABatch()` - transfers multiple ERC721A tokens to a destination address with platform co-signing.
+      - `transferERC1155()` - transfers ERC1155 tokens to a destination address with platform co-signing.
+      - `transferERC1155Batch()` - transfers multiple ERC1155 tokens to a destination address with platform co-signing.
+      - `transferNonStandardToken()` - transfers non-standard tokens (e.g. Cryptopunks, Etherrocks) to a destination address with platform co-signing.
+
+      **Infinex Protocol Config Beacon**
+      - `setPlatformKey()` - sets the platform key used for co-signing transfers.
+
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts:</br>
+    </p>
+
+    <template type="file-hashes">
+      248198167e03918429fc72254fa229238903cc97d83695fb0cd07b7a8ad94514  ./src/accounts/modules/AccountUtilsModule.sol
+      9dcb821d7f898779474770af98f5a6bbd9de31f9a6610f70355e128fa38029e8  ./src/accounts/modules/AppModule.sol
+      1e42e73a9ffd4515bd49e97be7beaab1748045bf75ac874596fa7db411c7c9fb  ./src/accounts/modules/BaseModule.sol
+      334f4582588276809d3968ebd13d78b31c8f03f9b2ebfdd2720245cdcec124ad  ./src/accounts/modules/BridgingModule.sol
+      5f1143b88bd3b58d00767ed94bbfdd0f25a391913b63063b1e993982bd139481  ./src/accounts/modules/RecoveryModule.sol
+      f73960c555e82392ea0faef01bafc56525b23e128cdc69308965ba5c39210beb  ./src/accounts/modules/TransferModule.sol
+      999e0d7c2bbd3a6de6431c6bcd47158eb73eaf3d0b3b01aada10ce8f16c1e2ee  ./src/accounts/modules/WithdrawModule.sol
+      246704d480ac812c1d729dc68345dc415d80bc36e8572cbded606fe28324c21a  ./src/accounts/storage/Account.sol
+      b2373c34fd674b0f31d0e509c1b5765a6f662adafd9f0407ad0ed86d26fad8df  ./src/accounts/storage/App.sol
+      cc8f253b656a46d605b53e1e19664448d4560d412032913383641d7861abe188  ./src/accounts/storage/Bridge.sol
+      1308eb688d37bfee83e8a4d6e5e10f607f1eb315613dec5db18b71f2e2982946  ./src/accounts/storage/Cosigning.sol
+      4823614863254c55d2fc7e63b9887686cca6ac8fc14c7ac8a32aaca7e264d1ab  ./src/accounts/storage/EIP712.sol
+      40dbef83e013a53d3e4948e486ccc18d03b21bb83a55737558a4692d11906176  ./src/accounts/storage/Recovery.sol
+      b4177aa5ae5d56cac6c05bbbfea50211b6acc2c95325c235cb18e90cdbfe30fb  ./src/accounts/storage/SecurityKeys.sol
+      4ebd51230bf0a903b7dfb8fedd840f32b73693c3a83ea09908ca45203a29546e  ./src/accounts/storage/Withdrawal.sol
+      e6f4420118e4b841d54a2e31f65af8905c86f01068bba4270efdca2f867c0e98  ./src/accounts/utils/AccountConstants.sol
+      47f7d9e0aef9cb95b439fdff5d01c232528650d5f62d29c86f4fcb67135f8c42  ./src/accounts/utils/RequestTypes.sol
+      7c5a6dde338befc3983cf13fecf088e24347f05f431602ca7e3f08cf91c03305  ./src/accounts/utils/SecurityModifiers.sol
+      f5a3c07dde9a117ee23c5fc129e81f3a591ce934f29854e7c639202eae5e81f0  ./src/accounts/utils/SecurityUtils.sol
+      89ae343855cf4a6803c23866baf14281e033d62548f586a8e150ed84c474be84  ./src/accounts/utils/WithdrawUtil.sol
+      291dc938d5ed96eaa67f6e0a837747e9a2b81d189e683fe8bc50b8b4a6ee3b83  ./src/ownership/IOwnable.sol
+      3ae255c26267ae1fd5e1eb1354c2616ace8f006e2dff72eab2165e9fa2603200  ./src/ownership/Ownable.sol
+      2041ccbd33c71a4206585640b797ae0c62a35c70e495ab62660e1d858d502de8  ./src/ownership/OwnableStorage.sol
+    </template>       
+    <p>
+      Note: Currently the referenced repository is private, but there are plans to make it public in the future. 
+    </p>
+  </content-for>
+</page>

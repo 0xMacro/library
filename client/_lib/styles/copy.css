@@ -111,6 +111,11 @@
   @apply pl-4;
 }
 
+.Copy blockquote.Copy ul,
+.Copy blockquote.Copy ol {
+  @apply pl-8;
+}
+
 .Copy p:first-child,
 .Copy ol:first-child,
 .Copy ul:first-child,
