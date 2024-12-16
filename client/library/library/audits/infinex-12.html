@@ -1,0 +1,58 @@
+<page
+  clientName="Infinex"
+  reportDate="October 17, 2024"
+  auditTitle="Infinex 12"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  repoCommitHash="b012e54c8c10e88eef5c825b36c1ecfd1385c9b0"
+  finalRepoCommitHash="c279c612e963e84f7cb1d77f6502f4cbc9474b1e"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from October 14th to October 15th, 2024.
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Initial):</b> </br>
+      <code>{{page.repoCommitHash}}</code>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Final):</b> </br>
+      <code>{{page.finalRepoCommitHash}}</code>
+    </li>
+  </ul>
+</content-for>
+
+
+
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+  </ul>
+
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    6ae1540f79c9ba4aa64e7fe2e37f60e57f832a8f9824b1e53e812c1934ded12f  src/patron/IPatronVesting.sol
+    514742d99e8d2950a1af902f34ee25036ff5aa31d581e5deef4698b0f4b21eb8  src/patron/PatronVesting.sol
+    f81397e98ccf40fd71a86397cb25a80e16c429fa723e7b274ea9fc79f4d6a29c  src/patron/PatronVestingStorage.sol
+  </template>
+</content-for>
+
+</page>
