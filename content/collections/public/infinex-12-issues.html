@@ -1,0 +1,141 @@
+<item>
+    <field name="topic">Replay signature</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">229e3943c71a8eaf115e908006f815cb592274ae</field>
+    <field name="content">
+      ## [L-1] Too broad hash structure for signatures can lead to replay signature attacks when more contracts support the EIP1271 standard with Infinex accounts
+
+      The `PatronVesting` contract allows claiming reward tokens to an Infinex account with the account’s sudo signature, using either the `claimWithERC1271()` function or the `claimWithERC1271ToAllowlistedAddress()` function with an EIP1271 signature. In the `claimWithERC1271()` function, the hash structure is the combination of `_tierId` with `uint8` type, `_recipient` with `address` type, and `_amount` with `uint256` type:
+  
+      ```solidity
+      bytes32 requestHash = keccak256(abi.encodePacked(_tierId, _recipient, _amount));
+      ```
+  
+      **Reference:** [PatronVesting.sol#L239](https://github.com/infinex-xyz/infinex-contracts/blob/2c008e29f664b7738c1c15398f30b89f95f9d717/src/patron/PatronVesting.sol#L239)
+  
+      In `claimWithERC1271ToAllowlistedAddress()` function, the hash structure is the combination of `_tierId` with `uint8` type, `_recipient` with `address` type, `_destination` with `address` type, and `_amount` with `uint256` type:
+  
+      ```solidity
+      bytes32 requestHash = keccak256(abi.encodePacked(_tierId, _recipient, _destination, _amount));
+      ```
+  
+      **Reference:** [PatronVesting.sol#L263](https://github.com/infinex-xyz/infinex-contracts/blob/2c008e29f664b7738c1c15398f30b89f95f9d717/src/patron/PatronVesting.sol#L263)
+  
+      The hash structures of these 2 functions are relatively simple. In the future, when more contracts allow the EIP1271 standard for Infinex accounts, it could lead to a single signature being a valid input for different functions from different contracts, potentially leading to unpredictable behavior.
+  
+      **Remediations to Consider**
+  
+      Consider including the `PatronVesting` address and corresponding function selector in the hashing structure of the signature
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Replay signature</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">229e3943c71a8eaf115e908006f815cb592274ae</field>
+    <field name="content">
+      ## [L-2] The signatures for `claimWithERC1271()` function or the `claimWithERC1271ToAllowlistedAddress()` function can be called multiple times
+  
+
+      The `PatronVesting` contract allows claiming NFTs to an Infinex account with the account’s sudo signature, using either the `claimWithERC1271()` function or the `claimWithERC1271ToAllowlistedAddress()` function with an EIP1271 signature. These functions don’t have any mechanism to prevent the same signature from being reused. Even though the NFTs will be sent to the correct account, it is still a potential griefing vector and we recommend preventing signatures from being replay.
+  
+      **Remediations to Consider**
+  
+      Consider including a nonce mechanism in the hashing structure of the signature
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Missing validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/infinex-xyz/infinex-contracts/pull/318/commits/56af8f10ba586e566829397afd7793f9696209fa,https://github.com/infinex-xyz/infinex-contracts/pull/318/commits/86b89521cb4bcd66a77f4d6000b071930773ca46</field>    <field name="content">
+      ## [L-3] Missing validation for `_startTime` input in `setTierStartTime()` function
+  
+
+
+  
+      In the `PatronVesting.setTierStartTime()` function, the `_startTime` input lacks validation to check whether the value is too small. If an unintentionally small value is provided by the contract owner, the NFT can be claimed immediately. 
+  
+      **Remediation to Consider**
+  
+      Consider adding a lower bound value to the `setTierStartTime()` function
+      ```diff
+      - if (_startTime == 0 || _startTime < PatronVestingStorage._deploymentTime())
+      + if (_startTime < PatronVestingStorage._deploymentTime())
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Missing validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">af8120b35a217c364826b73b7f148129240e53e6</field>
+    <field name="content">
+      ## [L-4] No check whether `_tierId` is valid in `setTierStartTime()` function
+  
+      In the `PatronVesting.setTierStartTime()` function, the `_tierId` input is not checked to verify if the tier already exists. This allows the owner to set `startDate` without adding the actual tier. As a result, a new tier is created with unchangeable zero values for `lockupDuration`, `releaseDuration`, `tierType`, and `tierOwner`. Furthermore, if vesting entries would be added to this new tier, recipients could claim them immediately. 
+  
+      **Remediation to Consider**
+      Consider disallowing non-existent tiers when calling the `setTierStartTime()` function.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Inheritance</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">118e5d568c2cafb18217c7b8dc6e3ea91b708b55</field>
+    <field name="content">
+      ## [Q-1] Missing `addTrustedForwarder()` and `removeTrustedForwarder()` functions
+  
+      The `PatronVesting` contract can only add a trusted forwarder via the `initialize()` function, which is not expected. Consider overriding `addTrustedForwarder()` and `removeTrustedForwarder()` functions from `ERC2771BaseUpgradeable` contract.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Nitpicks</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/infinex-xyz/infinex-contracts/pull/318/commits/b60895401d524d094bd0919d18531c4e0052d956,https://github.com/infinex-xyz/infinex-contracts/pull/318/commits/e6483fc79347cc0c04e604ba6ffc0849960a1b30,https://github.com/infinex-xyz/infinex-contracts/pull/318/commits/a386fef37c9f9fabe5804afc063f9f6da01bf042</field>
+    <field name="content">
+      ## [Q-2] Nitpicks
+
+      1. In the `addVestingEntry()` function, the `VestingEntryAdded` event doesn’t need to include `_ERC2771MsgSender`, as it will always be the distributor contract.
+  
+      2. The `onlyDistributor` modifier can use `msg.sender` directly instead of `_ERC2771MsgSender()`, since it is only used by the distributor contract.
+  
+      3. The `onlyDistributor` modifier passes a parameter `_tierId`, which is not used.
+  
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Bitmap</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">19a0c35aae9cac5646000914f3d2c19e6981e8a4</field>
+    <field name="content">
+      ## [G-1] Use bitmap for nonce for better gas optimization
+  
+
+      PatronVesting uses nonces to track claimed NFTs. Those nonces are stored in a `mapping(uint256 => bool)` which uses an entire storage slot per nonce used. Instead, if a bitmap would be used, a single storage slot can hold up to 256 nonces, significantly reducing the gas costs (3k gas instead of 20k) after the first one written to the slot.
+  
+      **Remediation to Consider**
+  
+      Consider using a bitmap to track used nonces. A good reference implementation can be found [here](https://github.com/dragonfly-xyz/useful-solidity-patterns/tree/main/patterns/bitmap-nonces).
+    </field>
+  </item>
+  

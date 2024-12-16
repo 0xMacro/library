@@ -16,7 +16,9 @@
 {{var contracts = page.contracts}}
 
   <div class="fixed print:static z-20 top-0 right-0 left-0 bg-gray-100 dark:bg-gray-900 print:bg-transparent">
-    <include src="./library/_sticky-cta.html" />
+    <if cond="!page.passwordEncrypt">
+      <include src="./library/_sticky-cta.html" />
+    </if>
     <div class="py-5 print:px-5 px-4 sm:px-12 lg:px-0 mx-auto max-w-3xl flex">
     <a href="https://0xmacro.com">
       <img class="h-6 dark:hidden" src="/library/logotype-t.svg" />
