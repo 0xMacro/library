@@ -1,0 +1,243 @@
+<item>
+    <field name="topic">Specification</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/superstateinc/onchain-redemptions/commit/28d2d1e70efc4bfdf157f4a692d56f7129303ee8</field>
+
+    <field name="content">
+      ## [M-1] Oracle stops functioning when `navs` gets smaller
+
+  
+      In the `SuperstateOracle`, the `calculateRealtimeNavs()` function determines the correct oracle price at a particular time based on linear extrapolation of prices from the last two effective checkpoints.
+  
+      ```solidity
+      function calculateRealtimeNavs(
+          uint128 targetTimestamp,
+          uint128 earlierCheckpointNavs,
+          uint128 earlierCheckpointTimestamp,
+          uint128 laterCheckpointNavs,
+          uint128 laterCheckpointTimestamp
+      ) public pure returns (uint128 answer) {
+          answer = laterCheckpointNavs
+              + ((laterCheckpointNavs - earlierCheckpointNavs) * (targetTimestamp - laterCheckpointTimestamp))
+                  / (laterCheckpointTimestamp - earlierCheckpointTimestamp);
+      }
+      ```
+  
+      However, implementation incorrectly assumes that the later checkpoint **will always have** a `navs` value higher than the earlier checkpoint. While this would be the case in most situations, there is a non-zero probability that `navs` may be reduced. In this scenario, the price oracle will stop functioning as `calculateRealtimeNavs()` would revert due to an underflow error.
+  
+      **Remediations to consider**
+  
+      - Update `calculateRealtimeNavs()` implementation to properly handle case when `navs` is reduced.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Specification</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/superstateinc/liquidation-contracts/commit/05a0fa05ae95edf820e6ea1a95f6b852c634a4bf</field>
+
+    <field name="content">
+      ## [M-2] Use SafeERC20.forceApprove() in liquidate()
+
+  
+      In the `MorphoLiquidationV1` contract, the `liquidate()` function includes approving the max amount of `loanToken` to the `morpho` contract for performing the corresponding liquidation. The regular `approve()` method is used in the implementation, which is adequate for most ERC20 implementations.
+  
+      ```solidity
+      uint256 balanceLoanToken = IERC20(marketParams.loanToken).balanceOf({account: address(this)});
+      if (balanceLoanToken == 0) revert InsufficientLoanTokenBalance();
+      IERC20(marketParams.loanToken).approve({spender: address(morpho), value: type(uint256).max});
+      ```
+  
+      However, `USDT`, a popular stablecoin ERC20, will revert the `approve()` if the spender's previous approved balance is non-zero. See the snippet below ([source](https://etherscan.io/token/0xdac17f958d2ee523a2206206994597c13d831ec7#code)).
+  
+      ```solidity
+      /**
+      * @dev Approve the passed address to spend the specified amount of tokens on behalf of msg.sender.
+      * @param _spender The address which will spend the funds.
+      * @param _value The amount of tokens to be spent.
+      */
+      function approve(address _spender, uint _value) public onlyPayloadSize(2 * 32) {
+  
+          // To change the approve amount you first have to reduce the addresses`
+          //  allowance to zero by calling `approve(_spender, 0)` if it is not
+          //  already 0 to mitigate the race condition described here:
+          //  https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+          require(!((_value != 0) && (allowed[msg.sender][_spender] != 0)));
+  
+          allowed[msg.sender][_spender] = _value;
+          Approval(msg.sender, _spender, _value);
+      }
+      ```
+  
+      As a result, the above implementation would not be appropriate for `USDT` when it is being used as a `loanToken` or for any other token that follows a similar implementation approach.
+  
+      **Remediations to consider**
+  
+      - Replace `approve()` with `forceApprove()` from the `SafeERC20` lib, which correctly handles this edge case.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Specification</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [M-3] Deploy scripts have incorrect caller
+  
+      In the `DeployAndUpgradeUstbScriptV2` and `DeployAndUpgradeUsccScriptV2` upgrade scripts, the upgrade procedure involves calling methods on other contracts that contain authorization checks.
+  
+      In the current implementation, the implicit assumption is that the deployer (executor of deploy scripts) is the same as an authorized party in called contracts, such as admin/owner in USTB and USCC contracts.
+  
+      However, this is not the case in mainnet contracts, and as a result, scripts are not directly executable.
+  
+      **Remediations to consider**
+  
+      - Update upgrade scripts to execute upgrade operations with proper permissions, or
+      - Use alternative methods based on the current infrastructure for managing authorizations.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Specification</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/superstateinc/onchain-redemptions/commit/323b2f6ec1c0eaff5e58f2864026bb110babdb79</field>
+
+    <field name="content">
+      ## [L-1] Missing validation for `navs` value change
+  
+      In the `SuperstateOracle`, `_addCheckpoint()` function contains multiple input validation constraints that enforce proper values set. One of these validates that the new `navs` value is never smaller than the `MINIMUM_ACCEPTABLE_PRICE`.
+  
+      However, there is no corresponding validation that enforces that the provided `navs` value is not unexpectedly large, which would impact all downstream systems using this oracle.
+  
+      **Remediations to consider**
+  
+      - Add validation for provided `navs` to never have a balance change greater than `MAX_NAVS_CHANGE`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Specification</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/superstateinc/liquidation-contracts/commit/05a0fa05ae95edf820e6ea1a95f6b852c634a4bf</field>
+    <field name="content">
+      ## [L-2] Reset loanToken approval after `liquidate()`
+
+  
+      In the `MorphoLiquidationV1` contract, the `liquidate()` function includes approving the max amount of `loanToken` to the `morpho` contract for performing the corresponding liquidation. When `liquidate()` is successfully processed, the `morpho` contract will still be authorized to spend almost the whole `MorphoLiquidationV1`'s loanToken balance.
+  
+      In case of an unexpected `morpho` contract compromise, this would put at risk all `loanToken` balances of the `MorphoLiquidationV1` contract.
+  
+      **Remediations to consider**
+  
+      - Reset `morpho` approval to 0 for `loanToken` after liquidation is performed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/superstateinc/ustb/pull/62/commits/92f3d6dda84414356550a8056ce10a4ee18a8763</field>
+    <field name="content">
+      ## [Q-1] The `tokenProxy` variable in the deploy scripts is unnecessary
+  
+  
+      In the `DeployAndUpgradeUsccScriptV2` and `DeployAndUpgradeUstbScriptV2` contracts, there’s a `tokenProxy` variable declared with the `TransparentUpgradeableProxy` type, which is later used by being wrapped in the `address` type. This is identical to the declared `tokenProxyAddress` variable. Consider removing the `tokenProxy` variable in the deploy script contracts
+  
+      ```diff
+                  ...		
+      -   TransparentUpgradeableProxy tokenProxy = TransparentUpgradeableProxy(tokenProxyAddress);
+  
+          vm.startBroadcast(deployer);
+  
+          // 1
+          USCC tokenV2Implementation = new USCC(admin, wrappedPerms);
+  
+          // 2
+          tokenProxyAdmin.upgrade(ITransparentUpgradeableProxy(tokenProxyAddress), address(tokenV2Implementation));
+  
+          // 3
+      -   USCC tokenV2 = USCC(address(tokenProxy));
+      +   USCC tokenV2 = USCC(tokenProxyAddress);
+  
+              ...
+      }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/superstateinc/ustb/pull/62/commits/257b62821d16201c9bf6f4c0a0088f9ad3c7f91d</field>
+    <field name="content">
+      ## [Q-2] Public function `initializeV2()` not present in ISuperstateToken
+
+  
+      In the `SuperstateToken` contract, with the recent changes, the `initializeV2()` public function has been introduced. However, diverging from the established practice this method does not have its declaration present in `ISuperstateToken` interface.
+  
+      Consider updating `ISuperstateToken` to include `initializeV2()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/superstateinc/ustb/pull/62/commits/456c47af14998abd718c2039fb1d49de12bf4435</field>
+    <field name="content">
+      ## [Q-3] OwnableUpgradeable contains extra functionality
+
+  
+      The `SuperstateToken` inherits from `OwnableUpgredeable`. As a result, it contains the unnecessary functionality of `renounceOwnership()`.
+  
+      Consider overriding it and reverting whenever it is called so it is clear that it is not supported.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-4] Unnecessary constant in SuperstateOracle
+  
+      In the `SuperstateOracle`, the `USTB_TOKEN_PROXY_ADDRESS` immutable variable is set and never used.
+  
+      Consider removing it unless it is necessary.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/superstateinc/liquidation-contracts/commit/05a0fa05ae95edf820e6ea1a95f6b852c634a4bf</field>
+    <field name="content">
+      ## [Q-5] MorphoLiquidationV1.liquidate() natspec is incorrect
+
+  
+      In the `MorphoLiquidationV1` contract, the natspec documentation for `liquidate()` is incorrect.
+  
+      1. It is missing `param` description for the `morphoMarketId` argument
+      2. It contains a `dev` comment, which does not apply to this implementation since it doesn't use the callback feature.
+      
+          ```solidity
+          @dev The function uses callbacks, so the sender doesn't need to hold tokens to perform this operation
+          ```
+      
+  
+      Consider updating natspec documentation for `liquidate()` to describe the current implementation properly.
+    </field>
+  </item>
+  

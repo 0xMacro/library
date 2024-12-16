@@ -1,0 +1,152 @@
+<item>
+  <field name="topic">Accounting</field>
+  <field name="impact">critical</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">b5ec5c30ed5de1eba63409989179e270399aa2e8</field>
+  <field name="content">
+    ## [C-1] Can drain all credited SUSD balance in engine
+
+    Credit is a balance of `SUSD` that can be used to cover conditional order execution fees. Credit can be added to an accountId by calling either [`creditAccount()`](https://github.com/Kwenta/smart-margin-v3/blob/eb3f357fd88fb3e33124772deb5306083a71c77c/src/Engine.sol#L551-L563) or the new [`creditAccountZap()`](https://github.com/Kwenta/smart-margin-v3/blob/eb3f357fd88fb3e33124772deb5306083a71c77c/src/Engine.sol#L565-L599) function. These end of transferring `SUSD` to the engine and credit the account id for that amount. If multiple accounts have credit, the engine’s `SUSD` balance should be the sum of the total credit (unless tokens are directly sent in).
+
+    This credit is used when executing conditional orders in order to pay the executor, by debiting the fee from their set credit via [`_debit()`](https://github.com/Kwenta/smart-margin-v3/blob/eb3f357fd88fb3e33124772deb5306083a71c77c/src/Engine.sol#L650-L660):
+
+    ```solidity
+    /// @dev impose a fee for executing the conditional order
+    /// @dev the fee is denoted in $sUSD and is
+    /// paid to the caller (conditional order executor)
+    /// @dev the fee does not exceed the max fee set by
+    /// the conditional order and
+    /// this is enforced by the `canExecute` function
+    if (_fee > 0) _debit(msg.sender, _co.orderDetails.accountId, _fee);
+    ```
+    Reference: [Engine.sol#L690-L696](https://github.com/Kwenta/smart-margin-v3/blob/eb3f357fd88fb3e33124772deb5306083a71c77c/src/Engine.sol#L690-L696)
+
+    If there was a way for `credit` to be increased by more than what is deposited into the engine contract, then via this fee mechanism the `SUSD` can be drained from the contract.
+
+    The new `creditAccountZap()` function allows for this to happen, as the amount credited isn’t set to the amount transferred in, but rather sets it to the entire balance of `SUSD` in the contract:
+
+    ```solidity
+      /// @inheritdoc IEngine
+      function creditAccountZap(
+          uint128 _accountId,
+          uint256 _amount,
+          IERC20 _collateral,
+          uint128 _marketId,
+          uint256 _tolerableWrapAmount,
+          uint256 _tolerableSwapAmount
+      ) external payable override {
+          Zap.ZapData memory zapData = Zap.ZapData({
+              spotMarket: SPOT_MARKET_PROXY,
+              collateral: _collateral,
+              marketId: _marketId,
+              amount: _amount,
+              tolerance: Zap.Tolerance({
+                  tolerableWrapAmount: _tolerableWrapAmount,
+                  tolerableSwapAmount: _tolerableSwapAmount
+              }),
+              direction: Zap.Direction.In,
+              receiver: address(this),
+              referrer: address(0)
+          });
+
+          _collateral.transferFrom(msg.sender, address(this), _amount);
+          _collateral.approve(address(zap), _amount);
+
+          // zap $Collateral -> $sUSD
+          zap.zap(zapData);
+
+    			//@audit: the susdAmount is set as the balance contained in the engine
+    			// and set as the credit for the account, now sum of credit > balance 
+          uint256 susdAmount = SUSD.balanceOf(address(this));
+
+          credit[_accountId] += susdAmount;
+
+          emit Credited(_accountId, susdAmount);
+      }
+    ```
+    Reference: [Engine.sol#L565-L599](https://github.com/Kwenta/smart-margin-v3/blob/eb3f357fd88fb3e33124772deb5306083a71c77c/src/Engine.sol#L565-L599)
+
+    This allows anyone that calls `creditAccountZap()` to receive the entire SUSD balance as credit, then set this credit as a fee for a conditional order execution. This would then drain all USDC from the engine, losing users assets and disrupting conditional order execution.
+
+    Additionally, `credit` can be stolen in the call to [`modifyCollateralZap()`](https://github.com/Kwenta/smart-margin-v3/blob/eb3f357fd88fb3e33124772deb5306083a71c77c/src/Engine.sol#L343-L393) due to a similar issue:
+
+    ```solidity
+    if (_direction == Zap.Direction.In) {
+        _collateral.transferFrom(msg.sender, address(this), _amount);
+        _collateral.approve(address(zap), _amount);
+
+        // zap $Collateral -> $sUSD
+        zap.zap(zapData);
+
+    		//@audit: the susdAmount is set as the balance contained in the engine
+    		// and is then added as collateral for the account id, which can then be stolen
+    		// when collateral is removed
+        uint256 susdAmount = SUSD.balanceOf(address(this));
+
+        SUSD.approve(address(PERPS_MARKET_PROXY), susdAmount);
+
+        PERPS_MARKET_PROXY.modifyCollateral(
+            _accountId, USD_SYNTH_ID, susdAmount.toInt256()
+        );
+    }
+    ```
+    Reference: [Engine.sol#L367-L380](https://github.com/Kwenta/smart-margin-v3/blob/eb3f357fd88fb3e33124772deb5306083a71c77c/src/Engine.sol#L367-L380)
+
+    Here all SUSD held is added to the account’s collateral, which is then able to be withdrawn and stolen when collateral is removed.
+
+    **Remediations to Consider**
+
+    Either:
+
+    - Have `zap.zap()` return the amount received and use that as credit.
+    - Get the balance difference before and after the call to `zap.zap()`.
+
+    This should also be resolved [here](https://github.com/Kwenta/smart-margin-v3/blob/eb3f357fd88fb3e33124772deb5306083a71c77c/src/Engine.sol#L421-L424).
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Authorization</field>
+  <field name="impact">critical</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">545e98f72c52364d2613f9ad3987b253b287bf22</field>
+  <field name="content">
+    ## [C-2] Anyone can drain a users collateral for any Perp position
+
+    Both [`unwindCollateral()`](https://github.com/Kwenta/smart-margin-v3/blob/ecf10bdb1c0bc198cbdf68e6b0cf4285c42539e3/src/Engine.sol#L461-L488) and [`unwindCollateralETH()`](https://github.com/Kwenta/smart-margin-v3/blob/ecf10bdb1c0bc198cbdf68e6b0cf4285c42539e3/src/Engine.sol#L490-L524) unwind a users Synthetix Perp position by using [`Zap`](https://github.com/Kwenta/smart-margin-v3/blob/95737447b67016af94505ac1d2bbe75e452d56c9/src/utils/zap/Zap.sol)'s [`unwind()`](https://github.com/Kwenta/smart-margin-v3/blob/95737447b67016af94505ac1d2bbe75e452d56c9/src/utils/zap/Zap.sol#L303-L352) function. `unwind()` uses an Aave flash loan to receive enough USDC which is used to cover the Perp account’s debt, then the collateral is withdrawn, and sold via swap for USDC to cover the loan, with the remaining collateral being sent to the set `_receiver`.
+
+    However, there are no permission requirements to initiate this process via `unwindCollateralETH()` or `unwindCollateral()` , and the receiver of this accounts collateral is set to `msg.sender`, or ETH is sent to `msg.sender` in the case of `unwindCollateralETH()`. This allows for anyone to unwind and take the collateral of any Perp account that has granted the Engine contract Admin permission, which any account using the Engine would have given.
+
+    An attacker an easily call unwindCollateral() on any account and steal all the accounts collateral minus debt.
+
+    **Remediations to Consider**
+
+    Add a check to ensure the caller is the account owner, or sufficiently permissioned user, for both `unwindCollateral()` and `unwindCollateralETH()` similar to what is done when [withdrawing collateral from an account](https://github.com/Kwenta/smart-margin-v3/blob/ecf10bdb1c0bc198cbdf68e6b0cf4285c42539e3/src/Engine.sol#L441).
+    This ensures that only authorized users can unwind a position and up up with an accounts collateral.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Validation</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">95737447b67016af94505ac1d2bbe75e452d56c9</field>
+  <field name="content">
+    ## [M-1] Collateral isn’t validated to be related to synth in Zap
+
+    `Zap.sol` allows to either sell a token for `SUSD` or by a token with `SUSD` via `SynthetixV3`’s associated spot markets. It does this by either wrapping or unwrapping the token with its synthetic version that the Synthetix spot market interacts with.
+
+    In the case of [_zapOut()](https://github.com/Kwenta/smart-margin-v3/blob/eb3f357fd88fb3e33124772deb5306083a71c77c/src/utils/zap/Zap.sol#L65-L89), `SUSD` is used to buy the synthetic version of the desired token out, which is defined by the `marketId` value, which is then unwrapped, exchanging the purchased synth for its associated collateral token, which then is assumed that the provided `collateral` param is the token received. However, there is no check to ensure that the `collateral` is associated with the synth `marketId` which could lead to issues when they are not related.
+
+    In the case where a user intends to receive a valuable token like `WETH`, but accidentally sets the `collateral` value to something like `SUSD`, then `WETH` will be sent into the contract but it will attempt to send an amount of `SUSD` out, which is valued much less. Typically this transaction would fail since `Zap` wouldn’t have a balance of `SUSD`, but if someone were to front-run this transaction, sending enough `SUSD` into `Zap`, then the transaction would execute. Then the `WETH` now in the `Zap` contract could be taken in a similar method by using a less valuable syth’s market id, and setting the `collateral` to be `WETH`, curating the parameters so the amount swapped equals the `WETH` held.
+
+    **Remediations to Consider**
+
+    Validate that the provided `collateral` is used by the spot market id by calling [getWrapper()](https://github.com/Synthetixio/synthetix-v3/blob/main/markets/spot-market/contracts/modules/WrapperModule.sol#L48-L54) to ensure the tokens received are as expected.
+  </field>
+</item>
