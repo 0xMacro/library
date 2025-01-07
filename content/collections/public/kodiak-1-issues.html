@@ -1,0 +1,219 @@
+<item>
+    <field name="topic">Spec breaking</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">d3a2f8e1d239ee5b9e59f53c0f435aa5003f4ef4</field>
+    <field name="content">
+      ## [M-1] Missing guard in withdrawLockedMultiple() and withdrawLockedAll() functions
+  
+      In the `CommunalFarm` contract, `withdrawLockedMultiple()` and `withdrawLockedAll()` allow a caller to withdraw earned rewards and previously provided stakes. On the other hand, `withdrawLocked()` and `emergencyWithdraw()`, functions with similar capabilities, have an additional guard that checks if `withdrawalsPaused` is not set.
+  
+      Since `withdrawalsPaused` guard in `withdrawLocked()` can be circumvented with calls to `withdrawLockedMultiple()` and `withdrawLockedAll()` its purpose is undermined.
+  
+      **Remediations to Consider**
+  
+      - Add `withdrawalsPaused` guard to `withdrawLockedMultiple()` and `withdrawLockedAll()`, or
+      - Remove `withdrawalsPaused` guard from all functions.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec breaking</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">d3a2f8e1d239ee5b9e59f53c0f435aa5003f4ef4</field>
+    <field name="content">
+      ## [M-2] Incorrect implementation of setStakingTokenCap validation
+  
+      In the `CommunalFarm` contract, input validation references `stakingTokenCap` instead of input argument `_stakingTokenCap`. As a result, if `setStakingTokenCap()` is called with 0 by mistake update will succeed. However, processing any further staking requests or changing `stakingTokenCap` will not be possible anymore.
+  
+      ```solidity
+      function setStakingTokenCap(uint256 _stakingTokenCap) external onlyOwner {
+          require(stakingTokenCap > 0, "Must be greater than 0");
+          stakingTokenCap = _stakingTokenCap;
+          emit StakingTokenCapUpdated(_stakingTokenCap);
+      }
+      ```
+  
+      **Remediations to Consider**
+  
+      - Update input validation to reference function argument `_stakingTokenCap` instead of the current state configuration variable.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec breaking</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [L-1] Multiple locked stakes with the same kek_id
+  
+      In the `CommunalFarm` contract, the `LockedStake` structure contains information about specific locked stake positions. The identifier of a specific position is `kek_id`, which is generated in the following way.
+  
+      ```solidity
+      bytes32 kek_id = keccak256(
+          abi.encodePacked(
+              staker_address,
+              start_timestamp,
+              liquidity,
+              _locked_liquidity[staker_address]
+          )
+      );
+      ```
+  
+      However, with a specific set of actions multiple locked stake positions of the same staker may end up having the same `kek_id` value.
+  
+      Consider scenario:
+  
+      - Staker already has one locked stake position A of size X
+          - at this point `_locked_liquidity[staker_address]` is X which is one of inputs for kek_id in next step
+      - At the time `t` the staker stakes at position B of the same size X
+          - at this point `_locked_liquidity[staker_address]` is 2X
+      - At the same time `t` staker withdraws position A of size X
+          - at this point `_locked_liquidity[staker_address]` is again X
+      - At the time `t`, the staker stakes at position C of the same size X
+          - both positions B and C end up having the same `kek_id`
+  
+      While having multiple staked positions with the same `kek_id` is not in line with the specification, the impact is limited to potential effects on off-chain monitoring and tracking tools, which may not expect that when locked stake position with specific `kek_id` is closed, others with the same `kek_id` may remain active.
+  
+      **Remediations to Consider**
+  
+      - Add validation to prevent creating locked stake positions for the same staker with the same `kek_id`
+    </field>
+    <field name="response">
+        Acceptable risk, since specific scenario is a rare corner case.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">d3a2f8e1d239ee5b9e59f53c0f435aa5003f4ef4</field>
+    <field name="content">
+      ## [L-2] Missing validation for duplicate token reward entries
+  
+      In the `CommunalFarm` contract, reward token configuration can be added on contract deployment and at a later point through `addNewRewardToken()`, which is accessible to the contract owner.
+  
+      However, if the same reward token is added multiple times intentionally or by mistake, it will corrupt related storage variables, and `rewardTokenAddrToIdx[_rewardToken]` will be overwritten. As a result, it would not be possible to update the reward rate for the previous token entry only for the last one.
+  
+      ```solidity
+      function setRewardRate(address reward_token_address, uint256 new_rate, bool sync_too) external onlyTknMgrs(reward_token_address) {
+          rewardRates[rewardTokenAddrToIdx[reward_token_address]] = new_rate;
+  
+          if (sync_too){
+              sync();
+          }
+      }
+      ```
+  
+      **Remediations to Consider**
+  
+      - Add validation to check if the reward token has already been added, both in the constructor and `addNewRewardToken()` function.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use case</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">d3a2f8e1d239ee5b9e59f53c0f435aa5003f4ef4</field>
+    <field name="content">
+      ## [Q-1] Renamed external function
+  
+      In the TokenRewards contract, the `updateDividendsInfo()` function from the original contract was renamed to `updateRewards()`, which may be unexpected for clients who expect the new function to be named `updateRewardsInfo()`.
+  
+      Consider renaming `updateRewards()` to `updateRewardsInfo()`
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use cases</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">d3a2f8e1d239ee5b9e59f53c0f435aa5003f4ef4</field>
+    <field name="content">
+      ## [Q-2] Unnecessary argument in withdrawLockedAll()
+  
+      In the `CommunalFarm` contract, `withdrawLockedAll()` accepts a single argument `user`, whose value must always be equal to the `msg.sender` for successful operation processing.
+  
+      ```solidity
+      function withdrawLockedAll(address user) nonReentrant public {
+          _getReward(msg.sender, msg.sender);
+          LockedStake[] memory locks = lockedStakes[user];
+          for(uint256 i = 0; i < locks.length; i++) {
+              if(locks[i].liquidity > 0 && block.timestamp >= locks[i].ending_timestamp){
+                  _withdrawLocked(msg.sender, msg.sender, locks[i].kek_id, false);
+              }
+          }
+      }
+      ```
+  
+      Consider removing the argument and using `msg.sender` everywhere within the function implementation to make code intention clearer.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use cases</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-3] Unused import and missing inherit
+  
+      In the `pools/v2-core/UniswapV2Pair` contract, `IUniswapV2Pair` import is present. However, the `UniswapV2Pair` contract doesn’t inherit from it, nor is it used anywhere else.
+  
+      Consider using the imported interface or removing the import.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Unnecessary code</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-4] Unnecessary use of SafeMath
+  
+      In contracts `xKDK.sol` and `TokenRewards.sol`, implementation relies on Solidity versions 0.8+ which have built-in overflow checks for Math operations. As a result, SafeMath library usage and corresponding operations from the SafeMath library are unnecessary. However, the current implementation uses it, which increases gas costs for regular operations.
+  
+      Consider removing the SafeMath library and updating implementation to rely on standard Math operations with built-in overflow/underflow checks.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">d3a2f8e1d239ee5b9e59f53c0f435aa5003f4ef4</field>
+    <field name="content">
+      ## [Q-5] Incorrect Natspec comments
+  
+      1. Incorrect inline comment in CommunalFarm.sol
+  
+      ```solidity
+      uint256 public lock_time_min = 0; // 1 * 86400  (1 day)
+      ```
+  
+      1. Incorrect renaming updates in TokenRewards.sol.
+          - `IxKDKTokenUsage` strings in natspec comments should be replaced with the correct interface name `IXKdkTokenUsage` (2x instances in natspec comments)
+      2. Potentially incorrect string in KodiakFactoryV1.
+          - In the `_preDeploy()` function, the string used to initialize the LP token name of a new Vault is `Kodiak Island V1`
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use cases</field>
+    <field name="content">
+      ## [I-1] Ownable contains extra functionality
+
+      In the CommunalFarm contract, `owned.sol` was replaced with `Ownable` openzeppelin library implementation.
+  
+      An ownable library adds extra functionality for renouncing ownership, which may or may not be desired depending on the expected use cases.
+  
+      Consider adding renounceOwnership override with revert if called, in case this functionality is not meant to be supported.
+    </field>
+  </item>
+  
