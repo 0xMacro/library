@@ -1,0 +1,19 @@
+<item>
+    <field name="topic">Verification</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ee3fbf81ccee61429784c186ce09768a1ea1cd20</field>
+   
+    <field name="content">
+      ## [M-1] `scriptPubkey` not validated allowing funds to be sent sent to any address
+  
+      `LombardBTCMinterDecoderAndSanitizer.sol`’s `[redeem()](https://github.com/Se7en-Seas/boring-vault/blob/c94d843a6e5d11b91f73f8e27c6b856d52ba8003/src/base/DecodersAndSanitizers/Protocols/LombardBtcMinterDecoderAndSanitizer.sol#L19-L22)` is intended to pull out sensitive values to be validated in the merkle tree to verify if the vault can call [`redeem()`](https://github.com/defidaddydavid/lombard/blob/main/contracts/LBTC/LBTC.sol#L171-L211) on `LBTC`. The input value `scriptPubkey` is intended to be the BTC address that Bitcoin will be sent to in return for burning `LBTC`. Since `LombardBTCMinterDecoderAndSanitizer.sol` does not validate this value, if this function is allowed to be called via a vaults merkle tree, then a malicious strategist could enter a `scriptPubkey` for a address they control allowing LBTC in the vault to be taken.
+      This function is not intended to be setup in any vaults merkle tree’s but should be removed as it is a danger if it ever is added.
+  
+      **Remediations to Consider**
+  
+      Remove [`redeem(`](https://github.com/Se7en-Seas/boring-vault/blob/c94d843a6e5d11b91f73f8e27c6b856d52ba8003/src/base/DecodersAndSanitizers/Protocols/LombardBtcMinterDecoderAndSanitizer.sol#L19-L22)) from `LombardBTCMinterDecoderAndSanitizer.sol`, since it could be used maliciously, additionally remove [`burn()`](https://github.com/Se7en-Seas/boring-vault/blob/c94d843a6e5d11b91f73f8e27c6b856d52ba8003/src/base/DecodersAndSanitizers/Protocols/LombardBtcMinterDecoderAndSanitizer.sol#L24-L27) as there is no reason to allow for burning and could be a griefing vector.
+    </field>
+  </item>
+  

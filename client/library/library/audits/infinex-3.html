@@ -1,0 +1,172 @@
+<page
+  clientName="Infinex"
+  reportDate="May 24, 2024"
+  auditTitle="Infinex A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-io/contracts-governance"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="624a3a74c042b51d95ae451208ef58a383508b15"
+  repoCommitHashFinal="52546188c0a4787ddbfbb950b24f5136eaf4472f"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from April 8 to April 18, 2024. Additionally, smaller changes were reviewed on June 21st, 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+    ### **Entities:**
+    
+    ### Safes:
+
+    The following are multi-sig smart contract wallets with varying councils set that determine it’s owners, and varying thresholds. Each veto signer set is required to sign of each transaction, or it cannot execute.
+    
+    - Deployer Safe:
+        
+        Owner of the IRMigrator, and admin of the Ecosystem and Treasury council. Can set the merkle roots for these contracts that define users voting power.
+        
+        Council signers:
+        
+        - Treasury
+        - Ecosystem
+        - Trader
+        - Operations
+        - Security
+        
+        Total members: 7
+        
+        Threshold: 4
+        
+    - Treasury Safe:
+        
+        Council signers:
+        
+        - Ecosystem
+        - Trader
+        - Operations
+        - Security
+        
+        Veto Signers:
+        
+        - Treasury
+        
+        Total members: 7
+        
+        Threshold: 5
+        
+    - Operation Safe:
+        
+        Can directly determine the signer of the Operation council.
+        
+        Council signers:
+        
+        - Treasury
+        - Ecosystem
+        - Trader
+        - Security
+        
+        Total members: 6
+        
+        Threshold: 4
+        
+    - Security Safe:
+        
+        Can directly determine the signer of the Security council.
+        
+        Council signers:
+        
+        - Treasury
+        - Ecosystem
+        - Trader
+        - Operation
+        
+        Total members: 6
+        
+        Threshold: 4
+        
+    
+    ### Councils:
+    
+    - Treasury:
+        
+        Member is determined via elections where voting power is determined by balance of a Patron NFT on ethereum mainnet.
+        
+        Members: 1
+        
+    - Ecosystem:
+        
+        Members are determined by election where voting power is based on collective snx token holdings across the chains optimism and ethereum.
+        
+        Members: 2
+        
+    - Trader:
+        
+        Members are determined by election where voting power is based on Infinex governance points balance on base.
+        
+        Members: 2
+        
+    - Operations:
+        
+        Member is determined directly from the Operations safe.
+        Members: 1
+        
+    - Security:
+        
+        Member is determined directly from the Security safe.
+        Members: 1
+        
+    
+    ### IRMigrator:
+    
+    Contract with the ability to change the councils of each safe wallet, and change the members of each council. Intended to be used to allow adjusting aspects of governance if required. Controlled by the deployment safe.
+    
+    ### **Assumptions:**
+
+    - It is assumed that elected members will act in the best interest of the Infinex ecosystem.
+
+    
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+      
+    <p>
+        Note: Currently the referenced repository is private, but there are plans to make it public in the future. 
+    </p>
+
+    <template type="file-hashes">
+        60c948e36d2927489316b7d174edfc077fea5934007a9f1dfb58598b2d24127d  src/direct-council/SingleCouncillorNft.sol
+        528c9bb72914e65644138a0b945a794a3836ef6854c38ada68bd4d32175f4d26  src/direct-council/modules/DirectElectionModule.sol
+        e696cf54e719686f12e677a49ab43e4c8bc8614aa716d82592c47343e27063bc  src/direct-council/storage/DirectElectionStorage.sol
+        16d3a3a09685997934fd2b750be29a5f269db71b1a433e135bdeced7d0fe02ad  src/operations-council/modules/OperationsElectionModule.sol
+        81ab20948a8de1bd2b4b33cd58086ab1903599d7f34a318a7f15e13b13eca00b  src/security-council/modules/SecurityElectionModule.sol
+        ff5d20a40d1e4823dce9e58ae5412349adffa2c8f6bfa3a6b64545b671d20456  src/treasury-council/modules/TreasuryElectionModule.sol
+        2ee0d9c7e2145effd81e2310a806603f1c8c1341ac231b850b4e30c932f1719c  src/ecosystem-council/modules/EcosystemElectionModule.sol
+        08933308a26dc126831340d244186a1b107f137e5165bfa239ddaa31a4a29d51  src/ecosystem-council/modules/ElectionVotesMixing.sol
+        3afe20e77752fd2d9234e7a157afda0b077666ab377d4c87a07695e812dab035  src/ecosystem-council/modules/WormholeDeclareAndCastModule.sol
+        b4645be71448415fb0326ea00821c8e3b5ad696ee7bed9c505b98d7412961263  src/ecosystem-council/storage/WormholeDeclareAndCastStorage.sol
+        bf6a03fda8d600bba2f8a3472b25b5bbc2069562b3dd15c9633dc970cb52900e  src/trader-council/modules/TraderElectionModule.sol
+        7b033debfd518635dafb19feba1db4c3da9db75ed76a4aab1d29e2af9edd4b9e  src/modules/ElectionInspectorModule.sol
+        525774a4f5225c5be1e547ee8dbfb4e75d6ceded2097af3cf8b91cb737e8c695  src/modules/ElectionModule.sol
+        de05d3a906cfbb31f52a23daae37e0746e6fb30995af343c35ef1a4d5fcfee10  src/modules/MigratorModule.sol
+        bdc76223d20d93cd0e925fb28a80526ada9758885c6b0bab3af6a7bf213ae1fe  src/modules/OwnerModule.sol
+        5e0db23c09ba88758b44aa8dc8ac2915e38a03533194e894c157819bcfb167e5  src/modules/RenounceableOwnerModule.sol
+        f7072cc28bb43e998d56cebbbef211bfb0c330dbe2812abe7755a4c0ebd5e4a9  src/governance-points/GovernancePointsAdapter.sol
+        8fcb39f92c80e0ab2e5dfe493a03f9a44cdb6f54db612e48464818b500e850ed  src/ir-migrator/IRMigrator.sol
+        411c20a38ae3e02de375abea4b7b72bf653237d2b6bf3774ebdd96b8bb1b6be9  src/safe-module/BaseSafeModule.sol
+        6ff75ebcd5350fa2aee2df197a68dcc8a6459e3136d7fb5825e746f270ac9bbd  src/safe-module/InfinexSafeModule.sol
+        0833dd9310f4116a88f722c7e7982f89dd7ba3564d69da0365ddb7a3725a5bc4  src/safe-module/ReceiverSafeModule.sol
+        0669bad9176a58227b3215f1d8fa9f7f4ffa868087b0d45d174b75cca4f4f3f2  src/safe-module/SafeModuleRegistration.sol
+        2ca3c4f92ef932af1d9d027dae5e7cd4795f9fbb25e7f4be3ef05135e1c26181  src/storage/AdminStorage.sol
+        df373290e2f0a852addf2a1bbd8fe536fde112279b9faab20871bd3bd8f9a27d  src/storage/MigratorStorage.sol        
+    </template>
+
+  </content-for>
+</page>

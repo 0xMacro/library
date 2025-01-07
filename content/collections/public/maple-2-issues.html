@@ -1,0 +1,78 @@
+<item>
+    <field name="topic">Edge Case</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] Conditional use of user permit signature
+  
+      Contracts `MplUserActions` and `SyrupUserActions` implement an internal `_permit()` function in all `xWithPermit()` functions on both contracts to handle the external `permit()` call only if the current allowance is less than the amount required:
+  
+      ```solidity
+      function _permit(
+        address asset_,
+        uint256 deadline_,
+        uint256 amount_,
+        uint8 v_,
+        bytes32 r_,
+        bytes32 s_
+      ) internal {
+        uint256 allowance_ = IERC20Like(asset_).allowance(
+          msg.sender,
+          address(this)
+        );
+
+        if (allowance_ < amount_) {
+          IERC20Like(asset_).permit(
+            msg.sender,
+            address(this),
+            amount_,
+            deadline_,
+            v_,
+            r_,
+            s_
+          );
+        }
+      }
+      ```
+  
+      **Reference:** [MplUserActions.sol#L127-133](https://github.com/maple-labs/syrup-utils-private/blob/b3d1bc1baebd4597181c626101a8b66dcddadbf7/contracts/MplUserActions.sol#L127-L133)
+  
+      If the allowance covers the amount intended to be transferred, users' valid signatures will not be used, nor will their nonce be set, potentially allowing the same function to be executed twice with the same parameters. Although not likely, if the front end or client mistakenly sends the transaction twice with the same data, this call could succeed with the same passed signature. 
+  
+      Allowance checks could be abstracted from the smart contracts layer, avoiding unnecessary logic execution and signature generation if not required. 
+  
+      **Remediations to Consider:**
+  
+      Consider using `try-catch` with the `permit()` call to prioritize using the user’s signature and nonce and checking the allowance if the request reverts.
+  
+    </field>
+    <field name="response">
+        Acknowledged - We will ensure that the frontend checks the allowance and doesn’t accidentally sent two transactions as the implementation optimises for a denial of service.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1a67384918d63e2f763a3cb087f991acc29918b4</field>
+    <field name="content">
+      ## [Q-1] `asset`, `globals`, and `stakedSyrup` variables can be immutable
+  
+      In `SyrupDrip` contract, the `asset`, `global`, and `stakedSyrup` variables are only set in the contract’s `constructor()` function. Consider declaring these variables as `immutable`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d1955b9a9b36c3362824ac4313ab3d55ae619f93</field>
+    <field name="content">
+      ## [Q-2] No direct retrieval method for `id` status
+  
+      `SyrupDrip` contract sets each specific claim ID in the `bitmap` mapping. However, there are no direct methods to fetch a specific ID’s status. Consider adding an external view function to allow users and integrators to verify the status of specific IDs in the `bitmap` mapping.
+    </field>
+  </item>
+  

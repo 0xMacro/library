@@ -1,0 +1,55 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Nov 8, 2024"
+  auditTitle="Seven Seas A-19"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="b7ad4066a946a5e64285c88617a5de36e5eef436"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team intermittently from Oct 28th to Nov 5th 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+   
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the Hyperlane decoder found in <a href="https://github.com/Se7en-Seas/boring-vault/pull/156">PR 156</a> allowing bridging using Hyperlane.
+    </p>
+
+    <template type="file-hashes">
+      5094116251dd72ad175c2312e476642b1414144990230207bdee0f6b0e41fff6  src/base/DecodersAndSanitizers/Protocols/HyperlaneDecoderAndSanitizer.sol
+    </template>
+    <p>
+      Additionally, the LayerZero teller was audited, allowing bridging boring vault shares to and from chains a vault supports, found in <a href="https://github.com/Se7en-Seas/boring-vault/pull/149">PR 149</a>.
+    </p>
+
+    <template type="file-hashes">
+      3b20acfd24fe496a80d01ef823ed908da257ddfb27381008783ffab694df0e81  src/base/Roles/CrossChain/Bridges/LayerZero/LayerZeroTeller.sol
+      cf7648fb6f6eccf804d386628eeab9aafdc25c0287918850bdc2671229903d18  src/base/Roles/CrossChain/CrossChainTellerWithGenericBridge.sol
+      d7c304296eccd0f73bbd87e31ad8654938e1ec309c86edbe9a17af21a7488f66  src/base/Roles/TellerWithMultiAssetSupport.sol
+
+    </template>
+
+    <p>
+      Additionally, the fixed rate accountant was audited, which allows for shares with a fixed share rate, resulting in positive yield being distributed as shares to holders. Found in <a href="https://github.com/Se7en-Seas/boring-vault/pull/153">PR 153</a>.
+    </p>
+
+    <template type="file-hashes">
+      79645b33990f223022e2bda304c2f801ae210af7ec78a89b83b314bec21b743a  src/base/DecodersAndSanitizers/BaseDecoderAndSanitizer.sol
+      397646055312fc30b389ea0a2c95b24286403db5840c8c4c2bcc8cb9c07cf2d1  src/base/Roles/AccountantWithFixedRate.sol
+      ee0be076b2eec33deb359f34fb79cb0fa2ac2566fc062a1c8a917b394e61bfd7  src/base/Roles/AccountantWithRateProviders.sol
+      f66f00424ae2a0cb1136971e4efe4b08b4235b58972573d2cf7702bb82175ec8  src/base/Roles/ManagerWithMerkleVerification.sol
+
+    </template>
+
+  </content-for>
+</page>

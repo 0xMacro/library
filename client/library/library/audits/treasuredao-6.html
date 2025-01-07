@@ -1,0 +1,59 @@
+<page
+  clientName="Treasure DAO"
+  reportDate="July 15th, 2024"
+  auditTitle="TreasureDAO A-6"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/TreasureProject/magicswapv2-contracts"
+  repoCommitHash="58ab5a8ac2c4cf60239b389c6c2ad3be71984afc"
+  repoCommitHashFinal="58ab5a8ac2c4cf60239b389c6c2ad3be71984afc"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from June 20, 2024 to July 2, 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contract within this repository:</p>
+
+    <template type="file-hashes">
+        7cbc8ea8a1e5edeff14bcd0c73a87fc919234afd9d3b3290aa77d4eb0f0383d8  src/Rewards/StakingContractMainnet.sol
+        2a5de8f6fdc3582740d383f67b27f547281590e9bb04d84da3e4c56a352a964c  src/Rewards/libraries/FullMath.sol
+        3d8d74835f2946f609b3aa929994c1aeab60f3ed2da275a7e24ec96ec5e872d2  src/Rewards/libraries/PackedUint144.sol
+        2ffe8fc7f03054e609cb2620fe627fcbd0468fc11b2a70a7a04757cd1351bc53  src/Router/IMagicSwapV2Router.sol
+        e1720511ad0a848ac5f8f39106dc665f0f363d7d2dcd2fee0847259208fef905  src/Router/MagicSwapV2Router.sol
+        b1af37edd188e5f6d6fdd30c5c6b77061e8fa10c0bd8529041943d294f462896  src/UniswapV2/core/UniswapV2ERC20.sol
+        f0718339653d3192e43a6c923545f4af93e93422b171fbcd2609b6f8c8e3fbf8  src/UniswapV2/core/UniswapV2Factory.sol
+        7da07770196c1741e9074d7a898dbea9edd2a656b91929b70bae8585a7fc22f6  src/UniswapV2/core/UniswapV2Pair.sol
+        206e8cbbad806327cf9698144910a0eba142b7c177b080e34ef8260a49cddd4c  src/UniswapV2/core/interfaces/IUniswapV2Callee.sol
+        1ffef2a9d2d1c94d2ecb76941abdf7d99ca4fd254668e9f7363bbf74b4ca0b81  src/UniswapV2/core/interfaces/IUniswapV2ERC20.sol
+        6ca36b936fcbd706407620b0462555e05d0e9d163abdb7bc079a8e48d9a343ff  src/UniswapV2/core/interfaces/IUniswapV2Factory.sol
+        35c9ca4f12241cc79d5bbd203658665c706bdb70f301a951c9c7cc3d4e917f56  src/UniswapV2/core/interfaces/IUniswapV2Pair.sol
+        a407aa6429d6f1e23d4e0551a052b5bd63cae6887724d1d425f54d42928b7b1c  src/UniswapV2/core/libraries/Oracle.sol
+        f4896274d9eec04f4d5bfc90df2cb127fa11b58dea85125f88e5d99b5ff69e5d  src/UniswapV2/core/libraries/SafeMath.sol
+        21c520df313335273cd20721812975a0d3a2684027710fbf09fcaff5d4db6e56  src/UniswapV2/core/libraries/UQ112x112.sol
+        41848de7a9cf0e2d9e29284cb36044749936d85580892b0d1d606f378a2737c8  src/UniswapV2/core/libraries/UniswapV2Math.sol
+        661466a5adb3390a624207654fdb8f5357e5d186179ee0f05a8f122000b4b69f  src/UniswapV2/libraries/Babylonian.sol
+        efd189eea67401b741d9845a5a55ff59e03f2f6f523c089e1758f37a636926fa  src/UniswapV2/libraries/BitMath.sol
+        819ae9982bc0a7b3d9c362bc0f0b119aad243feac805e58ebcb1203123230842  src/UniswapV2/libraries/FullMath.sol
+        96ce38945adb19c77800ae72db0c9dc3e4b3f31b94671258d0ba28096cbfbf8a  src/UniswapV2/libraries/TransferHelper.sol
+        f234f4953d8c5c592ba9c7948fdc5df0e5384547b9b4f1bc963bfb1edfa28a08  src/UniswapV2/periphery/UniswapV2Router02.sol
+        a63503906469cad7fbf111d930e705c0a744775df43557d2ff4d4d2a541a4177  src/UniswapV2/periphery/interfaces/IERC20.sol
+        155f2539137e65a41c5ebebc27514339a2c6c39fce72d32cba4dfd36a7134377  src/UniswapV2/periphery/interfaces/IUniswapV2Router01.sol
+        e8044b905d57a0d9a3c38af15bd85ecd0a03c9d1cd0f8db64619ae45fd6ce489  src/UniswapV2/periphery/interfaces/IWETH.sol
+        0eb43ff4ca68e3834a702bbaf15ff4119957466466bc52d6261cb5dcffaae0b0  src/UniswapV2/periphery/libraries/OracleLibrary.sol
+        da4c0c475ee37f0a1bb9633b2c3d9f44985853fccdc6a025edae33f3cee7bfb6  src/UniswapV2/periphery/libraries/UniswapV2Library.sol
+        8be4c058d3c828a367e5493804b432b7952916283a90cc816a8d78563973a809  src/Vault/INftVault.sol
+        5e1111a1abd38a85cf870b66da66807e90c0ad35d7726a34a1443243e74b0b81  src/Vault/INftVaultFactory.sol
+        12135c3fa19f4be1e9c19d3ad934df04dd91470b7b34443368bf73a2211ac94e  src/Vault/NftVault.sol
+        d5616c18262aeb58710f8e3c75ef437f1f4ff65ac5682dd4512208f752fb50b7  src/Vault/NftVaultFactory.sol
+    </template>
+
+  </content-for>
+</page>

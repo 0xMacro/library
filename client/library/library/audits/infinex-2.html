@@ -1,0 +1,63 @@
+<page
+  clientName="Infinex"
+  reportDate="May 10, 2024"
+  auditTitle="Infinex A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-io/infinex-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="71f267f408eeb50fcca7a182217814a8f02e77dc"
+  repoCommitHashFinal="94e20a411aa2d388cc358b802f60b556fd19d500"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from February 5, 2024 to February 6 2024, and additionally on March 18th 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+    ### **Trusted entities:**
+
+    - StWStakingRewards owner:
+        - Can set the rewards duration, set the rewards to be distributed over that time, as well as set keepers. They are trusted to set these values fairly and only while Infinex accounts cannot withdraw funds.
+    - Keepers:
+        - Set by the staking rewards owner, and can update a users stake for multiple chains. They are trusted to set these values correctly and fairly.
+    - GovernancePoints owner:
+        - Can add and remove authorized minters, as well as upgrade the GovernancePoints contract. They are trusted to only authorize minters that will act in the best interest of the users and protocol, as well also not maliciously upgrade the contract.
+    - Authorized minter:
+        - Allows minting any number of GovernancePoints points to any address. It is trusted that they only mint points as specified by the protocol. The GPStakingRewards contract is one expected Authorized minter, there are also plans for a merkle tree contract to mint points to users based on other metrics.
+    - ERC2771 Trusted Forwarder:
+        - A ERC2771 Trusted Forwarder is set in the constructor of the GPStakingRewards contract. This is trusted to be a address, typically a contact that only makes calls on behalf of an account if there is a valid signature made by that account.
+
+    ### **Assumptions:**
+
+    - There is an assumption that permissioned entities will not act maliciously.
+    - It is assumed that Infinex trading accounts will not be able to withdraw while Governance Points are rewarded from StWStakingRewards.
+
+    
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+      
+    <p>
+        Note: Currently the referenced repository is private, but there are plans to make it public in the future. The contracts reviewed can be viewed
+      <a href="https://usecannon.com/packages/infinex-gp/latest/8453-StW/code/InfinexGovernancePoints?source=src%2Fgovernance%2FGovernancePoints.sol">
+        here, as version 1.0.0 StW
+        </a>, and have been verified on the primary block explorer for each supported chain.
+    </p>
+
+    <template type="file-hashes">
+        89655096dee407ba0cb1786baa0c1d0c8916a323e04e387f662caa4365d8c6a1  src/governance/GovernancePoints.sol
+        605fcbab2006f4f50bfb525abebd08a0110b70d1d2697c93bae08058c506989a  src/governance/GovernancePointsStorage.sol
+        1bec44d3fadc5e25f62795b6f5639be156f9927b8f4753045d4bc356c639b0ee  src/governance/StWStakingRewards.sol
+    </template>
+
+  </content-for>
+</page>

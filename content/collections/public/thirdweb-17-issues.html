@@ -1,0 +1,107 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-1] Compact signatures are not supported
+        
+        **Reference**: [SeaportEIP1271.sol#L21](https://github.com/thirdweb-dev/seaport-eip1271/blob/355fa9f481f0c3ee06f628ba063aa6bccee2aaf0/src/SeaportEIP1271.sol#L21)
+        
+        The `isValidSignature` functions only works with signatures consisting of 65 bytes. However, another form of signatures exists - the so called “compact” signatures - that only consist of 64 bytes (see [ERC-2098](https://eips.ethereum.org/EIPS/eip-2098)). 
+        
+        As a result, the `isValidSignature` functions reverts for both Seaport bulk orders as well as standard signatures when a message has been signed using the compact signature scheme. 
+        
+        **Remediations to Consider**
+        
+        Adapt the logic to support compact signatures.     
+    </field>
+</item>
+
+<item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-2] Signature validation only works with Seaport 1.5
+        
+        **Reference**: [SeaportOrderParser.sol#L74C15-L74C42](https://github.com/thirdweb-dev/seaport-eip1271/blob/355fa9f481f0c3ee06f628ba063aa6bccee2aaf0/src/SeaportOrderParser.sol#L74C15-L74C42)
+        
+        The current validation logic for bulk orders is only compatible with Seaport version 1.5. This is due to the domain separator being built from the version hash derived from the string "1.5":
+        
+        ```jsx
+         // Derive hash of the version string of the contract.
+         versionHash = keccak256(bytes("1.5"));
+        ```
+        
+        Therefore, the current implementation does not support earlier versions or future versions. Although Seaport v1.5 is the latest deployed version, v1.6 was [recently released](https://github.com/ProjectOpenSea/seaport-core/releases/tag/v1.6.6). It is foreseeable that protocols will use version 1.6 or newer versions in the future.
+        
+        **Remediations to Consider**
+        
+        Adapt the logic in `isValidSignature` to accommodate different versions of seaport, as of now version 1.5 and 1.6 might be relevant. The differentiation can be made based on the address of the Seaport contract that calls the `isValidSignature` function.
+        
+        Going forward, whenever a new version of seaport needs to be supported, `ManagedAccountFactory` can be upgraded to support those versions.  
+    </field>
+</item>
+
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-3] Comment the origin of SeaportOrderParser.
+        
+        **Reference**: [SeaportOrderParser.sol](https://github.com/thirdweb-dev/seaport-eip1271/blob/355fa9f481f0c3ee06f628ba063aa6bccee2aaf0/src/SeaportOrderParser.sol)
+        
+        Most of the functions in SeaportOrderParser were copied over from [Seaport’s Core repository](https://github.com/ProjectOpenSea/seaport-core), mainly from [GettersAndDerivers](https://github.com/ProjectOpenSea/seaport-core/blob/main/src/lib/GettersAndDerivers.sol) and [Verifiers](https://github.com/ProjectOpenSea/seaport-core/blob/d4e8c74adc472b311ab64b5c9f9757b5bba57a15/src/lib/Verifiers.sol) contracts. 
+        
+        **Remediations to Consider**
+        
+        Add appropriate comments to the respective functions to make it clear for potential readers (users, devs, auditors) where the code is coming from. 
+    </field>
+</item>
+
+<item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-4]  Use constant instead of literal
+        
+        **Reference**: [SeaportEIP1271.sol#L31](https://github.com/thirdweb-dev/seaport-eip1271/blob/355fa9f481f0c3ee06f628ba063aa6bccee2aaf0/src/SeaportEIP1271.sol#L31)
+        
+        The function `isValidSignature` uses the following `if` statement to differentiate between bulk orders and standard ECDSA signatures:
+        
+        ```jsx
+        if (_signature.length > 65) {
+           ...
+        ```
+        
+        However, instead of the literal `65` the constant `ECDSA_MaxLength` defined in SeaportOrderParser can be used.
+        
+        **Remediations to Consider**
+        
+        To improve readability, it is recommended to use constants instead of literals.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Tests</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-5] Improve testing
+        
+        Reference: [SeaportEIP1271.t.sol](https://github.com/thirdweb-dev/seaport-eip1271/blob/355fa9f481f0c3ee06f628ba063aa6bccee2aaf0/test/SeaportEIP1271.t.sol)
+        
+        Currently, only a minimal test case is included that verifies the successful creation and fulfillment of a simple Seaport bulk order. 
+        
+        **Remediations to Consider**
+        
+        Add additional test cases covering:
+        
+        - fulfilling a single order (instead of bulk orders)
+        - include a offer item in the bulk order
+        - etc.
+    </field>
+</item>
+

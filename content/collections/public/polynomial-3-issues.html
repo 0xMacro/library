@@ -1,0 +1,22 @@
+<item>
+  <field name="topic">Griefing</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## [M-1] `bridgeWithPermit` can be griefed
+
+    In SocketDotTech’s `Controller.sol`, the function [`bridgeWithPermit()`](https://github.com/SocketDotTech/socket-plugs/blob/ebc63def2e4cbf5b62c667691f01324766afd34c/contracts/bridge/Controller.sol#L52-L80) was added, which allows skipping an approval transaction to bridge assets by making use of the tokens [`permit()`](https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol#L116-L160) function. Permit takes a signature, and verifies it and increments the nonce to prevent signature replay attacks, so a signature cannot be used multiple times. Since permit does not care about the caller, and only verifies that the signature matches the inputs of what to approve, anyone can call it provided they have a valid signature. Since the signature may be public when transmitting the `bridgeWithPermit` transaction, someone can directly call permit on the token and front run the call to `bridgeWithPermit`, resulting in the the intended approval being set but the call to `bridgeWithPermit` would fail because the signature would be invalidated as the nonce increased. 
+
+    Although this may not be the biggest deal for an EOA attempting to bridge assets, as they could just directly call [`bridge()`](https://github.com/SocketDotTech/socket-plugs/blob/ebc63def2e4cbf5b62c667691f01324766afd34c/contracts/bridge/Controller.sol#L13-L50) after their transaction fails, however, for a smart contract with logic tied to the expected execution of [`bridgeWithPermit()`](https://github.com/SocketDotTech/socket-plugs/blob/ebc63def2e4cbf5b62c667691f01324766afd34c/contracts/bridge/Controller.sol#L52-L80) given a set signature the repercussions could be more severe.
+
+    **Remediations to Consider
+    Either:**
+
+    - Instead of directly calling `permit()`, check if the contract already has the required approval before calling
+    - Use try/catch in the call to `permit()`, which ensures the signature’s nonce is consumed even if appropriate approvals have been given.
+  </field>
+  <field name="response">
+    We don't think any changes are required. If a DOS happens on bridgeWithPermit() by consuming permit() already, user can be rerouted via bridge() function
+  </field>
+</item>

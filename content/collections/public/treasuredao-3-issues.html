@@ -1,0 +1,856 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">e2c12fcab9efa503d30f6bd9b59d81a50a05a597</field>
+    <field name="content">
+      ## [H-1] Single NFT token per vault will not be retrievable
+  
+      Whenever an NFT token is deposited to Vault, `ONE` amount of ERC20 Vault tokens is minted to the depositor. To be able to utilize corresponding ERC20 Vault tokens, corresponding UniswapV2Pair is created and initialized. With the call to `mint()` function this pair contract is configured with initial liquidity. During initial liquidity provision, `MINIMUM_LIQUIDITY` of LP tokens are permanently locked. Due to this, a small amount of LP tokens and consequently ERC20 Vault tokens will become permanently inaccessible.
+  
+      Due to some amount of ERC20 Vault tokens becoming permanently inaccessible, it will not be possible to withdraw all NFTs from the Vault even in case of obtaining all ERC20 Vault tokens on the market. In other words, one NFT cannot be withdrawn. As a result, some amount of ERC20 Vault tokens (smaller than `ONE`) will be unbacked by the corresponding NFT token. The impact of this issue varies depending on how many NFT tokens a particular Vault is handling. 
+  
+      **Remediations to consider:**
+  
+      - Updating NftVault to support withdrawal of last NFT token in the vault with an approximately close amount to but smaller than the exact amount of ERC20 Vault tokens
+      - Documenting and emphasizing risks of losing access to some of the ERC20 Vault tokens
+    </field>
+    <field name="response">
+        Additional commit [5da6887caf29825d52604ea63606c4faafda1bf1](https://github.com/TreasureProject/magicswapv2-contracts/commit/5da6887caf29825d52604ea63606c4faafda1bf1)
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">addressed</field>
+    <field name="commit">a6c64f73fa1936b671086170293ef94a4cd2d7d0</field>
+    <field name="content">
+      ## [H-2] Token transfer restriction in Soulbound vaults can be bypassed
+  
+      The intention for soulbound vaults is to tokenize items that are not meant for sale.
+  
+      The design of the solution is not to let AMM and its router be the recipient of a soulbound vault tokens’ transfer.
+  
+      The implementation restricts transfer recipients to an EOA / a soulbound vault / an allowed list of contracts.
+  
+      ```
+      // NftVault.sol
+      function _beforeTokenTransfer(
+          address /*from*/,
+          address to,
+          uint256 /*amount*/
+      ) internal view override {
+          /// @dev Soulbound Vault ERC20 token can be transfered to any EOA, this Vault or `allowedContracts`
+          if (
+              isSoulbound               
+              && to != address(this)   
+              && Address.isContract(to)
+              && !allowedContracts[to]
+          ) revert SoulboundTransferDisallowed();
+      }
+      ```
+  
+      However, an attacker can bypass the recipient restriction by using the fact that a contract is deemed to be an EOA before its constructor finishes.
+  
+      ```
+      // Address.sol
+      function isContract(address account) internal view returns (bool) {
+          // This method relies on extcodesize/address.code.length, which returns 0
+          // for contracts in construction, since the code is only stored at the end
+          // of the constructor execution.
+  
+          return account.code.length > 0;
+      }
+      ```
+  
+      Specifically, an attacker trying to bypass the recipient restriction:
+  
+      1. Attacker gathers soulbound vault ERC20 tokens and `vault.approve(predetermined-contract-addr, type(uint256).max)`
+      2. Attacker creates a malicious ERC20 at the predetermined address (CREATE2)
+      3. **In the malicious ERC20’s constructor, it transfers soulbound ERC20 to itself using the allowance, wrapping the vault tokens into the malicious ERC20 tokens**
+      4. This malicious ERC20 can now be traded in any pool
+      5. To mirror the vault ERC20, malicious ERC20 can retrieve the underlying NFT by calling withdrawal on the vault when a malicious token holder burns enough malicious tokens
+  
+      Note that by restricting to EOAs and allow list of contracts, smart contract wallets will need to be approved one by one.
+  
+      **Remediations to consider**
+  
+      - Consider disallowing an arbitrary EOA to be a vault token recipient.
+    </field>
+    <field name="response">
+      Vault was split into permissioned and permissionless. Permissioned vault kept original code and is made out of scope of this audit. Further work will be done in the future to secure permissioned functionality.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">bb74655ff8fac3ce58244466802fa6bb2733e675</field>
+    <field name="content">
+      ## [H-3] Swap fees distribution can be manipulated
+  
+      In the modified `UniswapV2Pair` contract, `_takeFees()` is called within `swap()` function to perform calculation and distribution of protocol and royalty fee to corresponding recipients. The current implementation assumes that only one of the input arguments `amount0In` or `amount1In` is set. It optimistically sets the value of the `amount` (base amount on which fees will be applied) to `amount0In` and overrides it with `amount1In` if this argument is greater than 0. Also, fees will be paid in `token0` unless `amount1In` is set. If `amount1In` is greater than 0, fees will be paid in `token1`.
+  
+      However, the assumption made in the current implementation is incorrect. Any malicious 3rd party may send directly to the contract a minuscule `token1` amount. This will cause swaps from `token0` to `token1` to take a particular execution path in `_takeFees()` that will result in an incorrect calculation and distribution of fees to expected recipients (protocol and royalty fee recipients). Consequently, fees that were appropriately calculated in `swap()` function, but not properly distributed in `_takeFees()`, will accrue in the contract and improve the position of liquidity providers.
+  
+      **Remediations to Consider:**
+  
+      - Charge and distribute fees based on both `amount0In` and `amount1In` if they are set. Note that the trivial solution of generating an error when both of these arguments are set can result in a griefing attack vector.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">9f1289eeacdecc47134bd76b4ef3305373f4289f</field>
+    <field name="content">
+      ## [M-1] Mismatch in inputs size may lead to loss of assets
+
+      In the `MagicSwapV2Router` contract, the `_withdrawVault()` exchanges Vault ERC20 tokens for NFTs in interaction with the underlying Vault. This function transfers `amountToBurn` tokens to the underlying vault. This amount is based on `_amount` input. The NFT tokens to retrieve back are defined by `_collection` and `_tokenId` inputs.
+  
+      ```jsx
+      IERC20(address(_vault)).transferFrom(_from, address(_vault), amountToBurn);
+      amountBurned = _vault.withdrawBatch(_to, _collection, _tokenId, _amount);
+      ```
+  
+      Processing happens in the `withdrawBatch()` function defined in the `NftVault` contract.
+  
+      ```jsx
+      function withdrawBatch(
+          address _to,
+          address[] memory _collection,
+          uint256[] memory _tokenId,
+          uint256[] memory _amount
+      ) external returns (uint256 amountBurned) {
+          for (uint256 i = 0; i < _collection.length; i++) {
+              amountBurned += withdraw(_to, _collection[i], _tokenId[i], _amount[i]);
+          }
+      }
+      ```
+  
+      User may call by accident `withdrawVault()` function with `_collection` input of a smaller length than the `_amount` input. This leads to user ERC20 tokens being transferred to the underlying vault but none (when `_collection` is an empty array) or fewer than the expected number of NFTs (when `_collection` is an array of smaller length than the `_amount`) sent back to the user. Note that `withdrawBatch()` will successfully process empty `_collection` without generating an error even if `_amount` is not empty.
+  
+      **Remediations to Consider:**
+  
+      - Consider adding a check that the size/length of array inputs matches, or
+      - Consider adding an assertion in `_withdrawVault()` function that the amount of tokens transferred to the Vault matches the amount burned `amountToBurn == amountBurned`
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [M-2] Unexpected fee rates are charged when the sum of fee rates exceeds `MAX_FEE`
+  
+      With `UniswapV2Factory`, there are three setters for three fees respectively:
+  
+      1. Royalty fees
+      2. Protocol fees
+      3. LP fees
+  
+      Each setter checks to make sure the fee is set below `MAX_FEE`. However, their sum can be set above `MAX_FEE` deviating from the intention. In this case, in `_getFees()` view function custom logic applies fee caps and prioritizes charging different fee types in a particular order. This can lead to some fees not being applied at all and as a result some participants not receiving their expected revenue share. 
+  
+      **Remediations to consider**
+  
+      Consider having 1 setter for all fees and fee beneficiaries to avoid entering into an invalid state. This 1 setter can be reused to set default fees to shorten code. See `setFees` and `_setFees` in [Proof of Concept - UniswapV2Factory](https://www.notion.so/Proof-of-Concept-UniswapV2Factory-53988210928b42b09b128d0183b9494e).
+    </field>
+    <field name="response">
+      Unexpected fee rates are well documented and only occur when admin sets too high values which should not happen in the first place. It’s much easier to manage the protocol when a single fee can be changed instead of multiple fees and that was the goal.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-3] NFT withdrawal from the NftVault is susceptible to griefing
+  
+      In the `MagicSwapV2Router` many functions rely on underlying `withdrawBatch()` in the `NftVault` contract for withdrawing NFTs stored in the Vault.
+  
+      Some of these functions are `withdrawVault()`, `removeLiquidityNFT()`, `removeLiquidityNFTETH()`, `swapTokensForNft()`, `swapETHForNft()`, `swapNftForNft()`.
+  
+      Each of these functions accepts three array inputs that define the amounts and identities of particular NFTs to withdraw. If the balance for any of these tokens is less than the requested amount, `withdrawBatch()` will revert and the whole transaction will fail.
+  
+      A malicious attacker may intentionally cause a user’s transaction always to fail if he can sandwich that transaction consistently. 
+  
+      The attacker, after observing the user’s transaction in mempool:
+  
+      1. withdraws a specific amount of the particular NFT token from the Vault (1 in the case of ERC721, and more in the case of ERC1155). 
+      2. Then the user’s transaction is executed. This transaction fails due to insufficient balance of a particular NFT token in the Vault. 
+      3. In the last step, the attacker executes a transaction in which he deposits back previously withdrawn NFT tokens to the Vault.
+  
+      **Remediations to consider**
+  
+      - **Consider treating each NFT token stored by NftVault as identical** and return the requested amount without considering the collection and token ids, or
+      - Consider implementing `withdrawBatch()` in a way in which the request can be partially fulfilled. This does not resolve the issue but it increases the complexity for the attacker to perform the attack since it requires him to have access to proportionally more ERC20 Vault tokens, or
+      - Consider allowing the user to indicate if in case of an insufficient balance of requested tokens system can fulfill the request by any other token managed by NftVault.
+    </field>
+    <field name="response">
+      Withdrawal must be processed atomically and the only real solution is for user to use flashbots to avoid mempool if such attack happens.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [M-4] Vault owner can prevent withdrawals in permissioned NftVault
+  
+      In the `NftVaultFactory` anyone can create a permissioned Vault. Permissioned NftVault has different characteristics and an associated risk profile that may not be obvious to end users. For example, both `deposit()` and `withdraw()` are guarded by `onlyAllowed()` modifier that implements access control.
+  
+      ```jsx
+      modifier onlyAllowed() {
+          if (isPermissioned() && !allowedWallets[msg.sender]) {
+              revert NotAllowed();
+          }
+          _;
+      }
+      ```
+  
+      For example, the owner of the permissioned NftVault may allow a particular user to deposit an NFT token. However, it may immediately revoke that user’s privileges so she cannot withdraw NFT if she wants.
+  
+      Also, when a particular user is allowed to deposit NFT in return, it receives ERC20 Vault tokens which she may sell. The buyer of these tokens might not be aware that by default she will not be allowed to use these tokens to withdraw the NFT which is backing them.
+  
+      In some circumstances, this functionality may represent a feature. However, any issue of this type may affect the public image of the whole project.
+  
+      **Remediations to consider**
+  
+      - Consider not restricting withdrawals even for permissioned NFT vaults (remove `onlyAllowed` from `withdraw()`), and
+      - Consider documenting and emphasizing additional risks for users of permissioned vaults, especially for those that issue `Soulbound` ERC20 Vault tokens.
+    </field>
+    <field name="response">
+      Vault was split into permissioned and permissionless. Permissioned vault kept original code and is made out of scope of this audit. Further work will be done in the future to secure permissioned functionality.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Coding Standards</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">addressed</field>
+    <field name="commit">6872d285fb1f8981adbdd43c64df447d8fb999db</field>
+    <field name="content">
+      ## [M-5] Fee on transfer tokens not properly handled
+
+      In `MagicSwapV2Router`, which inherits from `UniswapV2Router02`, some functions are meant to handle fee-on-transfer tokens, such as `swapExactTokensForTokensSupportingFeeOnTransferTokens()`, `swapExactETHForTokensSupportingFeeOnTransferTokens()`, and `swapExactTokensForETHSupportingFeeOnTransferTokens()`.
+  
+      However, the custom implementation in MagicSwapV2Router cannot handle these non-standard types of tokens.
+  
+      **Remediations to consider**
+  
+      - Remove fee-on-transfer token functionality from `UniswapV2Router02`, or
+      - Update custom functionality in `MagicSwapV2Router` to be able to handle this type of token properly
+    </field>
+    <field name="response">
+      Fee-on-transfer and other non-standard token implementations are not meant to be supported. Corresponding functionality removed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">bd85203a707d9a94bb47731febbf50da28a29259</field>
+    <field name="content">
+      ## [M-6] Flash loans/swaps unexpectedly supported by the implementation
+  
+      In `UniswapV2Pair`, `swap()` function follows Uniswap V2 design and supports flash loans/swaps by optimistically transferring the requested amounts of tokens. After performing an external call, it checks to verify that balances are in the proper state. While flash loans/swaps can represent an additional source of revenue, they also enable malicious attackers to amplify deviations and generate more profitable exploits.
+  
+      The current project specification does not include flash loans/swaps as a feature. However, its presence increases the complexity of the implementation and introduces extra risks.
+  
+      **Remediations to consider**
+  
+      - Remove flash loans/swaps support from the codebase
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [M-7] Centralization risks in UniswapV2Factory
+  
+      In `UniswapV2Factory`, the contract owner has admin privileges that allow him to set LP, royalty, and protocol fees, as well as corresponding beneficiaries. As a result, the contract owner can change how much and where is revenue distributed from all of the underlying token pairs.
+  
+      Since these privileged operations represent attractive targets, consider using a more adequate authorization mechanism.
+  
+      **Remediations to consider**
+  
+      - Instead of the contract owner being EOA, use multi-sig, or
+      - Implement governance with a timelock mechanism for performing fee updates
+    </field>
+    <field name="response">
+      Team is going to use a multi-sig wallet for governance.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">b31faa77ea3a652fed4270102e9baad7e25994e9</field>
+    <field name="content">
+      ## [L-1] When `defaultFees` is set it is not possible to reduce `lpFee` or `protocolFee` to 0 for individual pair
+  
+      In the `UniswapV2Factory` contract, to override default fees, it is necessary to call `setProtocolFee()` and `setLpFee()`. To retrieve `lpFee` and `protocolFee` corresponding functions `_getLpFee()` and `_getProtocolFee()` are available.
+  
+      However, due to how these getter functions are implemented, when `defaultFees.lpFee` and `defaultFees.protocolFee` are set and ≠ 0, it is impossible to override them and set these same fees for particular pair to 0.
+  
+      **Remediations to consider**
+  
+      - Add field to Fees struct which would indicate if override is taking place or if `defaultFees` should be used
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">53a1f8f54ce885cae0330170db40edac1d9d7c4e</field>
+    <field name="content">
+      ## [L-2] Missing check that beneficiary is a valid address in `setRoyaltiesFee()`
+  
+      In the `UniswapV2Factory` contract, the owner can set royalty-related information for particular pair by calling the `setRoyaltiesFee()` function. In this function, a guard is preventing `_royaltiesFee` to be set to an invalid value. 
+  
+      ```jsx
+      function setRoyaltiesFee(address _pair, address _beneficiary, uint256 _royaltiesFee)
+          external onlyOwner
+      {
+          require(_royaltiesFee <= MAX_FEE, 'MagicswapV2: _royaltiesFee > MAX_FEE');
+          pairFees[_pair].royaltiesBeneficiary = _beneficiary;
+          pairFees[_pair].royaltiesFee = _royaltiesFee;
+      }
+      ```
+  
+      However, there is no corresponding check for the `royaltiesBeneficiary` state variable which can be set to 0 address accidentally. If this happens, `swap()` functionality in the underlying pair contract will be bricked since each call to `_takeFees()` will revert due to an error raised in the `_safeTransfer()` for transferring royalty amount to an invalid `royaltiesBeneficiary`.
+  
+      **Remediations to consider**
+  
+      - Add address validity check for `_beneficiary` argument in `setRoyaltiesFee()` function
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b31faa77ea3a652fed4270102e9baad7e25994e9</field>
+    <field name="content">
+      ## [L-3] Updates succeed with an invalid pair contract address
+
+      In the following functions in the UniswapV2Factory contract, there are no checks that provided `_pair` is a valid pair contract and one managed by the particular instance of UniswapV2Factory.
+  
+      - `setLpFee()`
+      - `setRoyaltiesFee()`
+      - `setProtocolFee()`
+      - `getFeesAndRecipients()`
+      - `getFees()`
+      - `getTotalFee()`
+  
+      ```jsx
+      function setLpFee(address _pair, uint256 _lpFee) external onlyOwner {
+          require(_lpFee <= MAX_FEE, 'MagicswapV2: _lpFee > MAX_FEE');
+          pairFees[_pair].lpFee = _lpFee;
+      }
+      ```
+  
+      In `setLpFee()` function we can see that `pairFees[_pair].lpFee` will be updated even if `_pair` is not the correct contract address. Moreover, the transaction will be successfully processed without any error being raised. This may lead to confusion in cases when an incorrect `_pair` address is accidentally provided.
+  
+      **Remediations to consider**
+  
+      - Instead of accepting `_pair` address, change function signatures to accept `tokenA` and `tokenB` addresses, perform a lookup of the corresponding `pair` address and revert in case it is not found
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b31faa77ea3a652fed4270102e9baad7e25994e9</field>
+    <field name="content">
+      ## [L-4] Improper storage type for `defaultFees`
+  
+      In the `UniswapV2Factory` contract, the `setDefaultFees()` function is called from the constructor to set the initial values of `protocolFee` and `lpFee`. This function is also callable afterward by the factory owner.
+  
+      ```jsx
+      function setDefaultFees(Fees memory _fees) public onlyOwner {
+          require(_fees.protocolFee <= MAX_FEE, 'MagicswapV2: protocolFee > MAX_FEE');
+          require(_fees.lpFee <= MAX_FEE, 'MagicswapV2: lpFee > MAX_FEE');
+          require(_fees.protocolFee + _fees.lpFee <= MAX_FEE, 'MagicswapV2: protocolFee + lpFee > MAX_FEE');
+          defaultFees = _fees;
+      }
+      ```
+  
+      This function accepts an argument of a `Fees` struct type defined in the `IUniswapV2Factory` contract. Owner may invoke `setDefaultFees()` with `royaltiesBeneficiary` and `royaltiesFee` values set in provided `_fees` argument with intent to update default values for these attributes. 
+  
+      ```jsx
+      struct Fees {
+          address royaltiesBeneficiary;
+          /// @dev in basis point, denominated by 10000
+          uint256 royaltiesFee;
+          /// @dev in basis point, denominated by 10000
+          uint256 protocolFee;
+          /// @dev in basis point, denominated by 10000
+          uint256 lpFee;
+      }
+      ```
+  
+      However, even though `defaultFees` state variable will be updated, confusingly no corresponding system behavior changes will be observed since these two fields of the `defaultFees` variable are not used anywhere.
+  
+      **Remediations to consider**
+  
+      - Instead of `Fees` struct for `defaultFees` define a different struct with `lpFee` and `protocolFee` fields only, or
+      - Use two independent uint256 variables such as `defaultLpFee` and `defaultProtocolFee` instead
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">2d7f00b620fc78c602e24a993d47caeb50e4e543</field>
+    <field name="content">
+      ## [L-5] No event emission for important state updates
+  
+      In the `UniswapV2Factory` contract, the following setters change important state. However, there is no event emission that would enable off-chain tracking and monitoring systems to react to them.
+  
+      - `setLpFee()`
+      - `setRoyaltiesFee()`
+      - `setProtocolFee()`
+      - `setProtocolFeeBeneficiary()`
+      - `setDefaultFees()`
+  
+      **Remediations to consider**
+  
+      - Add event emission for each state change in these functions
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust Model</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [L-6] Vault owner can approve receiving but not withdraw
+  
+      In `NftVault.sol`, the states `allowedWallets` and `allowedContracts`, set by the vault owner to (dis)approve the accounts for withdrawal and receiving vault token, respectively.
+  
+      However, it’s possible the vault owner by mistake approves an account for receiving but not withdrawal so the account cannot redeem NFTs after receiving vault tokens. 
+  
+      This can be a feature in some cases. But this can lead to poor user experience and requires the owner to intervene.
+  
+      **Remediations to consider**
+  
+      - Consider reverting in `allowVaultTokenTransfersTo` when the account is not already approved for deposit/withdrawal.
+    </field>
+    <field name="response">
+      Solved in H-2. Permissions will be removed from the vault and factory making this issue irrelevant.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-7] `MagicSwapV2Router:addLiquidityNFT()` can be denied of service
+  
+      `MagicSwapV2Router:addLiquidityNFT()` allows a liquidity provider to provide NFT-tokenB liquidity. It calls into `UniswapV2Router02:_addLiquidity()`  to get quotes for `amountA` and `amountB`.
+  
+      ```
+      // Inside MagicSwapV2Router:addLiquidityNFT
+  
+      uint256 amountAMinted = _depositVault(_collection, _tokenId, _amount, _tokenA, address(this));
+  
+      (amountA, amountB) = _addLiquidity(
+          address(_tokenA),
+          _tokenB,
+          amountAMinted,         // amountADesired
+          _amountBDesired,       // amountADesired
+          amountAMinted,         // amountAMin
+          _amountBMin            // amountBMin
+      );
+      ```
+  
+      ```
+      // Inside UniswapV2Router02:_addLiquidity
+  
+      // Try fixing amountA to get amountB
+      uint amountBOptimal = UniswapV2Library.quote(amountADesired, reserveA, reserveB);
+      if (amountBOptimal <= amountBDesired) {
+          require(amountBOptimal >= amountBMin, 'UniswapV2Router: INSUFFICIENT_B_AMOUNT');
+          (amountA, amountB) = (amountADesired, amountBOptimal);
+      // Try fixing amountB to get amountA
+      } else {
+          uint amountAOptimal = UniswapV2Library.quote(amountBDesired, reserveB, reserveA);
+          // Importantly, amountA is required to be amountAMin
+          assert(amountAOptimal <= amountADesired);
+          require(amountAOptimal >= amountAMin, 'UniswapV2Router: INSUFFICIENT_A_AMOUNT');
+          (amountA, amountB) = (amountAOptimal, amountBDesired);
+      }
+      ```
+  
+      However, because 1) a griefer can control `reserveA` and `reserveB` and 2) `addLiquidityNFT()` implementation requires `amountA` in liquidity provision be exactly `amountAMinted`, attacker can always make `UniswapV2Router02:_addLiquidity()` revert to make `MagicSwapV2Router:addLiquidityNFT()` unavailable. 
+  
+      Specifically, a griefer can sandwich:
+  
+      - frontrun to swap B in for A to
+          - make `amountBOptimal` higher so the `else` block runs and
+          - `amountAOptimal` lower than `amountAMin`
+      - LP’s `addLiquidityNFT()` reverts
+      - backrun to reverse the swap to recoup the same amount of token B
+  
+      Notice also that likelihood of this issue decreases as AMM fees for swaps increase, since the attacker will need to bear costs of manipulating exchange price twice.
+  
+      **Remediations to consider**
+  
+      - Consider making `_amountBDesired` always be `type(uint).max` to get a quote which gives `amoutADesired` because the intention (in `MagicSwapV2Router:addLiquidityNFT()`) is always to get exactly `amountAMinted`.
+    </field>
+    <field name="response">
+      Issue will be addressed on the frontend with UI setting type(uint).max as _amountBDesired without a contract enforcing that value.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [L-8] Precision loss for TWAP observations
+  
+      In `UniswapV2Pair`, when there is a price change, the implementation records the last price as part of the accumulated prices to deduce TWAP later.
+  
+      However, `lastPrice` has token1’s decimals which can be intolerably low. For example, if token1 has 6 decimals, prices with more than 6 decimals start to lose precision such as 3 / 7 = 0.428571 (repeated). This can undervalue TWAP causing e.g. a lending application to undervalue the NFT collateral of a borrow. 
+  
+      ```
+      // function UniswapV2Pair:_update
+    
+      lastPrice = 10 ** TOKEN0_DECIMALS * _reserve1 / _reserve0;
+      // write an oracle entry
+      (observationIndex, observationCardinality) = observations.write(
+          observationIndex,
+          _blockTimestamp(),
+          lastPrice,
+          observationCardinality,
+          observationCardinalityNext
+      );
+      ```
+  
+      **Remediations to consider**
+  
+      Consider using a scaling factor e.g. 1e18 or 1e27 to ensure there is sufficient precision. Note that the price being scaled should be documented for TWAP users or scale down TWAP in the appropriate methods. 
+  
+       For more info: [https://en.wikipedia.org/wiki/Fixed-point_arithmetic#Division](https://en.wikipedia.org/wiki/Fixed-point_arithmetic#Division)
+  
+      > If the result is not exact, the error introduced by the rounding can be reduced or even eliminated by converting the dividend to a  smaller scaling factor.  For example, if *r* = 1.23 is represented as 123 with scaling 1/100, and *s* = 6.25 is represented as 6250 with scaling 1/1000, then simple division of the integers yields 123÷6250 = 0 (rounded) with scaling factor  (1/100)/(1/1000) = 10.  If *r* is first converted to 1,230,000 with scaling factor 1/1000000, the result will be 1,230,000÷6250 = 197 (rounded) with scale factor 1/1000 (0.197).  The exact value 1.23/6.25  is 0.1968.
+      >
+    </field>
+    <field name="response">
+      The protocol is meant to be used with vaults that always follow 18 decimals convention. If another vault is used with lower decimals, say 6, loss of precision is acceptable. DeFi is using 6 decimal prices with USDC and other tokens safely. Tokens with 0 decimals are not meant to be supported.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c51d03720ea7bae72f326b5954883b8cba6e6d19</field>
+    <field name="content">
+      ## [L-9] NftVault initialization accepts unnormalized entries in _collection input
+  
+      In the `NftVault` contract, `init()` function accepts `_collection` array input. Currently, duplicate configuration entries in `_collection` input will be processed without raising any error. Later configuration entries will override previous entries with the same `collection.addr` value. 
+  
+      Duplicate entries will result in different `vaultHash` value in `NftVaultFactory:createVault()` and consequently multiple NftVaults being generated. Also, there can be many “duplicate” vaults that have the same collections but in the different order.
+  
+      **Remediations to consider**
+  
+      - Check the return value at the following line in `NftVault:init()` function and if false revert
+      
+          ```jsx
+          allowedCollections.set(collection.addr, nftType);
+          ```
+      
+      - Perform `_collection` array input validation and normalization (checking for duplicates, checking that collection addresses are sorted) in `NftVaultFactory:createVault()` before generating vault hash id.
+    </field>
+    <field name="response">
+      On the product level, it is extremely easy to create a duplicate vault which would be essentially identical for a human (say they differ by one NFT). This logic tries to prevent endless duplicates however it is accepted that if users really want to, they can do it. Vault curation will be on the UI side.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Good Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">695a75d1e147767b0a0bd08c3d9069843c181a8b</field>
+    <field name="content">
+      ## [Q-1] Update OpenZeppelin dependency
+  
+      Multiple security advisories overlap with the 4.7.0 version currently used within the project [https://github.com/OpenZeppelin/openzeppelin-contracts/security/advisories](https://github.com/OpenZeppelin/openzeppelin-contracts/security/advisories). Update to the most recent patch version 4.7.3.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6ab5f7f8aa5ecd2efdbdb930b483d50df1ff7c3c</field>
+    <field name="content">
+      ## [Q-2] Unnecessary casts in `swapLeftover()` function
+  
+      In the `MagicSwapV2Router` contract, in the `swapLeftover()` function, there are two unnecessary casts of `_tokenA` variable which is of address type to address.
+  
+      ```jsx
+      1. path[0] = address(_tokenA);
+      2. _approveIfNeeded(address(_tokenA), _amountIn);
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Good Practice</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-3] Add an `override` keyword to the interface functions
+  
+      Add `override` keyword to functions which are implementation of functions declared in parent interfaces to differentiate interface-related functionality from contract-specific functionality more explicitly. For example, add an `override` keyword to functions in the `UniswapV2Factory` contract which are implementations of corresponding functions declared in the `IUniswapV2Factory` interface (also `NftVault` and `INftVault`). This also allows detection of functions that are not properly declared in the parent interface.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Good Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">9c4890739663164d228197dfa762790adbcd2b19</field>
+    <field name="content">
+      ## [Q-4] Use an appropriate argument name
+  
+      In the `NftVaultFactory` and corresponding interface, `getVaultAt()` and `getPermissionedVaultAt()` are defined with insufficiently descriptive argument name `_i`. Consider using `_vaultId`, `_id`, or `_index`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-5] Unnecessary checks
+  
+      Following condition in the `Oracle:grow()` function is not needed since `observationCardinalityNext` which is assigned to the `current` variable can never be 0.  `observationCardinalityNext` is initialized to 1 during contract deployment.
+  
+      ```jsx
+      require(current > 0, 'I');
+      ```
+  
+      In addition, the following condition in the `Oracle:observe()` is unnecessary since `observationCardinality` can never be 0. It is initialized to 1 during contract deploy.
+  
+      ```jsx
+      require(cardinality > 0, 'I');
+      ```
+    </field>
+    <field name="response">
+      Oracle code inherited checks from original code and the goal was to keep it as close to original as possible.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Good Practice</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-6] Different approaches for raising errors within the codebase
+  
+      Throughout the codebase, different approaches for raising errors are used. In the `NftVault` contract Solidity custom errors are used. In `UniswapV2Factory` and `UniswapV2Pair` contracts, string errors are raised in `require` expressions. While in the `MagicSwapV2Router` contract, there are instances of both approaches. Consider choosing one approach and consistently applying it throughout the codebase.
+    </field>
+    <field name="response">
+      Code inherited errors handling from original code and the goal was to keep the code as close to original as possible and use new way of error handling whenever possible.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4d17c569eb7e3e317a20070556830b1ab51df5c2</field>
+    <field name="content">
+      ## [Q-7] Missing indexed attributes for emitted events
+  
+      Indexed event attributes facilitate off-chain tracking and monitoring. Their absence may negatively affect the performance of these off-chain systems.
+  
+      - In the `INftVaultFactory`, the `VaultCreated` event definition does not have indexed attributes.
+      - In the `INftVault`, the `Deposit`, `Withdraw`, `AllowedDepositWithdraw`,  `DisallowedDepositWithdraw`,  `AllowedContract`, and `DisallowedContract` event definitions do not have indexed attributes.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-8] SafeMath lib’s functionality is redundant
+  
+      SafeMath lib is imported in UniswapV2Library, UniswapV2Router02, UniswapV2Pair, and UniswapV2ERC20. This library provides math functions that handle overflow, and underflow edge cases. However, this functionality is built in Solidity versions 0.8.0+. Therefore, in the current implementation, many operations that rely on SafeMath perform redundant checks. Consider, replacing SafeMath functionality with built-in math operations.
+    </field>
+    <field name="response">
+      It is understood and accepted. We want to keep the code as close to original as possible.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Good Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4a57b5f5a683a37b962f908bf84570d320af6b49</field>
+    <field name="content">
+      ## [Q-9] Warn users that NftVault functions are not safe to be used directly
+  
+      Add warnings to Natspec documentation for INftVault functions, such as `deposit()/depositBatch()` and `withdraw()/withdrawBatch()`, that they should not be used directly but through MagicSwapV2Router. Otherwise, user transactions could be frontrunned.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Extra Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">eb65735b44430a49228cf7baa90744e8f2ad186e</field>
+    <field name="content">
+      ## [Q-10] Unnecessary imports
+  
+      - `src/UniswapV2/libraries/FixedPoint.sol`
+          - Because it is not used anywhere
+      - `src/UniswapV2/libraries/UQ112x112.sol`
+          - Because `uint224` is not used in `UniswapV2Pair` which is what `UQ112x112` is for
+      - `Ownable2Step.sol` in `UniswapV2Pair`
+          - Because it is not used
+      - `Counters.sol` in NftVaultFactory
+          - Because it is not used
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Good Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">34f776bbea305f2ed74eabad690ae450190add2e</field>
+    <field name="content">
+      ## [Q-11] Non-library/interface files should use fixed compiler versions, not floating ones
+  
+      Use consistent pragma version across all files, or add `—use` to forge build to specify the solc version or a solc path.
+  
+      - NftVault
+      - NftVaultFactory
+      - MagicSwapV2Router
+      - UniswapV2Router02
+      - UniswapV2Pair
+      - UniswapV2Factory
+      - UniswapV2ERC20
+      - StakingContractMainnet
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Good Practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">34f776bbea305f2ed74eabad690ae450190add2e</field>
+    <field name="content">
+      ## [Q-12] Documentation improvements
+  
+      - Not comprehensive documentation for Soulbound vaults
+      
+          In `INftVaultFactory.sol`
+      
+          ```
+      
+          /// @param isSoulbound if true, Vault is soulbound and its ERC20 token can only be transfered
+          ///        to `allowedContracts` managed by `owner`
+      
+          ```
+      
+          However, Soulbound ERC20 tokens can also be transferred to EOA or the vault itself. Consider adding documentation about these 2 possibilities. 
+      
+      - Misspellings
+          - “allwed” should be allowed instead.
+      
+          ```
+          src/Vault/INftVault.sol
+              /// @notice Returns true if wallet is allwed to deposit/withdraw. Only applicable to permissioned vault.
+      
+          src/Vault/NftVault.sol
+              /// @notice deposit/withdraw allow list. Maps wallet address to bool, if true, wallet is allwed to deposit/withdraw
+                /// @notice Vault ERC20 receive allow list. Maps contract address to bool, if true, contract is allwed to receive
+          ```
+      
+          - “unique it” → unique ID
+          - “geenrated” → generated
+      
+          ```
+          /// @notice unique it of the vault geenrated using its configuration
+              bytes32 public VAULT_HASH;
+          ```
+      
+      - In INftVaultFactory
+          - missing @param  comment for owner in `VaultCreated`
+          - @dev comment for `createVault` is incorrect since function doesn’t return already deployed vault if one already exists
+          - same for @return comment related to this part `(newly)` since it always `newly`
+          - param names inconsistent with ones in the implementation, they are not prefixed with `_`
+          - missing @return comment for `isPermissionedVault()`
+          - missing @return comment for `isVault()`
+      - In IUniswapV2Factory
+          - Update `getFeesAndRecipient()` natspec comment, this part especially `if the owner of UniswapV2Factory is malicious`, since if this is the case cap fee will be the smallest problem.
+          
+              ```jsx
+              Fees are capped by MAX_FEE, however it is possible for a malicious owner
+              of this contract to do a combination of transactions to achive fees above MAX_FEE.
+              ```
+          
+          - Missing natspec for some of the functions
+              - `getPair()`
+              - `allPairs()`
+              - `allPairsLength()`
+              - `createPair()`
+              - event `PairCreated`
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Good Practice</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-13] Vault can start in a partial state
+  
+      The vault, after the `constructor()` runs, starts without collections defined. It relies on `init()` to set and configure the collections. The current router `createVault()` combines the `constructor()` and `init()` into 1 call. 
+  
+      However, collection initialization can be combined into constructor and the vault won’t be in a partial state even if the router gets updated in the future.
+  
+      Consider initializing the collections in the constructor.    
+    </field>
+  </item>  

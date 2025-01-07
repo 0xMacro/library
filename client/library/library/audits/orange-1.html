@@ -1,0 +1,31 @@
+<page
+  clientName="Orange"
+  reportDate="May 23rd, 2024"
+  auditTitle="Orange A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/ORANGEWEB3/orange-sc"
+  repoCommitHash="ed2c9ae41f28ac408cefb7052a16c2ed77b526b2"
+  repoCommitHashFinal="a2c27697e6c4c8238f7b8f3ac2892be8a27cab2f"
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on May 16th, 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contract within this repository:</p>
+
+    <template type="file-hashes">
+      d683d39641c7ae45992a55cbdbbece367a10a9541502d87f5c63706013d7fcf0  contracts/SaleDeposit.sol
+      469e581cbd62fec9f0c6de82838661ae3de97067793dad9febd749fff7532b27  contracts/SaleDepositWhitelist.sol
+    </template>
+
+  </content-for>
+</page>

@@ -158,7 +158,7 @@ Why doesn’t this approach work?
 <details>
   <summary>Answer</summary>
 
-  - Lines 1 and 2 do as intended; they multiply `A` by `7`.
+  - Lines 1 and 2 do as intended; they add `7` to `A`.
   - However, the next part is where things go wrong.
       - Lines 1 and 2 consumed two items of the stack, but it also pushed back the result – namely, `A + 7`.
       - Thus, Lines 3 and 4 *are not* adding `7` to `B`, but instead adding it to `A + 7`

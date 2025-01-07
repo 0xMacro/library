@@ -1,0 +1,155 @@
+<page
+  clientName="Infinex"
+  reportDate="May 10, 2024"
+  auditTitle="Infinex A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts/"
+  repoUrl2="https://github.com/infinex-io/infinex-contracts"
+  repoUrl3="https://github.com/infinex-io/infinex-platform-testnet"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+  customReviewInfo
+  repoCommitHashFinal="d267ef612bede48a5ce59a57e31e2ccf416012a8"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team in 5 parts (*) (**): 
+    <ul>
+      <li>Part 1a was performed from December 11th to December 21th, 2023. </li>
+      <li>Part 1b was performed from January 18th to January 30th, 2024. </li>
+      <li>Part 1c was performed from March 20th to March 29th, 2024. </li>
+      <li>Part 1e was performed from April 8th to April 19th, 2024. </li>
+      <li>Part 1f was preformed from April 23rd to April 29th, 2024. </li>
+    </ul>
+    <br> * Audit 1d is not included as it was referred to a different set of contracts.
+    <br> ** Audit findings that do not correspond to the hashed files described below have been omitted as some contracts have not been included in the v1 implementation.
+  </content-for>
+
+  <content-for name="repo-info">
+
+      <li> <b>Scope</b>
+        <ul>
+          <li>
+            <b>Repository:</b>
+            <a href="{{page.repoUrl}}" target="_blank">
+              infinex-contracts
+            </a>
+          </li>
+
+          <li class="break-words break-all">
+            Final Commit Hash:
+            <code>d267ef612bede48a5ce59a57e31e2ccf416012a8</code>
+          </li>
+        
+        </ul>
+
+      </li>
+  </ul>
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+      <li>Provided technical documentation.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      As part as a comprehensive review, security included not only that user funds would be secure from external actors, but also from Infinex acting maliciously.
+
+      ## Infinex Governance
+
+      Protocol DAO that has control over contract implementation upgrades and configurations as the `Owner` role:
+      - Controlling the Account factory migration and can enable or disable the account address prediction and creation.
+      - Setting configuration parameters in the Procotol Configuration Beacon such as:
+        - Setting proxy and account implementation addresses used for Account creation and upgrades. (Upgrades are Opt-in by Account control).
+        - `trustedRecoveryKeepers` that sets or unsets an address as a trusted recovery keeper who can recover assets from accounts to the owner's recovery address if set.
+        - `revenuePool` that sets the pool address where fees are sent to.
+        - `USDC` address of the USDC token contract. (Update of this in the account is Opt-in by Account control).
+        - `bridgeConfiguration.minimumUSDCBridgeAmount` minimum USDC amount that can be bridged. (Update of this in the account is Opt-in by Account control).
+        - Wormhole and Circle bridging parameters. (Update of this in the account is Opt-in by Account control).
+
+      ## Infinex Users
+
+      Users control their accounts with the following keys:
+
+      ### Sudo Keys
+
+      Super user set of addresses, initially set during the account creation as the Account owner but can be expanded to multiple Sudo key entities. 
+      Essentially acts as the highest authority and can perform most actions such as set other Sudo keys, setup Operational keys, setup the Recovery key, upgrade the Account's implementation, upgrade Configurations from the Protocol beacon, and perform withdrawals.
+      
+      ### Operation Keys
+
+      Multiple Operation Keys can be added by any Sudo key and they can only execute intra-account bridging within different chains.
+      
+      ### Recovery Keys and Recovery Address
+
+      A Sudo Key user can set the immutable Recovery Address once and enable Recovery Keys to recover USDC and tokens to this specific address. It is worth to note that the immutability of this address is only ensured within this Account's implementation as the logic might be migrated and allowed to change this variable. 
+      Multiple Recovery keys can be added by any Sudo key, this special key actor can recover the USDC balance to a specific Circle CCTP Domain and ERC20 tokens, only if a Fund Recovery Address has been set as mentioned before. 
+
+    ## External Assumptions 
+
+    It is assumed that Infinex governance will set withdrawal fees, and that all account upgrades and beacon updates that accounts can opt into will be beneficial for users.
+
+    ## Account Assumptions
+
+    - Governance can update configuration in the beacons, including the implementation used for account creation and account upgrades, but account owners can choose to opt into using them or not.
+    - Until accounts are deployed, given that the address of the deployed accounts is controlled by the factory, Infinex Governance has the power to disallow or allow the account deployment on all chains; before the full flow of an account’s creation is completed on all supported chains, it is assumed that no account implementation or beacon configurations changes would be applied.
+    - Different key actors are designed to avoid a single point of failure if any of the keys were compromised. Users can decide how to design their account’s access control and potentially centralize all guards into a singleton key if this is added to all roles.
+    - User’s funds are safe within the account as long as keys are not compromised, however, there are guards against single failure points to remove, recover, and add keys with different restrictions as described in the *Actors section.*
+
+    ## Fees
+
+    Current account implementations have a maximum withdrawal fee hardcoded in the Account of 50 USDC tokens. Withdrawals fees of different ERC20 tokens are also charged in USDC.
+  </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Note: Currently the referenced repository is private, but there are plans to make it public in the future. The contracts reviewed can be viewed
+    <a href="https://usecannon.com/packages/infinex-multichain/1.0.0/8453-O2/code/infinex?source=src%2FInitializable.sol">
+      here, as version 1.0.0 O2
+      </a>, and have been verified on the primary block explorer for each supported chain.
+    </p>
+    
+    <p>
+      The following contracts were audited (*):
+    </p>
+    <template type="file-hashes">
+    c2ba091b45bedcb2710b727bca1280769fcd9ec10267611379c72998a70c5b64  ./src/Initializable.sol
+    f152119fa2802a63f6d80816cc4f43c00902c7b2e49ba831237a595395dd6357  ./src/accounts/AccountFactory.sol
+    eaba1552dc6d860ec17773d6248601b1e93c551e27e7262bbebbc6db814d4417  ./src/accounts/modules/AccountUtilsModule.sol
+    06eaf3cfa23bbe45d2620a5ed914f15effa122b19c864bc3fcea53e08ff56509  ./src/accounts/modules/BaseModule.sol
+    e1e02bf5dc9fad21689e9a67e75f4fdefd65c77bb830e406e20db162d83146d7  ./src/accounts/modules/BridgingModule.sol
+    fecb1e896f5e2b55adf6a5656aa4255d0ad63d3e4b8ad7577edb61b24a19c76a  ./src/accounts/modules/RecoveryModule.sol
+    59329b46074d605341a63ffb67400508c8763eaa8ca2e74a413fc2cbb958fcae  ./src/accounts/modules/WithdrawModule.sol
+    c136d59774bfc6a52e6ce162d9e1e491882e253e8ea4eb376a83cea92a515ea6  ./src/accounts/storage/Account.sol
+    cc8f253b656a46d605b53e1e19664448d4560d412032913383641d7861abe188  ./src/accounts/storage/Bridge.sol
+    00922e211d9cb73dbfb374910cf05cc52b8c11618e3d903d730e9c7d4a7a2e1d  ./src/accounts/storage/EIP712.sol
+    a4a6392ec56f3c3d1416a38e5a9e12ba332933fb73213024ac8cdafe8a99d8cf  ./src/accounts/storage/Recovery.sol
+    e0a356558af9c23344a6db8433c35fe440ceb91112f57bac28479befacf74f1e  ./src/accounts/storage/SecurityKeys.sol
+    7a24b16a5a9524557956a494de8eefa8a7f0f4d2afffff5d40afd3afabd08764  ./src/accounts/storage/Withdrawal.sol
+    e6f4420118e4b841d54a2e31f65af8905c86f01068bba4270efdca2f867c0e98  ./src/accounts/utils/AccountConstants.sol
+    47f7d9e0aef9cb95b439fdff5d01c232528650d5f62d29c86f4fcb67135f8c42  ./src/accounts/utils/RequestTypes.sol
+    2e75ab375d273880ec4349a1a29c2574121a2a83b45718589ea00cac971c63dc  ./src/accounts/utils/SecurityModifiers.sol
+    c647e1b8f2784424923bcb207d2f231b5b1963fa63723c6c911cf3e2d6cbeb27  ./src/accounts/utils/WithdrawUtil.sol
+    90fa65add6293fb7d90fbd4a6192cc746751e3646f8026414e5fba4c59f1a50d  ./src/beacons/InfinexProtocolConfigBeacon.sol
+    9d292ad949fc252ef9836f4d9dacf7d09590b0b41d6d841a9f97d0af0b5a0049  ./src/forwarder/ERC2771Context.sol
+    9b5ee721951882983675ee932c64e91e79be0a0ce07530b592894994341ed497  ./src/forwarder/InfinexERC2771Forwarder.sol
+    f653b5e2642b5c73b4dee3b8377872411b6ee57591b86883b0746eed79e23d0e  ./src/integrations/BridgeIntegrations.sol
+    4705e8cf64cf44304b61a6c18480b0658c7b54d686e63682bb82980439c31323  ./src/interfaces/accounts/IAccountFactory.sol
+    450c229079e6be901e728bab86d50a1f4f685a94a2090dfa7b3d6924a16a5889  ./src/interfaces/accounts/IAccountUtilsModule.sol
+    23a682f3f62b5ded288b044260aa63813290f1a3aab8c28c9b9dd59a5b31b590  ./src/interfaces/accounts/IBaseModule.sol
+    31b435abebfc990987cfd8a89cc3ed4897ddc4cb88a8a3ac2eeb7bfd78043be9  ./src/interfaces/accounts/IBridgingModule.sol
+    89369194578d70bfd74a03dad5687b7aa5a6c9e466a314f1d2421743c0681dde  ./src/interfaces/accounts/IRecoveryModule.sol
+    2a637559b7238839b7d401d566c323b8d83f7890de3eaa6491c2ba32f36b13c8  ./src/interfaces/accounts/IWithdrawModule.sol
+    89ddb97a3464b0c3c91b8b311d266b008fa9216902f2b092b141555cc4c5bf43  ./src/interfaces/beacons/IInfinexProtocolConfigBeacon.sol
+    681eed80d6482032e273a7a85825cc5e4aee6c64b54b167b6528245e03e3b840  ./src/libraries/DecimalScaling.sol
+    ec69fd445c45605ba659c356d9ae791e256f95d2016da96e353e6879d05b6f7c  ./src/libraries/Error.sol
+    4fd2c604b220bc016e0d441bac3566af17aa9e3042c64b4dcc20446fc7258b2c  ./src/libraries/SolanaUtils.sol
+    3d5fd4f57ca1681900930fb02dbc514b657af3d56764b4e76e6dad0873a7822a  ./src/proxy/InfinexProxy.sol
+    90ece440dae4b48932a52e9b66918969c02527a8c7accf3aee0144baaa53326a  ./src/proxy/InitialProxyImplementation.sol
+    </template>
+
+    * File hashes shown above are the final version of the reviewed contracts, corresponding to the final commit hash.
+  </content-for>
+</page>

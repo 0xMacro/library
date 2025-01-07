@@ -1,0 +1,187 @@
+<item>
+    <field name="topic">ERC20</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">47817842452f47f6a66569af5e7267caad264e84</field>
+    <field name="content">
+      ## [L-1] Some tokens don’t revert on failed transfers
+  
+      `PaymentStream` contract uses `IERC20:transfer()` function to send the payment token to the `payee` and/or to the `termReceiver`:
+  
+      ```solidity
+      function claim() external {
+          require(msg.sender == payee, "Not authorized");
+          require(claimedAmount < paymentAmount, "All tokens have been claimed");
+          require(!isTerminated, "Stream terminated");
+  
+          uint256 claimable = getClaimableAmount();
+  
+          claimedAmount += claimable;
+  
+          IERC20(paymentToken).transfer(payee, claimable);
+      }
+      ```
+  
+      **Reference:** [PaymentStream.sol#L62-72](https://github.com/Titan-Node/payment-stream/blob/bd0dce23217976949b164812c8ccf4db3e58a79d/src/PaymentStream.sol#L62-L72)
+  
+      However, some non-compliant ERC20 tokens do not revert on failed transfers. This could cause the function `claim()` to succeed, incrementing the `claimedAmount` but not transferring the tokens, for example, if the tokens are not present in the contract.
+  
+      **Remediations to Consider:**
+  
+      Consider using the **[SafeERC20](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol)** library to handle potential nonconventional ERC20 tokens or documenting this potential pitfall.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">47817842452f47f6a66569af5e7267caad264e84</field>
+    <field name="content">
+      ## [Q-1] Code consistency
+
+      When deploying and initializing a `PaymentStream` in its constructor, input arguments are being partially verified with sanity checks.
+  
+      ```solidity
+          constructor(
+              address _payee,
+              uint256 _duration,
+              address _paymentToken,
+              uint256 _paymentAmount,
+              address[2] memory _termSigners,
+              address _termReceiver
+          ) {
+              require(_duration > 0 && _paymentToken != address(0) && _paymentAmount > 0, "Invalid args");
+      ```
+  
+      **Reference:** [PaymentStream.sol#L28-36](https://github.com/Titan-Node/payment-stream/blob/bd0dce23217976949b164812c8ccf4db3e58a79d/src/PaymentStream.sol#L28-L36)
+  
+      Consider checking all address parameters to keep a consistent behavior across the contract.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Storage Layout</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">47817842452f47f6a66569af5e7267caad264e84</field>
+    <field name="content">
+      ## [Q-2] Mappings use the same key value can be merged
+  
+      To simplify the storage structure, consider mergin `isTermSigner` and `_hasConfirmed` mappings into one mapping.
+  
+      ```solidity
+      // Termination
+      mapping(address => bool) public isTermSigner;
+      ...
+  
+      mapping(address => bool) public _hasConfirmed;
+      ```
+  
+      **Reference:** [PaymentStream.sol#L21-26](https://github.com/Titan-Node/payment-stream/blob/bd0dce23217976949b164812c8ccf4db3e58a79d/src/PaymentStream.sol#L21-L26)
+  
+      For example, both mappings share the same key and could be merged with a struct.
+  
+      ```solidity
+      struct TermSign {
+          bool isTermSigner;
+          bool hasConfirmed;
+      }
+  
+      mapping(address => TermSign) public termSigners;
+      ```
+  
+      *Suggested code snippet.*
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">47817842452f47f6a66569af5e7267caad264e84</field>
+    <field name="content">
+      ## [Q-3] Declare immutable variables
+
+      Immutable variables will set the values passed to the constructor directly into the bytecode, disallowing any future changes for these and optimizing gas, as these values can directly be used as constants and avoid reading and writing storage.
+  
+      ```solidity
+      contract PaymentStream {
+          // Init
+          address public payee;   //@audit can be immutable
+          uint256 public duration;    //@audit can be immutable
+  
+          // Payment
+          address public paymentToken;    //@audit can be immutable
+          uint256 public paymentAmount;   //@audit can be immutable
+  
+          uint256 public startTime;   //@audit can be immutable
+          uint256 public endTime;   //@audit can be immutable
+          uint256 public claimedAmount;
+  
+          // Termination
+          mapping(address => bool) public isTermSigner;
+          address public termReceiver;   //@audit can be immutable
+      ```
+  
+      **Reference:** [PaymentStream.sol#L9-22](https://github.com/Titan-Node/payment-stream/blob/bd0dce23217976949b164812c8ccf4db3e58a79d/src/PaymentStream.sol#L9-L22)
+  
+      Consider using the `immutable` keyword for all variables that are only set once in the contract’s constructor.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">47817842452f47f6a66569af5e7267caad264e84</field>
+    <field name="content">
+      ## [Q-4] Lack of events
+  
+      The current `PaymentStream` implementation lacks events for important and functional operations in general, `claim()` and `terminate()` functions could emit events for easier data retrieval and allow external protocols to index past events efficiently.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Architecture</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">47817842452f47f6a66569af5e7267caad264e84</field>
+    <field name="content">
+      ## [Q-5] Unnecessary use of external party library
+  
+      `PRB` library is currently used to calculate on a linear basis the corresponding claimable amounts of the payee, according to the time base variables and the current `block.timestamp`. 
+  
+      ```solidity
+      claimable = (ud(paymentAmount).mul(ud(timeElapsed).div(ud(duration)))).intoUint256() - claimedAmount;
+      ```
+  
+      **Reference:** [PaymentStream.sol#L59](https://github.com/Titan-Node/payment-stream/blob/bd0dce23217976949b164812c8ccf4db3e58a79d/src/PaymentStream.sol#L59)
+  
+      This operation can be implemented with inbuilt solidity language features, avoiding unnecessary casting operations and the use of a third-party library. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Standards</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">47817842452f47f6a66569af5e7267caad264e84</field>
+    <field name="content">
+      ## [Q-6] Naming convention
+  
+      Mapping `_hasConfirmed` starts with an underscore, using the `internal`/`private` naming convention even though it’s public.
+    </field>
+  </item>
+  

@@ -1,0 +1,107 @@
+  <item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">94e20a411aa2d388cc358b802f60b556fd19d500</field>
+    <field name="content">
+      ## [H-1] Changing `solanaMultiplier` alters total rewards issued and leads to unfair token allocation
+  
+      The `StWStakingRewards.sol` contract allows users to “stake” their tokens across various chains, in order to receive rewards governancePoints token rewards over time. However, it is expected the program deployed on the Solana chain will be delayed. In order to make up for this delay and allow users on Solana to receive comparable rewards for staking, despite the delay, there is a `solanaMultiplier` set that will multiply a users staked tokens to give them a boost to rewards.
+  
+      This `solanaMultiplier` is set by the owner of the contract via the `setSolanaMultiplier()` function:
+  
+      ```solidity
+      /**
+       * @dev Sets the Solana multiplier
+       * @param _solanaMultiplier The new solana multiplier
+       */
+      function setSolanaMultiplier(uint256 _solanaMultiplier) external onlyOwner {
+          if (_solanaMultiplier == 0) revert Error.ZeroValue();
+  
+          emit SolanaMultiplierSet(_solanaMultiplier);
+          solanaMultiplier = _solanaMultiplier;
+      }
+      ```
+      Reference: [StWStakingRewards.sol#L213-L222](https://github.com/infinex-io/infinex-contracts/blob/71f267f408eeb50fcca7a182217814a8f02e77dc/src/governance/StWStakingRewards.sol#L213-L222)
+  
+      However, there is nothing preventing the `solanaMultiplier` to be changed more than once, which could lead to imbalances in rewards earned for the same amount of tokens and duration, depending on when a users rewards are updated via `updateReward()`, in relation to the `solanaMultiplier` update.
+  
+      In the case where a user staked rewards on Solana and was registered by the keeper when the `solanaMultiplier` was say 1.1 times, and after a week staked more rewards which updated their earned rewards based on the 1.1 times multiplier. If later the `solanaMultiplier` was updated to 1.5 times, then they would only earn the 1.5 x multiplier from the period after they updated their rewards. Users that didn’t update their rewards would receive the 1.5 times multiplier for the entire rewards duration.
+  
+      Since the reward rate is determined by the total staked tokens, which effected by the `solanaMultiplier`, there is an assumption that all Solana stakers will receive the current `solanaMultiplier` for the entire reward duration is it was last updated, but as discussed that may not be the case if it changes, leading to a differing total rewards issued than expected.
+  
+      Changing the `solanaMultipler` is likely to occur if there is an initial rewards duration after the first, or the rewards period is extended. Since the `solanaMultipler` is set to make distribution fair for the initial rewards period, if extended this multiplier would need to be reduced, or even set to be a 1x multiplier. The Infinex team also suggested it could be adjusted to increase deposits, so it is quite possible this issue would occur, and potentially negatively effect Solana stakers, or give unfair benefits to some if the multiplier is increased.
+  
+      **Remediations to Consider**
+  
+      Only allow the `solanaMultipler` to be set once, and prevent deposits from the solana chain until the multiplier has been set. Also remove the ability to add an additional reward period, or extend it, unless these periods are accounted for separately or the `solanaMultiplier` is the same. 
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [L-1] Maintain ERC20 standard functions and events to maintain interoperability
+  
+      `GovernancePoints.sol` is a “points” contract, which is currently quite new to the space and hasn’t been standardized. It is possible that other protocols, or off-chain applications or systems will make assumptions regarding a “points” contract, such this is, and attempt to call typical `ERC20` functions like `decimals()`, `name()`, or `symbol()`,  or listen to a `Transfer` event when tokens are minted.
+  
+      Although there is no set standard for points contracts, it can be safe to assume that keeping in line with the ERC20 standard is the mostly likely path if on-chain points contracts become more widely adopted.
+  
+      **Remediations to Consider**
+  
+      Implement the `decimals()`, `name()` and `symbol()` functions, as well as use the `Transfer` event for minting and burning, to ensure this contract is interoperable other protocols and applications.
+  
+    </field>
+    <field name="response">
+        Since there is no visibility on how the GPs will evolve in the system, keeping the contract as simple as possible is probably easier. This could be implemented in another iteration if needed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">94e20a411aa2d388cc358b802f60b556fd19d500</field>
+    <field name="content">
+      ## [Q-1] Scaling amounts input is unnecessary
+  
+      In `StwStakingRewards.sol`, a set keeper address can updated the staked balances of accounts across chains. This keeper is trusted to provide accurate values for the `amounts` inputted. However, the inputted amounts get scaled to 18 decimals, assuming they are inputted as USDC’s 6 decimals:
+  
+      ```solidity
+       function _scaleAmounts(TokenAmounts calldata _amounts) internal view returns (uint256[7] memory) {
+          uint256[SUPPORTED_CHAINS_COUNT] memory scaledAmounts;
+          uint256 decimals = IERC20Metadata(USDC).decimals();
+  
+          scaledAmounts[uint256(ChainIndex.ARBITRUM)] = DecimalScaling.scale(_amounts.arbitrum, decimals);
+          scaledAmounts[uint256(ChainIndex.AVALANCHE)] = DecimalScaling.scale(_amounts.avalanche, decimals);
+          scaledAmounts[uint256(ChainIndex.BASE)] = DecimalScaling.scale(_amounts.base, decimals);
+          scaledAmounts[uint256(ChainIndex.ETHEREUM)] = DecimalScaling.scale(_amounts.ethereum, decimals);
+          scaledAmounts[uint256(ChainIndex.OPTIMISM)] = DecimalScaling.scale(_amounts.optimism, decimals);
+          scaledAmounts[uint256(ChainIndex.POLYGON)] = DecimalScaling.scale(_amounts.polygon, decimals);
+          scaledAmounts[uint256(ChainIndex.SOLANA)] = DecimalScaling.scale(_amounts.solana, decimals);
+  
+          return scaledAmounts;
+      }
+      ```
+      Reference: [StwStakingRewards.sol#L283-L296](https://github.com/infinex-io/infinex-contracts/blob/71f267f408eeb50fcca7a182217814a8f02e77dc/src/governance/StWStakingRewards.sol#L283-L296)
+  
+      ```solidity
+       function stake(address _account, TokenAmounts calldata _amounts) external nonReentrant onlyKeeper updateReward(_account) {
+              if (!IAccountFactory(accountFactory).createdAccounts(_account)) revert NotAnInfinexAccount();
+  
+              uint256[7] memory scaledAmounts = _scaleAmounts(_amounts);
+              uint256 stakeableAmount = _aggregateAmounts(scaledAmounts);
+      ```
+      Reference: [StwStakingRewards.sol#L245-L249](https://github.com/infinex-io/infinex-contracts/blob/71f267f408eeb50fcca7a182217814a8f02e77dc/src/governance/StWStakingRewards.sol#L245-L249)
+  
+      **Remediations to Consider**
+  
+      Since the keeper is trusted to provide these values accurately, they should also present these values scaled to 18 decimals to prevent the need to scale these values on-chain, and reduce the complexity of the contract.
+    </field>
+  </item>
+  

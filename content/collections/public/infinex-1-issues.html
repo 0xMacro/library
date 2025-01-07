@@ -1,0 +1,734 @@
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">critical</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">This fix was completed during a pre-production audit and is fixed in the current codebase. Now the initial `_sudoKey` required to create an Account is used as the `salt` to ensure the Account deployed to that deterministic address is controlled by it.</field>
+  <field name="commitTree">d267ef612bede48a5ce59a57e31e2ccf416012a8</field>
+  <field name="content">
+    ## [C-1] Accounts can be deployed with malicious keys
+
+    The way Infinex’s user flow works is users deploy a deposit account on layer 1 Ethereum using the `AccountFactory`, providing a `seed` that can be used on the target layer 2 chains `AccountFactory` to create a trading account with the same address, allowing the deposit account to bridge funds to the other chain using `address(this)`.
+
+    ```solidity
+    /**
+     * @notice Bridge USDC tokens from Layer 1 to Layer 2 via the circle bridge.
+     * @dev The entire balance of the contract will be bridged.
+     */
+    function bridgeUSDCtoL2() external {
+    	AccountStorage.Data storage data = AccountStorage.getStorage();
+    	uint256 amount = IERC20(data.circleBridgeUSDCTokenAddress).balanceOf(address(this));
+    	IERC20(data.circleBridgeUSDCTokenAddress).approve(data.circleBridge, amount);
+
+    	emit USDCBridgedToL2(data.circleBridgeUSDCTokenAddress, amount);
+    	ITokenMessenger(data.circleBridge).depositForBurn(
+    		amount,
+    		data.circleBridgeDestinationDomain,
+    		// The circle bridge expects the mint recipient address as a bytes32
+    		bytes32(uint256(uint160(address(this)))),
+    		data.circleBridgeUSDCTokenAddress
+    	);
+    }
+    ```
+
+    **Reference:** DepositAccountImplementation.sol#L23-L40
+
+    However, since the `salt` passed into the `AccountFactory`’s `createAccount()` function is the only parameter that determines the address of the account on either chain. A malicious user can either frontrun its creation or see a deposit account created on mainnet, and respond by creating a trading account on the L2 chain, using the same `salt` but providing with their own keys. This still creates an account with the expected address, but the keys controlling withdrawals and trading are not the same as the intended users.
+
+    ```solidity
+    /// @dev A new UUPSProxy is deployed using CREATE2 with a default implementation.
+    /// This ensures that both create2 calls for Trading and Deposit accounts are identical,
+    /// resulting in both accounts receiving the same address.
+    newAccount = Create2.deploy(0, _salt, _getProxyBytecode(initialProxyImplementation));
+    ```
+
+    **Reference:** AccountFactory.sol#L109-L112
+
+    This allows attackers to gain control of corresponding L2 trading accounts or even L1 deposit accounts, allowing user funds deposited and/or bridged to compromised accounts they don’t control.
+
+    **Remediations to Consider**
+
+    Instead of only using the provided `_salt` to determine the address of deployed accounts, hash the included keys together with the provided `_salt` and use that as the final salt when deploying. This will ensure that deployed accounts of the same address are initially controlled by the intended users, preventing user assets from being stolen.    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">This fix was completed during a pre-production audit and is fixed in the current codebase. Checks were added to verify that the recovery guard is active prior to recovers.</field>
+  <field name="commitTree">d267ef612bede48a5ce59a57e31e2ccf416012a8</field>
+  <field name="content">
+    ## [H-1] Missing fund recovery guard
+
+    With the addition of the `RecoveryModule`, it allows users to recover funds to a set recovery address, or withdraw them back to a account on a default chain, currently base. 
+
+    However, the `StWStakingRewards` contract assumes that funds can not be removed from the account until after the rewards period has ended, otherwise users would receive governance points for assets they no longer have “staked” in their account. Currently there is no guard preventing fund recovery, which would allow users to withdraw their funds even if they are staked.
+    The documentation mentions a “global allow funds recovery” that would prevent funds from being recovered until set to true, but this has not been put in place. There is a public variable named `fundsRecoveryActive` in the `InfinexProtocolConfigBeacon` that can be set by it’s owner:
+
+    ```solidity
+    /**
+    * @notice Sets the funds recovery flag to active.
+    * @dev Initially only the owner can call this. After 90 days, it can be activated by anyone.
+    */
+    function setFundsRecoveryActive() external {
+        if (owner() != _msgSender()) {
+            if (block.timestamp - CREATED_AT < 90 days) {
+                revert Error.FundsRecoveryActivationDeadlinePending();
+            }
+        }
+        emit FundsRecoveryStatusSet(true);
+        fundsRecoveryActive = true;
+    }
+    ```
+
+    **Reference:** [InfinexProtocolConfigBeacon.sol#L289-L301](https://github.com/infinex-xyz/infinex-contracts/blob/d267ef612bede48a5ce59a57e31e2ccf416012a8/src/beacons/InfinexProtocolConfigBeacon.sol#L289-L301)
+
+    This value seems to be the guard mentioned in the docs, but it is not referenced anywhere in the scope, and in particular not used to prevent early fund recovery in the recoveryModule’s functions.
+
+    Notably, the function `recoverToken()` allows any token to be withdrawn by either a Sudo key or the recovery key, which would allow all assets to be moved out, even if they are staked with the `StWStakingRewards` contract:
+
+    ```solidity
+    /**
+     * @notice Recovers all of the specified token to to the funds recovery address on this chain
+     * @dev requires the sender to be the origin key or recovery key
+     * @param _token The token to recover
+     */
+    function recoverToken(address _token) external requiresOriginOrRecoveryKey nonReentrant {
+        if (Recovery._getFundsRecoveryAddress() == address(0)) revert Error.NullAddress();
+        _withdraw(
+            _token,
+            Recovery._getFundsRecoveryAddress(),
+            DecimalScaling.scale(IERC20(_token).balanceOf(address(this)), IERC20Metadata(_token).decimals())
+        );
+    }
+    ```
+
+    **Reference:** RecoveryModule.sol#L80-L92 
+
+    **Remediations to Consider**
+
+    Consider ensuring the value of `fundsRecoveryActive` in the `InfinexProtocolConfigBeacon` is set to true for each relevant function in the `RecoveryModule` to prevent funds from moving out of accounts before they should be able to.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Spec</field>
+  <field name="impact">critical</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">This fix was completed during a pre-production audit and is fixed in the current codebase. The current Account factory is not upgradable, notably governance can disable account creation before the account is created in other chains, it is assumed that the DAO won't act maliciously.</field>
+  <field name="commitTree">d267ef612bede48a5ce59a57e31e2ccf416012a8</field>
+  <field name="content">
+    ## [H-2] `AccountFactory` upgrades could lock or steal funds sent to un-deployed accounts
+
+    `AccountFactory.sol` is upgradeable, and can be upgraded by Infinex governance. If it is upgraded in a way that makes it impossible to deploy accounts to the same addresses as the previous factory implementation, assets sent or bridged before deploying the corresponding L2 account would be inaccessible. This could likely be the case if new initialization parameters are added to accounts, which would need to be included in the `create2` salt when the factory deploys them, thus changing the resulting addresses.
+
+    In the case where Infinex governance is compromised or acts malicious, it could upgrade the account factory to allow the creation of arbitrary contracts to addresses with funds previously sent, since the salt required to generate the address would be known.
+
+    **Remediations to Consider**
+
+    The Account Factory could be made to be not upgradeable, and in the case where there are desired changes to the way accounts are deployed, new factories could be deployed across all chains with the same address. This would ensure that all account deployments will remain supported, and funds sent before deployment will always be recoverable by the intended keys.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Bridge integration</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">969c837d60ce1a027e54458c7628745703c9cd61</field>
+  <field name="content">
+    ## [H-3] Bridging USDC to Solana using CCTP using the wrong destination address
+
+    According to [CCTP documentation](https://developers.circle.com/stablecoins/docs/solana-programs#mint-recipient-for-solana-as-destination-chain-transfers), when bridging tokens from a non-Solana chain to Solana, the `mintRecipient` address should be the USDC-associated token account. However, in `bridgeUSDCWithCCTPSolana()`, the function is using the `_solanaAccount` parameter as a destination address.
+
+    ```solidity
+        function bridgeUSDCWithCCTPSolana(
+            uint256 _amount,
+            bytes32 _solanaAccount,
+            bytes32 _solanaTokenAccount,
+            uint8 _accountBump,
+            uint8 _tokenAccountBump
+        ) external requiresAuthorizedOperationsParty {
+    				...
+					
+            _bridgeUSDCWithCCTP(_amount, _solanaAccount, solanaDestinationDomain);
+        }
+    ```
+
+    **Reference:** [BridgingModule.sol#L83-121](https://github.com/infinex-xyz/infinex-contracts/blob/de5fb024243752cb5a3ee9c1dcd6c654713ea8c6/src/accounts/modules/BridgingModule.sol#L83-L121)
+
+    **Remediations to Consider:**
+
+    Consider passing the `_solanaTokenAccount` as a destination address.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Bridging</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">ack</field>
+  <field name="response">
+    As part of our partnership with Wormhole, we will be notified if the fee is set. If the fee is set and we are not notified, we would want these calls to fail.
+  </field>
+  <field name="content">
+    ## [M-1] Wormhole bridging doesn’t work when fee is enabled
+
+    `RecoveryModule.bridgeUSDCWithWormholeForRecovery` allows for bridging USDC tokens from current chain to Base. The actual call to the wormhole bridge happens in `BridgeIntegration._bridgeUSDCWithWormhole`:
+
+    ```jsx
+    ICircleIntegration(wormholeCircleBridge).transferTokensWithPayload(transferParameters, 0, abi.encode(msg.sender));
+    ```
+
+    **Reference**: [BridgeIntegrations.sol#L86](https://github.com/infinex-xyz/infinex-contracts/blob/d267ef612bede48a5ce59a57e31e2ccf416012a8/src/integrations/BridgeIntegrations.sol#L86)
+
+    The above call to `transferTokensWithPayload` works fine as long as their are no fees charged for sending a message. If fees are enabled for a certain chain, the call will fail as no fee value is passed. 
+
+    This is also mentioned in the comments for `transferTokensWithPayload` function:
+
+    ```jsx
+     * @dev reverts if:
+     * - user passes insufficient value to pay Wormhole message fee
+    ```
+
+    **Reference**: [CircleIntegration.sol#L36](https://github.com/wormhole-foundation/wormhole-circle-integration/blob/main/evm/src/circle_integration/CircleIntegration.sol#L36)
+
+    Note that currently fees are only enabled for Solana and no fees are charged for any EVM chains.
+
+    However, this can change in the future as also mentioned in the [wormhole documentation](https://docs.wormhole.com/wormhole/explore-wormhole/core-contracts#sending):
+
+    ```jsx
+    Currently there are no fees to publish a message (with the exception of publishing on Solana) but this is not guaranteed to always be the case in the future.
+    ```
+
+    **Remediation to Consider**
+
+    Pass the actual fee value returned by `IWormhole.messageFee()` to the `transferTokensWithPayload` call.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Trust Assumption</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">This fix was completed during a pre-production audit and is fixed in the current codebase. Now, if users remove the trusted forwarder, when upgrading the trusted forwarder from the new config beacon won't be added.</field>
+  <field name="commitTree">d267ef612bede48a5ce59a57e31e2ccf416012a8</field>
+  <field name="content">
+    ## [M-2] Trusted forwarder update is not controlled by the user
+
+    While upgrading the protocol beacon parameters, the user passes the expected beacon address to the `upgradeProtocolBeaconParameters` function to verify it’s the implementation address to be used as a new protocol beacon.
+
+    ```solidity
+    function upgradeProtocolBeaconParameters(address _newInfinexProtocolConfigBeacon) external requiresStrongDeviceKey {
+    	Account.Data storage accountData = Account.getStorage();
+    	IInfinexProtocolConfigBeacon protocolConfigBeacon = Account._infinexProtocolConfig();
+    	address latestInfinexProtocolConfigBeacon = protocolConfigBeacon.latestInfinexProtocolConfigBeacon();
+
+    	if (latestInfinexProtocolConfigBeacon == address(protocolConfigBeacon)) {
+    		revert Error.SameAddress();
+    	}
+    	if (latestInfinexProtocolConfigBeacon != _newInfinexProtocolConfigBeacon) {
+    		revert Error.ImplementationMismatch(_newInfinexProtocolConfigBeacon, latestInfinexProtocolConfigBeacon);
+    	}
+
+    	ERC2771Context._removeTrustedForwarder(protocolConfigBeacon.trustedForwarder());
+    	ERC2771Context._addTrustedForwarder(
+    		IInfinexProtocolConfigBeacon(latestInfinexProtocolConfigBeacon).trustedForwarder()
+    	);
+
+    	emit AccountInfinexProtocolBeaconImplementationUpgraded(latestInfinexProtocolConfigBeacon);
+    	accountData.infinexProtocolConfigBeacon = latestInfinexProtocolConfigBeacon;
+    }
+    ```
+
+    **Reference:** UtilsModule.sol#L313-332
+
+    However, within this call, the trusted forwarder is also being updated. The trusted forwarder address can’t be predicted by the user, and it would depend on the beacon implementation. If this parameter is updatable, the user could end up with a different trusted forwarder than expected.
+
+    **Remediations To Consider**
+
+    Adding an expected `_newTrustedForwarder` address and asserting against the new protocol config beacon trusted forwarder to be added, or having a separate function to update the trusted forwarder.
+
+    Also, consider including the trusted forwarder address added to the `AccountInfinexProtocolBeaconImplementationUpgraded` event.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Model</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">This fix was completed during a pre-production audit and is fixed in the current codebase.</field>
+  <field name="commitTree">d267ef612bede48a5ce59a57e31e2ccf416012a8</field>
+  <field name="content">
+    ## [L-1] Mislabeling wormhole chain ids as domains
+
+    In the `RecoveryModule`'s `bridgeUSDCWithWormholeForRecovery()` function, it allows a trusted recovery keeper to bridge the accounts USDC to the default chain, which is base. The default chain to bridge to is defined by the `_wormholeDefaultDestinationDomain` value stored in the accounts bridge struct set on initialization. 
+
+    ```solidity
+     BridgeIntegrations._bridgeUSDCWithWormhole(
+          maxAmount, bytes32(uint256(uint160(address(this)))), Bridge._wormholeDefaultDestinationDomain()
+      );
+    ```
+
+    **Reference:** RecoveryModule.sol#L75-L77
+    
+    This “domain” is passed into the internal `_bridgeUSDCWithWormhole()` function as the `_destinationDomain`, which is also validated by calling `_validateWormholeDestinationDomain()`:
+
+    ```solidity
+    function _bridgeUSDCWithWormhole(uint256 _amount, bytes32 _destinationAddress, uint16 _destinationDomain) internal {
+        _checkExceedsMinBridgeAmount(_amount);
+        if (!_validateWormholeDestinationDomain(_destinationDomain)) revert Error.InvalidDestinationDomain();
+        ...
+    ```
+
+    **Reference:** BridgeIntegrations.sol#L70-L72
+
+    ```solidity
+    function _validateWormholeDestinationDomain(uint16 _domain) internal view returns (bool isValid) {
+        if (ICircleIntegration(Bridge._wormholeCircleBridge()).getDomainFromChainId(_domain) == 0) return false;
+        return true;
+    }
+    ```
+
+    **Reference:** BridgeIntegrations.sol#L103-L106
+
+    Notice the validation call made to the bridge is `getDomainFromChainId()`, as this “domain” is really a chain id.
+
+    Although this implementation is setup correctly as a chain id aside, from the mislabeling, there could be issues in setting up these values incorrectly by inputting the domain rather than the expected chainId for the `_wormholeDefaultDestinationDomain` value. This could lead to issues for accounts that may require an upgrade, since the `Bridge` struct is only written to on the account’s initialization.
+
+    **Remediations to Consider**
+
+    Rename the `_wormholeDefaultDestinationDomain` in the accounts `Bridge` struct, and in the `InfinexProtocolConfigBeacon`’s `BridgeConfiguration` struct as a chain id, rather than a domain, and replace the input parameter names of `_bridgeUSDCWithWormhole()` and `_validateWormholeDestinationDomain()` to `_destinationChainId` and `_chainId` respectively, and rename `_validateWormholeDestinationDomain()` to `_validateWormholeDestinationChainId()`.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Decimals</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">be574e7e4f7034bcd8475c6a6501f1778ea33ee4</field>
+  <field name="content">
+    ## [L-2] `_computeScaledAmount()` takes arbitrary tokens but checks `USDC` bridge max amount
+
+    `BridgeModule.sol` implements `_computeScaledAmount()` to account for any passed token decimals and verify the maximum bridgable amount and balance.
+
+    ```solidity
+    function _computeScaledAmount(uint256 _amount, address _tokenAddress) internal returns (uint256) {
+        uint256 scaledAmount = uint256(DecimalScaling.scaleTo(int256(_amount), IERC20Metadata(_tokenAddress).decimals()));
+
+        if (scaledAmount > BridgeIntegrations._getBridgeMaxAmount()) revert Error.BridgeMaxAmountExceeded();
+
+        if (scaledAmount > IERC20(_tokenAddress).balanceOf(address(this))) revert Error.InsufficientBalance();
+
+        return scaledAmount;
+    }
+    ```
+
+    **Reference:** [BridgingModule.sol#L161-169](https://github.com/infinex-xyz/infinex-contracts/blob/de5fb024243752cb5a3ee9c1dcd6c654713ea8c6/src/accounts/modules/BridgingModule.sol#L161-L169)
+
+    However, the function `_getBridgeMaxAmount()` fetches the maximum bridge amount of the hardcoded `USDC` token, which counts with `6` decimals, with the current value on the Base chain being set to `1_000_000_000_000`, which equals `1_000_000` tokens with 6 decimals. 
+
+    ```solidity
+    function _getBridgeMaxAmount() internal view returns (uint256) {
+        return ITokenMinter(Bridge._circleMinter()).burnLimitsPerMessage(Bridge._USDC());
+    }
+    ```
+
+    **Reference:** [BridgingIntegrations.sol#L125-127](https://github.com/infinex-xyz/infinex-contracts/blob/de5fb024243752cb5a3ee9c1dcd6c654713ea8c6/src/integrations/BridgeIntegrations.sol#L125-L127)
+
+    If the function `_computeScaledAmount` is used with a token with a different number of decimals, the max bridge amount will not be accurate, and the function could revert incorrectly. For example, if used with `USDT`, an `18`-decimal token, the maximum limit would translate to **0,000001** `USDT` tokens and revert if higher than this.
+
+    **Remediations to Consider:**
+
+    Consider moving the `_getBridgeMaxAmount()` check outside the internal `_computeScaledAmount()` function or implementing logic only for the `USDC` token.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Use cases</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">14218c87930338f4cd58e2b89f4a52c1efde1c09</field>
+  <field name="content">
+    ## [L-3] Ether transfer may revert with out of gas
+
+    `_withdrawEther` function in `WithdrawUtil` uses `.transfer()` built-in method to transfer native assets to the withdrawal address. This hardcodes **2300** gas to the call and can revert for multi-sig addresses or smart contracts accounts.
+
+    ```solidity
+    function _withdrawEther(address _withdrawalAddress, uint256 _amount) internal {
+        _takeUSDCWithdrawalFee();
+        emit WithdrawalEtherExecuted(_withdrawalAddress, _amount);
+        payable(_withdrawalAddress).transfer(_amount);
+    }
+    ```
+
+    **Reference:** [WithdrawUtil.sol#L112-116](https://github.com/infinex-xyz/infinex-contracts/blob/de5fb024243752cb5a3ee9c1dcd6c654713ea8c6/src/accounts/utils/WithdrawUtil.sol#L112-L116)
+
+    **Remediations to Consider:**
+
+    Consider using a low-level `.call()` with the corresponding `msg.value` and verifying the result.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">wontdo</field>
+  <field name="response">
+    We have plans to use the `_withdraw()` function for other purposes in the future.
+  </field>
+  <field name="content">
+    ## [Q-1] Redundant token scaling when recovering tokens
+
+    **Note: This issue is from 1e audit.**
+
+    In the `RecoveryModule`, when `recoverToken()` is called, it calls the internal function _withdraw() and scales the accounts balance of the token to 18 decimals. 
+
+    ```solidity
+     _withdraw(
+          _token,
+          Recovery._getFundsRecoveryAddress(),
+          DecimalScaling.scale(IERC20(_token).balanceOf(address(this)), IERC20Metadata(_token).decimals())
+      );
+    ```
+
+    **Reference:** RecoveryModule.sol#L87-L91
+
+    This is then immediately is scaled back to the tokens original decimals, effectively undoing the prior scale up. 
+
+    ```solidity
+    function _withdraw(address _token, address _destinationAddress, uint256 _amount) internal {
+        // amount is in 18 decimals, scale to token decimals
+        uint256 scaledAmount = DecimalScaling.scaleTo(_amount, IERC20Metadata(_token).decimals());
+        uint256 amountAfterFee = scaledAmount;
+        ...
+    ```
+
+    **Reference:** WithdrawUtil.sol#L63-L66
+
+    Doing so may make sense to do if other functions used  `_withdraw()`, and required the input to be in 18 decimals, but currently `recoverToken()` is the only function using this method. 
+
+    **Remediations to Consider**
+
+    Adjust `_withdraw()` to take the _amount value in the corresponding tokens original decimals to prevent redundant scaling.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>  
+  <field name="statusNote">This fix was completed during a pre-production audit and is fixed in the current codebase.</field>
+  <field name="commitTree">d267ef612bede48a5ce59a57e31e2ccf416012a8</field>
+  <field name="content">
+    ## [Q-2] NatSpec and comments
+
+    - Additional 'to' in natspec comment in `recoverToken()`.
+    - Missing NatSpec in `requiresTrustedRecoveryKey` modifier.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">This fix was completed during a pre-production audit and is fixed in the current codebase.</field>
+  <field name="commitTree">d267ef612bede48a5ce59a57e31e2ccf416012a8</field>
+  <field name="content">
+    ## [Q-3] Missing event for state-changing function
+
+    The function `RecoveryModule.setFundsRecoveryAddress` is called to set the recovery address. This function is currently not emitting any event, which is recommended for every state-changing function.
+
+    **Remediation to Consider**
+    
+    Add an appropriate event to the `setFundsRecoveryAddress` function.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">ack</field>
+  <!-- <field name="commit">TODO</field> -->
+  <field name="content">
+
+    ## [Q-4] Redundant check for minimum bridge amount
+
+    In `RecoveryModule.recoverUSDCToEVMChain`, it is checked that USDC balance is greater than the minimum bridge amount:
+
+    ```solidity
+    if (balance < protocolConfigBeacon.getMinimumUSDCBridgeAmount()) revert Error.InsufficientBalance();
+    ```
+
+    **Reference**: [RecoveryModule.sol#L118](https://github.com/infinex-xyz/infinex-contracts/blob/d267ef612bede48a5ce59a57e31e2ccf416012a8/src/accounts/modules/RecoveryModule.sol#L118)
+
+    The function `recoverUSDCToEVMChain` internally calls `WithdrawUtil._withdrawUSDCToChain` which in turn calls `BridgeIntegrations._bridgeUSDCWithCCTP(amountAfterFee, …)`.
+
+    In `_bridgeUSDCWithCCTP`, the minimum bridge amount is again checked by calling `_checkExceedsMinBridgeAmount`:
+
+    ```solidity
+    function _checkExceedsMinBridgeAmount(uint256 _amount) internal view {
+      if (_amount < Account._infinexProtocolConfig().getMinimumUSDCBridgeAmount()) revert Error.InsufficientBalance();
+    }
+    ```
+
+    **Reference**: [BridgeIntegrations.sol#L117-L119](https://github.com/infinex-xyz/infinex-contracts/blob/d267ef612bede48a5ce59a57e31e2ccf416012a8/src/integrations/BridgeIntegrations.sol#L117-L119)
+
+    The only difference between those checks is that the latter one takes the actual amount being bridged, meaning the balance subtracted by the fee.
+
+    **Remediation to Consider**
+
+    To improve code readability and reduce gas costs, remove the `getMinimumUSDCBridgeAmount()` check from `RecoveryModule.recoverUSDCToEVMChain()`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="statusNote">This fix was completed during a pre-production audit and is fixed in the current codebase.</field>
+  <field name="commitTree">d267ef612bede48a5ce59a57e31e2ccf416012a8</field>
+  <field name="content">
+    ## [Q-5] Unused event
+
+    In `WithdrawUtil.sol`, the following event is defined but not used anywhere in the code:
+
+    ```solidity
+    event EthereumWithdrawalStarted(address indexed token, address indexed EthereumAddressTo, uint256 amount);
+    ```
+
+    **Remediation to Consider**
+
+    Remove the above event definition from the code.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">20a5b3996a70bef5776efde8a59e55015992f54f</field>
+  <field name="content">
+    ## [Q-6] Cache external parameter in memory
+
+    `recoverToken()` could cache `fundsRecoveryAddress` in memory, similar to `recoverUSDCToEVMChain()`.
+
+    ```solidity
+    function recoverToken(address _token) external requiresAuthorizedRecoveryParty nonReentrant {
+        IInfinexProtocolConfigBeacon protocolConfigBeacon = Account._infinexProtocolConfig();
+        if (!protocolConfigBeacon.fundsRecoveryActive()) revert Error.FundsRecoveryNotActive();
+        if (Recovery._getFundsRecoveryAddress() == address(0)) revert Error.NullAddress();
+        _withdrawERC20(
+            _token,
+            Recovery._getFundsRecoveryAddress(),
+            DecimalScaling.scale(IERC20(_token).balanceOf(address(this)), IERC20Metadata(_token).decimals())
+        );
+    }
+
+    /**
+     * @notice Recovers all USDC to the funds recovery address on the specified chain via Circle CCTP.
+     * @param _destinationCCTPDomain The CCTP domain id of the destination chain.
+     * @return amountBridged The amount of USDC bridged in native decimals (6).
+     * @return fullBalanceBridged A boolean indicating if the amount to bridge is the full balance of the account.
+     * @dev Requires the sender to be either sudo or recovery key.
+     */
+    function recoverUSDCToEVMChain(uint32 _destinationCCTPDomain)
+        external
+        requiresAuthorizedRecoveryParty
+        nonReentrant
+        returns (uint256 amountBridged, bool fullBalanceBridged)
+    {
+        ...
+        address fundsRecoveryAddress = Recovery._getFundsRecoveryAddress();
+        if (fundsRecoveryAddress == address(0)) revert Error.NullAddress();
+        ...
+        amountBridged = _withdrawUSDCToChain(maxAmount, fundsRecoveryAddress, _destinationCCTPDomain);
+        ...
+    }
+    ```
+
+    **Reference:** [RecoveryModule.sol#L87-123](https://github.com/infinex-xyz/infinex-contracts/blob/de5fb024243752cb5a3ee9c1dcd6c654713ea8c6/src/accounts/modules/RecoveryModule.sol#L87-L123)
+
+    
+  </field>
+</item>
+
+
+<item>
+  <field name="topic">Documentation</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">20a5b3996a70bef5776efde8a59e55015992f54f</field>
+  <field name="content">
+    ## [Q-7] Inaccurate comments
+
+    Some Natspec comments in the contracts still refer to an outdated key name convention but should refer to the operation key:
+
+    - [SecurityKeys.sol#L53](https://github.com/infinex-xyz/infinex-contracts/blob/de5fb024243752cb5a3ee9c1dcd6c654713ea8c6/src/accounts/storage/SecurityKeys.sol#L53).
+    - [SecurityModifiers.sol#L63](https://github.com/infinex-xyz/infinex-contracts/blob/de5fb024243752cb5a3ee9c1dcd6c654713ea8c6/src/accounts/utils/SecurityModifiers.sol#L63).
+    - [IBridgingModule.sol#L33](https://github.com/infinex-xyz/infinex-contracts/blob/de5fb024243752cb5a3ee9c1dcd6c654713ea8c6/src/accounts/utils/SecurityModifiers.sol#L63) and [#L45](https://github.com/infinex-xyz/infinex-contracts/blob/de5fb024243752cb5a3ee9c1dcd6c654713ea8c6/src/interfaces/accounts/IBridgingModule.sol#L45).
+
+    Additionally, some comments do not reflect the function’s implementation:
+
+    - [BridgingModule.sol#L81](https://github.com/infinex-xyz/infinex-contracts/blob/de5fb024243752cb5a3ee9c1dcd6c654713ea8c6/src/accounts/modules/BridgingModule.sol#L81) describes incorrectly this function is called only by sudo keys.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Best practice</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">20a5b3996a70bef5776efde8a59e55015992f54f</field>
+  <field name="content">
+    ## [Q-8] Duplicated internal functions name
+
+    Function `_bridgeUSDCWithWormhole()` and `_bridgeUSDCWithCCTP()` are present in both, `BridgingModule.sol` and `BridgeIntegrations.sol` contracts. Consider renaming these in one of the contracts to avoid confusion and potentially avoid missing any validation checks from the `BridgingModule` internal functions.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Informational</field>
+  <field name="response">
+    Although this is not blocked in the smart contracts, we do not show users their deposit address until they have specified their funds recovery address.
+  </field>
+  <field name="content">
+    ## [I-1] The fund recovery address should be set to a safe address for each account before adding funding
+
+    The fund recovery address is the address that funds will be sent to when `recoverToken()` is called by either a Sudo key or a set Recovery key. This address can only be set once by a Sudo key:
+
+    ```solidity
+     /**
+     * @notice Set the funds recovery address
+     * @param _fundsRecoveryAddress the address for funds recovery.
+     * @dev The origin key is required as a modifier to add a recovery address to recovery funds.
+     */
+    function setFundsRecoveryAddress(address _fundsRecoveryAddress) external requiresOriginKeySender {
+        if (Recovery._getFundsRecoveryAddress() != address(0)) revert Error.AddressAlreadySet();
+        if (_fundsRecoveryAddress == address(0)) revert Error.NullAddress();
+        Recovery._setFundsRecoveryAddress(_fundsRecoveryAddress);
+    }
+    ```
+
+    **Reference:** [RecoveryModule#L55-L64](https://github.com/infinex-xyz/infinex-contracts/blob/d267ef612bede48a5ce59a57e31e2ccf416012a8/src/accounts/modules/RecoveryModule.sol#L55-L64)
+
+    In the case where a malicious actor gains access to the user's Sudo key, if the funds recovery address is not yet set, then they could set it to a wallet they control and steal all assets in the account. However, if users set this to a safe and secure wallet address before adding funds, there is currently no way for funds to be stolen by a malicious Sudo key, protecting a users funds.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Implementation Migration</field>
+  <field name="response">We'll take this into account when performing Account upgrades.</field>
+  <field name="content">
+    ## [I-2] Storage corruption breaks access control roles
+
+    In this version of the core Infinex contracts, `SecurityKeys` storage removed the previous singleton `originKey` address parameter member from the `Data` struct, added new mappings, and the `sudoKeysCounter` variable. 
+
+    For accounts that upgraded the previous storage implementation, the following data struct changes were reviewed. 
+
+    - 1c version:
+
+    ```solidity
+    struct Data {
+    	address originKey;
+    	mapping(bytes32 => bool) nonces; // Mapping of nonces
+    	mapping(address => bool) strongDeviceKeys; // Mapping of strong device keys
+    	mapping(address => uint256) weakDeviceKeys; // Mapping of weak device keys
+    }
+    ```
+
+    - 1e version:
+
+    ```solidity
+    struct Data {
+        address originKey;
+        mapping(bytes32 => bool) nonces; // Mapping of nonces
+        mapping(address => bool) recoveryKeys;
+    }
+    ```
+
+    - 1f version:
+
+    ```solidity
+      struct Data {
+          mapping(bytes32 => bool) nonces; // Mapping of nonces
+          mapping(address => bool) operationKeys;
+          mapping(address => bool) recoveryKeys;
+          mapping(address => bool) sudoKeys;
+          uint16 sudoKeysCounter;
+      }
+    ```
+
+    From **1c** to **1e** versions, all previously set `strongDeviceKeys` stored in accounts would be valid `recoveryKeys`, as the mapping storage pointer would be the same as the previous.
+
+    In **1f** migration, since the `originKey` variable was removed the account storage will change drastically causing, in the struct declaration order:
+
+    - `nonces` to be reset to a new storage pointer, and since the type hash and domain separator parameters are the same as in previous iterations, previously used and consumed nonces will be valid again, allowing signed transactions to be relayed and replayed.
+    - `operationKeys` mapping could be corrupted depending on the used nonces to be set as `true`. However, this is not a critical access control role, and it's highly dependent on the value of `nonces` used as they might not render a malicious address or a valid EOA.
+    - `sudoKeys` will use the storage slot of the previously used `weakDeviceKeys` in **1c**. Furthermore, since the previous variable mapping uses `uint256` as a value and used to be set to `block.timestamp`, all odd numbers set will return `true` for the given key. `weakDeviceKeys` would then become `sudoKeys`.
+
+    **Considerations for Upgrades:**
+
+    - Keeping deprecated variables in the struct, changing their name to describe this, and adapting new variables with that in the account.
+    
+        ```solidity
+        struct Data {
+        			address deprecated_originKey;
+              mapping(bytes32 => bool) nonces; // Mapping of nonces
+              mapping(address => bool) operationKeys;
+              mapping(address => bool) recoveryKeys;
+              mapping(address => bool) sudoKeys;
+              uint16 sudoKeysCounter;
+          }
+        ```
+    
+    - If a major release is needed and all account data should be reset and re-initialized, the `getStorage()` pointer could be changed to use new isolated storage from scratch.
+    
+        ```solidity
+        function getStorage() internal pure returns (Data storage data) {
+            bytes32 s = keccak256(abi.encode("io.infinex.Withdraw.v2.0"));
+            assembly {
+                data.slot := s
+            }
+        }
+        ```
+    
+    - Upgrading the EIP712 `version` parameter to describe correctly the contract version. This would invalidate previously generated signatures since the domain separator will be different.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Specification</field>
+  <field name="content">
+    ## [I-3] Operation keys can not perform allowlisted withdrawals
+
+    The specification describes operational keys to be allowed to execute allowlisted withdrawals, through `withdrawERC20ToAllowlistedAddress()`, `withdrawERC721ToAllowlistedAddress()`, and `withdrawEtherToAllowlistedAddress()`. 
+
+    However, none of these functions can be called by operation keys since they use the `requiresSudoKeySender` modifier. Furthermore, this makes the allow listing process redundant as the same access control rank can skip this step and directly execute withdrawals.
+  </field>
+</item>

@@ -1,0 +1,75 @@
+<page
+  clientName="Infinex"
+  reportDate="August 28, 2024"
+  auditTitle="Infinex A-6"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash1="7ab01b19d20e03ff991100d07414784e4f3a0ceb"
+  repoCommitHashFinal="ecaeef63f11cdf5a3639837eefd8abef223b5b73"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from July 30 to August 1, 2024. 
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial) Patron Purchase App:</b> </br>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b> </br>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      The changes audited rely on the following assumptions specifically.
+      
+      ### Patron Purchase App:
+
+      - Purchase tokens will be authorized by the contract owner.
+      - The Purchase App will handle the receipt data storage, process the payment and ensure its signature is valid and not replayable.
+      - Signature creation happens entirely off-chain and it is assumed that the proper data (`nftQuantity`, `recipient`, and `vestingTier`) is signed.
+            
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts:</br>
+    </p>
+     
+    <template type="file-hashes">
+      4d202051b8c5bc30f2a747b92816bbb8d24a7743a003ac9fb35eacc341cf7d16  ./src/apps/patron-purchase/PatronPointOfPurchase.sol
+      0c666349ad3ea09ff74b94c348e8739a31acef52ff69849de188732878d7212c  ./src/apps/patron-purchase/PatronPointOfPurchaseStorage.sol
+      efc7c8cd1cba4307120e22f05fa3b8b183546ace641bb1ae1882eb3bda577528  ./src/apps/patron-purchase/PatronPurchaseVault.sol
+      147d94bc898589a6833a91dddf606a26de93cad3e56e94f622f74f6f3601c410  ./src/apps/patron-purchase/PatronPurchaseVaultStorage.sol
+      ac4ca74594ec0edd0056b824f1413755494a0ba6150fd904fd9315f5186e3359  ./src/apps/patron-purchase/PurchaseApp.sol
+      90829b054aeb1a8af775720d31657dddac4ca94e53b01a5b7e4d91cee133bfb9  ./src/apps/patron-purchase/PurchaseAppBeacon.sol
+      979f3692fab02fb9ce441c3f0222ce2bdb48bd01161d0e850ee6b372fbf4a4a7  ./src/apps/patron-purchase/PurchaseError.sol
+    </template>                
+       
+    <p>
+      Note: Currently the referenced repository is private, but there are plans to make it public in the future. 
+    </p>
+  </content-for>
+</page>

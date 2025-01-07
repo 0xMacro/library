@@ -1,0 +1,145 @@
+<item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] Incorrect data emitted in IncentiveUpdated event
+
+  
+      In the `StakingContractMainnet:updateIncentive()` function, the `IncentiveUpdated()` event is emitted at the end of the execution in the following way.
+  
+      ```solidity
+      emit IncentiveUpdated(incentiveId, changeAmount, incentive.lastRewardTime, incentive.endTime);
+      ```
+  
+      However, the `changeAmount` argument does not, in all cases, represent the actual amount with which the incentive was updated. In the scenario where the `change amount` is less than 0, and its absolute value is greater than the remaining reward, the actual change amount would equal the value of rewardRemaining.
+  
+      ```solidity
+          } else if (changeAmount < 0) {
+            uint112 transferOut = uint112(-changeAmount);
+      >>    if (transferOut > incentive.rewardRemaining) transferOut = incentive.rewardRemaining;
+            unchecked { incentive.rewardRemaining -= transferOut; }
+            ERC20(incentive.rewardToken).safeTransfer(msg.sender, transferOut);
+          }
+      ```
+  
+      **Remediations to consider**
+  
+      - Update `IncentiveUpdated()` event emission to send the proper `changeAmount` value in all scenarios so that off-chain monitoring and tracking tools have the correct input data.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] Redundant validation checks can be replaced with internal function
+  
+        Consider replacing following check across the contract with call to new function `_validIncentiveId()`.
+  
+        ```solidity
+        if (incentiveId > incentiveCount || incentiveId <= 0) revert InvalidInput();
+        ```
+  
+        New function
+  
+        ```solidity
+        function _validIncentiveId(uint256 incentiveId) internal returns(bool) {
+            return incentiveId != 0 && incentiveId <= incentiveCount;
+        }
+        ```
+
+        Update current checks with the following:
+    
+        ```solidity
+        if(!_validIncentiveId(incentiveId)) revert InvalidInput();
+        ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-2] Unnecessary checks for uint not being less than 0
+        
+        Instances:
+        
+        - `createIncentive()` - reward amount cannot be less than 0 since it is uint112.
+            
+            ```solidity
+            if (rewardAmount <= 0) revert InvalidInput();
+            ```
+            
+        - `subscribeToIncentive()`, `accrueRewards()`, `claimRewards()` - incentiveId cannot be less than 0 since it is uint256.
+            
+            ```solidity
+            if (incentiveId > incentiveCount || incentiveId <= 0) revert InvalidInput();
+            ```
+            
+        - `subscribeToIncentive()` - referenced value cannot be less than 0 since it is uint112.
+        
+            ```solidity
+            if (userStakes[msg.sender][incentive.token].liquidity <= 0) revert NotStaked();
+            ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-3] Event may be emitted without any state updates
+  
+      In `updateIncentive()` - when changeAmount, newStartTime, and newEndTime are all zeros, `IncentiveUpdate` event will be emitted even though no changes have been performed.
+  
+      Also, in `stake()` and `unstake()` when amount is 0, `Stake()` and `Unstake()` events may be emitted, without corresponding state updates.
+  
+      Since events without state update may negatively impact off-chain tracking tools, consider updating implementation to not emit event unless at least one of the parameters has changed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-1] Multiple unnecessary casts
+  
+      In `updateIncentive()` - changeAmount is casted multiple times.
+  
+      ```solidity
+      incentive.rewardRemaining += uint112(changeAmount);
+  
+      ERC20(incentive.rewardToken).safeTransferFrom(msg.sender, address(this), uint112(changeAmount));
+      ```
+  
+      Consider assigning casted value to variable in memory and using it instead.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-2] Unnecessary function calls
+
+      In the `StakingContractMainnet`, replace `_increment(i)` calls with `unchecked { ++i; }` at the end of each loop for more efficient operation, or update contract to use Solidity version 0.8.22+ which has this [optimization built in by default](https://soliditylang.org/blog/2023/10/25/solidity-0.8.22-release-announcement/#:~:text=Notable%20New%20Features-,Unchecked%20loop%20increments,-The%20usage%20of).
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [I-1] Fee-on-transfer and rebase tokens not supported
+
+      Current `StakingContractMainnet` implementation, does not support fee-on-transfer tokens nor rebase tokens, as staking and reward tokens. Parties interacting with the contract are advised not to configure it with such tokens nor use incentives relying on such tokens.
+    </field>
+  </item>
+  

@@ -1,0 +1,333 @@
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-1] ETH sent to `MintsEthUnwrapperAndCaller` can be stolen if incorrect call is made
+  
+      `MintsEthUnwrapperAndCaller.sol` has the specific purpose of allowing a user to redeem their mint tokens for ETH, and supply their own additional ETH as necessary, to make an arbitrary call using this ETH. This call could be to do anything, but a specific use case is to bridge the ETH received, using Relay, and mint Zora NFTs on another chain.
+  
+      How it does this is a little indirect, where a user signs a permit that allows transferring of their mints, as well as having additional data that is passed into `onERC1155Received` or `onERC1155BatchReceived` hook, which the received mints tokens are redeemed for ETH and an arbratrary call is made, using the ETH initially sent as well as the amount redeemed via the mints tokens. Any excess ETH remaining in the contact is then sent back to the user.
+  
+      ```solidity
+      function permitWithAdditionalValue(IZoraMints1155Managed.PermitBatch calldata permit, bytes calldata signature) external payable {
+          IZoraMints1155Managed(address(zoraMints1155)).permitSafeTransferBatch(permit, signature);
+      }
+      ```
+      Reference: [MintsEthUnwrapperAndCaller.sol#L42-L44](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/helpers/MintsEthUnwrapperAndCaller.sol#L42-L44)
+  
+      ```solidity
+      function onERC1155Received(address, address from, uint256 id, uint256 value, bytes calldata data) external onlyMints returns (bytes4) {
+          // temporarily enable receiving eth
+          expectReceive = true;
+          // redeem the MINTs - all eth will be sent to this contract
+          Redemption memory redemption = zoraMints1155.redeem(id, value, address(this));
+          // disable receiving ETH
+          expectReceive = false;
+  
+          // if any redemption is erc20, revert
+          if (redemption.tokenAddress != address(0)) {
+              revert ERC20NotSupported(0);
+          }
+  
+          // forward eth balance redeemed to the desired receiver, calling it with the data and desired
+          // value to forward.
+          // refund the remaining eth to the original owner of the MINTs
+          _sendToReceiverAndRefundExcess(data, from);
+  
+          return ON_ERC1155_RECEIVED_HASH;
+      }
+      ```
+      Reference: [MintsEthUnwrapperAndCaller.sol#L46-L65](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/helpers/MintsEthUnwrapperAndCaller.sol#L46-L65)
+  
+      ```solidity
+      function _sendToReceiverAndRefundExcess(bytes calldata data, address refundRecipient) internal {
+          bytes4 action = bytes4(data[:4]);
+  
+          if (action != IUnwrapAndForwardAction.callWithEth.selector) {
+              revert UnknownUserAction();
+          }
+  
+          // decode the call: get address to forward eth to, encoded function to call on it, and value to forward
+          (address receiverAddress, bytes memory call, uint256 valueToSend) = abi.decode(data[4:], (address, bytes, uint256));
+  
+          (bool success, bytes memory callResponseData) = receiverAddress.call{value: valueToSend}(call);
+          if (!success) {
+              revert CallFailed(callResponseData);
+          }
+  
+          // if theres any remaining eth, refund it to the original owner of the MINTs
+          if (address(this).balance > 0) {
+              Address.sendValue(payable(refundRecipient), address(this).balance);
+          }
+      }
+      ```
+      Reference: [MintsEthUnwrapperAndCaller.sol#L95-L114](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/helpers/MintsEthUnwrapperAndCaller.sol#L95-L114)
+  
+      However, this assumes that the call made to `permitSafeTransferBatch()` transfers the mints tokens to this unwrapper contract which triggers the hooks and continue the execution flow. If any other address is provided in the `PermitBatch`’s `to` parameter, then the expected execution flow stops and any ETH sent with the call to `permitWithAdditionalValue()` remains in the contract.
+      In the case where this occurs, the ETH left in the contract can be easily scooped up by anyone, either maliciously or accidentally, as the next call that properly executes as expected will have all the excess ETH sent to the `refundRecipient`. 
+  
+      **Remediations to Consider**
+  
+      Ensure that the `permit`’s `to` parameter is set to `address(this)` in `permitWithAdditionalValue()`, to make sure that the call executes as expected and no ETH is lost due to incorrect inputs.
+  
+    </field>
+    <field name="response">
+        while this is a risk, this contract call is setup by our front-end, and not meant to be used directly by third parties, so the risk is low.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">461d3ba2f82a1e1a96bf6788f20367204edb1af5</field>
+    <field name="content">
+      ## [M-2] Cannot pre-mint paid NFTs using mints
+  
+      Mints tokens are ERC1155 tokens that are intended to be used to cover fees to mint NFTs on the Zora protocol, where each mint token can be redeemed to mint at a 1:1 rate for normal free mints, and additional ETH can be sent used to cover any additional fees a collection may require.
+  
+      Typically users can mint from a Zora collection that integrates with mints, via a direct call to [mintWithMints()](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/1155-contracts/src/nft/ZoraCreator1155Impl.sol#L555-L574), sending any additional ETH with the call to cover additional fees for paid mints, if required.
+  
+      There is an alternative method that allows for users to use Mints without having to make an additional approval transaction to the collection. This is done my calling [transferBatchToManagerAndCall()](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/ZoraMints1155.sol#L322-L342) on the `ZoraMints1155.sol` contract or transferring the Mints tokens to the Zora Mints Manager contract with additional data relating to the call. Going through the mint manager allows 2 calls to be made, [Collect()](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/ZoraMintsManagerImpl.sol#L226-L241), which effectively calls `mintWithMints()` on the desired collection, and `collectPremintV2()`:
+  
+      ```solidity
+      function collectPremintV2(
+          ContractCreationConfig calldata contractConfig,
+          PremintConfigV2 calldata premintConfig,
+          bytes calldata signature,
+          MintArguments calldata mintArguments,
+          address signerContract
+      ) external payable override onlyThis returns (PremintResult memory result) {
+          MintArguments memory emptyArguments;
+          TransferredMints memory transferredMints = _getTransferredMints();
+          address firstMinter = transferredMints.from;
+          // call premint with mints on the premint executor, which will get or create the contract,
+          // get or create a token for the uid.
+          // quantity to mint is 0, meaning that this step will just get or create the contract and token
+          result = premintExecutor.premintV2WithSignerContract{value: msg.value}(
+              contractConfig,
+              premintConfig,
+              signature,
+              0,
+              // these arent used in the premint when quantity to mint is 0, so we can pass empty arguments
+              emptyArguments,
+              firstMinter,
+              signerContract
+          );
+  
+          // collect tokens from the creator contract using MINTs
+          _collect(
+              IMintWithMints(result.contractAddress),
+              IMinter1155(premintConfig.tokenConfig.fixedPriceMinter),
+              result.tokenId,
+              mintArguments.mintRewardsRecipients,
+              abi.encode(mintArguments.mintRecipient, ""),
+              mintArguments.mintComment
+          );
+      }
+      ```
+      Reference: [ZoraMintsManagerImpl.sol#L247-L280](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/ZoraMintsManagerImpl.sol#L247-L280)
+  
+      `CollectPremintV2()` does the same as collect, but allows minting on a collection that may not exist yet, by calling [`premintV2WithSignerContract()`](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/1155-contracts/src/delegation/ZoraCreator1155PremintExecutorImpl.sol#L114-L150) on the set `premintExecutor`, creating the collection if it does not exist and the collection owner has signed the appropriate data for the new collection.
+      However, when calling `premintV2WithSignerContract()` ETH is sent with the call, equal to `msg.value`, which is not used when no tokens are minted, since `quantityToMint` is set to zero there is no call to `mintWithETH()` on the collection:
+  
+      ```solidity
+       if (quantityToMint > 0) {
+          ZoraCreator1155PremintExecutorImplLib.mintWithEth(
+              IZoraCreator1155(result.contractAddress),
+              premintConfig.tokenConfig.fixedPriceMinter,
+              result.tokenId,
+              quantityToMint,
+              mintArguments
+          );
+      }
+      ```
+      Reference: [ZoraCreator1155PremintExecutorImpl.sol#L132-L140](https://www.notion.so/75a583549419468e956ce2a4ed0a920d?pvs=21)
+  
+      So any ETH sent in this call gets locked in the  `ZoraCreator1155PremintExecutor` contract, but when the call continues to `_collect()` the `msg.value` is used again when calling `mintWithMints()`:
+  
+      ```solidity
+      ...
+      mints1155.setApprovalForAll(address(zoraCreator1155Contract), true);
+      // call the Zora Creator 1155 contract to mint the creator tokens.  The creator contract will redeem the MINTs.
+      uint256 quantityMinted = zoraCreator1155Contract.mintWithMints{value: msg.value}(
+          tokenIds,
+          quantities,
+          minter,
+          zoraCreator1155TokenId,
+          rewardsRecipients,
+          // here we strip out the comment since it doesn't work properly with msg.sender changing.
+          minterArguments
+      );
+      ...
+      ```
+      Reference: [ZoraMintsManagerImpl.sol#L308-L319](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/ZoraMintsManagerImpl.sol#L308-L319)
+  
+      Since the value of the call was already sent out of the contract in the call to  `premintV2WithSignerContract()`, there likely isn’t any ETH remaining in the contract to make the second call to `mintWithMints()`, so the execution should revert if `msg.value` is non-zero, and there wasn’t any ETH in the contract prior to the call, which is likely.
+      The only case where there is expected to extra ETH sent is where the user wants to mint a paid NFT, so in the case of attempting to pre-mint or mint a paid NFT using `collectPremintV2()`, the transaction will fail. 
+  
+      **Remediations to Consider**
+  
+      Do not send any ETH in the call to `premintV2WithSignerContract()`, to allow minting paid NFTs via the `collectPremintV2()` path.
+      Also consider adjusting  the [`premintV2WithSignerContract()`](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/1155-contracts/src/delegation/ZoraCreator1155PremintExecutorImpl.sol#L114C14-L150) function to make sure that there is no value sent in if quantityToMint is zero, as any ETH sent in accidentally is currently locked.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] Users may not mint the expected Mints token, potentially spending more than desired
+  
+      Minting Mints tokens is not done directly, but rather by calling either `mintWithEth()` or `mintWithERC20()` on the Mints Manager:
+  
+      ```solidity
+       /// This will be moved to the Mints Manager
+      function mintWithEth(uint256 quantity, address recipient) external payable override returns (uint256 mintableTokenId) {
+          MintsManagerStorage storage mintsManagerStorage = _getMintsManagerStorage();
+          mintableTokenId = mintsManagerStorage.mintableEthToken;
+          mintsManagerStorage.mints.mintTokenWithEth{value: msg.value}(mintableTokenId, quantity, recipient, "");
+      }
+  
+      /// This will be moved to the Mints Manager
+      function mintWithERC20(address tokenAddress, uint quantity, address recipient) external returns (uint256 mintableTokenId) {
+          MintsManagerStorage storage mintsManagerStorage = _getMintsManagerStorage();
+          mintableTokenId = mintsManagerStorage.mintableERC20Token[tokenAddress];
+  
+          _mintTokenWithERC20(mintableTokenId, tokenAddress, quantity, recipient, "");
+      }
+      ```
+      Reference: [ZoraMintsManagerImpl.sol#L140-L153](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/ZoraMintsManagerImpl.sol#L140-L153)
+  
+      However, the specific Mints token id isn’t specified, and the currently set mintable token is used depending on the payment type used. This mintable token is set by the owner of the Mints Manager via `setDefaultMintable()`:
+  
+      ```solidity
+      // note: this is to be moved to the mints manager
+      function setDefaultMintable(address tokenAddress, uint256 tokenId) external override onlyOwner {
+          _setDefaultMintable(tokenAddress, tokenId);
+      }
+      ```
+  
+      Since the token id that is minted can change, if a user submits a transaction to mint, they may be expecting a certain price, or token with an accepted `redeemHandler`, but if the mintable token changes before they execute the transaction, they may not be happy with the result. When paying with ETH it is less likely to be an issue if the price changes as the call will likely revert, but if a user has approved the Mints Manager for a large amount of ERC20 tokens, they could have enough balance and approvals to purchase a mint for more than expected if the new token’s price is higher. In both cases a new redeemHandler that takes some of the redeemed amount may have dissuaded the user from minting had they known beforehand.
+  
+      **Remediations to Consider**
+  
+      Add a expected tokenId to both the `mintWithERC20(`) and `mintWithEth()` functions to ensure the outcome for users is as expected.
+  
+    </field>
+    <field name="response">
+        Won’t fix for now - adding a tokenId to this makes sense.  While this is a risk, it only occurs with erc20 based mint token ids.  We don’t plan on adding support for erc20 minting anytime soon.  If/when we do, we will switch to taking a token id as a parameter.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-1] Unnecessary setting and removing transferred mints
+  
+      Mints tokens are transferred to the Zora Mints Manager, the tokens sent are stored to be later used in the calls made to itself to `collect()` or `collectPremintV2()`, then the store values are removed. This can occur via transfers or calls to callWithTransferTokens() by the Mints contract:
+  
+      ```solidity
+      function onERC1155Received(address, address from, uint256 id, uint256 value, bytes calldata data) external onlyMints returns (bytes4) {
+          (uint256[] memory ids, uint256[] memory quantities) = BatchDataHelper.asSingletonArrays(id, value);
+          _setTransferredMints(from, ids, quantities);
+  
+          if (data.length != 0) {
+              _handleReceivedCallAndRevertIfFails(data);
+          }
+  
+          _clearTransferredMints();
+  
+          return ON_ERC1155_RECEIVED_HASH;
+      }
+  
+      function onERC1155BatchReceived(
+          address,
+          address from,
+          uint256[] calldata ids,
+          uint256[] calldata values,
+          bytes calldata data
+      ) external onlyMints returns (bytes4) {
+          _setTransferredMints(from, ids, values);
+  
+          if (data.length != 0) {
+              _handleReceivedCallAndRevertIfFails(data);
+          }
+  
+          _clearTransferredMints();
+  
+          return ON_ERC1155_BATCH_RECEIVED_HASH;
+      }
+  
+      function callWithTransferTokens(
+          address callFrom,
+          uint256[] calldata tokenIds,
+          uint256[] calldata quantities,
+          bytes calldata call
+      ) external payable onlyMints returns (bool success, bytes memory result) {
+          _setTransferredMints(callFrom, tokenIds, quantities);
+          (success, result) = _handleReceivedCall(call, msg.value);
+          _clearTransferredMints();
+      }
+      ```
+      Reference: [ZoraMintsManagerImpl.sol#L358-L398](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/ZoraMintsManagerImpl.sol#L140-L153)
+  
+      However, when the mints contract calls callWithTransferTokens() in its transferBatchToManagerAndCall() function, it first transferred the mints tokens with no data, which would trigger onERC1155BatchReceived() to set and clear the transferred mints before it is set again in the call to callWithTransferTokens():
+  
+      ```solidity
+      function transferBatchToManagerAndCall(
+          uint256[] calldata tokenIds,
+          uint256[] calldata quantities,
+          bytes calldata call
+      ) external payable returns (bytes memory callReturn) {
+          safeBatchTransferFrom(msg.sender, getManager(), tokenIds, quantities, "");
+  
+          // store the msgSender, so that the manager can get the msgSender of the call
+          (bool success, bytes memory result) = ICollectWithZoraMints(getManager()).callWithTransferTokens{value: msg.value}({
+              callFrom: msg.sender,
+              tokenIds: tokenIds,
+              quantities: quantities,
+              call: call
+          });
+          ...
+      ```
+      Reference: [ZoraMints1155.sol#L322-L335](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/ZoraMints1155.sol#L322-L335)
+  
+      For the `onERC1155BatchReceived` and `onERC1155Received` hooks, the transferred tokens are only used if the data is not empty.
+  
+      **Remediations to Consider**
+  
+      Only set the transferred tokens for the 1155 hooks if the data passed in is not empty to prevent and additional set and removal when `transferBatchToManagerAndCall()` is used.
+
+    </field>
+    <field name="response">
+        We are going to eventually remove this logic completely for more simple functionality that enables unwrapping/ 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] Inaccurate comments
+  
+      Notes to move functions to mint manager should be removed since they are currently in the mint manager:
+  
+      - [here](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/ZoraMintsManagerImpl.sol#L140)
+      - [here](https://github.com/ourzora/zora-protocol/blob/8e514b7bd55d431b0a5d718e98e0f8fb54831b22/packages/mints/src/ZoraMintsManagerImpl.sol#L147)
+      - [here](https://www.notion.so/Zora-1-Preliminary-Audit-Report-external-private-154dc6c5c479425c8379ef58b6d582fd?pvs=21)
+    </field>
+    <field name="response">
+        When we do the next upgrade to this contract we can fix it.
+    </field>
+  </item>
+  
