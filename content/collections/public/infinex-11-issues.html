@@ -1,0 +1,581 @@
+<item>
+    <field name="topic">Protocol design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">686bbf8ee9c71f4ed5ed077f5bf38f6ada393fa9</field>
+    <field name="content">
+      ## [M-1] The full amount of `totalRewards` cannot be allocated when overriding vesting entries
+  
+      When setting vesting entries, the `_setVestingEntry` function checks that the total allocated amount doesn't exceed the `totalReward` amount:
+  
+      ```jsx
+      if (_amount + campaign.totalAllocated > campaign.totalReward) revert AllocationOverTotalReward();
+      ```
+  
+      **Reference**: [RewardCampaign.sol#L359](https://github.com/infinex-xyz/infinex-contracts/blob/5604cda46f4620c8487d087e7f2aa963e41e5213/src/reward-campaign/RewardCampaign.sol#L359)
+  
+      This check works as intended for new accounts. However, it fails when overriding an existing vesting entry. The issue arises because `campaign.totalAllocated` includes the old entry's amount, potentially causing the transaction to revert even when the total allocation doesn't actually exceed `totalReward`.
+  
+      Consider this scenario: A campaign has a `totalReward` of 100, with 95 already allocated, including 10 for `accountA`. If the vestingEntryManager tries to change `accountA`'s allocation to 15, the check fails:
+  
+      `15 + 95 > 100` (true, causing revert)
+  
+      To fix this, subtract the old amount (= 10) from `totalAllocated`:
+  
+      `15 + (95 - 10) > 100` (false, allowing the update)
+  
+      **Remediation to Consider**
+  
+      Modify the above check to account for the previously allocated amount when overriding an existing entry.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">c2b73c1130dd34df5becc55c4aec730ca54503d8</field>
+    <field name="content">
+      ## [M-2] A deleted campaign can still be funded, started, and can even be claimed by users when the campaign is deleted
+
+      In order to delete the campaign, the owner must call to `deleteCampaign()`, which basically sets the `campaign.id` value to zero:
+  
+      ```solidity
+      function deleteCampaign(uint32 _campaignId) external onlyOwner {
+          IRewardCampaign.Campaign memory campaign = RewardCampaignStorage._getCampaign(_campaignId);
+          if (_campaignId == 0 || campaign.id == 0) revert InvalidCampaignId();
+  
+          emit CampaignDeleted(_campaignId);
+  
+          RewardCampaignStorage._deleteCampaign(_campaignId);
+  
+          if (campaign.funded) {
+              IERC20(campaign.token).safeTransfer(msg.sender, campaign.totalReward - campaign.totalClaimed);
+          }
+      }
+      ```
+  
+      **Reference:** [RewardCampaign.sol#L164-L175](https://github.com/infinex-xyz/infinex-contracts/blob/ec9a38e6bdcc7aaa473b6d485b3b8fc5e7f28d35/src/reward-campaign/RewardCampaign.sol#L164-L175)
+  
+      ```solidity
+      function _deleteCampaign(uint32 _campaignId) internal {
+          getStorage().campaigns[_campaignId].id = 0;
+      }
+      ```
+  
+      **Reference:** [RewardCampaignStorage.sol#L110-L112](https://github.com/infinex-xyz/infinex-contracts/blob/ec9a38e6bdcc7aaa473b6d485b3b8fc5e7f28d35/src/reward-campaign/RewardCampaignStorage.sol#L110-L112)
+  
+      In the `fundCampaign()`, `startCampaign()`, and all the claiming functions don’t restrict whether the campaign is deleted. As a result, a deleted campaign can still be funded, started, and can even be claimed by users when the campaign is deleted
+  
+      **Remediations to Consider**
+  
+      Consider disallowing the call to other functions with a particular campaign if the campaign is deleted  
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol design</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ef135dfe1ef8a0523ca0817524d5dc67c9dacd6a</field>
+    <field name="content">
+      ## [L-1] No support for fee-on-transfer tokens
+
+  
+      RewardCampaign doesn't properly account for tokens that apply a transfer tax. When such a token is used, the actual amount transferred in the `fundCampaign` function is less than the specified `_amount`. This discrepancy leads to an incorrect `totalReward` calculation, potentially preventing users from claiming rewards as the contract may run out of funds.
+  
+      **Remediation to Consider**
+  
+      To accurately handle fee-on-transfer tokens, calculate the contract's balance before and after the transfer. Use this difference, rather than the specified amount, to update the campaign's total reward.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Incorrect return value</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">686bbf8ee9c71f4ed5ed077f5bf38f6ada393fa9</field>
+    <field name="content">
+      ## [L-2] The `claimable()` view function is not returning proper value when the campaign has not started yet
+
+  
+      In the `RewardCampaign.claimable()` function, the return value will be the amount of token that can be claimed for a particular vesting entry at that moment:
+  
+      ```solidity
+      function claimable(uint32 _campaignId, address _account) external view returns (uint256) {
+          IRewardCampaign.Campaign memory campaign = RewardCampaignStorage._getCampaign(_campaignId);
+          IRewardCampaign.VestingEntry memory vestingEntry = RewardCampaignStorage._getVestingEntry(_campaignId, _account);
+          if (vestingEntry.amount == 0) return 0;
+  
+          uint256 claimableAmount = _claimable(campaign.startDate, campaign.vestingCliff, campaign.vestingDuration, vestingEntry.amount);
+          uint256 availableToClaim = claimableAmount - vestingEntry.claimed;
+          return availableToClaim;
+      }
+      ```
+  
+      **Reference:** [RewardCampaign.sol#L120-L127](https://github.com/infinex-xyz/infinex-contracts/blob/ec9a38e6bdcc7aaa473b6d485b3b8fc5e7f28d35/src/reward-campaign/RewardCampaign.sol#L120-L127)
+  
+      When the campaign is not started, the campaign’s `startDate` is still 0. Theoretically, the `claimable()` function should return zero at that time, since no vesting entry can be claimed. But in reality, it will return a maximum amount of token of the vesting entry:
+  
+      ```solidity
+      function _claimable(uint256 _start, uint256 _cliff, uint256 _duration, uint256 _amount) internal view returns (uint256) {
+          if (block.timestamp < _start + _cliff) {
+              return 0;
+          } else if (block.timestamp >= _start + _cliff + _duration) {
+              return _amount;    //<@@ will go to this case because _start == 0 
+          } else {
+              return _amount * (block.timestamp - (_start + _cliff)) / _duration;
+          }
+      }
+      ```
+  
+      **Remediations to Consider**
+  
+      Consider making the `claimable()` return zero when the campaign has not started yet
+  
+      ```diff
+      function claimable(uint32 _campaignId, address _account) external view returns (uint256) {
+          IRewardCampaign.Campaign memory campaign = RewardCampaignStorage._getCampaign(_campaignId);
+      +   if (campaign.startDate == 0) return 0;
+          IRewardCampaign.VestingEntry memory vestingEntry = RewardCampaignStorage._getVestingEntry(_campaignId, _account);
+          if (vestingEntry.amount == 0) return 0;
+  
+          uint256 claimableAmount = _claimable(campaign.startDate, campaign.vestingCliff, campaign.vestingDuration, vestingEntry.amount);
+          uint256 availableToClaim = claimableAmount - vestingEntry.claimed;
+          return availableToClaim;
+      }
+      ```
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Reentrancy</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/infinex-xyz/infinex-contracts/pull/305/commits/5604cda46f4620c8487d087e7f2aa963e41e5213,https://github.com/infinex-xyz/infinex-contracts/pull/305/commits/686bbf8ee9c71f4ed5ed077f5bf38f6ada393fa9</field>
+    <field name="content">
+      ## [L-3] Not following the CEI pattern led to reentrancy with ERC777
+  
+  
+      The `_claim()` function doesn’t follow check-effect-interaction (CEI) pattern:
+  
+      ```solidity
+      function _claim(uint32 _campaignId, address _account, address _destination) internal {
+        ...
+        IERC20(campaign.token).safeTransfer(_destination, availableToClaim); <@@@ REENTRANCY
+        RewardCampaignStorage._setVestingEntryClaimed(_campaignId, _account, availableToClaim);
+        RewardCampaignStorage._setCampaignTotalClaimed(_campaignId, availableToClaim);
+        ...
+      }
+      ```
+  
+      Reference: [RewardCampaign.sol#L330-L346](https://github.com/infinex-xyz/infinex-contracts/blob/ec9a38e6bdcc7aaa473b6d485b3b8fc5e7f28d35/src/reward-campaign/RewardCampaign.sol#L330-L346)
+  
+      As a result, the function is vulnerable to reentrancy when the reward token of that campaign supports the ERC777 standard. The attacker can claim many times without changing states, which leads to draining all the reward token that belong to the `RewardCampaign` contract
+  
+      The `fundCampaign()` function is also not following the CEI pattern, which is also vulnerable to reentrancy when the reward token of that campaign supports the ERC777 standard. Even though the impact is not severe, it’s better still to follow the CEI pattern
+  
+      ```solidity
+      function fundCampaign(uint32 _campaignId, uint256 _amount) external {
+        IRewardCampaign.Campaign memory campaign = RewardCampaignStorage._getCampaign(_campaignId);
+        if (_ERC2771MsgSender() != campaign.rewarder) revert InvalidRewarder();
+        if (campaign.funded) revert CampaignAlreadyFunded();
+        if (_amount != campaign.totalReward) revert InvalidAmount();
+  
+        emit CampaignFunded(_campaignId, campaign.rewarder, _amount);
+  
+        // slither-disable-next-line arbitrary-send-erc20
+        IERC20(campaign.token).safeTransferFrom(_ERC2771MsgSender(), address(this), _amount);
+        RewardCampaignStorage._setCampaignFunded(_campaignId, true);
+      }
+      ```
+  
+      Reference: [RewardCampaign.sol#L182-L193](https://github.com/infinex-xyz/infinex-contracts/blob/ec9a38e6bdcc7aaa473b6d485b3b8fc5e7f28d35/src/reward-campaign/RewardCampaign.sol#L182-L193)
+  
+      **Remediations to Consider**
+  
+      Consider following CEI pattern in `_claim()` and `fundCampaign()` functions
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Replay signature</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c3179322b33aec19186127091ae37214a58d850c</field>
+    <field name="content">
+      ## [L-4] Too broad hash structure for signatures can lead to replay signatures attacks when more contracts support the EIP1271 standard with Infinex accounts
+  
+
+      The `RewardCampaign` contract allows claiming reward tokens to an Infinex account with the account’s sudo signature, using either the `claim()` function or the `claimToAllowlistedWithdrawalAddress()` function with an EIP1271 signature. In the `claim()` function, the hash structure is the combination of `_campaignId` with `uint32` type and `_account` with `address` type:
+  
+      ```solidity
+      bytes32 requestHash = keccak256(abi.encodePacked(_campaignId, _account));
+      ```
+  
+      **Reference:** [RewardCampaign.sol#L299](https://github.com/infinex-xyz/infinex-contracts/blob/cfc405e22afb9b9eabe18dfa91de9e72255cb354/src/reward-campaign/RewardCampaign.sol#L299)
+  
+      In `claimToAllowlistedWithdrawalAddress()` function, the hash structure is the combination of `_campaignId` with `uint32` type, `_account` with `address` type, and `_withdrawalAddress` with `address` type:
+  
+      ```solidity
+      bytes32 requestHash = keccak256(abi.encodePacked(_campaignId, _account, _withdrawalAddress));
+      ```
+  
+      **Reference:** [RewardCampaign.sol#L324](https://github.com/infinex-xyz/infinex-contracts/blob/cfc405e22afb9b9eabe18dfa91de9e72255cb354/src/reward-campaign/RewardCampaign.sol#L324)
+  
+      The hash structures of these 2 functions are relatively simple. In the future, when more contracts allow the EIP1271 standard for Infinex accounts, it could lead to a single signature being a valid input for different functions from different contracts, potentially leading to unpredictable behavior.
+  
+      **Remediations to Consider**
+  
+      Consider including the `RewardCampaign` address and corresponding function selector in the hashing structure of the signature
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Replay signature</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">c3179322b33aec19186127091ae37214a58d850c</field>
+    <field name="content">
+      ## [L-5] The signatures for `claim()` function or the `claimToAllowlistedWithdrawalAddress()` function can be called multiple times
+
+      The `RewardCampaign` contract allows claiming reward tokens to an Infinex account with the account’s sudo signature, using either the `claim()` function or the `claimToAllowlistedWithdrawalAddress()` function with an EIP1271 signature. These functions don’t have any mechanism to prevent the same signature from being reused. Even though the reward tokens will be sent to the correct account, it is still a potential griefing vector and we recommend preventing signatures from being replay.
+  
+      **Remediations to Consider**
+  
+      Consider including a nonce mechanism in the hashing structure of the signature
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">686bbf8ee9c71f4ed5ed077f5bf38f6ada393fa9</field>
+    <field name="content">
+      ## [Q-1] Vesting entries can be created with `amount = 0`
+  
+  
+      The `setVestingEntry` function lacks a check to ensure the `_amount` parameter is greater than zero. Consequently, claiming for an entry with a zero amount will fail, triggering an `InvalidVestingEntry()` error.
+  
+      **Remediation to Consider**
+  
+      Although this doesn't pose a security risk, it's advisable to prevent the creation of invalid entries in the `setVestingEntry` function. 
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">686bbf8ee9c71f4ed5ed077f5bf38f6ada393fa9</field>
+    <field name="content">
+      ## [Q-2] Trusted forwarder can be set as `address(0)` in the `RewardCampaign.initialize()` function
+  
+  
+      In the `RewardCampaign.initialize()` function, trusted forwarder can be set as `address(0)`
+  
+      ```solidity
+      function initialize(address _owner, address _trustedForwarder) public initializer {
+          OwnableUpgradeable.__Ownable_init(_owner);
+          ERC2771Context.initialize(_trustedForwarder);
+      }
+      ```
+  
+      **Reference:** [RewardCampaign.sol#L55-L58](https://github.com/infinex-xyz/infinex-contracts/blob/ec9a38e6bdcc7aaa473b6d485b3b8fc5e7f28d35/src/reward-campaign/RewardCampaign.sol#L55-L58)
+  
+      This behavior is not harmful because the owner can change trusted forwarder anytime, but since `addTrustedForwarder()` and `removeTrustedForwarder()` are not allowing `trustedForwarder` as `address(0)`, it makes sense to also disallow in the `initialize()` function for consistency state
+  
+      **Remediations to Consider**
+  
+      Consider disallowing `_trustedForwarder` to `address(0)` in the `initialize()` function
+  
+      ```diff
+      function initialize(address _owner, address _trustedForwarder) public initializer {
+          OwnableUpgradeable.__Ownable_init(_owner);
+      
+      +   if (_trustedForwarder == address(0)) revert Error.NullAddress();
+          ERC2771Context.initialize(_trustedForwarder);
+      }
+      ```
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant state</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">13a2b7cce9d458237c77cc28fbb9d7e732331863</field>
+    <field name="content">
+      ## [Q-3] `id` member in the `Campaign` struct can be changed to `isDeleted` member
+  
+  
+      The `id` member in the `Campaign` struct is non-zero when the campaign exists and is set to zero if the campaign is not created or deleted. The `id` is already stored as a key in the `campaigns` mapping, hence it’s redundant to have an `id` member in the `Campaign` struct. 
+  
+      Consider changing the `id` member in the `Campaign` struct to `isDeleted` member with a boolean type for better clarity and to reduce state redundant
+  
+      ---
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">13a2b7cce9d458237c77cc28fbb9d7e732331863</field>
+    <field name="content">
+      ## [Q-4] Redundant underflow check in `_setVestingEntry` function
+  
+
+  
+      In the `RewardCampaignStorage._setVestingEntry` function, there’s a mechanism to prevent the underflow error:
+  
+      ```solidity
+      if (vestingEntry.amount > _amount) {
+       newTotalAllocated = campaign.totalAllocated - (vestingEntry.amount - _amount);
+      } else {
+       newTotalAllocated = campaign.totalAllocated + (_amount - vestingEntry.amount);
+      }
+      ```
+  
+      **Reference:** [RewardCampaignStorage.sol#L160-L164](https://github.com/infinex-xyz/infinex-contracts/blob/ec9a38e6bdcc7aaa473b6d485b3b8fc5e7f28d35/src/reward-campaign/RewardCampaignStorage.sol#L160-L164)
+  
+      This logic is redundant due to the following invariant: the `totalAllocated` of the campaign is equal to the sum of all the `vestingEntry` amounts of the same campaign. This means the `totalAllocated` of the campaign is always greater than or equal to any single `vestingEntry` amount of the same campaign. Therefore, it's impossible for `campaign.totalAllocated - vestingEntry.amount` to underflow.
+  
+      **Remediations to Consider**
+  
+      Consider removing the underflow mechanism for better simplicity:
+  
+      ```diff
+      function _setVestingEntry(uint32 _campaignId, address _account, uint256 _amount) internal {
+          IRewardCampaign.Campaign memory campaign = getStorage().campaigns[_campaignId];
+          IRewardCampaign.VestingEntry memory vestingEntry = getStorage().vestingEntries[_campaignId][_account];
+          uint256 newTotalAllocated;
+  
+      -   if (vestingEntry.amount > _amount) {
+      -       newTotalAllocated = campaign.totalAllocated - (vestingEntry.amount - _amount);
+      -   } else {
+      -       newTotalAllocated = campaign.totalAllocated + (_amount - vestingEntry.amount);
+      -   }
+  
+      +		newTotalAllocated = campaign.totalAllocated + _amount - vestingEntry.amount;
+  
+          getStorage().campaigns[_campaignId].totalAllocated = newTotalAllocated;
+          getStorage().vestingEntries[_campaignId][_account] = IRewardCampaign.VestingEntry({ amount: _amount, claimed: 0 });
+      }
+      ```
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c2b73c1130dd34df5becc55c4aec730ca54503d8</field>
+    <field name="content">
+      ## [Q-5] `fundCampaign` can be called after campaign were started
+
+      After a campaign has been started, no more vesting entries can be added to the campaign. Thus, there is no need to add more funds to the campaign via `fundCampaign`.
+  
+      **Remediation to Consider**
+  
+      Consider preventing the addition of funds to campaigns that have already started.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol design</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c2b73c1130dd34df5becc55c4aec730ca54503d8</field>
+    <field name="content">
+      ## [Q-6] Rewarder and VestingManager can be changed for started campaign
+  
+  
+      A Rewarder and VestingManager address can be set via `setCampaignRewarder` and `setCampaignVestingEntryManager` for campaigns. Ideally, this should only be possible for campaigns that haven't started yet. However, the current implementation allows setting or changing these addresses even for ongoing campaigns.
+  
+      **Remediation to Consider**
+  
+      Restrict the ability to set Rewarder and VestingManager addresses to campaigns that have not yet begun.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Inheritance</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2962464ff3cf4137125bb09e5cf1d2300ce29918</field>
+    <field name="content">
+      ## [Q-7] Overriding `addTrustedForwarder()` and `removeTrustedForwarder()` functions from the `ERC2771BaseUpgradeable` contract is not mandatory
+
+  
+      In the `ERC2771BaseUpgradeable` abstract contract, there are `addTrustedForwarder()` and `removeTrustedForwarder()` functions that the child contract should override. However, because these functions contain empty braces `{ }`, the compiler treats them as implemented with empty logic. As a result, the compiler will not throw any error when a child contract does not override the `addTrustedForwarder()` and `removeTrustedForwarder()` functions from the `ERC2771BaseUpgradeable` contract. Child contracts that forget to override these functions may not be able to add or remove trusted forwarders.
+  
+      ```solidity
+      function addTrustedForwarder(address _trustedForwarder) external virtual returns (bool) { }
+      function removeTrustedForwarder(address _trustedForwarder) external virtual returns (bool) { }
+      ```
+  
+      **Reference:** [ERC2771BaseUpgradeable.sol#L54-L61](https://github.com/infinex-xyz/infinex-contracts/blob/ec9a38e6bdcc7aaa473b6d485b3b8fc5e7f28d35/src/forwarder/ERC2771BaseUpgradeable.sol#L54-L61)
+  
+      **Remediations to Consider**
+  
+      Consider changing the code as follows to make function overriding mandatory for child contracts:
+  
+      ```diff
+      -    function addTrustedForwarder(address _trustedForwarder) external virtual returns (bool) { }
+      +    function addTrustedForwarder(address _trustedForwarder) external virtual returns (bool);
+  
+      -    function removeTrustedForwarder(address _trustedForwarder) external virtual returns (bool) { }
+      +    function removeTrustedForwarder(address _trustedForwarder) external virtual returns (bool);
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol design</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">96b2535fbb7b2b34045555a554593f11b92ee58a</field>
+    <field name="content">
+      ## [Q-8] Unnecessarily restricting the rewarder of the campaign
+  
+  
+      In the `RewardCampaign` contract, the rewarder of the campaign is set initially in the `createCampaign()` function by the owner, and can be changed later with the `setCampaignRewarder()` function by the owner. Only the rewarder of the campaign can fund the corresponding campaign via the `fundCampaign()` function, which is too strict. 
+  
+      **Remediation to Consider**
+  
+      Consider removing the rewarder mechanism and making `fundCampaign()` function permissionless for more flexibility.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6ca4a2eae8f034a07de60cbce59d0e06565ef8cc</field>
+    <field name="content">
+      ## [Q-9] Missing EOA validation for the Blast Point operator address
+  
+      | **Topic** | Validation |
+      | --- | --- |
+      | **Impact** | Low |
+  
+      According to the [Blast’s documentation](https://docs.blast.io/airdrop/mainnet-points-api/concepts#smart-contract-operator), the Blast Point operator must be an EOA:
+  
+      > An operator is an EOA (externally owned account) whose private key is accessible to an internet-connected server.
+      > 
+  
+      However, in the `BlastPointDistributor` contract, there's no check to verify whether the operator is an EOA or not. Consider adding a validation to restrict the operator to EOA addresses only.
+    </field>
+  </item>
+  
+
+
+  <item>
+    <field name="topic">Redundant checks</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">686bbf8ee9c71f4ed5ed077f5bf38f6ada393fa9</field>
+    <field name="content">
+      ## [G-1] The same requirement is checked inside the loop in the `setVestingEntries()` function
+  
+  
+      In the `setVestingEntries()` function, `_setVestingEntry()` internal function is called multiple times in the loop with the same `_campaignId` argument:
+  
+      ```solidity
+      function setVestingEntries(uint32 _campaignId, address[] calldata _accounts, uint256[] calldata _amounts)
+          external
+          onlyVestingEntryManager
+      {
+          if (_accounts.length != _amounts.length) revert Error.InvalidLength();
+          for (uint256 i = 0; i < _accounts.length; i++) {
+              _setVestingEntry(_campaignId, _accounts[i], _amounts[i]);
+          }
+      }
+      ```
+  
+      **Reference:** [RewardCampaign.sol#L228-L236](https://github.com/infinex-xyz/infinex-contracts/blob/ec9a38e6bdcc7aaa473b6d485b3b8fc5e7f28d35/src/reward-campaign/RewardCampaign.sol#L228-L236)
+  
+      In the `_setVestingEntry()` function, the `_campaignId` parameter is restricted by these two requirements:
+  
+      ```solidity
+      function _setVestingEntry(uint32 _campaignId, address _account, uint256 _amount) internal {
+          IRewardCampaign.Campaign memory campaign = RewardCampaignStorage._getCampaign(_campaignId);
+      
+          if (_campaignId == 0 || campaign.id == 0) revert InvalidCampaignId();
+          if (campaign.startDate > 0) revert CampaignHasStarted();
+      
+          ...
+      }
+      ```
+  
+      **Reference:** [RewardCampaign.sol#L313-L322](https://github.com/infinex-xyz/infinex-contracts/blob/ec9a38e6bdcc7aaa473b6d485b3b8fc5e7f28d35/src/reward-campaign/RewardCampaign.sol#L313-L322)
+  
+      While calling `_setVestingEntry()` multiple times through the `setVestingEntries()` function, the same two requirements are checked, which is redundant and should be only checked once throughout the `setVestingEntries()` function
+  
+      **Remediations to Consider**
+  
+      Consider moving these two requirements from `_setVestingEntry()` function to the higher functions, which is `setVestingEntry()` and `setVestingEntries()` functions
+  
+      ```diff
+      function setVestingEntry(uint32 _campaignId, address _account, uint256 _amount) external onlyVestingEntryManager {
+      +   IRewardCampaign.Campaign memory campaign = RewardCampaignStorage._getCampaign(_campaignId);
+      +   if (_campaignId == 0 || campaign.id == 0) revert InvalidCampaignId();
+      +   if (campaign.startDate > 0) revert CampaignHasStarted();
+  
+          _setVestingEntry(_campaignId, _account, _amount);
+      }
+      ```
+  
+      ```diff
+      function setVestingEntries(uint32 _campaignId, address[] calldata _accounts, uint256[] calldata _amounts)
+          external
+          onlyVestingEntryManager
+      {
+          if (_accounts.length != _amounts.length) revert Error.InvalidLength();
+  
+      +   IRewardCampaign.Campaign memory campaign = RewardCampaignStorage._getCampaign(_campaignId);
+      +   if (_campaignId == 0 || campaign.id == 0) revert InvalidCampaignId();
+      +   if (campaign.startDate > 0) revert CampaignHasStarted();
+  
+          for (uint256 i = 0; i < _accounts.length; i++) {
+              _setVestingEntry(_campaignId, _accounts[i], _amounts[i]);
+          }
+      }
+      ```
+  
+      ```diff
+      function _setVestingEntry(uint32 _campaignId, address _account, uint256 _amount) internal {
+          IRewardCampaign.Campaign memory campaign = RewardCampaignStorage._getCampaign(_campaignId);
+      
+      -   if (_campaignId == 0 || campaign.id == 0) revert InvalidCampaignId();
+      -   if (campaign.startDate > 0) revert CampaignHasStarted();
+      
+          ...
+      }
+      ```
+    </field>
+  </item>
+  

@@ -1,0 +1,104 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Dec 12, 2024"
+  auditTitle="Seven Seas A-24"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash1="9fb767756890e97154fa350c18e03e4f9432633e"
+  repoCommitHash2="c4b43f931206a7047d2901dcb08d7a52e0a45cd1"
+  repoCommitHash3="8a6a85e4f57a128e14c8ed577b4e12ff9d7098fc"
+  repoCommitHash4="e4abe13074277d04dd9e9335f808891c8b984153"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from Dec 9th to Dec 10th, 2024.
+</content-for>
+
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+      
+      ## Trust Assumptions:
+
+      Corn's SimpleSwapFacilityPermissioned: Is upgradeable so could potentially update logic and introduce vulnerabilities. Furthermore, the swapExactCollateralForDebt and swapExactDebtForCollateral functions are access-controlled, which means the boring vault must be explicitly granted permission to call them. 
+
+      Lombard’s BTCB: Is upgradeable so could potentially update logic and introduce vulnerabilities. 
+
+      SonicDepositDecoderAndSanitizer: The contract was verified to match the ABI provided by the Seven Seas team. A more thorough review will be possible once the underlying contracts are provided.
+     
+    </template>
+   
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+          <b>BTCN Decoder (PR 173) Commit Hash:</b> </br>
+          <code>{{page.repoCommitHash1}}</code>
+      </li>
+  
+      <li class="break-words break-all">
+        <b>Lombard Decoder (PR 174) Commit Hash:</b> </br>
+        <code>{{page.repoCommitHash2}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Sonic Decoder (PR 12) Commit Hash:</b> </br>
+        <code>{{page.repoCommitHash3}}</code>
+      </li>
+      
+      <li class="break-words break-all">
+        <b>FluidDex Decoder (PR 166) Commit Hash:</b> </br>
+        <code>{{page.repoCommitHash4}}</code>
+      </li>
+
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      We audited the BTCN Decoder from <a href="https://github.com/Se7en-Seas/boring-vault/pull/173">PR 173</a>.
+    </p>
+
+    <template type="file-hashes">
+      db60c5cabf082e919c60815edbcbc8ba4b960911d3d452269d5a376380084b12  src/base/DecodersAndSanitizers/BTCNFullMinterDecoderAndSanitizer.sol
+      8682611a5e6b50c5b0bbcbdf8311eea1a2866e91dfc8f6416fa9fbf408582be4  src/base/DecodersAndSanitizers/Protocols/BTCNMinterDecoderAndSanitizer.sol
+    </template>
+
+    <p>
+      The Lombard Decoder from <a href="https://github.com/Se7en-Seas/boring-vault/pull/174">PR 174</a>.
+    </p>
+
+    <template type="file-hashes">
+      fc900a73a394f747225c07d9550eee13bac8c0834196f9bea63f3af7f15a6fd5  src/base/DecodersAndSanitizers/Protocols/LombardBtcMinterDecoderAndSanitizer.sol
+    </template>
+
+    <p>
+      The Sonic Decoder from <a href="https://github.com/Se7en-Seas/boring-vault/pull/12">PR 12</a>.
+    </p>
+
+    <template type="file-hashes">
+      188bfdff35081d63931b359b6634a064c9c399be9f0594a04cb3bbae4fad19f5  src/base/DecodersAndSanitizers/Protocols/SonicDepositDecoderAndSanitizer.sol
+      5b236822f8bf46ca3d7a85696cae1382f8aaceaca776b8a650f6273c99d21097  src/base/DecodersAndSanitizers/SonicFullDepositDecoderAndSanitizer.sol
+    </template>
+
+    <p>
+      The FluidDEX Decoder from <a href="https://github.com/Se7en-Seas/boring-vault/pull/166">PR 166</a>.
+    </p>
+
+    <template type="file-hashes">
+      2e2e5f3113f6b52c01098690c754a1118289987a321f076f242d2c6404de0d76  src/base/DecodersAndSanitizers/Protocols/FluidDexDecoderAndSanitizer.sol
+      d69a31b77cd7dcc7800bbd55a9d717b8d1bad4764383002c55b6c17aeb4acae7  src/base/DecodersAndSanitizers/FluidDexFullDecoderAndSanitizer.sol
+    </template>
+
+  </content-for>
+</page>

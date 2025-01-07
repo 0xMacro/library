@@ -1,0 +1,34 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Nov 20, 2024"
+  auditTitle="Seven Seas A-22"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="6378c3210946d5912aecf203606367f3e49414d6"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on Nov 13th, 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+   
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the Aera vault decoder, allowing boring vaults to interact with and have assets managed by Aera vaults. Changes reviewed from <a href="https://github.com/Se7en-Seas/boring-vault/pull/161">PR 161</a> with no issues found.
+    </p>
+
+    <template type="file-hashes">
+      97e2ee0a1bb8d95453bfd670b1dc346c380038c39275903fe04b68cbdb8613e6  src/base/DecodersAndSanitizers/AeraVaultFullDecoderAndSanitizer.sol
+      75eb728bf5f2e552c490a347ed609034824c2331896e915b091a37fa1aff498a  src/base/DecodersAndSanitizers/Protocols/AuraDecoderAndSanitizer.sol
+    </template>
+
+  </content-for>
+</page>

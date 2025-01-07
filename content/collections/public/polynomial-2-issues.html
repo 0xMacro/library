@@ -1,0 +1,157 @@
+<item>
+    <field name="topic">Signatures</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">65e484b87d431d38f323472ceef083a76fce523a</field>
+    <field name="content">
+      ## [M-1] Missing EIP1271 signature support
+  
+      In `PerpsAccountModule.sol`, signatures are verified to be signed by the owner to update an accounts fee tier:
+  
+      ```solidity
+      function _verify(
+          address _signer,
+          uint256 _feeTierId,
+          uint128 _accountId,
+          uint256 _expiry,
+          bytes memory signature
+      ) internal pure returns (bool) {
+          bytes32 messageHash = _getMessageHash(_feeTierId, _accountId, _expiry);
+          bytes32 ethSignedMessageHash = _getEthSignedMessageHash(messageHash);
+  
+          return _recoverSigner(ethSignedMessageHash, signature) == _signer;
+      }
+  
+      function _recoverSigner(
+          bytes32 _ethSignedMessageHash,
+          bytes memory _signature
+      ) internal pure returns (address) {
+          (bytes32 r, bytes32 s, uint8 v) = _splitSignature(_signature);
+  
+          return ecrecover(_ethSignedMessageHash, v, r, s);
+      }
+      ```
+  
+      Reference: [PerpsAccountModule.sol#L133-L153](https://github.com/Polynomial-Protocol/fx-contracts/blob/3c09fa61dbd332c2b9566f2da90176ec5358d211/markets/perps-market/contracts/modules/PerpsAccountModule.sol#L133-L153)
+  
+      However, this directly uses `ecrecover()` to pull the signer from the signature, which only works for external owned account signatures. In cases where the signer is a smart contract, like a multi-sig or AA wallet, this method for verifying signatures will not work. The intended owner will be a multi-sig smart contract, which currently will not worth with this setup. [EIP1271](https://eips.ethereum.org/EIPS/eip-1271) was designed to allow smart contracts to sign messages and allow for it’s verification on-chain, so supporting this eip is required.
+  
+      **Remediations to Consider**
+  
+      Add EIP1271 support to allow the owner to sign fee tier updates properly.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Signatures</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">65e484b87d431d38f323472ceef083a76fce523a</field>
+    <field name="content">
+      ## [L-1] Signature malleability
+  
+      As shown in M-1, the signature verification is done by directly using `ecrecover()`, and it does not include additional checks on the r, s, and v signature values. As mentioned in openzeppelin’s implementation of [signature validation](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol#L128-L139), `ecrecover()` allows for [signature malleability](https://medium.com/draftkings-engineering/signature-malleability-7a804429b14a) if the library used to sign the message does not explicitly prevent it. Although most libraries will not generate malleable signatures, explicitly preventing them from being used on-chain is best practice.
+  
+      **Remediations to Consider**
+  
+      Prevent signature malleability by using [openzeppelin’s signature checker library](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/SignatureChecker.sol), or prevent the `s` value from being greater than  `0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0` to resolve the issue yourself.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Signatures</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">65e484b87d431d38f323472ceef083a76fce523a</field>
+    <field name="content">
+      ## [L-2] Does not use EIP712
+  
+      [EIP712](https://eips.ethereum.org/EIPS/eip-712) is a standard for signatures for specifying how to sign data with structs, but more importantly describes the standard method for adding a domain to each signature. A domain is additional information that specifies the target contracts address, chain, and version that a signature can be used for, preventing a signature from being used on a differing chain, or unintended contract. Without a domain, signatures made by a signer could potentially be reused maliciously, and in this case prior signatures of the owner could be used to set an unintended fee tier if the prior signature also did not include a domain.
+  
+      **Remediations to Consider**
+  
+      Follow EIP-712 to generate and verify the signatures to be sure the signatures are valid.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">65e484b87d431d38f323472ceef083a76fce523a</field>
+    <field name="content">
+      ## [L-3] Setting `FeeTierId` `0` unintentionally effects most accounts
+
+      In `FeeTierModule.sol`, the owner can set the maker and taker fee discounts for a fee tier based on a provided id by calling `setFeeTier()`:
+  
+      ```solidity
+      function setFeeTier(
+          uint256 id,
+          uint256 makerDiscount,
+          uint256 takerDiscount
+      ) external override {
+          OwnableStorage.onlyOwner();
+  
+          FeeTier.Data storage feeTier = FeeTier.load(id);
+          FeeTier.setFeeTier(feeTier, makerDiscount, takerDiscount);
+  
+          emit FeeTierSet(id, makerDiscount, takerDiscount);
+      }
+      ```
+      Reference: [FeeTierModule.sol#L12-L23](https://github.com/Polynomial-Protocol/fx-contracts/blob/3c09fa61dbd332c2b9566f2da90176ec5358d211/markets/perps-market/contracts/modules/FeeTierModule.sol)
+  
+      ```solidity
+      function setFeeTier(Data storage self, uint256 makerDiscount, uint256 takerDiscount) internal {
+          // check discount should not be more than 100%
+  
+          if (makerDiscount > 10000) {
+              revert ParameterError.InvalidParameter(
+                  "makerDiscount",
+                  "Maker discount should not be more than 100%"
+              );
+          }
+          if (takerDiscount > 10000) {
+              revert ParameterError.InvalidParameter(
+                  "takerDiscount",
+                  "Taker discount should not be more than 100%"
+              );
+          }
+  
+          self.makerDiscount = makerDiscount;
+          self.takerDiscount = takerDiscount;
+      }
+      ```
+      Reference: [FeeTier.sol#L21-L39](https://github.com/Polynomial-Protocol/fx-contracts/blob/3c09fa61dbd332c2b9566f2da90176ec5358d211/markets/perps-market/contracts/storage/FeeTier.sol#L21-L39)
+  
+      However, there are no constraints on the `id` set. If the `id` set is `0` then since `0` is the default value of `feeTier` for each account, setting this will apply the `makerDiscount` and `takerDiscount` to all users that have no set `feeTier`:
+  
+      ```solidity
+         // @dev fee tier for this account
+         uint256 feeTierId;
+      ```
+      Reference: [PerpsAccount.sol#L53-L54](https://github.com/Polynomial-Protocol/fx-contracts/blob/3c09fa61dbd332c2b9566f2da90176ec5358d211/markets/perps-market/contracts/storage/PerpsAccount.sol#L53-L54)
+  
+      **Remediations to Consider**
+  
+      Prevent setting a `feeTier` with an `id` of `0`. 
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Refactoring</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] Signature validation should not be handled in `PerpsAccountModule`
+  
+      The signature verification functions are currently in the `PerpsAccountModule`, however these functions should be moved to their own signature verification library, since they are distinct enough and unrelated to the direct functionality of the `PerpsAccountModule`. Also consider using the openzeppelin libraries for signature verification rather than writing your own.
+    </field>
+  </item>
+  
