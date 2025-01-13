@@ -1,0 +1,36 @@
+<page
+  clientName="Community Gaming"
+  reportDate="January 13th, 2024"
+  auditTitle="CommunityGaming-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/TournamentDAO/cg-smart-contracts"
+  repoCommitHash="0da91d98d2b20ea55976f0eb243b21b2ba05c9c0"
+  finalRepoCommitHash="819bd1ca57e21e9c8e3f70b0a2adc67fb8488875"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_COMMUNITYGAMING"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team January 8th, 2024.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Telegram and Google meetings with the {{page.clientName}} team.</li>
+  </ul>
+  
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    c6f5e3ba9a7b1b214bae9d10d3b5d4e267dea6c2fd33d2ed9bf435fa0d98068a  contracts/cgx_token/AirdropHash.sol
+    ad903ca13c6fa78c8610cfb4a01ff616528cccccdaced7ae1a75274370066997  contracts/cgx_token/SignatureVerifier.sol
+  </template>
+</content-for>
+
+</page>
