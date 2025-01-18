@@ -1,0 +1,105 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Jan 17, 2025"
+  auditTitle="Seven Seas A-26"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+  passwordEncrypt="env:PAGE_PASS_SEVENSEAS_26"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from Jan 6th to Jan 10th, 2025.
+</content-for>
+
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+      
+      ## Trust Assumptions:
+      Some of the reviewed decoders allow Boring Vaults to interact with protocols controlled by multisig wallets that can update important state variables or upgrade the contract to a new version. It is trusted that the owners of this mulitsig will act in the interest of users. It should be understood that a loss of Boring Vault funds is possible if these wallets act maliciously.
+
+    </template>
+   
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+          <b>Usual Money Decoder (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/30">PR 30</a>)</b> </br>
+          Commit hash: <code>ebd718bd1bdd6370318466ab224d728a53045a41</code>
+        <template type="file-hashes">
+            2f3489c865260fb05c39b2616f78ebcb444ee95bf45c16f5ce3f97b7c07f94e0  src/base/DecodersAndSanitizers/Protocols/UsualMoneyDecoderAndSanitizer.sol
+        </template>
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>Sky Money Decoder (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/30">PR 30</a>)</b> </br>
+        Commit Hash: <code>ebd718bd1bdd6370318466ab224d728a53045a41</code>
+        <template type="file-hashes">
+            c6724cf18c6b93cf60c9f6b8a1c1c8d8f2b7724703697697d8c773a9113b25b2  src/base/DecodersAndSanitizers/Protocols/SkyMoneyDecoderAndSanitizer.sol
+        </template>
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>Royco Decoder (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/31">PR 31</a>)</b> </br>
+        Commit Hash: <code>e660df4bff18796b52aec29acb29d9490378ca37</code>
+        <template type="file-hashes">
+            1f63418b4b25955ad0e47390feabd0275b7f08d4d0c5b1677e88e53a92135ab6  src/base/DecodersAndSanitizers/Protocols/RoycoDecoderAndSanitizer.sol
+        </template>
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>Sonic Gateway Decoder (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/32">PR 32</a>)</b> </br>
+        Commit Hash: <code>6ce916eed1cc07b63bece82e65b92942e60a9a36</code>
+        <template type="file-hashes">
+            ff59a49af088f6e336ff1fcc4e6235a41be4fd9ce4755cfa4adf60614c6f3c00  src/base/DecodersAndSanitizers/Protocols/SonicGatewayDecoderAndSanitizer.sol
+        </template>    
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>Euler EVK Decoder (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/33">PR 33</a>)</b> </br>
+        Commit Hash: <code>ef703d9dba2bf74cb52000876046d23731b4a772</code>
+        <template type="file-hashes">
+            2b8a52c1c1f4744c73a5ce88eb0f514caef90c8c4a8b29992c4d58ec467eedc5  src/base/DecodersAndSanitizers/Protocols/EulerEVKDecoderAndSanitizer.sol
+            2c29e27cdf5ba0c4c1a37facbcc72c1ac9373a505a0edd4fac2e059e14054435  src/base/DecodersAndSanitizers/EulerEVKFullDecoderAndSanitizer.sol
+        </template>
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>Sonic Deposit Decoder (from <a href="https://github.com/Se7en-Seas/boring-vault">Main</a>)</b> </br>
+        Commit Hash: <code>898ce9b8140d9f46c11655c018e4265f0732a16b</code>
+        <template type="file-hashes">
+            5b236822f8bf46ca3d7a85696cae1382f8aaceaca776b8a650f6273c99d21097  src/base/DecodersAndSanitizers/SonicFullDepositDecoderAndSanitizer.sol
+            188bfdff35081d63931b359b6634a064c9c399be9f0594a04cb3bbae4fad19f5  src/base/DecodersAndSanitizers/Protocols/SonicDepositDecoderAndSanitizer.sol           
+        </template>
+      </li>
+    </br>
+      <li class="break-words break-all">
+        <b>Refactor of BaseDecoderAndSanitizer (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/41">PR 41</a>)</b> </br>
+        Commit Hash: <code>c3b13b829563f37ea6b034ec95ca6608e7daf690</code>
+        <template type="file-hashes">
+            a544983fc4a9d8c7376b1574a0a8ce63878e6d6e14873f066260498adb3f8c08  src/base/DecodersAndSanitizers/BaseDecoderAndSanitizer.sol
+            f908906d200fd4edc15359ffb29de9321ec67a45771bd87d495075831f988f32  src/base/DecodersAndSanitizers/Protocols/UniswapV3DecoderAndSanitizer.sol
+            291fef5bc0092041cd103829b362c64b02d3d7e6d9f4665dc546b2c936a4b5df  src/base/DecodersAndSanitizers/Protocols/CamelotDecoderAndSanitizer.sol
+            e850ffd3e5b0d11e0ca301fd98465e77b28411f0e1e092d468a270ad270d335c  src/base/DecodersAndSanitizers/Protocols/PancakeSwapV3DecoderAndSanitizer.sol
+            135ab5f456bd9f763080406216c2c3fe558820753e5e8257e9849bb0cf12f44d  src/base/DecodersAndSanitizers/Protocols/VelodromeDecoderAndSanitizer.sol
+        </template>
+      </li>
+    </br>
+        <li>
+            <b>Zeroland Compatibility</b><br/>
+            Additionally, we reviewed the Zeroland protocol for compatibility with the AaveeV3DecoderAndSanitizer.
+        </li>
+    </br>
+    </ul>
+  </content-for>
+</page>
