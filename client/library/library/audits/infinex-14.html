@@ -1,19 +1,21 @@
 <page
   clientName="Infinex"
-  reportDate="December 5, 2024"
+  reportDate="December 2, 2024"
   auditTitle="Infinex A-14"
-  auditVersion="1.0.0"
+  auditVersion="1.0.1"
   repoUrl="https://github.com/infinex-xyz/infinex-contracts"
   layout="/library/audits/_layout.html" 
   repoCommitHash1="4f3f116579b91a9b25e0304fa0cff4f46c786357"
   repoCommitHash2="9ad2835d989960b09d07fc4cb3aab874e7d65253"
+  repoCommitHash3="2fc6bf0a3720883444c8843345d36354f9806206"
   repoCommitHashFinal="0e142681656af4854ca5eeef5421da5612230b92"
   repoCommitHashFinal2="67829a7e4d34b877c3f2473c65489bb69f974fb9"
+  repoCommitHashFinal3="a4db81b17619137ae24fdc7360bd0d103ca0132c"
   customRepoInfo
   customReviewInfo
 >
   <content-for name="schedule">
-    The security audit was performed by the Macro security team and conducted in two separate parts, with the ownership changes reviewed on October 31st 2024, and the rest on November 27, to 29 2024. 
+    The security audit was performed by the Macro security team on November 27, to 29 2024. 
   </content-for>
 
   <content-for name="repo-info">
@@ -33,6 +35,16 @@
       </li>
 
       <li class="break-words break-all">
+        <b>Commit Hash Security Key (Initial):</b> </br>
+        <code>{{page.repoCommitHash3}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash  Security Key (Final):</b> </br>
+        <code>{{page.repoCommitHashFinal3}}</code>
+      </li>
+
+      <li class="break-words break-all">
         <b>Commit Hash (Initial):</b> </br>
         <code>{{page.repoCommitHash1}}</code>
       </li>
@@ -41,7 +53,6 @@
         <b>Commit Hash (Final):</b> </br>
         <code>{{page.repoCommitHashFinal}}</code>
       </li>
-      
     </ul>
   </content-for>
 
@@ -58,7 +69,7 @@
       ### Cosigning
 
       The CoSigning key set in the Infinex Config Beacon acts as a trusted entity that generates specific user signatures used as a double verification along with a valid sudo key's signature. 
-      This entity can not interact with any user account unless a valid Sudo key signs the specific withdraw or transfer request.
+      This entity can not interact with any user account unless a valid Sudo key signs the specific withdraw or transfer request. 
       
       ## Change summary
       **Recovery Module**
@@ -79,6 +90,7 @@
 
       **Infinex Protocol Config Beacon**
       - `setPlatformKey()` - sets the platform key used for co-signing transfers.
+      - `setPlatformKeyTerminatorStatus()` - sets or unsets an address as a security key.
 
     </template>
   </content-for>
@@ -114,7 +126,17 @@
       291dc938d5ed96eaa67f6e0a837747e9a2b81d189e683fe8bc50b8b4a6ee3b83  ./src/ownership/IOwnable.sol
       3ae255c26267ae1fd5e1eb1354c2616ace8f006e2dff72eab2165e9fa2603200  ./src/ownership/Ownable.sol
       2041ccbd33c71a4206585640b797ae0c62a35c70e495ab62660e1d858d502de8  ./src/ownership/OwnableStorage.sol
-    </template>       
+    </template>   
+    
+    <p>
+      <br>
+      And, the following contracts for the platform security keys addition:</br>
+    </p>
+
+    <template type="file-hashes">
+      114948a1dcf757469494d28badfd28d75345946fa2ed55b10c62b4f4bda8b63a  ./src/beacons/InfinexProtocolConfigBeacon.sol
+      1f7c48e854d955c87b247c1199a9dfdfc72c91108e004fb22f5b270e0ec76318  ./src/interfaces/beacons/IInfinexProtocolConfigBeacon.sol
+    </template>  
     <p>
       Note: Currently the referenced repository is private, but there are plans to make it public in the future. 
     </p>
