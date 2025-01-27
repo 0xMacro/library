@@ -1,0 +1,32 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Veda-Labs/boring-vault/pull/48/commits/e31948727fa63409c6a8bc8fe627f38b1741bd67</field>
+    <field name="content">
+        ## [M-1] Symbiotic decoder is unable to claim rewards
+
+        SymbioticVaultDecoderAndSanitizer implements the `claimRewards` function from `IDefaultOperatorRewards`:
+        
+        ```jsx
+        claimRewards(address recipient, address network, address token, uint256 totalClaimable, bytes32[] calldata proof)
+        ```
+        
+        Reference: [IDefaultOperatorRewards.sol#L83-L89](https://github.com/symbioticfi/rewards/blob/main/src/interfaces/defaultOperatorRewards/IDefaultOperatorRewards.sol#L83-L89)
+        
+        However, since the boring vault functions as a protocol staker rather than an operator, it must implement the `claimRewards` function for stakers:
+        
+        ```jsx
+        claimRewards(address recipient, address token, bytes calldata data)
+        ```
+        
+        Reference: [IStakerRewards.sol#L45](https://github.com/symbioticfi/rewards/blob/main/src/interfaces/stakerRewards/IStakerRewards.sol#L45)
+        
+        **Remediation to Consider**
+        
+        Update `claimRewards` function to be compatible with the implementation of IStakerRewards.sol.
+        
+    
+    </field>
+  </item>

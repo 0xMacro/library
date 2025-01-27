@@ -1,0 +1,81 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Jan 17, 2025"
+  auditTitle="Seven Seas A-27"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit performed by the Macro security team lasted three days, from Jan 13th to Jan 17th, 2025.
+</content-for>
+
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+      
+      ## Trust Assumptions:
+      Some of the reviewed decoders allow Boring Vaults to interact with protocols controlled by multisig wallets that can update important state variables or upgrade the contract to a new version. It is trusted that the owners of this mulitsig will act in the interest of users. It should be understood that a loss of Boring Vault funds is possible if these wallets act maliciously.
+      <br/>
+      Additionally, since the Silo V2 protocol is undergoing audits, boring vaults should not interact with the protocol until all audits are completed and issues are resolved.    </template>
+   
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+          <b>Symbiotic Decoder (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/48">PR 48</a>)</b> </br>
+          Commit hash: <code>edfcba3f29f691c638b06d04f60af79503632b58</code>
+        <template type="file-hashes">
+            55949f2f9f3d1f0ea6d08fbdb19eb4dc5475669145c45dbcfac366a823d342d8  src/base/DecodersAndSanitizers/Protocols/SymbioticVaultDecoderAndSanitizer.sol
+        </template>
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>BoringOnChainQueue capacity limit (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/27">PR 27</a>)</b> </br>
+        Commit Hash: <code>9b0ceb767fda7fd4d3001526189d7234e6f78142</code>
+        <template type="file-hashes">
+            e446d88685f923ef28e301df6da66afafe19d7cc9dff104d798c362025ae5ba9  src/base/Roles/BoringQueue/BoringOnChainQueue.sol
+            2de48f14cfd987c79366603905782f8683e46cb8f735a87790e0deb376b8ad6a  src/base/Roles/BoringQueue/BoringOnChainQueueWithTracking.sol
+        </template>
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>Morpho Decoders (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/54">PR 54</a>)</b> </br>
+        Commit Hash: <code>79a5ced0fcc0eab61f7f8825c1cd9bef0668903d</code>
+        <template type="file-hashes">
+            db9f5549ad3d1250f3aab04917de99ab5eccf76c7d799b433d53857a875e1d64  src/base/DecodersAndSanitizers/MorphoRewardsDecoderAndSanitizer.sol
+            79621e1e7b77c64cd835c27167ab85bb4a15bb39e71912901c84302474130df4  src/base/DecodersAndSanitizers/Protocols/MorphoRewardsMerkleClaimerDecoderAndSanitizer.sol
+            ae91873a26455d31259648b3b6e32d90bc66279ad5d94f4f91d7638e119e0fbb  src/base/DecodersAndSanitizers/Protocols/MorphoRewardsWrapperDecoderAndSanitizer.sol
+        </template>
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>Teller Decoder (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/61">PR 61</a>)</b> </br>
+        Commit Hash: <code>d580fd8bc9dd33c6857a40bd622464d4962de0ef</code>
+        <template type="file-hashes">
+            aace47c08c1b702758e89a1dc08e4256054b3afe4c1cbe82f54fdc05d78ac615  src/base/DecodersAndSanitizers/Protocols/TellerDecoderAndSanitizer.sol
+            583a46847db78aef2d222c8c44420a92bf785858ae63198dbb26860ff55a9e04  src/base/DecodersAndSanitizers/Protocols/WithdrawQueueDecoderAndSanitizer.sol
+        </template>    
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>Silo Decoder (from <a href="https://github.com/Se7en-Seas/boring-vault/pull/66">PR 66</a>)</b> </br>
+        Commit Hash: <code>557277a8e6f91ddfa5804cc3b62281c6e253d470</code>
+        <template type="file-hashes">
+            425b4ee7a8990af6e8f1d4cff1357e1889625b904e5a00e9c15f1d575f1980c6  src/base/DecodersAndSanitizers/Protocols/SiloDecoderAndSanitizer.sol
+        </template>
+      </li>
+      </br>
+    </ul>
+  </content-for>
+</page>
