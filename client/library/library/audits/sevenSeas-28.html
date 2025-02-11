@@ -1,0 +1,103 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Feb 11, 2025"
+  auditTitle="Seven Seas A-27"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit performed by the Macro security team over multiple days starting January 28th.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>UniswapV2 Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/73/files">PR 73</a>)</b> </br>
+        Commit Hash: <code>ef6d0192c0c6ab0d4fb5d5f800320c6c1779948b</code>
+        <template type="file-hashes">
+          5777e164874149e3f60c465e4ebc58e17d6b6574962384351e7a0fba41282a57  src/base/DecodersAndSanitizers/Protocols/UniswapV2DecoderAndSanitizer.sol
+        </template>
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>Royco Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/74">PR 74</a>)</b> </br>
+        Commit hash: <code>1ac1f8f3a6fb88abac800a0099f42603a050b541</code>
+      <template type="file-hashes">
+        e7b0113daa7bc0bca96c0ab3a05867b7e7dff9c4bb8a783c12c768a3a42c3842  src/base/DecodersAndSanitizers/Protocols/RoycoDecoderAndSanitizer.sol
+      </template>
+    </li>
+      <li class="break-words break-all">
+        <b>Royco Decoder update (from <a href="https://github.com/Veda-Labs/boring-vault/pull/91">PR 91</a>)</b> </br>
+        Commit hash: <code>f1437908bc3fbdbef9948d450192871725428b41</code>
+      <template type="file-hashes">
+        153d4b88e272b643b385e5dbf8daf0fbccc245f996e1d963c3190743c22c4250  src/base/DecodersAndSanitizers/Protocols/RoycoDecoderAndSanitizer.sol
+      </template>
+    </li>
+    </br>
+      <li class="break-words break-all">
+        <b>Dolomite Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/81">PR 81</a>)</b> </br>
+        Commit Hash: <code>6e7ca7a01bf69b3c132ad5e7ef2c04ae95f3395a</code>
+        <template type="file-hashes">
+          42ef4d50d03ea03d37149014286bdb19f36eb59c9b769c02e7ee04e2d87e9207  src/base/DecodersAndSanitizers/Protocols/DolomiteDecoderAndSanitizer.sol
+        </template>
+      </li>
+    </br>
+  </br>
+  <li class="break-words break-all">
+    <b>Kodiak Island Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/84">PR 84</a>)</b> </br>
+    Commit Hash: <code>3b97d95e53a086c670c485e424564390ad8d8704</code>
+    <template type="file-hashes">
+      9d5a96127042b821dc88a22ac7e547bdaa3c6a6e4fd36f82249434941602ce8f  src/base/DecodersAndSanitizers/Protocols/KodiakIslandDecoderAndSanitizer.sol
+    </template>
+  </li>
+  </br>
+  <li class="break-words break-all">
+    <b>Honey Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/85">PR 85</a>)</b> </br>
+    Commit Hash: <code>f6753b257749a5dec6643ed6896e4ae8f1262075</code>
+    <template type="file-hashes">
+      0dc14906930c9e3d7efabfa82310ee907a016a95c312fdb9267e86beb3bbaf0a  src/base/DecodersAndSanitizers/Protocols/HoneyDecoderAndSanitizer.sol
+    </template>
+  </li>
+  </br>
+  <li class="break-words break-all">
+    <b>Infrared Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/87">PR 87</a>)</b> </br>
+    Commit Hash: <code>5135a52a15f08007c4643619deb6d30e8c80fb76</code>
+    <template type="file-hashes">
+      0128c9d418be32c282e702610bfcab78ae09439c6cee5d8558c138f6afcb2843  src/base/DecodersAndSanitizers/Protocols/InfraredDecoderAndSanitizer.sol
+    </template>
+  </li>
+  </br>
+  <li class="break-words break-all">
+    <b>BeraETH Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/88">PR 88</a>)</b> </br>
+    Commit Hash: <code>fafa7f5bd19d2430f8c99cdaab71fca09ec36e13</code>
+    <template type="file-hashes">
+      6e48416b6477de6858e266d3416ce9e7c3dddaedf742a0f30c9814ad664ce2c4  src/base/DecodersAndSanitizers/Protocols/BeraETHDecoderAndSanitizer.sol
+    </template>
+  </li>
+  </br>
+
+  <li class="break-words break-all">
+    <b>Goldilocks Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/88">PR 88</a>)</b> </br>
+    Commit Hash: <code>33828c8c732a9f7b39a3d5c98800390fa72fa339</code>
+    <template type="file-hashes">
+      6193bc722f2ca3580eba90d03fff211995a5e1a2992a5cfcccc8296bdcfd65d2  src/base/DecodersAndSanitizers/Protocols/GoldiVaultDecoderAndSanitizer.sol
+    </template>
+  </li>
+  </br>
+  
+      
+    </ul>
+  </content-for>
+</page>
