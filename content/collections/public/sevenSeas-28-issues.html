@@ -1,0 +1,33 @@
+<item>
+    <field name="topic">Sanitization</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8494e11dea8a6703aaa7eaa3000d22472a3d744b</field>
+    <field name="content">
+      ## [L-1] Unsanitized dolomite token addresses
+  
+      In [`DolomiteDecoderAndSanitizer.sol`](https://github.com/Veda-Labs/boring-vault/blob/6e7ca7a01bf69b3c132ad5e7ef2c04ae95f3395a/src/base/DecodersAndSanitizers/Protocols/DolomiteDecoderAndSanitizer.sol#L1) both [`closeBorrowPosition()`](https://github.com/Veda-Labs/boring-vault/blob/6e7ca7a01bf69b3c132ad5e7ef2c04ae95f3395a/src/base/DecodersAndSanitizers/Protocols/DolomiteDecoderAndSanitizer.sol#L140-L147) and [`closeBorrowPositionWithDifferentAccounts()`](https://github.com/Veda-Labs/boring-vault/blob/6e7ca7a01bf69b3c132ad5e7ef2c04ae95f3395a/src/base/DecodersAndSanitizers/Protocols/DolomiteDecoderAndSanitizer.sol#L183-L192) do not sanitize the `_collateralMarketIds` of the position being closed. Although the marketIds and their associated tokens are likely already whitelisted, verifying the vault is intended to interact with these particular markets for additional safety is advised.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">0c3e15cfda71b160ac24283c988fbc6e283fbf16</field>
+    <field name="content">
+      ## [L-2] Missing Royco decoder function
+  
+      In [`RoycoDecoderAndSanitizer.sol`](https://github.com/Veda-Labs/boring-vault/blob/0c3e15cfda71b160ac24283c988fbc6e283fbf16/src/base/DecodersAndSanitizers/Protocols/RoycoDecoderAndSanitizer.sol) the function to allow withdrawals on the destination chain once able via [`DepositExecutor.sol:withdrawMerkleDeposit()`](https://github.com/roycoprotocol/cross-chain-deposit-module/blob/master/src/core/DepositExecutor.sol#L604C14-L612) is missing.
+  
+      **Remediations to Consider**
+  
+      Add the withdrawMerkleDeposit() function to [`RoycoDecoderAndSanitizer.sol`](https://github.com/Veda-Labs/boring-vault/blob/0c3e15cfda71b160ac24283c988fbc6e283fbf16/src/base/DecodersAndSanitizers/Protocols/RoycoDecoderAndSanitizer.sol).
+  
+    </field>
+  </item>
+
+  

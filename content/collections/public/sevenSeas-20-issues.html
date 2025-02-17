@@ -1,0 +1,121 @@
+<item>
+    <field name="topic">Sanitize</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] Unsanitized `evm_recipient` can lead to the funds being stuck in the bridge forever
+  
+      In order to bridge tokens using Hyperlane protocol, the input destination recipient address must be 32 bytes to generalize the case where the destination chain is not an EVM-compatible chain.
+  
+      Since the Boring Bridge Holder intends to bridge only from the Eclipse chain to the ETH chain, it’s  unnecessary to store the destination recipient address in 32 bytes. The `evm_recipient` configuration in the program currently has `[u8; 32]` type.
+  
+      However, 32 bytes allows for a potentially malformed address. If a value has any data in the 12 leftmost bytes, this will cause the transaction to fail on the ETH chain (specifically, Hyperlane’s [TypeCasts helper](https://github.com/hyperlane-xyz/hyperlane-monorepo/blob/1159e0f4ba935e5fbdb196143cb06ffb61f94a53/solidity/contracts/libs/TypeCasts.sol#L13-L14)), leaving the funds stuck in the bridge indefinitely.
+  
+      **Remediations to Consider**
+  
+      Consider changing `evm_recipient` type to `[u8; 20]` type, then converting to `[u8; 32]` type when cross-program invocating to the Hyperlane protocol.
+
+    </field>
+    <field name="response">
+        We recognize that having the 32 byte evm recipient could lead to stuck funds if an improper EVM address is supplied. 
+        To mitigate this we will throughly test the set configuration to confirm that it does in fact bridge assets back to the proper EVM address. 
+        Because of the config hash setup if the strategist were to then pass in a malformed evm address, the transaction would revert from the generated hash being different from the one stored in the BoringState account
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">527a86463a0538382069158cf44330d606f56f96</field>
+    <field name="content">
+      ## [Q-1] Hardcoded space calculation
+
+  
+      Currently, when initializing a new boring account, the account size is manually calculated based on the size of the `BoringState` struct. Rather than calculating this ourselves, we can use the `std::mem::size_of` utility to determine the size of the struct we are trying to store:
+  
+      ```diff
+      + use std::mem::size_of;
+  
+      ...
+  
+      pub struct Initialize<'info> {
+          #[account(
+              init,
+              payer = signer,
+      -       space = 8 + 32 + 32 + 32 + 32 + 1,
+      +       space = typeof::<BoringState>() + 8,
+              seeds = [b"boring_state", signer.key().as_ref()],
+              bump
+          )]
+          pub boring_account: Account<'info, BoringState>,
+          #[account(mut)]
+          pub signer: Signer<'info>,
+          pub system_program: Program<'info, System>,
+      }
+      ```
+  
+      **Reference:** [src/lib.rs#L252](https://github.com/Veda-Labs/boring-bridge-holder/blob/5239c754dc0730216def82997d41560623a2216d/programs/boring-bridge-holder/src/lib.rs#L252)
+  
+    </field>
+
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">527a86463a0538382069158cf44330d606f56f96</field>
+    <field name="content">
+      ## [Q-2] Unnecessary `#[account()]` field-level attributes
+
+      Throughout the program, some struct fields use the `#[account()]` attributes with empty parentheses, which adds no logical functionality. Consider removing these `#[account()]` attributes.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">527a86463a0538382069158cf44330d606f56f96</field>
+    <field name="content">
+      ## [Q-3] Unnecessary `#[account(mut)]` field-level attributes
+  
+      In the `UpdateOwner`, `UpdateStrategist`, and `UpdateConfiguration` struct, there are struct fields called `signer` using `#[account(mut)]` attributes. 
+  
+      Generally,`#[account(mut)]` field-level attribute used in a `Signer` type field is when that signer is spending or receiving lamports (not including gas payment) within the transaction. In our case, `transfer_ownership()`, `update_strategist()`, and `update_configuration()` functions will not affect the caller’s balance; hence, we can safely remove the `#[account(mut)]` attributes from those struct fields.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">527a86463a0538382069158cf44330d606f56f96</field>
+    <field name="content">
+      ## [Q-4] Unused `BorshDeserialize` derived attribute
+  
+      | **Topic** | Best practices |
+      | --- | --- |
+      | **Impact** | Low |
+  
+      The `TransferRemote` struct includes `BorshDeserialize` type attribute, which is not used anywhere. Consider removing the attribute
+  
+      ```diff
+      - #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
+      + #[derive(BorshSerialize, Debug, Clone)]
+      pub struct TransferRemote {
+          pub destination_domain: u32,
+          pub recipient: [u8; 32],
+          pub amount_or_id: [u8; 32],
+      }
+      ```
+  
+      **Reference:** [lib.rs#L413-L418](https://github.com/Veda-Labs/boring-bridge-holder/blob/5239c754dc0730216def82997d41560623a2216d/programs/boring-bridge-holder/src/lib.rs#L413-L418)
+  
+    </field>
+  </item>
+  

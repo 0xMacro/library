@@ -1,0 +1,54 @@
+<page
+  clientName="Savea"
+  reportDate="Nov 18th, 2024"
+  auditTitle="Savea A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/xsavea/Savea-Contracts"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="22365145d9445882a4e4fa6cdd098ae90e94ca0a"
+  repoCommitHashFinal="91c7d11be24fd4c2109c0cfb31505cf771fbac1f"
+  customRepoInfo
+  passwordEncrypt="env:PAGE_PASS_SAVEA_1"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from Nov 7th to Nov 11th, 2024. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within this repository:</p>
+    <template type="file-hashes">
+        7d7ae9e03c4f49c6edd93705fad54405cec6f2cc4226d91cc35f7746abc31538  contracts/Management.sol
+        573da29ba97a4725db4236fa0161ac0cb3e2fc28d51c8bea8edf42438d966689  contracts/SaveaToken.sol
+        be2019dd06da5b755e162383a302a0c4fa31634623650214b330692d58930130  contracts/libraries/DataTypes.sol
+        0ba297d9062b39fbac782f7f6c98448993760e3bfd94af653e160cc64717b376  contracts/libraries/Errors.sol
+        99c15f50f7661c655b4a95e004815f6cd03d473b9fc5fddbb69784d4595813fb  contracts/libraries/IterableMapping.sol
+        52a2ffee76b7e8af79d8490b253afc3f656fed77a4ddb2d8dfe6d7989b72a2df  contracts/libraries/Settings.sol
+    </template>
+  </content-for>
+</page>

@@ -1,0 +1,175 @@
+<item>
+    <field name="topic">DoS</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-1] `tierOwnerAddVestingEntry()` fails when using trusted forwarder
+        
+        When calling the `PatronNFT.tierOwnerAddVestingEntry()` function, the tier owner can either call the function directly or via the trusted forwarder:
+        
+        ```solidity
+        modifier onlyTierOwner(uint8 _tierId) {
+            if (_ERC2771MsgSender() != PatronVestingStorage._tierConfig(_tierId).tierOwner) {
+                revert UnauthorizedCaller();
+            }
+            _;
+        }
+        ```
+        
+        **Reference:** [PatronVesting.sol#L81-L86](https://github.com/infinex-xyz/infinex-contracts/blob/186a5898d243ac7558f3f2524890daca0ebd39b3/src/patron/PatronVesting.sol#L81-L86)
+        
+        When using the trusted forwarder, the patron NFTs are pulled from `msg.sender`, which will be the forwarder address instead of the tier owner as expected. As a result, the function reverts:
+        
+        ```solidity
+        function tierOwnerAddVestingEntry(address _recipient, uint256[] calldata _indices, uint8 _tierId)
+            external
+            onlyTierOwner(_tierId)
+        {
+            emit VestingEntryAdded(_recipient, _tierId);
+            IERC721ABatchTransferable patronNft = IERC721ABatchTransferable(PatronVestingStorage._patronNFT());
+        >>  patronNft.safeBatchTransferFrom(msg.sender, address(this), _indices);
+            PatronVestingStorage._addVestingEntry(_recipient, _tierId, _indices);
+        }
+        ```
+        
+        **Reference:** [PatronVesting.sol#L251-L259](https://github.com/infinex-xyz/infinex-contracts/blob/186a5898d243ac7558f3f2524890daca0ebd39b3/src/patron/PatronVesting.sol#L251-L259)
+        
+        **Remediations to Consider:**
+        
+        Consider replacing `msg.sender` with `_ERC2771MsgSender()` :
+        
+        ```diff
+        function tierOwnerAddVestingEntry(address _recipient, uint256[] calldata _indices, uint8 _tierId)
+            external
+            onlyTierOwner(_tierId)
+        {
+            emit VestingEntryAdded(_recipient, _tierId);
+            IERC721ABatchTransferable patronNft = IERC721ABatchTransferable(PatronVestingStorage._patronNFT());
+        -   patronNft.safeBatchTransferFrom(msg.sender, address(this), _indices);
+        +   patronNft.safeBatchTransferFrom(_ERC2771MsgSender(), address(this), _indices);
+            PatronVestingStorage._addVestingEntry(_recipient, _tierId, _indices);
+        }
+        ```
+    </field>
+    <field name="response">
+        We are highly unlikely to use with the forwarder as all the tier owners are safe's / EOA's and we are likely to submit transactions via script or the cannon website
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">2e54997fcf363bf08e52523c699c62fa669a64a0</field>
+    <field name="content">
+        ## [Q-1] Add `address(0)` check for `_newRecipient`
+
+        In `allocateCWGTokens`, there is no check that prevents passing `address(0)` for the `_newRecipient` parameter. This is in contrast to PatronDistributor’s `registerRecipient` function, which explicitly doesn’t allow providing `address(0)` for the `_recipient` parameter. 
+        
+        **Remediation to Consider**
+        
+        Revert if `address(0)` is passed for the `_newRecipient` parameter.
+    </field>
+  </item>
+
+
+  
+
+  <item>
+    <field name="topic">Gas optimizations</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3205d8da2bc29688f905b64d446facaf0eb33b54</field>
+    <field name="content">
+      ## [G-1] Small gas optimizations
+
+    1. The `_end` and `_start` validation checks in `_getVestingEntryRange()` can never occur when being called from `_claim()`. They can be abstracted to the `getVestingEntryRange()` view function.
+    
+        ```diff
+        function _getVestingEntryRange(address _recipient, uint8 _tierId, uint256 _start, uint256 _end)
+            internal
+            view
+            returns (uint256[] memory tokenIds)
+        {
+            Data storage store = getStorage();
+        -   if (_end <= _start || _end > store.vestingEntries[_recipient][_tierId].totalAllocation) {
+            -       revert IPatronVesting.InvalidRange();
+            -   }
+                uint256 length = _end - _start;
+                tokenIds = new uint256[](length);
+        
+                // Only loads the specific array elements needed
+                unchecked {
+                    for (uint256 i = 0; i < length;) {
+                        tokenIds[i] = store.vestingEntries[_recipient][_tierId].tokenIds[_start + i];
+                        ++i;
+                    }
+                }
+            }
+        ```
+        
+        **Reference:** [PatronVestingStorage.sol#L116-L132](https://github.com/infinex-xyz/infinex-contracts/blob/3205d8da2bc29688f905b64d446facaf0eb33b54/src/patron/PatronVestingStorage.sol#L116-L132)
+    
+    2. `claimable` calculation can also be included in the `unchecked` block as the `releasedAmount` will always be higher or equal to the `claimedAmount`.
+    
+        ```diff
+        - 		uint256 claimable = releasedAmount - claimedAmount;
+        - 		if (claimable < _amount || _amount == 0) revert InvalidClaimAmount();
+    		
+        			// Only load the specific tokenIds needed for the claim
+        			unchecked {
+        + 		        uint256 claimable = releasedAmount - claimedAmount;
+        + 		        if (claimable < _amount || _amount == 0) revert InvalidClaimAmount();			
+    			
+        			    uint256[] memory tokenIds = PatronVestingStorage._getVestingEntryRange(
+        			        _recipient,
+        			        _tierId,
+        			        claimedAmount, // start from claimed amount
+        			        claimedAmount + _amount // up to claimed + amount
+        			    );
+        			    IERC721ABatchTransferable patronNft = IERC721ABatchTransferable(PatronVestingStorage._patronNFT());
+        			    emit TokensClaimed(_recipient, _destination, _amount, _tierId);
+        			    PatronVestingStorage._updateClaimedAmount(_recipient, _tierId, _amount);
+    			
+        			    if (_amount == 1) {
+        			        patronNft.safeTransferFrom(address(this), _destination, tokenIds[0]);
+        			    } else {
+        			        patronNft.safeBatchTransferFrom(address(this), _destination, tokenIds);
+        			    }
+        			}
+        ```
+    
+        **Reference:** [PatronVesting.sol#L474-L503](https://github.com/infinex-xyz/infinex-contracts/blob/3205d8da2bc29688f905b64d446facaf0eb33b54/src/patron/PatronVesting.sol#L474-L503)
+    
+    3. Optimization of `_removeLastNVestingEntries()` function:
+    
+        ```diff
+            function _removeLastNVestingEntries(address _recipient, uint8 _tierId, uint256 _amount)
+                internal
+                returns (uint256[] memory tokenIds)
+            {
+                IPatronVesting.VestingEntry storage entry = getStorage().vestingEntries[_recipient][_tierId];
+                tokenIds = new uint256[](_amount);
+    
+        +       unchecked {
+                uint256 startIndex = entry.totalAllocation - _amount;
+    
+        -       unchecked {
+                    for (uint256 i = 0; i < _amount;) {
+                        uint256 currentIndex = startIndex + i;
+                        tokenIds[i] = entry.tokenIds[currentIndex];
+                        delete entry.tokenIds[currentIndex];
+                        ++i;
+                    }
+                }
+        -       entry.totalAllocation -= _amount;
+        +       entry.totalAllocation = startIndex;
+                return tokenIds;
+            }
+        ```
+    
+        **Reference:** [PatronVestingStorage.sol#L233-L255](https://github.com/infinex-xyz/infinex-contracts/blob/3205d8da2bc29688f905b64d446facaf0eb33b54/src/patron/PatronVestingStorage.sol#L233-L255)
+  </field>
+</item>

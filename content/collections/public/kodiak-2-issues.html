@@ -1,0 +1,663 @@
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">9efaed81fb1da7d1bbce09a860ac933cd0ee0f7b</field>
+    <field name="content">
+      ## [H-1] Incorrect initial DEX price due to unaccounted LP fee
+  
+      In the Panda project, the core specification requirement is that the final price achieved within PandaPool should equal the initial price in the corresponding DEX pair. All the system implementation and corresponding exchange formulas within the PandaPool contract are based on this core requirement. From the pool initiation, through swaps (buys/sells of PandaToken) and fee application, the system enforces this requirement. However, when conditions are satisfied for the PandaToken to be “graduated” **or migrated to the DEX pair, additional actions are performed that do not follow this core system requirement.
+  
+      In the `PandaToken` contract, the `_moveLiquidity()` function migrates liquidity from the `PandaPool` to the corresponding DEX pair. When `poolFees.lpFee` is 0, the total raised amount is paired with `tokensForLp` and used to initialize liquidity in the DEX pair, achieving an expected price equal to the final price in the `PandaPool`. However, when `poolFees.lpFee` is ≠ 0 (max up to 10%), the migrated amount of `baseToken` to the DEX pair will `lpFee` percent less than expected. Since `tokensForLp` will remain unchanged, the initial price on the DEX pair will be smaller than the final price in the PandaPool.
+  
+      ```solidity
+      function _moveLiquidity() internal override {
+              ...
+          uint256 lpFeeInBaseTokens = baseReserve * poolFees.lpFee / PandaMath.FEE_SCALE;
+          uint256 amountPanda = tokensForLp;
+          uint256 amountBase = baseReserve - lpFeeInBaseTokens;
+          
+              ...
+              address pair = _dexFactory.getPair(_pandaToken, _baseToken);
+          TransferHelper.safeTransfer(_pandaToken, pair, amountPanda);
+          TransferHelper.safeTransfer(_baseToken, pair, amountBase);
+          
+              ...
+          //Deployer fee share
+          uint256 deployerFee = lpFeeInBaseTokens * poolFees.deployerFeeShare / PandaMath.FEE_SCALE;
+          TransferHelper.safeTransfer(_baseToken, deployer, deployerFee);
+  
+          //Transfer remaining baseTokens to the treasury
+          TransferHelper.safeTransfer(_baseToken, treasury, IERC20(_baseToken).balanceOf(address(this)));
+  
+          emit LiquidityMoved(amountPanda, amountBase);
+      }
+      ```
+  
+      Due to the above, the latest buyers of the specific PandaToken close to graduation would be at an immediate loss immediately after graduation. This may disincentivize potential buyers and reduce the probability for the specific PandaToken to “graduate”.
+  
+      **Remediations to consider**
+  
+      - Take into account `lpFee` when calculating `tokensInPool` / `tokensForLp` split, or
+      - Reduce the number of `tokensForLp` used for DEX pair initialization in proportion to the amount of `lpFee` applied to the total raised amount.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">9efaed81fb1da7d1bbce09a860ac933cd0ee0f7b</field>
+    <field name="content">
+      ## [H-2] Incorrect initial DEX price due to graduation threshold
+  
+      In the Panda project, the core specification requirement is that the final price achieved within PandaPool should equal the initial price in the corresponding DEX pair. From this core requirement, all math formulas related to tokensInPool/tokensForLp ratio, liquidity amount, reserves of base and PandaToken, and exchange rate are derived and consequently applied. While the system enforces these constraints, it contains a feature for graduating PandaTokens after a threshold of 99% of `tokensInPool` is sold.
+  
+      ```solidity
+      function moveLiquidity() external virtual nonReentrant {
+          require(!graduated, "PandaPool: GRADUATED");
+          require(pandaReserve <= tokensInPool * GRADUATION_THRESHOLD / PandaMath.FEE_SCALE, "PandaPool: POOL_NOT_EMPTY");
+          _moveLiquidity();
+      }
+      ```
+  
+      While it seems like a safe feature on first look, it breaks core invariant and math formulas since the total raised amount won’t be 100% but 99%. As a result, due to DEX pair initialization with constant `tokensForLp` and less than expected total raised amount of base tokens, the initial price on the DEX pair will not match the final price on the PandaPool.
+  
+      Due to the above, the latest buyers of the specific PandaToken close to graduation would be at an immediate loss immediately after graduation. This may disincentivize potential buyers and reduce the probability for the specific PandaToken to “graduate”.
+  
+      **Remediations to consider**
+  
+      - Reduce the number of `tokensForLp` used for DEX pair initialization to achieve the same initial price as the final price in the PandaPool based on the sold amount of PandaTokens.
+    </field>
+    <field name="response">
+        The amount of PandaTokens added to the dex is slightly increased to account for the lower ending price (see _moveLiquidity() implementation).
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Loss of precision</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">f9b0159e6350ddcb9675b2b755dd5058edc92487</field>
+    <field name="content">
+      ## [H-3] Incorrect rounding direction may lead to asset loss
+  
+      In the `PandaPool`, `getAmountOutBuy()` and `getAmountOutSell()` perform important calculations in buy and sell of panda tokens. Within the implementation rounding direction for most of the operations is appropriate.
+  
+      However, in two instances when new price is calculated incorrect rounding direction is set which results in more assets being withdrawn from the pool than it should have been.
+  
+      For example, in `getAmountOutBuy()` when `sqrtP_new` is calculated rounding direction is UP, as a result of this dividend is smaller and divisor is bigger in expression for calculating `pandaReserve_new`. `pandaReserve_new` being smaller results in larger `amountOut` in the final expression. As a consequence, more panda token assets are withdrawn from the pool than should have been.
+  
+      ```solidity
+      uint256 baseReserve_new = baseReserve + deltaBaseReserve;
+      // @audit-issue - should be rounded down
+      sqrtP_new = sqrtPa + baseReserve_new.mulDiv(PandaMath.PRICE_SCALE, liquidity, Math.Rounding.Up);
+  
+      if (sqrtP_new > sqrtPb) sqrtP_new = sqrtPb;
+  
+      // @audit-ok - rounding up is correct
+      uint256 pandaReserve_new = liquidity.mulDiv(sqrtPb - sqrtP_new, sqrtP_new * sqrtPb, Math.Rounding.Up);
+      amountOut = pandaReserve - pandaReserve_new;
+      
+      ```
+  
+      Similarly, in `getAmountOutSell()` when `sqrtP_new` is calculated rounding direction is DOWN, as a result of this dividend is smaller in expression for calculating `baseReserve_new`. `baseReserve_new` being smaller results in larger `amountOut` in the final expression. As a consequence, more base token assets are withdrawn from the pool than should have been.
+  
+      ```solidity
+      // simplified code without fee calculation and application
+      sqrtP_new = liquidity.mulDiv(sqrtPb, (pandaReserve_new * sqrtPb + liquidity), Math.Rounding.Down);
+  
+      if (sqrtP_new < sqrtPa) sqrtP_new = sqrtPa;
+  
+      uint256 baseReserve_new = liquidity.mulDiv(sqrtP_new - sqrtPa, PandaMath.PRICE_SCALE, Math.Rounding.Up);
+      uint256 deltaBaseReserve = baseReserve - baseReserve_new;
+  
+      amountOut = deltaBaseReserve;
+  
+      ```
+  
+      **Remediations to consider**
+  
+      - Update `getAmountOutBuy()`
+      
+          ```solidity
+          // current
+          sqrtP_new = sqrtPa + baseReserve_new.mulDiv(
+              PandaMath.PRICE_SCALE, liquidity, Math.Rounding.Up
+          );
+          // replace with
+          sqrtP_new = sqrtPa + baseReserve_new.mulDiv(
+              PandaMath.PRICE_SCALE, liquidity, Math.Rounding.Down
+          );
+          ```
+      
+      - Update `getAmountOutSell()`
+      
+          ```solidity
+          // current
+          sqrtP_new = liquidity.mulDiv(
+              sqrtPb, (pandaReserve_new * sqrtPb + liquidity), Math.Rounding.Down
+          );
+          // replace with
+          sqrtP_new = liquidity.mulDiv(
+              sqrtPb, (pandaReserve_new * sqrtPb + liquidity), Math.Rounding.Up
+          );
+          ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">DoS</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">484d231676cbfc735a9ff353cf49462e3b822fa5</field>
+    <field name="content">
+      ## [M-1] Malicious attacker may front-run PandaPool deployments
+  
+      In the `PandaFactory`, `deployPandaToken()` and `deployPandaPool()` enable the creation of PandaPool with a predefined PandaToken ERC20 contract with a strictly defined supply and a custom ERC20 contract with more flexibility. Both functions accept the `deployer` as an argument. This argument is associated with the created instance of the PandaPool and allows the deployer to claim incentives for graduated Pool and share of `lpFees`. In addition, in the case of `deployPandaPool()`, the deployer approves `totalTokens` for the PandaFactory, and `PandaFactory` pulls corresponding tokens for pool creation and initialization.
+  
+      However, since `deployPandaToken()` and `deployPandaPool()` are not permissioned functions, anyone may invoke or front-run invocation of these functions with maliciously set parameters, including the correct deployer but incorrect other `PandaPoolParams` such as initial/final price, enable/disable vesting, or change base token for the PandaPool. Each of these changes may introduce friction in user experience. For example, clients may need to repeat the deployment process, or if they do not notice a maliciously deployed pool, this may lead to a loss of funds, such as in the case of an unexpectedly large `vestingPeriod`. 
+  
+      Also, in the case of `deployPandaPool()`, if approval for the custom pandaToken ERC20 contract happens in a separate transaction, a malicious attacker may transfer the whole approved supply with the incorrectly configured instance of PandaPool. Since that token supply would be practically locked, users would need to recreate their custom pandaToken contract. This impact may vary from annoyance to asset loss depending on whether that custom pandaToken had any previous usage.
+  
+      **Remediations to consider**
+  
+      - Remove the `deployer` argument and allow only `msg.sender` to create and initialize the pool, set `deployer` to original `msg.sender` and allow it to claim incentives with provided address or by default to itself.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">df373b4c454a8dbf562edd604ad309f8ececc4e3</field>
+    <field name="content">
+      ## [M-2] Incorrect minRaise validation for all Panda pools
+  
+      In the `PandaFactory`, the `_checkDeploymentInputs()` function performs important validations on the deployment of PandaToken pools and custom PandaPool implementations. One of these validations checks that the expected total raise amount from the Pool is greater than the configured minimum amount. This validation prevents the creation of many pools with insignificant economic activity.
+  
+      ```solidity
+      uint256 totalRaised = PandaMath.getTotalRaise(pp.sqrtPa, pp.sqrtPb, TOKEN_SUPPLY);
+      require(totalRaised >= minRaise[pp.baseToken], "PandaFactory: RAISE_TOO_LOW");
+      ```
+  
+      However, this validation is incorrect for both PandaToken and non-PandaToken pools. For PandaToken, validation is incorrect since it references the whole `TOKEN_SUPPLY` even though only `tokensInPool` would be offered and sold through the Pool. For custom PandaPool instances, `TOKEN_SUPPLY` is not even applicable since their supply is not restricted in the same way as for PandaToken contract instances.
+  
+      **Remediations to consider**
+  
+      Ensure that the `tokensInPool` variable and its proper value are used to perform minRaise validation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [M-3] Missing validation for custom pandaToken totalSupply()
+  
+      In the `PandaFactory`, `deployPandaPool()` enables deployment of PandaPool with custom `pandaToken` ERC20 contract. `_checkDeploymentInputs()` performs multiple validations that ensure that provided parameters are valid for PandaPool assumed scenarios of operation.
+  
+      However, one important parameter, and that is `totalTokens`, is accepted as is and used for all followup operations within PandaPool. Implicit assumption is that totalTokens is equal to the `totalSupply` of the custom pandaToken ERC20.
+  
+      Since there is no corresponding validation, it is to invalidate this implicit assumption. As a result multiple system invariants can be compromised. For example with extra supply of `pandaToken` price can be easily manipulated in DEX pair after graduation and upon initialization . In addition, some of the other validations, such as those related to MIN and MAX tokens in pool, could be bypassed.
+  
+      **Remediations to consider**
+  
+      - Add validation that `totalTokens` is equal to totalSupply() of custom `pandaToken` ERC20, or
+      - Remove `totalTokens` as parameter and retrieve `totalSupply()` directly from the custom `pandaToken` ERC20.
+    </field>
+    <field name="response">
+        For non PandaTokens, there is no requirement of totalTokens == total supply.
+        We want to able to support tokens created elsewhere, where only a portion of the supply is sold into the pandaPool. Most likely these will have different / new implementations and different moveLiquidity function.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">6e9a57fd742510bc14ceb67d6119837639c086de</field>
+    <field name="content">
+      ## [M-4] Incompatible fee calculations across functions
+  
+      In the `PandaPool`, `getAmountOutBuy()` and `getAmountInBuy()` are meant to provide different means to perform a swap of baseToken for pandaToken.
+  
+      These functions should be reversible, and the following informal relation should hold:
+  
+      - getAmountInBuy(pandaTokenX) = baseTokenY → getAmountOutBuy(baseTokenY) = pandaTokenX.
+  
+      However, with the current implementation of these functions, this is not the case. The cause is that they apply corresponding fee calculations in incompatible ways. In `getAmountInBuy()` the fee is calculated based on the net value, and input is `net value + fee`.
+  
+      On the other hand, in `getAmountOutBuy()` the fee is applied based on the gross value, and the input is the `gross value - fee`. As a result, functions are not reversible and generate different results.
+  
+      **Remediations to consider**
+
+      - Calculate and apply fees consistently across all functions.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">928d35ad741c1e1aad779e7796c0e93e597d3735</field>
+    <field name="content">
+      ## [M-6] Incorrent invariant check in _update()
+  
+      The `PandaPool._update()` performs a state update, which is immediately followed by invariant validations.
+  
+      ```solidity
+      function _update(uint256 _pandaReserve, uint256 _baseReserve, uint256 _sqrtP) internal {
+          //Update reserves
+          sqrtP = _sqrtP;
+          pandaReserve = _pandaReserve;
+          baseReserve = _baseReserve;
+      
+          require(
+      ==>     pandaReserve <= IERC20(pandaToken).balanceOf(address(this))
+                  && baseReserve <= IERC20(baseToken).balanceOf(address(this)),
+              "PandaPool: RESERVE_OVERFLOW"
+          );
+  
+          emit Sync(pandaReserve, baseReserve, sqrtP);
+      }
+      ```
+  
+      However, the invariant check for `pandaReserve` is incorrect or not restrictive enough since it does not subtract `tokensForLp` amount (tokens that are on the contract but not meant to be sold but to be used for dexPair initialization) from the pandaToken balance on the contract.
+  
+      **Remediations to consider**
+  
+      Update invariant condition check to prevent `pandaReserve` from becoming greater than the expected value.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [M-7] getCurrentPrice() returns incorrect price
+  
+      In `PandaPool`, the square root of the current price is tracked with the `sqrtP` variable. As a result, `getCurrentPrice()` has a simple implementation that returns the square value of `sqrtP`.
+  
+      ```solidity
+      function getCurrentPrice() public view returns (uint256) {
+        return sqrtP * sqrtP;
+      }
+      ```
+  
+      However, this implementation is incorrect since the initial values of `sqrtPa` and `sqrtPb` are scaled by `e18`.
+  
+      ```solidity
+      //Helper function to get the sqrtP of the token
+      ///@param baseTokenPer1e18PandaToken: price of the token specified as baseToken per 1e18 pandaToken
+      ///@dev For example, to get sqrtP associated with a price of 0.00001, pass in 0.00001 * 1e18 here
+      function getSqrtP(uint256 baseTokenPer1e18PandaToken) internal pure returns (uint256) {  
+          return Math.sqrt(baseTokenPer1e18PandaToken * (PRICE_SCALE / 1e18));
+      }
+      ```
+  
+      For example, when Pb price and `baseTokenPer1e18PandaToken` is `100e18`, the corresponding value retrieved from `getSqrtP()` is `10e18`. If this final sqrt price is applied in `getCurrentPrice()` result will be `100e36` instead of the expected `100e18`.
+  
+      **Remediations to consider**
+  
+      Change implementation and perform downscaling to return the correct price value.
+    </field>
+    <field name="response">
+        We are expecting price in 1e36 scale from this function. We also modified the “getSqrtP()” interface to be consistent, it now expects price scaled to 1e36 as well.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [M-8] Blocklisted deployer or treasury address may result in locked assets
+  
+      In the `PandaToken`, when graduation threshold is reached `_moveLiquidity()` function is invoked to perform appropriate actions related to dex pair initialization and raised liquidity migration to this new dex pair. In addition, lpFee and deployer lp fee share is transferred to treasury and deployer. Implementation here follows push approach for transferring tokens as part of most important flow within the project.
+  
+      However, if deployer or treasury cannot accept tokens for some reason this flow will always revert and token may never graduate. As a result, in this situation many will try to sell tokens and retrieve some of the invested assets. This may happen for example due to deployer or treasury being blocklisted by major base token issuers (e.g. USDC, USDT).
+  
+      **Remediations to consider**
+  
+      - Perform accounting for `lpFee` and `deployer` share of the `lpFee` within `_moveLiquidity()` function, but implement pull instead of push approach, so that deployer and treasury may collect their assets and whatever their status they could not block important system flow.
+    </field>
+    <field name="response">
+        The initial set of baseTokens don't have blacklist feature, and currently it is out of scope to design for potential blacklists.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5def4cfffade3b75f1fa155ae1afb7d86ad9fd73</field>
+    <field name="content">
+      ## [L-1] PandaFactory missing feature to update _initCodeHash
+  
+      `PandaFactory` contract exposes the `setDexFactory()` function for updating the corresponding `dexFactory` variable value.
+  
+      ```solidity
+      function setDexFactory(address _factory, bytes32 _initCodeHash) external override onlyOwner {
+          require(_factory != address(0));
+          dexFactory = _factory;
+          emit FactorySet(_factory, _initCodeHash);
+      }
+      ```
+  
+      However, while it accepts the `_initCodeHash` variable and emits it as part of the event, there is no functionality to update `_initCodeHash`.
+  
+      Consider adding `_initCodeHash` update functionality or removing `_initCodeHash` function parameter if it is not meant to be used.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">00f53484e16b1adef4848bedcb11fb3f77993070</field>
+    <field name="content">
+      ## [L-2] Missing validation on individual setters
+  
+      In the `PandaFactory` contract, the `minRaise` and `minTradeSize` configuration parameters are validated during `PandaPool` deployment to be non-zero values (see `_checkDeploymentInputs()`). If these two have a 0 value, deployment will revert with an error.
+  
+      However, individual setters such as `setMinRaise()` and `setMinTradeSize()` do not have such validation and allow a 0 value to be set, which would effectively stop new pool deployments for a particular base token.
+  
+      Add corresponding 0 value validation to `setMinRaise()` and `setMinTradeSize()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a12904d3aad25a1486b45c26d4d784d2ded876a1</field>
+    <field name="content">
+      ## [L-3] Missing minTradeSize validation in getAmountInBuy()
+  
+      In the `PandaPool` contract, functions `getAmountOutBuy`, `getAmountOutSell()`, `getAmountInSell()` feature `minTradeSize` validation.
+  
+      However, `getAmountInBuy()` does not feature the same validation.
+  
+      Consider adding `minTradeSize` validation to the `getAmountInBuy()` for consistent validation functionality.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">120acc2ba28d53314be3edd12466de868ac8c27b</field>
+    <field name="content">
+      ## [L-4] getAmountInBuyRemainingTokens() returns incorrect fee
+  
+      In the `PandaPool`, `getAmountInBuyRemainingTokens()` returns the fee for buying the whole pool's supply of tokens. However, it should return the fee for buying only the remaining tokens.
+  
+      Consider updating the function declaration not to return the fee and new price since they are not used anywhere within the current codebase or change the implementation to return the correct fee.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">fd6351f75262205ba54f31dbea3d6a4f6744121d</field>
+    <field name="content">
+      ## [Q-1] Function declaration mismatch in IPandaFactory
+  
+      `PandaFactory` contract exposes the `setPandaPoolFees()` function with the following declaration:
+  
+      ```solidity
+      ///param: _buyFee: buyFee in bps. Taken in baseToken terms
+      ///param: _sellFee: sellFee in bps. Taken in baseToken terms
+      ///param: _lpFee: lpFee in bps. Share of total baseToken raised that is taken as fee (remainder is added to LP)
+      ///param: _deployerFeeShare: Share of lpFee that is shared with deployer
+      function setPandaPoolFees(
+        uint16 _buyFee,
+        uint16 _sellFee,
+        uint16 _lpFee,
+        uint16 _deployerFeeShare) ...
+      ```
+  
+      However, in the `IPandaFactory` interface same function is declared with different argument names
+  
+      ```solidity
+      function setPandaPoolFees(
+          uint16 _lpFee,
+          uint16 _incentiveFee,
+          uint16 _deployerFee,
+          uint16 _treasuryFee) external;
+      ```
+  
+      Consider updating the `setPandaPoolFees()` function declaration in `IPandaFactory` to match implementation in the `PandaFactory` contract.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">548113a7837c5f3d0359866f7a19253d91f222f5</field>
+    <field name="content">
+      ## [Q-2] Missing function declarations in IPandaFactory
+  
+      `PandaFactory` contract exposes getters for `allowedImplementations` and `allPools` public variables. However, the corresponding interfaces do not have function declarations for these functions. Consider adding appropriate function declarations to the interface and `override` specifier in the `PandaFactory` contract.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">add9c4b7fc89912ee26d9cf8ef265a19114aba64</field>
+    <field name="content">
+      ## [Q-3] Missing error descriptions in PandaFactory functions
+  
+      In `PandaFactory` contract, `setTreasury()` and `setDexFactory()` functions perform validation with the help of `require()` expression. However, they do not feature error strings, which may affect dependent off-chain systems.
+  
+      Consider adding corresponding error strings.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">81bd1115dfe0e2ba16ace90154fb83c1a7543ac3</field>
+    <field name="content">
+      ## [Q-4] Unused events
+  
+      Several events are declared but never used in the PandaFactory and PandaPool. Consider removing them unless there is missing functionality where they are meant to be used.
+  
+      ```solidity
+      // PandaFactory.sol
+      event TokensForPandaPoolSet(uint16 minTokensForPandaPool, uint16 maxTokensForPandaPool);
+      ```
+  
+      ```solidity
+      // PandaPool.sol
+      event FeesCollected(uint256 baseTokenAmount);
+      event TokensBought(address indexed buyer, uint256 amountIn, uint256 amountOut);
+      event TokensSold(address indexed seller, uint256 amountIn, uint256 amountOut);
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7829c1ae3e51270988d170cacf0cb6dbe9180069</field>
+    <field name="content">
+      ## [Q-5] Hardcoded cross-contract constants
+  
+      In the `PandaFactory` and `PandaPool` contracts, several hardcoded constants are used in both contracts.
+  
+      `PandaFactory.setPandaPoolFees()` and `PandaPool.initializePool()` share fee limit constants. Similarly, `PandaFactory.deployPandaPool()` and `PandaPool.buyAllTokens()` share the same constant `9900/10000`.
+  
+      Consider replacing hardcoded values with named constants and reuse them across contracts.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">df373b4c454a8dbf562edd604ad309f8ececc4e3</field>
+    <field name="content">
+      ## [Q-6] Inconsistent naming of variables
+  
+      In the `PandaFactory` contract, the `_checkDeploymentInputs()` function performs appropriate validations.
+  
+      ```solidity
+      require(tokensInPool <= totalTokens, "PandaFactory: INVALID_TOKENSINPOOL");
+      uint256 tokensInLpShare = tokensInPool * PandaMath.FEE_SCALE / totalTokens;
+      require(
+          tokensInLpShare >= MIN_TOKENSINLP_SHARE && tokensInLpShare <= MAX_TOKENSINLP_SHARE,
+          "PandaFactory: INVALID_TOKENSINPOOL"
+      );
+  
+      ```
+  
+      However, code that validates `tokensInPool` share has variables named with the intent to validate `tokensInLpShare`.
+  
+      Consider updating the calculation or renaming the `tokensInLpShare` variable and corresponding constants.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">928d35ad741c1e1aad779e7796c0e93e597d3735</field>
+    <field name="content">
+      ## [Q-7] Validation checks should be performed earlier
+  
+      - In `PandaPool.initializePool()`, the `tokenInPool` value check should be moved before its first use. For example, if the `tokensInPool` is greater than the `totalTokens`, the expression for calculating `tokensForLp` would revert due to overflow.
+      
+          ```solidity
+          totalTokens = _totalTokens;
+          tokensInPool = getTokensInPool(pp.sqrtPa, pp.sqrtPb, _totalTokens);
+          tokensForLp = _totalTokens - tokensInPool;
+      
+          require(tokensInPool <= totalTokens, "PandaPool: INVALID_TOKENSINPOOL");
+          ```
+      
+      - In addition, in the same function, validations of `pp.sqrtPa` and `pp.sqrtPb` should be moved before their first usage to avoid extra gas costs in case they are invalid.
+      
+          ```solidity
+          require(pp.sqrtPb > pp.sqrtPa, "PandaPool: PRICE_MISCONFIGURED");
+          require(pp.sqrtPa > 0, "PandaPool: INVALID_START_PRICE");
+          ```
+      
+      - The last check is unreachable in `PandaPool.getAmountOutSell()` and should happen before the `deltaBaseReserve` is calculated.
+      
+          ```solidity
+          require(deltaBaseReserve <= baseReserve, "PandaPool: INSUFFICIENT_LIQUIDITY");
+          ```
+      
+          For `deltaBaseReserve` to be greater than the `baseReserve`, `baseReserve_new` should have been a negative number, which is not the case.
+      
+          ```solidity
+          uint256 baseReserve_new = liquidity.mulDiv(sqrtP_new - sqrtPa, PandaMath.PRICE_SCALE, Math.Rounding.Up);
+          uint256 deltaBaseReserve = baseReserve - baseReserve_new;
+          ```
+      
+          Consider adding the following validation before `deltaBaseReserve` calculation.
+      
+          ```solidity
+          require(baseReserve >= baseReserve_new, "PandaPool: INSUFFICIENT_LIQUIDITY");
+          ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">82cb11cf96f68f05f7a593935f00da48c9a23c51</field>
+    <field name="content">
+      ## [G-1] Optimize getAmountInBuyRemainingTokens() function
+  
+      In `PandaPool`, `getAmountInBuyRemainingTokens()` performs most operations that rely on constants. As a result, it can be optimized significantly with precomputed intermediary results.
+  
+      ```solidity
+      function getAmountInBuyRemainingTokens() public view returns (uint256 amountIn, uint256 fee, uint256 sqrtP_new) {
+          uint256 baseTokenNeeded = tokensInPool.mulDiv(sqrtPa * sqrtPb, PandaMath.PRICE_SCALE, Math.Rounding.Up);
+          fee = baseTokenNeeded.mulDiv(poolFees.buyFee, PandaMath.FEE_SCALE, Math.Rounding.Up);
+          sqrtP_new = sqrtPb;
+          amountIn = baseTokenNeeded + fee - baseReserve;
+      }
+      ```
+  
+      In `initializePool()`, a new `totalBaseToken` and `totalFee` variable could be precalculated in the following way.
+  
+      ```solidity
+      uint256 totalBaseToken = tokensInPool.mulDiv(sqrtPa * sqrtPb, PandaMath.PRICE_SCALE, Math.Rounding.Up);
+      uint256 totalfee = totalBaseToken.mulDiv(poolFees.buyFee, PandaMath.FEE_SCALE, Math.Rounding.Up);
+      ```
+  
+      Then 
+  
+      ```solidity
+      function getAmountInBuyRemainingTokens() public view returns (uint256 amountIn, uint256 fee, uint256 sqrtP_new) {
+          return (totalBaseToken + totalFee - baseReserve, totalFee, sqrtPb)
+      }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">dc1ed0ce22a8c1f180b7a6bbdb4e42c90fbc7bb3</field>
+    <field name="content">
+      ## [G-2] Optimize getSqrtP() function
+    
+      In `PandaMath` contract, `getSqrtP()` is implemented in the following way where baseTokenPer1e18PandaToken is multiplied with the result of the division of two constants PRICE_SCALE = 1e36 and literal constant 1e18.
+  
+      ```solidity
+      function getSqrtP(uint256 baseTokenPer1e18PandaToken) internal pure returns (uint256) {
+          return Math.sqrt(baseTokenPer1e18PandaToken * (PRICE_SCALE / 1e18));
+      }
+      ```
+  
+      Consider replacing it with the following more readable implementation.
+  
+      ```solidity
+      function getSqrtP(uint256 baseTokenPer1e18PandaToken) internal pure returns (uint256) {
+          return Math.sqrt(baseTokenPer1e18PandaToken * 1e18);
+      }
+      ```
+    </field>
+    <field name="response">
+      Modified function interface.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Token standards</field>
+    <field name="content">
+      ## [I-1] System does not support non-ERC20 compliant tokens
+
+      Currently, the system does not properly handle any nonstandard ERC20 tokens such as fee-on-transfer or rebasing tokens. Therefore, system admins will need to ensure that those tokens are not used.
+    </field>
+  </item>
+  
