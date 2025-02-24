@@ -1,0 +1,67 @@
+<page
+  clientName="Seven Seas"
+  platform="Solana"
+  reportDate="Feb 21, 2025"
+  auditTitle="Seven Seas A-29"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-svm"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="ea1e9036856accfaaf2767835230547fb59530a0"
+  passwordEncrypt="env:PAGE_PASS_SEVENSEAS_29"
+
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from Feb 10th to Feb 20th 2025.
+</content-for>
+
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash:</b> </br>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+    </ul>
+  </content-for>
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+   
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+        Specifically, we audited Solana programs that mimic Veda's Boring Vault contracts on the EVM chain.
+    </p>
+
+    <template type="file-hashes">
+        df79f990986184edd3a89c3ab1050587269c7cbb23dca6dea9ae960d531dc0c3  boring-vault-svm/src/constants.rs
+        3c989f44d563e38716904ee55c6d8095a77f6bd65d141b0efbbefa6a2191ef02  boring-vault-svm/src/error.rs
+        beed56647a6440c9850c92fb84cc8563eea88b03188cac745fad44544c126b1d  boring-vault-svm/src/lib.rs
+        9135996e1a4ab937d9ec33dcf70e2284accf4584682d03c8333418f3437e0922  boring-vault-svm/src/state.rs
+        
+        8cae17fbd2a731c44189a9c5b249f15b135b6893db92e9db98198487316cdba8  boring-vault-svm/src/utils/mod.rs
+        8cdad473e1a1540ce63eee8eac2f45fb07d654956a241418be0a1d83bebc2281  boring-vault-svm/src/utils/operators.rs
+        5ce667fee3dcbbb26c2270e1baba2e896b85f528ec3aebbe15157cbd19493ada  boring-vault-svm/src/utils/teller.rs
+
+        e93f16dcabada4003c3d8ef941cbfbd3c46d2368f5c885bf2d9751bce62101e9  boring-onchain-queue/src/constants.rs
+        6547765064f2ebafa53fb6762835f56ca3a2a7fcd143fcf45d8081c4853f255f  boring-onchain-queue/src/error.rs
+        404f726f872950a659391b7e81b420273eeb08f7ad4cb43c1cf6c4d1b1986e3a  boring-onchain-queue/src/lib.rs
+        8e667d836eb1b5d5ce46f1685d942c8c79dd586ee5689ae9c8284bad5111a6ee  boring-onchain-queue/src/state.rs
+
+        3da9e41e54128210d823f125f1da814f694f96a0e8f982a53fd5500ae70bc06c  boring-onchain-queue/src/utils/mod.rs
+        b92ecfbad281624f171294ee2613aefbbdee47274bf85ec0112e102b816c63a2  boring-onchain-queue/src/utils/utils.rs
+        2c125bda79183630e5e1301da83a7dd99f97f694f59926423bb7eaa76cd84ef5  boring-onchain-queue/src/utils/validate.rs
+
+
+    </template>
+  </content-for>
+</page>
