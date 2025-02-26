@@ -1,0 +1,52 @@
+<item>
+    <field name="topic">Missing function</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">00550a84c43bd413a3f5d593cf38fb82ca1e940c</field>
+    <field name="content">
+        ## [L-1] Spectra decoder doesn’t support deposits with slippage protection
+
+        Currently, the spectra decoder implements only the basic `deposit` function without slippage protection:
+        
+        ```jsx
+        function deposit(uint256 /*amount*/, address receiver)
+        ```
+        
+        **Remediation to Consider**
+        
+        Add the `deposit` function with slippage protection to avoid receiving less tokens than expected.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Missing functionality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">00550a84c43bd413a3f5d593cf38fb82ca1e940c</field>
+    <field name="content">
+        ## [Q-1] Spectra decoder doesn’t support `redeem` function
+
+        The spectra decoder currently implements `redeemIBT` to redeem interest-bearing tokens (IBT), but lacks support for the `redeem` function that would allow redeeming the underlying token.
+        
+        **Remediation to Consider**
+        
+        Add the [redeem function](https://github.com/perspectivefi/spectra-core/blob/main/src/tokens/PrincipalToken.sol#L275-L280) with slippage protection to the decoder.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Missing functionality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">253e9eeb82f90caccd9c224b4489522d3d7a7cf7</field>
+    <field name="content">
+        ## [Q-2] Resolv decoder doesn’t support `redeem` function
+
+        The Resolv decoder implements `requestBurn`, which burns `USR` and returns `USDC` once `completeBurn` is called by a trusted entity. The Resolv protocol also offers a redeem function that burns USR tokens and returns USDC immediately in a single transaction.
+        
+        **Remediation to Consider**
+        
+        Implement the `redeem` function to support burning USR and receiving back USDC in a single transaction.
+    </field>
+  </item>
