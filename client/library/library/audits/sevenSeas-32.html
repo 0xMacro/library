@@ -1,0 +1,43 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Feb 28, 2025"
+  auditTitle="Seven Seas A-32"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on February 27th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>ConvexFX Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/143">PR 143</a>)</b> </br>
+        Commit Hash: <code>58038232fb896c8f8cee169ac241925950a8888f</code>
+        <template type="file-hashes">
+            0b7d6ce8cdd0520def65d9c0e8e70db4aea721db70481043caccd2440d325878  src/base/DecodersAndSanitizers/Protocols/ConvexFXDecoderAndSanitizer.sol
+        </template>
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>Level Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/144">PR 144</a>)</b> </br>
+        Commit hash: <code>649c020b4aaab3fe237b1933523b672907f79b26</code>
+      <template type="file-hashes">
+        823e38e6c5c38e2b2d6de5f0fb8c5ba1fa83faf8ed0ee6113af0c33a2a4b8efb  src/base/DecodersAndSanitizers/Protocols/LevelDecoderAndSanitizer.sol     
+    </template>
+    </li>
+      
+    </ul>
+  </content-for>
+</page>
