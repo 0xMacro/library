@@ -1,0 +1,33 @@
+<page
+  clientName="Agora Finance"
+  reportDate="February 17, 2025"
+  auditTitle="Agora Finance A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/agora-finance/stable-swap-dev"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="f35c3a2ffae9e700573c4a39d2fe8a279092e2a9"
+  issueSummaryFormat="table"
+  passwordEncrypt="env:PAGE_PASS_AGORA"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from February 17, 2025 to February 19, 2025.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available public documentation and provided docs for the specific release.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the messaging layer contracts within this repository:</p>
+    <template type="file-hashes">
+        a9f6384a872c509ffd6603bc3eeb8df21ddd614431792840964dceb84095af76  src/contracts/AgoraStableSwapAccessControl.sol
+        e75f0066a51b98c6cbfb86b5b4e0d93e5b928a65dc5e908eef4c215b14ebd5ca  src/contracts/AgoraStableSwapPair.sol
+        bad4bce118cfdec706f1185484af950f95d0bd48c361cc1024506b9198399163  src/contracts/AgoraStableSwapPairConfiguration.sol
+        874dde4276e9eae8f4d47f81576a1110f67b159f760ebd444463abae5de40000  src/contracts/AgoraStableSwapPairCore.sol
+        b763cda13a15e02f555e6c8d88c1e32ecaf3701052cfccb2730d1315a5a81401  src/contracts/interfaces/IAgoraStableSwapPair.sol
+        96a39046be4497b75848e853c8f4b31689a4d2c6a39ab22949333d5ddce20038  src/contracts/interfaces/IUniswapV2Callee.sol
+    </template>
+</page>
