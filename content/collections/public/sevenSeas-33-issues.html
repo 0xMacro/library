@@ -1,0 +1,41 @@
+<item>
+    <field name="topic">Assembly</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">ceeb14e6c8e0085fdf9683a5d56e1bc06e33f796</field>
+    <field name="content">
+        ## [M-1] `swapCompact` not working with `addressList`
+
+The `OdosDecoderAndSanitizer` implements the `swapCompact` function that provides a gas-efficient way of swapping. One way to reduce the `calldata` size is to cache addresses in an `addressList`, allowing users to specify only the ID instead of the entire address. However, in `swapCompact`, the logic to mark addresses fails and breaks the decoder. 
+
+For addresses that need to be fetched from the addressList, assembly is used to store a marker as follows:
+
+```jsx
+  default {
+      // Store a marker in the high bits and the index in the low bits
+      // We'll use this later to know we need to look up from addressList
+      result := or(0x1000000000000000000000000000000000000000, sub(inputPos, 2))
+      newPos := add(currPos, 2)
+  }
+```
+
+**Reference**: [OdosDecoderAndSanitizer.sol#L55](https://github.com/Veda-Labs/boring-vault/blob/080322f15d61fe0b35b960384ac918723a2a7f7f/src/base/DecodersAndSanitizers/Protocols/OdosDecoderAndSanitizer.sol#L55)
+
+Subsequently, it is checked via `isAddressMarked` if a marker is set and whether an address needs to be fetched:
+
+```jsx
+function isAddressMarked(address addr) private pure returns (bool) {
+    return uint256(uint160(addr)) >= 2**160;
+}
+```
+
+**Reference**: [OdosDecoderAndSanitizer.sol#L55](https://github.com/Veda-Labs/boring-vault/blob/080322f15d61fe0b35b960384ac918723a2a7f7f/src/base/DecodersAndSanitizers/Protocols/OdosDecoderAndSanitizer.sol#L55)
+
+The marker is stored at `0x1000000000000000000000000000000000000000` which is the equivalent to `2**156`. However, `isAddressMarked` checks against `≥ 2**160`. Consequently, marked addresses will never be fetched from the `addressList,` breaking the integration to the protocol. 
+
+**Remediation to Consider**
+
+Change the way how relevant addresses are being marked. One possible solution is to simply use a `mapping(address→bool)` to store addresses that need to be fetched from the `addressList`. </field>
+  
+</item>
