@@ -1,0 +1,35 @@
+<page
+  clientName="towns"
+  reportDate="March 17, 2025"
+  auditTitle="Towns A-9"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/towns-protocol/towns"
+  repoCommitHash="0386ab484baf0cc3ba9c77c628a3dd6e6f1fe082"
+  repoCommitHashFinal="4127ef6a19fcf902950e7fc9fd11e74bef3397ff"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_TOWNS_9"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from March 7, 2025 to March 10, 2023.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the HNT team.</li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within <i>contracts/src/tokens/towns</i> repository directory:</p>
+
+  <template type="file-hashes">
+    986b4ad31ea1eec2ffaae1b8934a98acbceef8e980afb6b2c404cb6c7f72e635  contracts/src/tokens/towns/base/Towns.sol
+    3f5f5e60f47fa882da3bdea89164fc75192c0f911e7b79c2f57a8b0f8073b9a4  contracts/src/tokens/towns/base/TownsDeployer.sol
+    dd8afe1f2194ac67e02b30636d2494bb517def9e3181d5ce1918cca814ac2a6f  contracts/src/tokens/towns/base/TownsLib.sol
+    fc67d46e84f6d5250f98415dca920830fcc73e165687d7b036d141d2a73fc54b  contracts/src/tokens/towns/base/versions/TownsV2.sol
+  </template>
+
+</content-for>
+
