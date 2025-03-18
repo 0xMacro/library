@@ -1,0 +1,39 @@
+<page
+  clientName="Clanker"
+  reportDate="March 18, 2025"
+  auditTitle="Clanker A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/clanker-devco/contracts"
+  repoCommitHash="0805bb89bceaf39a9a1e6422a61dfefce3dddcc1"
+  repoCommitHashFinal=""
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_CLANKER_1"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from March 11, 2025 to March 17, 2025.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the Clanker team.</li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within the repository:</p>
+
+  <template type="file-hashes">
+    ac3555b7232bf007dcc67a656a645ac5006656ab5055079570c0f266d2b42816  src/Clanker.sol
+    8d346d9e8192afd41ab57f65d42514379b4263b2722b790ceca0e0f4c24a2d6f  src/ClankerDeployer.sol
+    e86210da783df250cb3a3de1343e967ade379359621f0ec0868eb4a35774a132  src/ClankerToken.sol
+    97eb8c784315b6efa99e5012addefa0a01a3d7eb797d275a8dc18a81e5cc4dbc  src/ClankerVault.sol
+    115eb7ceea6014642f0670f5e848312cb1e6d2d54eb0ad04dca6403bd56195c2  src/LpLockerv2.sol
+    cf78b237444395e9fef8b4be69e4f1f3bdfe2945be1ecb974f2895e235947acc  src/interfaces/IClanker.sol
+    e89eac07d18cae598dfe184b57078a3d76c5aeae14f1a13778417ee147e35314  src/interfaces/IClankerVault.sol
+    fa57253d70478b722e4e5e549c2337332267e379c19b4065c8ff263565501a31  src/interfaces/ILPLockerv2.sol
+    8aacdba548c8fc33d871a9c382546cf26e3ade99d28f45aaa0f0153677481acd  src/interfaces/uniswapv3.sol
+  </template>
+</content-for>
+
