@@ -1,4 +1,52 @@
 <item>
+  <field name="topic">Sanitization</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="customCommits">https://github.com/Veda-Labs/boring-vault/pull/182/commits/94c958ff3501eaeb2c9a15f36b34c9ce58a58505,https://github.com/Veda-Labs/boring-vault/pull/182/commits/f50621fd33b259839b7ee9dc7f4733e207f3a769</field>
+  <field name="content">
+    ## [M-1] UniswapV4 decoder's `modifyLiquidities` function only sanitizes first two actions
+
+    In `UniswapV4DecoderAndSanitizer`, the `modifyLiquidities` function allows for adding, removing, and modifying liquidity on UniswapV4 pools. It allows for batching multiple actions that are encoded in the first argument: 
+    
+    ```jsx
+    function modifyLiquidities(bytes calldata unlockData, uint256 /*deadline*/) external view returns (bytes memory addressesFound) { 
+            // First decode the outer tuple (actions, params)
+            (bytes memory actions, bytes[] memory params) = abi.decode(unlockData, (bytes, bytes[]));
+    ```
+    
+    **Reference**: [UniswapV4DecoderAndSanitizer.sol#L56](https://github.com/Veda-Labs/boring-vault/blob/d7211fbfaa54fcc389faa52dfdf73928391984c3/src/base/DecodersAndSanitizers/Protocols/UniswapV4DecoderAndSanitizer.sol#L56)
+    
+    However, only `actions[0]` and `actions[1]` are sanitized, and the function lacks a check to prevent additional actions from being passed in the `unlockData` argument. As a result, any additional actions encoded in unlockData can be executed without any sanitization.
+    
+    **Remediation to Consider**
+    
+    It is recommended to restrict the execution only to supported action sequence. Thus, consider adding a check to only allow the required number of actions passed to the function.
+  </field>
+</item>
+
+
+
+<item>
+  <field name="topic">Sanitization</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="customCommits">e6e923372df96365cd584be78d82f0ea25d63214</field>
+  <field name="content">
+    ## [M-2] UniswapV4 decoder's `execute` function only sanitizes first three actions
+
+    Similar to M-1, the [`UniswapV4DecoderAndSanitizer’s` `execute`](https://github.com/Veda-Labs/boring-vault/blob/e7ba202e111feeb84e3995fd5bc2c088c8392c1e/src/base/DecodersAndSanitizers/Protocols/UniswapV4DecoderAndSanitizer.sol#L37) function only sanitizes the first three actions. Any additional actions being passed in `inputs[0]` remain unsanitized. 
+    
+    **Remediation to Consider**
+    
+    Restrict the execution only to supported action sequence. Thus, consider adding a check to only allow the required number of actions passed to the function.  
+  </field>
+</item>
+
+
+
+<item>
     <field name="topic">Missing function</field>
     <field name="impact">low</field>
     <field name="chance">low</field>
@@ -16,6 +64,24 @@
         **Remediation to Consider**
         
         Add the `deposit` function with slippage protection to avoid receiving less tokens than expected.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Sanitization</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Veda-Labs/boring-vault/pull/182/commits/f50621fd33b259839b7ee9dc7f4733e207f3a769,https://github.com/Veda-Labs/boring-vault/pull/182/commits/f21be3fc52bfcd7aee8d8db9721749e2ecd985b0,https://github.com/Veda-Labs/boring-vault/pull/182/commits/b69d5263566067ffaf20e4634dbaa512cfd07feb</field>
+    <field name="content">
+      ## [L-2] Loose validation in UniswapV4 decoder's `modifyLiquidities` might lead to unwanted execution
+  
+      In `UniswapV4DecoderAndSanitizer`, `modifyLiquidities` misses certain checks that would ensure only supported sequences of actions are allowed. Specifically, it's recommended to add verification for:
+      
+      1. for the `MINT_POSITION` operation, check that `actions[1]` is `SETTLE_PAIR` before decoding `params[1]`
+      2. for the `INCREASE_LIQUIDITY`, `DECREASE_LIQUIDITY`, and `BURN_POSITION` operations, the `tokenId` is encoded in `params[0]` to identify the specific pool for execution. However, this is not sanitized. The PositionManager’s `getPoolAndPositionInfo` could be called to receive the `PoolKey` and sanitize it’s addresses.
+      3. for the `INCREASE_LIQUIDITY`/`DECREASE_LIQUIDITY` operation when using sub-actions `CLOSE_CURRENCY` or `CLEAR_OR_TAKE`, check for `actions[2] ==  CLOSE_CURRENCY` and `actions[2] == CLEAR_OR_TAKE`
+      4. for the `BURN_POSITION` operation, check that `actions[2] == TAKE_PAIR`
     </field>
   </item>
 
@@ -48,5 +114,21 @@
         **Remediation to Consider**
         
         Implement the `redeem` function to support burning USR and receiving back USDC in a single transaction.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Missing functionality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">b18d9291ea7ac8ad3092e80f9f2afbcff7130c6d</field>
+    <field name="content">
+      ## [Q-3] UniswapV4 decoder's execute function only supports `SWAP_EXACT_IN_SINGLE` swaps
+  
+      In `UniswapV4DecoderAndSanitizer`, the `execute` function enables swapping via the UniversalRouter contract. Currently, the function only supports "Exact Input Swaps." To increase flexibility, implementing additional swap types—such as "Exact Output Swaps"—would be beneficial.
+      
+      **Remediation to Consider**
+      
+      Implement support for additional swap actions.
     </field>
   </item>
