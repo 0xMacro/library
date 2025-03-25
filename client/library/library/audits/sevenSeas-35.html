@@ -1,0 +1,67 @@
+<page
+  clientName="Seven Seas"
+  reportDate="March 25, 2025"
+  auditTitle="Seven Seas A-35"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team over multiple days starting on March 18th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Odos Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/184">PR 184</a>)</b> </br>
+        Commit Hash: <code>f472abafb22f7a45e81df2814ae4bdf6f56dd74a</code>
+        <template type="file-hashes">
+          99df2d0b09be291f4eee4857ad21fce43cf6540ed7c6231bb10197564688581b  src/base/DecodersAndSanitizers/Protocols/OdosDecoderAndSanitizer.sol        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Elixir Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/185">PR 185</a>)</b> </br>
+        Commit Hash: <code>187e7b0b619dfdcbe78273d41b7fe24d1bb22ed7</code>
+        <template type="file-hashes">
+          1b8cceee10b662f9d8c31e021048e95a85fe18de0ec4fddd9774a14e1828b897  src/base/DecodersAndSanitizers/Protocols/ElixirClaimingDecoderAndSanitizer.sol       </template>
+        </li>
+
+      <li class="break-words break-all">
+        <b>Syrup Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/179">PR 179</a>)</b> </br>
+        Commit Hash: <code>e80c7df3607fb8e84fd323720aed23f98213227a</code>
+        <template type="file-hashes">
+          bf432c48e72ee1d0d77884b5d8184c0a05a662c4e2d0186d3032eeffb9615ab1  src/base/DecodersAndSanitizers/Protocols/SyrupDecoderAndSanitizer.sol        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>BalancerV3 Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/190">PR 190</a>)</b> </br>
+        Commit Hash: <code>8530fbe7225fb699a1924aa29545f17c622f28e4</code>
+        <template type="file-hashes">
+          e4d359e1b6b03852bfb524de6d5acf01019e214f9083790272142ba129401a73  src/base/DecodersAndSanitizers/Protocols/BalancerV3DecoderAndSanitizer.sol
+          d30a5067007016755a14f5f8320a686deb7fcbd45896593d07c08dd808e5dab7  src/base/DecodersAndSanitizers/Protocols/Permit2DecoderAndSanitizer.sol
+        </template>
+      </li>
+
+
+      <li class="break-words break-all">
+        <b>Royco Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/188">PR 188</a>)</b> </br>
+        Commit Hash: <code>8530fbe7225fb699a1924aa29545f17c622f28e4</code>
+        <template type="file-hashes">
+          2cbc4b13b799fb4a26c23cd40648b4c2144dd0e2d3626e583f96ef3f9938169c  src/base/DecodersAndSanitizers/Protocols/RoycoDecoderAndSanitizer.sol
+        </template>
+      </li>
+    
+      
+    </ul>
+  </content-for>
+</page>

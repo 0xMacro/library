@@ -1,0 +1,30 @@
+<item>
+    <field name="topic">Missing Functionality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a6aaea2dbd5ef48a8560934a85ec4dab6adf3eee</field>
+    <field name="content">
+      ## [Q-1] Permit2 decoder doesn’t support `lockdown`
+
+For the `Permit2DecoderAndSanitizer`, it could be useful to allow revoking approvals by supporting the `lockdown` function.
+
+**Remediation to Consider**
+Add the [`lockdown` function](https://github.com/Uniswap/permit2/blob/main/src/interfaces/IAllowanceTransfer.sol#L157) to the Permit2DecoderAndSanitizer.
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Missing Functionality</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">fd105d16ef992bfd33fe346907e08d34f3818f52</field>
+    <field name="content">
+        ## [Q-2] Royco decoder doesn’t support cancelling offers on the `VaultMarketHub`
+
+        The `RoycoDecoderAndSanitizer` allows creating AP (action provider) offers on both the RecipeMarketHub and VaultMarketHub. While offer cancellation is implemented for RecipeMarketHub through `cancelAPOffer`, no equivalent cancellation function exists for VaultMarketHub.
+        
+        **Remediation to Consider**
+        Add support for cancelling offers on the VaultMarketHub by implementing the `cancelOffer` function.
+    </field>
+  </item>
