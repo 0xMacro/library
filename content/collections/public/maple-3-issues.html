@@ -1,0 +1,48 @@
+<item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">18eb8b3e6a3e603fca85316de8e4bed22b39c618</field>
+    <field name="content">
+        ## [M-1] Missing slippage protection in withdrawFromStrategy()
+
+        In the `MapleBasicStrategy` contract, `withdrawFromStrategy()` is responsible for obtaining requested `assetsOut` in exchange for burning an appropriate amount of `shares` through interaction with the IERC4626Like `strategyVault`. When `strategyVault` has low liquidity, slippage may significantly affect this swap operation. This has been adequately addressed in `fundStrategy()` operation with `minSharesOut_` argument and corresponding validation.
+        
+        However, `withdrawFromStrategy()` does not feature any slippage protection mechanism and, therefore, is susceptible to potentially burning much more than the expected amount of shares to obtain the requested assets by `assetsOut`.
+        
+        **Remediations to Consider**
+        
+        Add slippage protection to withdrawFromStrategy by:
+        
+        - Adding a `maxSharesBurned_` parameter
+        - Adding a check to ensure the actual shares burned don't exceed the maximum specified
+        - Maintaining consistency with the protection model used in `fundStrategy()`
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4dbf2b92aafeaaec1b0ab3c454ddd3596216bc59</field>
+    <field name="content">
+        ## [L-1] Missing validation in setPsm()
+
+        In the `MapleSkyStrategy` contract, the `setPsm()` enables protocol admins to change the Peg Stability Module (PSM) in use. However, in contrast to the initialization logic in `MapleSkyStrategyInitializer`, the feature for changing the PSM module address does not contain validation logic that the new PSM module uses adequate assets.
+        
+        ```solidity
+        // validation present in MapleSkyStrategyInitializer._initialize() 
+        require(IPSMLike(psm_).gem() == fundsAsset_, "MSSI:I:INVALID_GEM_PSM");
+        require(IPSMLike(psm_).usds() == usds_, "MSSI:I:INVALID_USDS_PSM");
+        ```
+        
+        If the instance of MapleSkyStrategy is misconfigured with an incorrect PSM module, it may lead to operations that revert or that perform incorrect calculations (e.g., due to different `to18ConversionFactor`)
+        
+        **Remediations to Consider**
+        
+        - Add corresponding missing validations to `MapleSkyStrategy.setPsm()`
+    </field>
+  </item>
