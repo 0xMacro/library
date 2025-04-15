@@ -1,0 +1,28 @@
+<item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/superstateinc/ustb/commit/78e8ca22a319efd265e7d6ba2c326475cb6b6e2e</field>
+    <field name="content">
+      ## [Q-1] Missing function declaration in ISuperstateToken
+  
+      In the `ISuperstateToken` interface defined in `ustb` repository, both subscribe function variants (with and without `to` address parameter) are missing.
+  
+      Consider adding function declaration for these two functions.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/superstateinc/onchain-redemptions/commit/59534af26d209ff5d3da5fda311c3a98471c1e71</field>
+    <field name="content">
+      ## [Q-2] The ISuperstateToken interface in onchain-redemptions is not up-to-date
+  
+      The `ISuperstateToken` interface file in onchain-redemptions has not been updated with the latest version of ISuperstateToken from the ustb repo. For example, it doesn't have the SubscribeV2 event.
+  
+      Consider updating the interface file to contain only relevant functions and events, or keep it up to date with the latest version from the `ustb` repo.
+    </field>
+  </item>
+  
