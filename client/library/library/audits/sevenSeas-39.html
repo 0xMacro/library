@@ -1,0 +1,54 @@
+<page
+  clientName="Seven Seas"
+  reportDate="April 17, 2025"
+  auditTitle="Seven Seas A-39"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team over multiple days starting on April 11th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li class="break-words break-all">
+        <b>Layer Zero OFT full address decoding (from <a href="https://github.com/Veda-Labs/boring-vault/pull/226">PR 226</a>)</b> </br>
+        Commit Hash: <code>4c9c671bb965899728167102a0e3ac22f4aabf7a</code>
+        <template type="file-hashes">
+          8031b6602db3cfe48ea2f266cd3e98730871f2d9cd46b07103ddec21feb6b0fe  src/base/DecodersAndSanitizers/Protocols/OFTDecoderAndSanitizer.sol      </template>
+        </li>
+
+      <li class="break-words break-all">
+        <b>Derive Withdraw Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/228">PR 228</a>)</b> </br>
+        Commit Hash: <code>d874ddfb17388df424b260a6caa633dda7c85b86</code>
+        <template type="file-hashes">
+          7ffcb6c2f3dd12534178df3f179005dd06fc4c2c8a4f0c263ec0d5c7be2f75b6  src/base/DecodersAndSanitizers/Protocols/DeriveWithdrawDecoderAndSanitizer.sol
+        </template>
+      </li>
+      <li class="break-words break-all">
+        <b>Fluid Rewards claiming decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/229">PR 229</a>)</b> </br>
+        Commit Hash: <code>5d8e13d89255dfbb171f3e324d6d06d38a9910d7</code>
+        <template type="file-hashes">
+          49dede0703ea8bb761a1ff261a964b8551070afb49c8af59026c1ba340567a34  src/base/DecodersAndSanitizers/Protocols/FluidRewardsClaimingDecoderAndSanitizer.sol
+        </template>
+      </li>  
+      <li class="break-words break-all">
+        <b>Add CrossChain Teller Functions (from <a href="https://github.com/Veda-Labs/boring-vault/pull/230">PR 230</a>)</b> </br>
+        Commit Hash: <code>dc9c645d90f87875b7430409b4000b7dda7528fd</code>
+        <template type="file-hashes">
+          9970b5a936a6981e8c9751982d3a76e1c58086a35186d9ea829afee71a4567d1  src/base/DecodersAndSanitizers/Protocols/TellerDecoderAndSanitizer.sol      </template>
+      </li>
+
+    </ul>
+  </content-for>
+</page>
