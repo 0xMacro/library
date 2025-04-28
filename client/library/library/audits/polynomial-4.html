@@ -1,0 +1,43 @@
+<page
+  clientName="Polynomial"
+  reportDate="april 16, 2024"
+  auditTitle="Polynomial A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Polynomial-Protocol/fx-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="5af5661f339ccaf62129b8a883a298bcda86facc"
+  finalRepoCommitHash="c199150b92a0514af11c24217e6d52f7cde32bd9"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on February 7-11th 2024.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+      26d0a61acdc630d08d556cb7687f1f8a21af2e5fa13f3425ff5e351eab8e6851  markets/perps-market/contracts/modules/GlobalPerpsMarketModule.sol
+      7e09af915478a2c7e872ae23da92cfc9ef88e5b68ca84b361502bd10d833ca9b  markets/perps-market/contracts/modules/LimitOrderModule.sol
+      b04ee7f619c7f072e2c88cf2af23dae296f2a9572ffb5e10a92569f9140133ae  markets/perps-market/contracts/modules/MarketConfigurationModule.sol
+      b95502c4b02f0c596b92dda53a67a15d59233494bb6291ce83bdd46b26a5203a  markets/perps-market/contracts/storage/GlobalPerpsMarketConfiguration.sol
+      c7c556d68d28a30dc9c0f522afbfb47c5834c053c3bea94a9461adc74d92e433  markets/perps-market/contracts/storage/LimitOrder.sol
+      f32c5ac2d502ed231aad66e9f3904678728fb78ce29a2c14c1891e481a741dff  markets/perps-market/contracts/storage/OrderFee.sol
+      da805362c8d9f218803b6d1ead8dbd16761de32a18f8f7ac5d385c809ca9b137  markets/perps-market/contracts/storage/PerpsMarket.sol
+      b34a7f94687fad1efe019cc15b074a0b7bed1d1f1d06d9a8bcc4fc3eca932879  markets/perps-market/contracts/storage/PerpsMarketConfiguration.sol
+      9ec840a84caad93924c197b3c3f9a8e62b8df70e4ba0d24c0adffc32cb4b2612  markets/perps-market/contracts/utils/Flags.sol
+      56543bc24c8d33cbf0684abdf6d6870bb6f05adee7cd111e33732899577545a1  protocol/synthetix/contracts/storage/Account.sol
+      951f7f9a8e8435fe5091d844da78719e9844c97b5e20f3d6dfb1ea82f5d813c4  protocol/synthetix/contracts/storage/AccountRBAC.sol
+    </template>
+  </content-for>
+</page>
