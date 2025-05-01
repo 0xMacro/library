@@ -1,0 +1,114 @@
+<page
+  clientName="Level Money"
+  reportDate="May 10, 2024"
+  auditTitle="LevelMoney A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Level-Money/contracts/"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+  customReviewInfo
+  repoCommitHashFinal="5065d156f72b878db301907509eadb49760275d2"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from April 18th to the 28th.
+</content-for>
+
+  <content-for name="repo-info">
+
+      <li> <b>Scope</b>
+        <ul>
+          <li>
+            <b>Repository:</b>
+            <a href="{{page.repoUrl}}" target="_blank">
+              Level Money contracts
+            </a>
+          </li>
+
+          <li class="break-words break-all">
+            Final Commit Hash:
+            <code>5065d156f72b878db301907509eadb49760275d2</code>
+          </li>
+        
+        </ul>
+
+      </li>
+  </ul>
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+      <li>Provided technical documentation.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      ### Trusted Entities:
+
+      - Admin Multisig: Is the roles admin of other roles, can upgrade contracts,  pause/unpause contracts, remove user roles, redeemable assets and oracles and disable both minting and redeeming. Has the highest authority of the protocol, and is trusted to act in the best interest of it. Is a 5/8 timelocked multisig, with 4 internal signers and 4 trusted 3rd party signers, where all signers use cold wallets.
+      - Operator Multisig: Can pause/unpause contracts, disable minting/redeeming, and manage the vault via the vault manager. Is a 2/5 safe, where signers are internal team members and 4/5 wallets are cold.
+      - Treasury Multisig: Can call reward() on the reward manager, and is trusted to use assets received to mint more lvlUSD and distribute to stakers. Is a 3/4 safe, where signers are internal team members and all wallets are cold.
+      - Hexagate GateKeepers: Can pause/unpause contracts and disable minting. Is trusted to monitor the state of lvlUSD and react when needed in the best interest of the protocol. Is a EOA stored in AWS.
+
+      ### Trust Assumptions:
+
+      - Users must trust that the above trusted entities will act in the best interest of the protocol.
+      - Holders of level money are at risk of losing assets if any of the strategies the protocol interacts with experiences unexpected issues, like in the event of a hack or insolvency. The intention is that level money will only interact with proven and stable protocols and keep this risk to a minimum.
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the following contracts within this repository:</p>
+    
+    <template type="file-hashes">
+        c4021a45a1a843d7668145a288561076ba47198f1699ccc01ff91fa312fab6bc  src/v2/LevelMintingV2.sol
+        c850e35f95312ca864747ba9eb616ab1af0a485f55d047e7ee5c280085774906  src/v2/LevelMintingV2Storage.sol
+        1ad1e7e356a4bb5916401f5904c706ab39cb36756aff3bf322ab34e92d307e53  src/v2/auth/AuthUpgradeable.sol
+        fe755fd0453ba4826937e330e48718ea980d50dc187388c06395a13af4ad2d72  src/v2/auth/StrictRolesAuthority.sol
+        924663aca6781dcb2f2988c187925d957c428649a3e582eabbba2b3485226908  src/v2/common/guard/PauserGuard.sol
+        6eea005248ca4eeeee4ad40154a788e0561eba55151b2df055396c2b057ec205  src/v2/common/guard/PauserGuarded.sol
+        959dc0878368bc68cac2c41474774fab228e22ca0e80b0d52cdfd183c5841e99  src/v2/common/libraries/MathLib.sol
+        407d083edfcf18243e2c5119ef4e50fdb9fd5e2326f2cd31a1363e56a0ef63b5  src/v2/common/libraries/OracleLib.sol
+        1857441f2512588aa055acd2dc1f094e3dac54d6f355be42a5edef7ce015d210  src/v2/common/libraries/StrategyLib.sol
+        73b1652096e4bf4ee47699c2923052ce59b9beff0b4b705ea1bdb3cd2a0aafbd  src/v2/common/libraries/VaultLib.sol
+        f713c8782afe6e66f8ef7e8caf08c4226d1af1ab9928dcf998e73d70427b966c  src/v2/interfaces/AggregatorV3Interface.sol
+        98bed7b7ba50b12eb66c4fddd6f7877fa00867601db8612d9d6b6983ae341615  src/v2/interfaces/aave/DataTypes.sol
+        352cab2ff6d1921094904dac59c21fbb74c2b2e8b0b719b86db6b7e00f2ce6d0  src/v2/interfaces/aave/IEACAggregatorProxy.sol
+        d359240fec5f2d131eb1bb43322d881bf194db4fdfd2535990d29899c8a28479  src/v2/interfaces/aave/IPool.sol
+        6596af3544778a94f9c01a3d78baf53dcefb221ef2546c99edc5f845f8d1d8d1  src/v2/interfaces/aave/IPoolAddressesProvider.sol
+        cef86c4a389461583f6dd879f288dde55983bb1d9a4fd1e389689fdea72af20d  src/v2/interfaces/level/IBoringVault.sol
+        568600b596c7f10892491e7087b22accf96a2a9db829199f2a60f253cbf19924  src/v2/interfaces/level/IERC4626Oracle.sol
+        e98e14b9417bd90130dc3d439d56336a88d77f939c2faf8c3b9be29eb2f2d7fc  src/v2/interfaces/level/ILevelMintingV2.sol
+        823da0726d6860c7a83e0094f3527d2fc34aa0dc17180a086586dd8741a8e0a2  src/v2/interfaces/level/IPause.sol
+        00f201c6bdf2338968d8d06e366220a6f069fd612fea1d6ebdf227aa17c8bb64  src/v2/interfaces/level/IPauserAuthority.sol
+        9a9d6ed54391e0af20c0984cc89c147feba6915e6970a58c2e936f5665f85922  src/v2/interfaces/level/IRewardsManager.sol
+        d4691784fa172fbfae072f9d553ccfb4ef51dda2db325d2447e2e0f5fd8579d8  src/v2/interfaces/level/IVaultManager.sol
+        5db26afef84f4e09fd1ff8fd8e76fa6cba905cadecb6a437006fbb471112d060  src/v2/interfaces/level/IlvlUSD.sol
+        ace96ee95cd6b68442712a256e24f903932b26d278094b04655611748049dae6  src/v2/interfaces/morpho/IMetaMorpho.sol
+        cfbc076c7d307ddbe0ea7430474a9148af830836449c5b0bed79ef1259b41532  src/v2/interfaces/morpho/IMetaMorphoV1_1.sol
+        e8600e7cb5620deddd002b17b014deaa74aadadd030cd56b2c21b56e53d09b11  src/v2/interfaces/morpho/IMorpho.sol
+        ca53d7a1bd1c9fe0a9cf092f197cbb8b02192faf773060fc8b2dac1d432c909a  src/v2/interfaces/morpho/PendingLib.sol
+        e93f82b6f01cef4710b1811bdffe22b00b15cbc7b5332cc7a9bc6249825b6604  src/v2/lens/LevelReserveLens.sol
+        81571e3a2989e3e5098548219e9e8cb92951a3c2a7366752a8f9888cc4433a58  src/v2/oracles/AaveTokenOracle.sol
+        549d137ecc2014f91d8b8734bc55a8f06a47e4a2414174ee277a46f8c10ecd62  src/v2/oracles/ERC4626DelayedOracle.sol
+        c7c82cdffc071aad172bbf40c2fffb8a0d2eee98bc0a03bd8cec754d9091cb45  src/v2/oracles/ERC4626Oracle.sol
+        7f3f5917bec713649201c428caa5b9d0dab4c00a98c913209e2633bb22e3a4e9  src/v2/oracles/ERC4626OracleFactory.sol
+        a08f6f69d92cd6f90526ff766c86e7998a0878a125943bebeed7ff2f51e12b63  src/v2/usd/BoringVault.sol
+        95af9b753ce148cb0583b281d250f0ed3c038ff1209cc690d677d4b6c035853a  src/v2/usd/RewardsManager.sol
+        c9b6e5cce9f36e2874f1cde4f0390cfa3d45552055750dcd2fe281ebef788354  src/v2/usd/RewardsManagerStorage.sol
+        d34a41e84eafbce858815e414e86083a74aba054c4c3f29a4046a81a0d4548f1  src/v2/usd/Silo.sol
+        c1092deb5ef7bb5f8d02cd8f70d2b35539c2984f7eaafe076a99f4b819698974  src/v2/usd/VaultManager.sol
+        a4c289ca09a769160a7e9d1a9f395cbb40ffd26dc1191064910517e554259378  src/v2/usd/VaultManagerStorage.sol
+    </template>
+
+    <p>Additionally we reviewed these deployment scripts:</p>
+    <template type="file-hashes">
+        bb998a52fb684f29a0976108abd50c4835e45ea2a00501a489d043b6ae19853d  script/v2/DeployLevel.s.sol
+        87862d3cc0967c38634c0e5e29942134a218ff0290ede456c3be5da517cfba5f  script/v2/DeployTestnet.s.sol
+        0ea8eee346e4ee7cff8bbe5fe250f35c062eda818d88a9aed17192abbc634930  script/v2/DeploymentUtils.s.sol
+        ab4ba98bf3671310f4667fc93a6b709febd19f5d4bd010f8e427a6423d7e2e03  script/v2/lens/UpgradeLevelReserveLens.s.sol
+    </template>
+
+    * File hashes shown above are the final version of the reviewed contracts, corresponding to the final commit hash.
+  </content-for>
+</page>
