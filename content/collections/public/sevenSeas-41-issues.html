@@ -1,0 +1,58 @@
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Veda-Labs/boring-vault/pull/261/commits/f6b0f74c7c3cad860988a204bc6c77224087b803,https://github.com/Veda-Labs/boring-vault/pull/261/commits/9ed139937687f35b6c3977d09f9957bbcbdf0f81</field>
+    <field name="content">
+        ## [M-1] Incorrect sanitization of destination chain
+
+        The assembly blocks in both the merkle tree generation and the decoder's `depositAndBridge` function aim to convert a `uint32` value from a `bytes` array to an `address` type. However, due to the final right shift operation (`shr(96, word)`), the conversion always returns `0x0` for the chain ID. The test appears to pass only because both functions return `0x0` for the address, meaning the sanitization is ineffective and allows any chain ID to be passed. 
+        
+        **Remediation to Consider**
+        
+        Remove the right shift operation from the assembly blocks to preserve the actual converted value.
+    </field>
+  </item>
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b9809e67e13bd25f18bf2ecfd612ddd5defd84d1</field>
+    <field name="content">
+        ## [L-1] Mellow decoder doesn’t sanitize the deposit token
+
+        In Mellow's [deposit function](https://github.com/Veda-Labs/boring-vault/pull/251/files#diff-e2a9ee842351c79873643646c5c510da1355cd6b49d7ecac8bb4ac86beebc63aR20), the parameter `amounts` determines which underlying vault tokens are being deposited based on their index in the array. While currently only `WETH` and `wstETH` tokens are supported, protocol admins can add additional tokens through the Vault's `addToken` function. To maintain control over which tokens can be deposited, the boring vault needs to sanitize the underlying tokens based on their index in the `amounts` array.
+        The likelihood of this issue is low since token deposits are additionally restricted by token approvals. 
+
+        **Remediation to Consider**
+        
+        Retrieve the vault's underlying tokens through the `underlyingTokens()` function and sanitize them according to their corresponding positions in the `amounts` array.
+    </field>
+  </item>
+
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d739d7e1c0d052ef54edc45c0e63714fe378e828</field>
+    <field name="content">
+        ## [L-2] `preDeposits` can be passed in `adjustDenVault`
+
+        In the Beraborrow decoder's `openDenVault` function, passing `preDeposit` is explicitly disallowed by this check:
+        
+        ```solidity
+        if (params._preDeposit.length > 0) revert BeraborrowDecoderAndSanitizer__PredepositLengthGtZero(); 
+        ```
+        
+        However, the `adjustDenVault` function lacks this check, which allows values to be passed to the `_preDeposit` parameter. This could enable deposits of assets not explicitly allowed by the boring vault.
+        
+        **Remediation to Consider**
+        
+        Add the above check to the `adjustDenVault` function.
+    </field>
+  </item>
