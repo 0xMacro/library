@@ -1,0 +1,41 @@
+<page
+  clientName="Seven Seas"
+  reportDate="May 12, 2025"
+  auditTitle="Seven Seas A-43"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on March 9th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Silo Vault Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/279">PR 279</a>)</b> </br>
+        Commit Hash: <code>f472abafb22f7a45e81df2814ae4bdf6f56dd74a</code>
+        <template type="file-hashes">
+          6d1473116f67ef6d45898d9ec11311947dee8c7538c992ee76eb721b3cec584b  src/base/DecodersAndSanitizers/Protocols/SiloDecoderAndSanitizer.sol       </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>wSwell unwrapping Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/280">PR 280</a>)</b> </br>
+        Commit Hash: <code>187e7b0b619dfdcbe78273d41b7fe24d1bb22ed7</code>
+        <template type="file-hashes">
+          45a3b3aac352288db286b41d2ab67ac0a8dfe2f0ff4b93f60da781a86ddd70c2  src/base/DecodersAndSanitizers/Protocols/wSwellUnwrappingDecoderAndSanitizer.sol       </template>
+        </li>
+      
+    </ul>
+  </content-for>
+</page>
