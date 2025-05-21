@@ -1,0 +1,36 @@
+<page
+  clientName="Superstate"
+  reportDate="May 21st, 2025"
+  auditTitle="Superstate A-8"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+
+  repoUrl="https://github.com/superstateinc/audit-evm-equity-token"
+  repoCommitHash="fe65f82421133f59f2c650626eea281e59fe2073"
+  repoCommitHashFinal="3d7f3d7d64d323ee14327347c87bc261ee081841"
+  passwordEncrypt="env:PAGE_PASS_SUPERSTATE_8"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from May 17th to May 19th, 2025.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts.</p>
+
+    <template type="file-hashes">
+        4b46db0663aa9f6808c0ff976df846f53950b456d1751976c7f30cfb208f0118  src/AccountingPausable.sol
+        134416e5cccbe905768124b27a7ed0ea7f70d9dcb91a00fe06786a975bcadb1a  src/Allowlistable.sol
+        2d96806b0b1ecd5954190e36a579c204f2eb54f46cef900f47948bdc0e82cafa  src/Bridgeable.sol
+        7ee25d0ec7fee024d50e7181c11b4734e2bd294c1f5d8f905d602d9d3bb12f95  src/EquityToken.sol
+        01a7457102de35cdf657df3858dfaf64e7b02c432e130ca502cfa21c9b0af7d2  src/Permittable.sol
+        49eeffe841c2dc7f6c249ef4351c13bba5940265d33aff576e85ff54c02f7de5  src/SuperstateTokenCore.sol
+    </template>
+  </content-for>
+</page>
