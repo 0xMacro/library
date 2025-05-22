@@ -1,0 +1,36 @@
+<item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8de7678302b9f52c52315b43e6cd16d9cf6e5121</field>
+    <field name="content">
+      ## [L-1] Contracts facilitating transfers may want to be blocked as well
+
+      With the addition of a blacklist to boring vaults, currently only the sender and receiver of the shares are passed to the teller in `beforeTransfer()` to check if they are blacklisted:
+  
+    ```solidity
+    /**
+    * @notice Implement beforeTransfer hook to check if shares are locked, or if `from` or `to` are on the deny list.
+    */
+    function beforeTransfer(address from, address to) external view {
+        if (denyList[from] || denyList[to]) revert TellerWithMultiAssetSupport__TransferDenied(from, to);
+            if (shareUnlockTime[from] >= block.timestamp) revert TellerWithMultiAssetSupport__SharesAreLocked();
+        }
+      ```
+      Reference: [TellerWithMultiAssetSupport.sol#L210-L216](https://github.com/Se7en-Seas/boring-vault/blob/9c6e1e4458fba53f2ff09efe21195dcf570ffc3e/src/base/Roles/TellerWithMultiAssetSupport.sol#L210-L216)
+  
+      However, when shares are transferred via `transferFrom()`, an approved operator facilitates the transfer, but in doing so this could be a contract that is involved in illegal or malicious behaviour that may want to be blocked. This may be unlikely but if contracts can be sanctioned as tornado cash was, in order to remain compliant with current or future regulations, it may be wise to allow for the ability to block operators in case it becomes necessary.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="impact">medium</field>
+    <field name="content">
+      ## [I-1] Addresses can be blacklisted from interacting with boringVault shares
+  
+      There is now the ability for an authorized role to update a `denyList` which prevents any address on the list from sending, receiving, or facilitating the transfer of vault shares. Although this is an accepted practice, and widely used tokens like USDC also have blacklist functionality, users should be aware that they can have their shares frozen. Blacklisting addresses should typically only be done to freeze assets of malicious users or prevent interaction with undesired contracts. Developers should also be aware that for contracts interacting with these shares, that either users or the contract itself can be blacklisted, which may adversely effect the contracts functionality.
+    </field>
+  </item>
+  
