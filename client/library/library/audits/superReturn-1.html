@@ -1,0 +1,43 @@
+<page
+  clientName="SuperReturn"
+  reportDate="May 22nd, 2025"
+  auditTitle="SuperReturn A-1"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+
+  repoUrl="https://github.com/aiblackrock/USDAI/"
+  repoCommitHash="31dc1be8b6f936ee706db86648a642041605adaa"
+  repoCommitHashFinal="7b4cb62673cfe0d44de87eb5141d2b53fb5c9169"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from May 13th to May 15th, 2025.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        Some of the reviewed decoders allow Boring Vaults to interact with protocols controlled by an EOA or multisig wallets that can update important state variables or upgrade the contract to a new version. It is trusted that the owners of this EOA or mulitsig will act in the interest of users. It should be understood that a loss of Boring Vault funds is possible if these wallets act maliciously.
+            
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts.</p>
+
+    <template type="file-hashes">
+        8c13b4c3651d21275b4695e4c53d60921a0d7d61b4c8e0608699d5aa5666e1e4  src/base/BoringVault.sol
+        077f24e86db6a6d0f249b152cbb10f23b262a34e2a5437c628d17188853df368  src/base/BoringVaultSCVersion.sol
+        5d332b1aa8c5a9ecdd60168eebf6da0549c130aa92a52ddd2e4a50e7fc475ac8  src/base/DecodersAndSanitizers/Protocols/MorphoDecoderAndSanitizer.sol
+        508dbd91645912f8ce36328b26ffb8d5c534a721d858c1a1ef67d6861600bd9d  src/base/DecodersAndSanitizers/Protocols/OpenEdenDecoderAndSanitizer.sol
+        989e241d6488c8ce5004003080d60b83e91d23f1bf49843d275216ccc420bdda  src/base/DecodersAndSanitizers/Protocols/SakeDecoderAndSanitizer.sol
+        5d8e08f60fac2670275d634fdce95b838aa7b51f954f46d83f2e97600621c66a  src/base/DecodersAndSanitizers/AcrossDecoderAndSanitizer.sol
+        6b63bf0f9f9e8e9f29c1b24ff4bb87c15e98ae2429fc2c62f68f2e367b234e02  src/base/Roles/BoringQueue/BoringOnChainQueue.sol
+        4a21bdb8f16cb1a0e987089663fe110fad17f84297e79eb7e44154d8d36aab99  src/base/Roles/BoringQueue/BoringOnChainQueueWithTracking.sol
+        b577bd8b30b970417402584fd8f47d315a5bf578edcb1aa11f3a1150cc844c1a  src/base/Roles/DelayedWithdraw.sol
+    </template>
+  </content-for>
+</page>
