@@ -1,0 +1,43 @@
+<page
+  clientName="Seven Seas"
+  reportDate="June 2, 2025"
+  auditTitle="Seven Seas A-35"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team over multiple days starting on May 30th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Beraborrow Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/316">PR 316</a>)</b> </br>
+        Commit Hash: <code>6de77927f58fde1a08420c9e325cb4f20880229f</code>
+        <template type="file-hashes">
+          7db84a6dc27d4e461702b58c182b7a21990e48c1d52d173809ba1d55cccfdbcc  src/base/DecodersAndSanitizers/Protocols/BeraborrowDecoderAndSanitizer.sol        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Atomic queue Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/308">PR 308</a>)</b> </br>
+        Commit Hash: <code>e99a972652b04e368572ac725ffea51e23ee2c79</code>
+        <template type="file-hashes">
+          dd43ceaed7bcccc7a2a6759684da7b731745c9102f90ba8af587c3c46eb8e929  src/base/DecodersAndSanitizers/OnlyAtomicQueueDecoderAndSanitizer.sol
+          dd43ceaed7bcccc7a2a6759684da7b731745c9102f90ba8af587c3c46eb8e929  src/base/DecodersAndSanitizers/OnlyAtomicQueueDecoderAndSanitizer.sol        </template>
+      </li>
+    
+      
+    </ul>
+  </content-for>
+</page>
