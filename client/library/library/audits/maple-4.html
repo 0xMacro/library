@@ -2,18 +2,18 @@
   clientName="Maple Finance"
   reportDate="February 7th, 2025"
   auditTitle="Maple Finance A-4"
-  auditVersion="1.0.0"
+  auditVersion="2.0.0"
   layout="/library/audits/_layout.html"
 
-  repoUrl1="https://github.com/maple-labs/syrup-utils-private"
-  repoCommitHash1="c367a2e4569131c37075e0f314ad21a5e7fddb9e"
-  repoCommitHashFinal1="c367a2e4569131c37075e0f314ad21a5e7fddb9e"
+  repoUrl1="https://github.com/maple-labs/syrup-utils"
+  repoCommitHash1="1b8633014528f4822ac1f36eb42cbae52bfb80c3"
+  repoCommitHashFinal1="1b8633014528f4822ac1f36eb42cbae52bfb80c3"
 
-  repoUrl2="https://github.com/maple-labs/open-term-loan-private"
+  repoUrl2="https://github.com/maple-labs/open-term-loan"
   repoCommitHash2="f61d459a09a97d836405afb10db451f26579ebe0"
   repoCommitHashFinal2="f61d459a09a97d836405afb10db451f26579ebe0"
 
-  repoUrl3="https://github.com/maple-labs/fixed-term-loan-private"
+  repoUrl3="https://github.com/maple-labs/fixed-term-loan"
   repoCommitHash3="61696225a133daeabeec374c23f4274d64a1996a"
   repoCommitHashFinal3="fc08a0425a86c4fa916b13750bbc547eeb3315c5"
   
@@ -32,7 +32,7 @@
 
   <content-for name="repo-info">
     <ul>
-      <a href="{{page.repoUrl1}}" target="_blank"> syrup-utils-private repository </a>
+      <a href="{{page.repoUrl1}}" target="_blank"> syrup-utils repository </a>
 
       <li class="break-words break-all">
         <b>Commit Hash (Initial):</b>
@@ -46,7 +46,7 @@
     </ul>
 
     <ul>
-      <a href="{{page.repoUrl2}}" target="_blank"> open-term-loan-private repository </a>
+      <a href="{{page.repoUrl2}}" target="_blank"> open-term-loan repository </a>
 
       <li class="break-words break-all">
         <b>Commit Hash (Initial):</b>
@@ -60,7 +60,7 @@
     </ul>
 
     <ul>
-        <a href="{{page.repoUrl3}}" target="_blank"> fixed-term-loan-private repository </a>
+        <a href="{{page.repoUrl3}}" target="_blank"> fixed-term-loan repository </a>
   
         <li class="break-words break-all">
           <b>Commit Hash (Initial):</b>
@@ -78,11 +78,11 @@
 
     <p>Specifically, we audited the following contracts within these repositories:</p>
     <template type="file-hashes">
-        8027c146cec3cf24a30cd913228e12985e4755fd4d4ac8ead06cfc27b629eb87  syrup-utils-private/contracts/MapleBorrowerActions.sol
-        0f268dd43e01619eaee7886e04591e01035ea43734752719791bdb7ff4deca4f  open-term-loan-private/contracts/MapleLoan.sol
-        0582cb2ed70a9a40da356008058061bca62562f13fa34f7370b4498f026d4b9d  fixed-term-loan-private/contracts/MapleLoan.sol
-        ecf68c712bac4a91eac657afaa0c8f741534b74f6e31acabc9357f3d3b56445e  maple-core-v2-private/scripts/BorrowerActionsDeployment.s.sol
-        3dd6d249673253ff24a99a9a4c9ff77235195b97b7a64282ce8f6b05e3787654  maple-core-v2-private/scripts/BorrowerActionsProxyDeployment.s.sol
+        8027c146cec3cf24a30cd913228e12985e4755fd4d4ac8ead06cfc27b629eb87  syrup-utils/contracts/MapleBorrowerActions.sol
+        0f268dd43e01619eaee7886e04591e01035ea43734752719791bdb7ff4deca4f  open-term-loan/contracts/MapleLoan.sol
+        0582cb2ed70a9a40da356008058061bca62562f13fa34f7370b4498f026d4b9d  fixed-term-loan/contracts/MapleLoan.sol
+        ecf68c712bac4a91eac657afaa0c8f741534b74f6e31acabc9357f3d3b56445e  maple-core-v2/scripts/BorrowerActionsDeployment.s.sol
+        3dd6d249673253ff24a99a9a4c9ff77235195b97b7a64282ce8f6b05e3787654  maple-core-v2/scripts/BorrowerActionsProxyDeployment.s.sol
     </template>
   </content-for>
 </page>
