@@ -1,0 +1,53 @@
+<page
+  clientName="Farcaster"
+  reportDate="June 12th, 2025"
+  auditTitle="Farcaster A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/farcasterxyz/contracts"
+  repoCommitHash="9b21c1fafbe1695c94d1305cb5ecbb3f59b51aa6"
+  repoCommitHashFinal="d711c78fd86ab1ae335b93df8ab4571ce6cdda48"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_FARCASTER_4"
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on June 3rd, 2025.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Provided audit handoff documentation.</li>
+      <li>Internal discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    The Farcaster protocol utilizes various privileged actors:
+          <ul>
+              <li>owner: can pause/unpause contracts and can modify many configuration parameters. </li>
+              <li>guardian: can pause contracts. </li>
+          </ul>
+    All roles are assumed to be trusted and to act in a reliable and good manner. A more detailed description of the different actors and their assumptions can be found in the [documentation](https://github.com/farcasterxyz/contracts/blob/9b21c1fafbe1695c94d1305cb5ecbb3f59b51aa6/docs/docs.md).
+
+    The following assumptions are made:
+    <ul>
+        <li>Owner is not malicious.</li>
+        <li>Payment tokens will not include [weird ERC20s](https://github.com/d-xo/weird-erc20). (We will likely stick to Base USDC for the near term, but want optionality to introduce a new token if necessary)</li>
+        <li>We will validate that price per day is reasonable and correctly set for whatever payment token we select.</li>
+        <li>We don’t care about validating that the FID emitted in the event is actually registered. If someone wants to pay $120 for a ID that isn’t registered yet, they can do so. Buyer and integrator beware.</li>
+        <li>We limit “max days” per payment, but it’s possible to pay multiple times and register an unlimited number of days. We will not enforce a limit on Snapchain or in the contract, and will accept these payments, but it’s not in the user’s economic interest to do this.</li>
+    </ul>
+  </template>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+        5fb200c7edeb5cb05421f514a766a7437b4369bdfec68807e5625cb191270bed  src/Bundler.sol
+        a034c5a91a9c0169867ec5efd81058395271307e267d504a8a7092c5b05bef22  src/TierRegistry.sol
+        72ff33aeb3e13c23a87b415cc010e9f32ad6924eff232b1bdc3616072eeddb3f  src/interfaces/IBundler.sol
+        70e7e229ba83fb0d5db6cd3a0232d13ace196553d8e7caba5c203eff56f80dac  src/interfaces/ITierRegistry.sol
+    </template>
+</content-for>
