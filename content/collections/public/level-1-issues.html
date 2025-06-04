@@ -1,0 +1,556 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-1] External reward received are stuck in the vault
+  
+      Level money V2 manages positions held by it’s vault using the [`VaultManager` contract](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/VaultManager.sol). The vault manager is currently setup to handle different strategies limited to depositing or withdrawing into or out of either Aave or Morpho lending pools. There is an assumption that the vault will only receive assets from these direct interactions, however if protocols offer separate rewards tokens for interacting with their protocols, or any other reason, the manager has no way to interact with these tokens, nor include them as rewards to distribute to token holders.
+      In the case of Morpho, their pools offer a native asset reward, but additionally rewards lenders Morpho tokens, that the vault can receive via the distributor contract.
+      Aave also allows for external incentives that are claimable via its incentive controller. 
+      Currently there is no way for the manager to properly handle receiving or interacting with these tokens, unless it is upgraded to do so.
+  
+      **Remediations to Consider**
+  
+      Add methods to handle external rewards for Aave and Morpho, as well as for other potential protocols you may interact with, to prevent them from being locking in the vault and potentially offer additional rewards to lvlUSD holders.
+  
+    </field>
+    <field name="response">
+        Since the owner of the BoringVault can call manage, the rewards won’t be lost forever. Aave seems to rarely issue rewards for USDC/T, and Morpho’s reward claiming mechanism can be configured by the contract’s deployer, so we’re okay with deferring adding a function to claim rewards to the next RewardsManager update.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Accounting</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">565fdf8f69b25807abc4a1081aaf986587a80fa1</field>
+    <field name="content">
+      ## [M-2] Potential precision loss calculating total assets
+  
+      In [`StrategyLib`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/common/libraries/StrategyLib.sol) contract, total assets held in strategies for a specific asset are calculated via [`getAssets()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/common/libraries/StrategyLib.sol#L41-L59), where the amount of receipt tokens owned is converted to the value of its associated underlying stable coin using pricing from the proper oracle. Before prices are used, the amount of receipt tokens held is converted from its decimals to the underlying stable coins decimals:
+  
+      ```solidity
+      uint256 shares = receiptToken.balanceOf(vault);
+  
+      uint256 sharesToAssetDecimals =
+          shares.mulDivDown(10 ** ERC20(address(config.baseCollateral)).decimals(), 10 ** receiptToken.decimals());
+  
+      (int256 assetsForOneShare, uint256 decimals) =
+          OracleLib.getPriceAndDecimals(address(config.oracle), config.heartbeat);
+  
+      assets_ = uint256(assetsForOneShare).mulDivDown(sharesToAssetDecimals, 10 ** decimals);
+      ```
+      Reference: [StrategyLib.sol#L48-56](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/common/libraries/StrategyLib.sol#L48-L56)
+  
+      In cases where they share the same decimals or the price is pegged 1:1 via rebasing like Aave’s aTokens, this isn’t an issue. However in the case where the receipt token differs from its underlying in decimals and its price isn’t pegged, then converting to decimals before including the price can lead to a loss of precision. In the case of Morpho, it uses ERC4626 vaults with 18 decimals, and the price of its shares is based on yield, so will likely trend to increase relative to the underlying asset. Considering the expected collateral assets will the be the stable coins USDC and USDT, both using 6 decimals, this can lead to precision loss, and inaccurate assessment of held assets. This can effect both withdrawals as well as inaccurate rewards calculations when calling [reward()](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/RewardsManager.sol#L36-L52).
+  
+      **Remediations to Consider**
+  
+      Multiply by price before converting to the underlying’s decimals to prevent precision loss.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">accounting</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">bbb4942da16f6b64ba0468a36b6df9c862c9dfc9</field>
+    <field name="content">
+      ## [M-3] Calculated rewards may be inaccurate if underlying depegs 
+  
+      When rewards are calculated via [`reward()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/RewardsManager.sol#L36-L52), asset value in the vault is calculated and related to the total vault shares to determine the amount of yield accrued, this yield is then withdrawn to the treasury, where it is trusted to mint more lvlUSD with the received assets, and distribute it to lvlUSD stakers. The main calculation for assets held for a given asset is handled by `getAccruedYield()`:
+  
+      ```solidity
+      function getAccruedYield(address[] calldata assets) public view returns (uint256 accrued) {
+          uint256 total;
+  
+          for (uint256 i = 0; i < assets.length; i++) {
+              address asset = assets[i];
+  
+              StrategyConfig[] memory strategies = allStrategies[asset];
+  
+              uint256 totalForAsset = vault._getTotalAssets(strategies, asset);
+  
+              total += totalForAsset.convertDecimalsDown(ERC20(asset).decimals(), vault.decimals());
+          }
+  
+          uint256 vaultShares = vault.balanceOf(address(vault));
+          accrued = total - vaultShares;
+  
+          return accrued;
+      }
+      ```
+      Reference: [RewardsManager.sol#L85-102](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/RewardsManager.sol#L85-L102)
+  
+      `getAccruedYield()` sums the value held for each asset specified into a final total, however, [`_getTotalAssets()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/common/libraries/VaultLib.sol) returns assets in terms of the strategies underlying token, rather than in terms of lvlUSD. Considering each underlying token is intended to be a USD based stable coin, this is typically fine. In the case where an underlying token is depegged, this 1:1 assumption could result in overvaluing assets held, and thus value accrued, resulting in reward() pulling more assets out than it should and causing lvlUSD to be under-collateralized. 
+  
+      **Remediations to Consider**
+  
+      Convert each underlying asset into lvlUSD via oracles, similar to how it is handled in [`computeMint()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/LevelMintingV2.sol#L179-L186) and [`computeRedeem()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/LevelMintingV2.sol#L191-L204).
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">f4fb184f6ae6561e4ec05c5f716fcc1a9bebfa1f</field>
+    <field name="content">
+      ## [M-4] USDT approvals can revert if current value is non-zero
+  
+      A [known issue with USDT](https://bailsec.io/tpost/auxijvrbd1-usdt-and-approvals) is that it requires the current approval amount for a protocol to be zero before setting to another non-zero value. When depositing into a protocol with either [`_depositToAave()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/common/libraries/VaultLib.sol#L97-L121) or [`_depositToMorpho()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/common/libraries/VaultLib.sol#L152-L173), [`vault.increaseAllowance()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/BoringVault.sol#L150-L153) is called to give the protocol approval to spend tokens:
+  
+      ```solidity
+      function increaseAllowance(address token, address spender, uint256 amount) external notPaused requiresAuth {
+        require(token.code.length != 0, "Token does not exist");
+        ERC20(token).safeApprove(spender, amount); //TODO replace with forceapprove due to reset to 0 allowance change requirement
+      }
+      ```
+      Reference: [BoringVault.sol#L50-53](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/BoringVault.sol#L150-L153)
+  
+      As mentioned in the TODO, `safeApprove` should be replaced by `forceApprove`, since [Solady’s `safeApprove`](https://github.com/Vectorized/solady/blob/main/src/utils/SafeTransferLib.sol#L338-L355) does not handle the edge case of USDT approvals, if a protocol being interacted with does not consume all USDT approvals when depositing, the lingering approval will cause future calls to `increaseAllowance` to fail. Considering USDT will be one of the main collateral tokens used, this edge case should be addressed to ensure deposits do not revert. Although deposits are allowed to revert in mint, the end result would be USDT directly transferred to the vault and not generating the expected yield that it would if deposited into the set default strategy. Additionally the vault would be blocked from depositing USDT into protocols that this occurs, until an external [`BoringVault.manage()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/BoringVault.sol#L59-L74) call is made to revoke unspent USDT approvals.
+  
+      **Remediations to Consider**
+  
+      Use Solady’s [`safeApproveWithRetry()`](https://github.com/Vectorized/solady/blob/main/src/utils/SafeTransferLib.sol#L357-L388), or another resolution from an trusted repo. Alternatively you can set approvals to zero before calling `increaseAllowance()`
+          
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Insolvency</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d3ac9fad4acf3216d4cdc80639babec5ad1688bd</field>
+    <field name="content">
+      ## [M-5] Risk of being under collateralized after calling reward()
+  
+      After [`reward()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/RewardsManager.sol#L36-L52) is called, based on price evaluations of assets held in the vault, all excess value not required to collateralize lvlUSD is sent to the treasury. This means that the value of the vaults assets equals the value of lvlUSD. This makes sense, however there can be near-term price updates that could then result in the value of assets held to not collateralize circulating lvlUSD, particularly for assets held in morpho pools where bad debt could lead to a decrease in price. Large price deviations of collateralized assets held in the vault is always a risk that could lead to depegging, which is why stable protocols and use of stable coins are the expected strategies, and a buffer of generated yield helps mitigate potential downside price fluctuations. In the case of directly after [`reward()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/RewardsManager.sol#L36-L52) is called, there is no longer an asset buffer and could lead to lvlUSD being under collateralized, with little direct incentive to mint more until the peg is re-achieved, as minting always costs $1 USD value of collateral asset. Maintaining a little asset value buffer may be advised based on the value of assets held in more volatile or risky pools/protocols to reduce risk of under collateralization and thus depegging.
+  
+      **Remediations to Consider**
+  
+      Add a optional percent or flat amount buffer parameter to [`reward()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/RewardsManager.sol#L36-L52) that keeps a specified amount of excess assets to potentially sufficiently over collateralize lvlUSD to reduce downside risk.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Rewards Management</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">13034faab5dd0b88336d7e6e33b029953b85d314</field>
+    <field name="content">
+      ## [M-6] Suboptimal yield withdrawal strategy reduces protocol returns
+  
+      The `RewardsManager.reward()` function implements a suboptimal strategy for withdrawing yield, resulting in reduced returns for the protocol over time. The current implementation withdraws yield by converting receipt tokens to base tokens without first utilizing available base tokens in the vault, leading to compounding interest losses.
+  
+      The root cause lies in the `reward()` function's withdrawal logic. When withdrawing accrued yield, the function:
+  
+      1. Calculates total accrued yield across all strategies
+      2. Directly converts receipt tokens to base tokens to fulfill the yield amount
+      3. Transfers the withdrawn amount to the treasury
+  
+      This approach fails to optimize for maximum yield because it doesn't prioritize using already-available base tokens in the vault before converting receipt tokens that are actively earning interest.
+  
+      Consider this scenario:
+  
+      Initial state:
+  
+      - Vault holds 50 USDC (base token) and 950 sUSDC (Steakhouse USDC, receipt token worth $950)
+      - After one day at 10% APY:
+          - The 950 sUSDC appreciates to $1,045
+          - Total vault value: $1,095
+          - Accrued yield: $95
+  
+      Current behavior:
+  
+      - Converts ~86.3 sUSDC to USDC to withdraw $95 yield
+      - Remaining vault value: 50 USDC + 863.7 sUSDC = $1,000
+      - After another day at 10% APY: Total value grows to $1,086.4
+  
+      Optimal behavior would:
+  
+      - Use the existing 50 USDC first
+      - Convert only 40.9 sUSDC to obtain the remaining $45 needed
+      - Leave 909.1 sUSDC in the vault
+      - After another day at 10% APY: Total value grows to $1,090.9
+  
+      The difference of $4.5 per cycle compounds over time, which proves the suboptimal yield of the protocol.
+  
+      **Remediations to Consider**
+      Implement a two-step withdrawal process in the `reward()` function:
+  
+      1. First, check and withdraw available base tokens from the vault
+      2. Only convert receipt tokens if additional funds are needed
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">accounting</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-7] Burnt lvlUSD not reflected in vault shares
+  
+      The expected invariant is that the shares of lvlUSD should equal the total balance of lvlUSD. The [LvlUSD token](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v1/lvlUSD.sol) is burnable, which means that the owner of the tokens can destroy their tokens by calling [burn()](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC20Burnable.sol#L20-L22) or [burnFrom()](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC20Burnable.sol#L35-L38) on the token, lowering the supply of lvlUSD. The vault supply is only informed of lvlUSD minting and burning via LevelMinting.sol, so burning tokens in this way does not result in the equivalent vault shares to be burned, causing the invariant to be broken. The effect of this can be seen in the case of RewardManager’s [reward()](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/RewardsManager.sol#L36-L52) where it determines accrued assets based on the vaults total supply, but in the case of burnt lvlUSD tokens this supply would be higher than lvlUSD, so the amount of assets required to collateralize lvlUSD should be lower than is calculated.
+  
+      **Remediations to Consider**
+  
+      Consider updating the vault shares on burning, evaluate assets required to collateralize lvlUSD based on it’s own supply rather than vault shares, or watch burning events and have the admin multisig burn a proportional amount of vault shares via vault.exit()
+    </field>
+    <field name="response">
+        We’ll watch for burn events and have the admin timelock can call vault.exit to recover the collateral that used to back the burned lvlUSD. Since lvlUSD is an immutable contract, we won't be able to affect it's logic.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">00a03c717b3236da4baa8c45cf05ff23e34446c7</field>
+    <field name="content">
+      ## [L-1] Minting can be prevented by a griefer
+  
+      When minting lvlUSD via [`mint()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/LevelMintingV2.sol#L45-L81) there is a limit to the amount of lvlUSD that can be minted in each block:
+  
+      ```solidity
+       mintedPerBlock[block.number] += lvlUsdMinted;
+  
+       if (mintedPerBlock[block.number] > maxMintPerBlock) revert ExceedsMaxBlockLimit();
+      ```
+      Reference: [LevelMintingV2.sol#L56-58](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/LevelMintingV2.sol#L45-L81)
+  
+      The intention behind constraining the amount of lvlUSD per block is to prevent large influxes in cases of depegging or arbitrage opportunities. However, if someone were to want to prevent users from being able to mint lvlUSD, or prevent a net positive issuance over time, they could continually frontrun and mint the max limit per block, preventing additional mints from occurring that block. They could then initiate a redemption via [`initiateRedeem()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/LevelMintingV2.sol#L83-L119) to redeem the minted lvlUSD back for their collateral after waiting the `cooldownDuration` (default of 5 minutes). If a user was so inclined and had the funds they repeat this for each block within the `cooldownDuration` and loop redeemed assets back to continue the attack. Notably, lvlUSD has a deny list, preventing transfers to or from any address on this list, however only the address when minting is checked if they are on this deny list, and when calling [`completeRedeem()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/LevelMintingV2.sol#L121-L135) any beneficiary can be set, allowing the griefer to circumvent any attempts to use the deny list to prevent this attack.
+      This attack is quite costly to implement, and has no obvious incentives to do so, it is good to be aware that it exists.
+  
+      **Remediations to Consider**
+  
+      Consider checking if `msg.sender` is on the deny list when calling [`completeRedeem()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/LevelMintingV2.sol#L121-L135), it is important to note that doing so could result in unredeemable assets in the case where the user is added to the deny list before completing their redemption, locking assets in the silo.
+    
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Oracles</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-2] Oracle not updated consistently
+  
+      When minting lvlUSD before it pulls the price from the oracle it attempt to update beforehand:
+  
+      ```solidity
+      if (isLevelOracle[order.collateral_asset]) {
+          oracles[order.collateral_asset]._tryUpdateOracle();
+      }
+      ```
+      Reference: [LevelMinting.sol#L50-52](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/LevelMintingV2.sol)
+      This is also done for VaultManager’s [`_deposit()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/VaultManager.sol#L146-L169) and [`_withdraw()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/VaultManager.sol#L171-L192) functions. This is done to ensure the price is accurate, specifically if the oracle is a [`ERC4626DelayedPriceOracle`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/oracles/ERC4626DelayedOracle.sol). In [`initiateRedeem()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/LevelMintingV2.sol#L83-L119) however, the oracle is not attempted to be updated, resulting in a potentially stale pricing if other calls that do update the oracle are not called. Additionally the same occurs in `RewardsManager.[getAccruedYield()](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/RewardsManager.sol#L84-L102)` .
+  
+      **Remediations to Consider**
+  
+      Consider attempting to update the oracle in `initiateRedeem()` to be more consistent and have potentially more up to date prices.
+  
+    </field>
+    <field name="response">
+        This would be true if we let users redeem lvlUSD for non-base collateral (ie Morpho vault tokens). Since redemptions are only going to be in base collateral (for which we only use Chainlink oracles), _tryUpdateOracle will never be called.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redemption Process</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-3] Users who initiate a new redemption while having a completed cooldown must wait again unnecessarily
+  
+      In `LevelMintingV2.sol`, the `initiateRedeem()` function allows users to start the redemption process for their lvlUSD tokens. However, when users attempt to initiate a new redemption while having a completed cooldown period from a previous redemption that hasn't been claimed yet, the function still enforces a new cooldown period instead of reverting.
+  
+      This creates a suboptimal user experience where users who forget to claim their completed redemption first will have their funds unnecessarily locked for another cooldown period when initiating a new redemption.
+  
+      **Remediations to Consider**
+      Add a check at the start of `initiateRedeem()` to ensure users cannot initiate new redemptions if they have completed but unclaimed redemptions. Alternatively, at the UI level, implement a warning message to notify users that initiating a new redemption will reset the cooldown period for their unclaimed redemptions.
+
+    </field>
+    <field name="response">
+        We will update this in the UI, and add a comment to the smart contract code. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Arithmetic Overflow</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5cfe191093d08e29938aec933d090c34dedda2d4</field>
+    <field name="content">
+      ## [L-4] Potential overflow in `computeMint()` when using high decimal tokens
+  
+      The `computeMint()` function in `LevelMintingV2.sol` performs calculations to determine the amount of lvlUSD to mint based on collateral value. When using high decimal tokens (particularly receipt tokens for stablecoins like PYUSD), the intermediate calculations can potentially overflow due to large exponents in the numerator.
+  
+      The issue occurs in the calculation: `collateralAmount * numerator / denominator`
+  
+      For receipt tokens, the numerator is the product of `10 ** LVLUSD_DECIMAL`, `collateralOraclePrice`, and `underlyingPrice`, while the denominator includes the corresponding decimal adjustments.
+  
+      With high decimal tokens like PYUSD (18 decimals) and its receipt token sPYUSD (18 decimals):
+  
+      - If `collateralOraclePrice` = 1.1e18 (sPYUSD/PYUSD)
+      - And `underlyingPrice` = 1e18 (PYUSD/USD)
+      - The numerator would be ~1.1e56
+  
+      This means a collateral amount of 105,265 PYUSD (~$115,792) would cause an overflow in the intermediate multiplication.
+  
+      While users can mitigate this by splitting deposits into multiple transactions, this workaround results in poor UX. More critically, when the `msg.sender` is a contract that cannot configure collateral amounts, this issue can lead to protocol integration problems.
+  
+      **Remediations to Consider**
+      Modify the calculation to reduce intermediate values by factoring out common decimals between numerator and denominator:
+  
+      ```solidity
+      numerator = collateralOraclePrice * underlyingPrice;
+      denominatorDecimals = collateralToken.decimals() + collateralOracleDecimals + underlyingPriceDecimals;
+  
+      if (denominatorDecimals > LVLUSD_DECIMAL) {
+          return collateralAmount.mulDivDown(numerator, 10 ** (denominatorDecimals - LVLUSD_DECIMAL));
+      } else {
+          return collateralAmount * numerator * (10 ** (LVLUSD_DECIMAL - denominatorDecimals));
+      }
+      ```
+  
+      This maintains the same mathematical relationship while reducing the size of intermediate values.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Rewards Calculation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6358dff10db9cd0b7a275641e46a384fa70ed83b</field>
+    <field name="content">
+      ## [L-5] Rewards calculation may be inaccurate due to non-exhaustive asset tracking
+  
+      The `reward()` function in `RewardsManager` contract relies on an array of assets passed as input to calculate accrued yield. This design is problematic because it allows for potential calculation inaccuracies if the caller does not provide a complete list of all assets that should be included in the yield computation.
+  
+      The root issue lies in the fact that while strategies are set per asset via `setAllStrategies()`, there is no mechanism to ensure that all relevant assets are included when `reward()` is called. This could lead to lower yield calculation if some assets are accidentally omitted from the input array.
+  
+      **Remediations to Consider**
+      Track all valid assets internally in the contract rather than relying on input parameters:
+  
+      ```diff
+      contract RewardsManager {
+      +   address[] public validAssets;
+  
+          function setAllStrategies(address asset, StrategyConfig[] memory strategies) external notPaused requiresAuth {
+      +       if (!_containsAsset(validAssets, asset)) {
+      +           validAssets.push(asset);
+      +       }
+              // ... existing code ...
+          }
+  
+      -   function reward(address[] calldata assets) external notPaused requiresAuth {
+      +   function reward() external notPaused requiresAuth {
+      -       uint256 accrued = getAccruedYield(assets);
+      +       uint256 accrued = getAccruedYield(validAssets);
+              // ... rest of the function ...
+          }
+      }
+      ```
+  
+      This ensures that yield calculations always consider all assets that have been properly configured in the system.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="content">
+      ## [I-1] Rebalancing can be griefed
+  
+      The [`VaultManager`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/VaultManager.sol) is able to control the vault to directly withdraw and deposit assets into supported protocols via [`deposit()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/VaultManager.sol#L29-L39) and [`withdraw()`](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/VaultManager.sol#L42-L50), allowing them to withdraw assets from one protocol and deposit them into another. However, since when redemptions are initiated, assets are also withdrawn from the vault first, then from default withdrawal strategies, it is possible that redemptions can cause rebalances to fail if the expected assets are no longer held in the vault or the expected amount is no longer in a default withdrawal strategy. This is not likely to arise as much of an issue, but ensuring strategists execute their rebalances in a single atomic transaction, and potentially using a private RPC is suggested to prevent this from occurring.
+  
+    </field>
+    <field name="response">
+        We plan on rebalancing through atomic transactions with private RPC URLS.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Accounting</field>
+    <field name="content">
+      ## [I-2] Rewards may not be claimable without rebalancing assets
+  
+      `RewardsManager.[reward()](https://github.com/Level-Money/contracts/blob/9c69738aac06ef0edb3be6a7c9f4c6ef320f8cef/src/v2/usd/RewardsManager.sol#L36-L52)` function calculates rewarded assets accrued, and pulls these assets from the vault into the treasury. Only a single asset is pulled from, the 0th index of the assets array parameter, to cover the rewards owed across potentially many different assets used in the protocol, which means that there is required to be enough free liquidity of that asset to cover all accrued rewards for the protocol. If this is not the case, coordination between the strategist freeing up assets before the treasury can call reward may be required. It is suggested there be enough assets available to cover rewards and for `reward()` to be called semi-frequently
+  
+    </field>
+    <field name="response">
+        Since we expect to call reward at least once a week, we expect amount of rewards claimed as a percentage of the reserves to be relatively low. To take an example, if the APR on lending protocols is 10% (which is rare), the weekly percentage of reserves we’d need to redeem as rewards is less than 20 bps. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Access Control</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7583109ac602cbab1242ad9a91ed37ce427245f4</field>
+    <field name="content">
+      ## [Q-1] Public functions with `requiresAuth` modifier can be bypassed in future upgrades
+  
+      Several functions including `LevelMintingV2.addMintableAsset()`, `LevelMintingV2.addRedeemableAsset()`, `LevelMintingV2.addOracle()`, `LevelMintingV2.removeOracle()`, `LevelMintingV2.setHeartBeat()`, `StrictRolesAuthority.setUserRole()`, and `StrictRolesAuthority.removeUserRole()` are marked as `public` while being protected by the `requiresAuth` modifier. This creates a potential security risk in future upgrades of the contract.
+  
+      The issue stems from how function selectors work in Solidity. The `requiresAuth` modifier checks `msg.sig` to determine if the caller has the required authorization. However, in future upgrades, if a new function is added that internally calls any of these `public` functions, that internal call would bypass the `requiresAuth` check since `msg.sig` would be the selector of the outer function, not the internal one being called.
+  
+      While this is not an immediate vulnerability since there are currently no functions that make such internal calls, it represents poor security architecture that could be exploited in future upgrades if proper care is not taken.
+  
+      Consider changing the visibility of these functions from `public` to `external` to prevent them from being called internally.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant logic</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7583109ac602cbab1242ad9a91ed37ce427245f4</field>
+    <field name="content">
+      ## [Q-2] Redundant denylist check in mint function leads to unnecessary gas costs
+  
+      The `LevelMintingV2.mint()` function in  performs an explicit check for denylisted addresses by calling `lvlusd.denylisted(msg.sender)`. However, this check is redundant since the lvlUSD token already performs the same validation in its `_beforeTokenTransfer()` hook, which is called during the minting process.
+  
+      Consider removing the redundant check:
+  
+      ```diff
+      function mint(Order calldata order) external requiresAuth notPaused returns (uint256 lvlUsdMinted) {
+      -   if (lvlusd.denylisted(msg.sender)) revert DenyListed();
+  
+          // ... rest of the function
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Simplification</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7583109ac602cbab1242ad9a91ed37ce427245f4</field>
+    <field name="content">
+      ## [Q-3] Redundant subtraction operation in `completeRedeem()` can be simplified
+  
+      In `LevelMintingV2.completeRedeem()`, the code first assigns `pendingRedemption[msg.sender][asset]` to `collateralAmount` and then subtracts `collateralAmount` from `pendingRedemption[msg.sender][asset]`. Since these values are equal and the intent is to clear the pending redemption, this operation can be simplified to a direct assignment to zero.
+  
+      Replace the subtraction operation with a direct assignment to zero since we're clearing the entire pending redemption:
+  
+      ```diff
+         collateralAmount = pendingRedemption[msg.sender][asset];
+      -  pendingRedemption[msg.sender][asset] -= collateralAmount;
+      +  pendingRedemption[msg.sender][asset] = 0;
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant logic</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7583109ac602cbab1242ad9a91ed37ce427245f4</field>
+    <field name="content">
+      ## [Q-4] Inefficient implementation of `getAssets` in `VaultLib._getTotalAssets`
+  
+      In `VaultLib._getTotalAssets`, the function iterates through each strategy to call `StrategyLib.getAssets(config, address(vault))` individually. However, `StrategyLib` already provides an overloaded `getAssets` function that accepts an array of `StrategyConfig` and performs the iteration internally. Using the array version would eliminate an unnecessary loop layer and slightly improve gas efficiency.
+  
+      **Remediations to Consider**
+      Replace the manual iteration with a direct call to the array version of `getAssets`:
+  
+      ```diff
+        function _getTotalAssets(BoringVault vault, StrategyConfig[] memory strategies, address asset)
+            internal
+            view
+            returns (uint256 total)
+        {
+            uint256 totalForAsset = ERC20(asset).balanceOf(address(vault));
+      -     for (uint256 j = 0; j < strategies.length; j++) {
+      -         StrategyConfig memory config = strategies[j];
+      -         totalForAsset += StrategyLib.getAssets(config, address(vault));
+      -     }
+      +     totalForAsset += StrategyLib.getAssets(strategies, address(vault));
+            return totalForAsset;
+        }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant logic</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6bc4a5724cac61e53cef4b0b66bf8e900ee7c4aa</field>
+    <field name="content">
+      ## [Q-5] Redundant calculation of deposited/withdrawn amounts in Vault operations
+  
+      In `VaultLib.sol`, there are multiple instances where the code calculates deposited/withdrawn amounts by taking the difference between balance before and after the operation. However, these calculations are redundant since the amounts are always equal to the input parameter `amount` in the functions `_depositToAave()`, `_depositToMorpho()`, and `_withdrawFromMorpho()`.
+  
+      Consider returning the input `amount` parameter instead of calculating the difference. This saves gas by eliminating redundant storage reads and arithmetic operations.
+  
+      Similar changes should be applied to `_depositToMorpho()` and `_withdrawFromMorpho()`.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundant logic</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1f43790811c4f83c9973165498607909bbc121af</field>
+    <field name="content">
+      ## [Q-6] Redundant token existence checks in BoringVault's enter/exit functions add unnecessary gas cost
+  
+      The BoringVault contract implements redundant token existence checks in both `enter()` and `exit()` functions using `require(address(asset).code.length != 0, "Token does not exist")`. These checks are unnecessary because `SafeTransferLib.safeTransfer()` already includes this check in the [Solmate version being used](https://github.com/transmissions11/solmate/blob/main/src/utils/SafeTransferLib.sol#L54).
+  
+      Consider removing the redundant token existence checks from both functions since they add unnecessary gas overhead.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">aa8ec849b835b9cf85be6544830ddaf5044e134c</field>
+    <field name="content">
+      ## [Q-7] Missing validation checks in strategy configuration functions
+  
+      In both `RewardsManager.setAllStrategies()` and `VaultManager.setDefaultStrategies()`, there are missing validation checks for strategy configuration parameters. While `RewardsManager` validates `baseCollateral`, it doesn't verify the `category` field. Conversely, `VaultManager` checks if the category is valid but doesn't validate if the `baseCollateral` matches the input asset. Consider adding validation in both functions
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Initialization Pattern</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1229d478716416b6c604337878e0298ef7448146</field>
+    <field name="content">
+      ## [Q-8] Inconsistent initialization pattern in `PauserGuarded` contract used by non-upgradeable contracts
+  
+      The `PauserGuarded` contract follows an upgradeable contract pattern with initialization functions, but it's being used by non-upgradeable contracts like `BoringVault`. The `__PauserGuarded_init()` function lacks the `onlyInitializing` modifier from OpenZeppelin's upgradeable pattern, which appears to be intentionally removed to allow non-upgradeable contracts like `BoringVault` to use it.
+  
+      This creates an inconsistent and potentially confusing pattern where the `PauserGuarded` contract uses upgradeable contract patterns (storage gaps, initialization functions), but removes key safety checks (`onlyInitializing`) to support non-upgradeable contracts. This mixed usage leads to `BoringVault` contract having bloated features for upgradability while not being upgradeable. Moreover, this can create confusion for future contracts that inherit from the `PauserGuarded` contract.
+  
+      Consider creating a non-upgradeable version of `PauserGuarded` specifically for non-upgradeable contracts like `BoringVault`. Alternatively, maintain the upgradeable pattern properly by keeping `onlyInitializing` and making `BoringVault` upgradeable if that flexibility is desired.
+  
+    </field>
+  </item>
+  

@@ -1,0 +1,39 @@
+<page
+  clientName="Polynomial"
+  reportDate="April 16, 2025"
+  auditTitle="Polynomial A-5"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Polynomial-Protocol/fx-contracts"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="b5422c2f98121063c6b5013f042c51cd1fd25093"
+  finalRepoCommitHash="c199150b92a0514af11c24217e6d52f7cde32bd9"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on March 13-18th 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+        91a6a7c73e6cec48921027e4895c18fb75f6187a52e791efca18fc93d5b3503a  markets/perps-market/contracts/modules/LimitOrderModule.sol
+        7358e479e37a02144332e35d40ad1bf0c21dfc227adf34bacaf9cdd40c1c6c1d  markets/perps-market/contracts/modules/OffchainAsyncOrderModule.sol
+        66217d57157162340427e9019df7ac227306a97eea5c30cc5063a0262aa81602  markets/perps-market/contracts/modules/OffchainLimitOrderModule.sol
+        320f0c43f35b2395a70f0ba6b21f378390099b18e83fb1879e81228586601642  markets/spot-market/contracts/storage/AsyncOrder.sol
+        b95502c4b02f0c596b92dda53a67a15d59233494bb6291ce83bdd46b26a5203a  markets/perps-market/contracts/storage/GlobalPerpsMarketConfiguration.sol
+        e21f754310be224797bb4bc432b80a1e027560149ce7d810d83eef2e9d223142  markets/perps-market/contracts/storage/LimitOrder.sol
+        fdd8b4819035bb145e01fb06c1aa1f900688951beb8140bf2d6c669e435f56ba  markets/perps-market/contracts/storage/OffchainOrder.sol
+    </template>
+  </content-for>
+</page>

@@ -1,0 +1,138 @@
+<page
+  clientName="Maple Finance"
+  reportDate="June 4th, 2025"
+  auditTitle="Maple Finance A-5"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+
+  repoUrl1="https://github.com/maple-labs/open-term-loan-private"
+  repoCommitHash1="fa3c9ff581e020dcccbbf6bfa08e60f19f1d8f84"
+  repoCommitHashFinal1="73f25b133f894cc1d6a945f7fcc82683520163bb"
+
+  repoUrl2="https://github.com/maple-labs/open-term-loan-manager-private"
+  repoCommitHash2="df69e3b0c20f4d624693e5b221ec473d5bfed68d"
+  repoCommitHashFinal2="df69e3b0c20f4d624693e5b221ec473d5bfed68d"
+
+  repoUrl3="https://github.com/maple-labs/pool-v2-private"
+  repoCommitHash3="1e3a2eb39aa3a1a1ca7479621d6f7ffadd48e9b2"
+  repoCommitHashFinal3="1e3a2eb39aa3a1a1ca7479621d6f7ffadd48e9b2"
+  
+  repoUrl4="https://github.com/maple-labs/maple-strategies-private"
+  repoCommitHash4="13f7a9785aa5752586a558efdc2edaee25e37db7"
+  repoCommitHashFinal4="6b40a9b38ab7f2e3aa208632905a5a98af693ce3"
+  
+  repoUrl5="https://github.com/maple-labs/syrup-utils-private"
+  repoCommitHash5="52e685dffb0030dca80d8dc202c8a47db79db8c6"
+  repoCommitHashFinal5="6f9ec954efdc0450d68baedc189c628aaab47362"
+
+  passwordEncrypt="env:PAGE_PASS_MAPLE_5"
+  customRepoInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from May 26th to May 29th, 2025. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+
+
+    <ul>
+      <a href="{{page.repoUrl1}}" target="_blank"> open-term-loan-private repository </a>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal1}}</code>
+      </li>
+    </ul>
+
+    <ul>
+        <a href="{{page.repoUrl2}}" target="_blank"> open-term-loan-manager-private repository </a>
+  
+        <li class="break-words break-all">
+          <b>Commit Hash (Initial):</b>
+          <code>{{page.repoCommitHash2}}</code>
+        </li>
+  
+        <li class="break-words break-all">
+          <b>Commit Hash (Final):</b>
+          <code>{{page.repoCommitHashFinal2}}</code>
+        </li>
+      </ul>
+
+      <ul>
+        <a href="{{page.repoUrl3}}" target="_blank"> pool-v2-private repository </a>
+  
+        <li class="break-words break-all">
+          <b>Commit Hash (Initial):</b>
+          <code>{{page.repoCommitHash3}}</code>
+        </li>
+  
+        <li class="break-words break-all">
+          <b>Commit Hash (Final):</b>
+          <code>{{page.repoCommitHashFinal3}}</code>
+        </li>
+      </ul>
+
+      <ul>
+        <a href="{{page.repoUrl4}}" target="_blank"> maple-strategies-private repository </a>
+  
+        <li class="break-words break-all">
+          <b>Commit Hash (Initial):</b>
+          <code>{{page.repoCommitHash4}}</code>
+        </li>
+  
+        <li class="break-words break-all">
+          <b>Commit Hash (Final):</b>
+          <code>{{page.repoCommitHashFinal4}}</code>
+        </li>
+      </ul>
+
+      <ul>
+        <a href="{{page.repoUrl5}}" target="_blank"> syrup-utils-private repository </a>
+  
+        <li class="break-words break-all">
+          <b>Commit Hash (Initial):</b>
+          <code>{{page.repoCommitHash5}}</code>
+        </li>
+  
+        <li class="break-words break-all">
+          <b>Commit Hash (Final):</b>
+          <code>{{page.repoCommitHashFinal5}}</code>
+        </li>
+      </ul>
+    </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within these repositories:</p>
+    <template type="file-hashes">
+        9f6b68d46b8cb2e1579fcdb50b9caa1cc9a8f4fdae4679dadcf06e6fc4885045  open-term-loan-private/contracts/MapleLoan.sol
+        1ded8331bf2ff13decd4f5917817c854388f215039e65b3425e09fea1dd22e87  open-term-loan-private/contracts/MapleLoanV202Migrator.sol
+        ecb80bbfab6edf5e73f9361a9a229f29de7b9c08a4dc8ff3876d1582840b5cda  open-term-loan-manager-private/contracts/MapleLoanManager.sol
+        5b448c1bba96bfe6a155c10de72b130cbecda7dd87eea1a8b374e969f803966e  pool-v2-private/contracts/MaplePoolManager.sol
+        847d34d2b2d7e8982146356205b5243590df191b810eac87a6b211e5667e429a  maple-strategies-private/contracts/MapleCoreStrategy.sol
+        1208ea58758d35fd0846229383ec5744a1c2d1425f50878585f01e8500320748  maple-strategies-private/contracts/proxy/coreStrategy/MapleCoreStrategyInitializer.sol
+        ad505ccafd0ce80c5075f824ed4fcfdb7afd58ea9163d16378ef07a97574d6ef  maple-strategies-private/contracts/proxy/coreStrategy/MapleCoreStrategyStorage.sol
+        bd5f6ef3efc5c3a3e5d8eb046b9f017b0dd1393df74fe9422f44ee82796c02dc  syrup-utils-private/contracts/MapleRouter.sol
+        68e8b89977db18d8e94c252e76303264d157dca931c05f6209e726291daa5387  syrup-utils-private/contracts/MapleRouterInitializer.sol
+        12f823de58747a93b33156ffe03cd72572414ad664c270f799251b7d85754508  syrup-utils-private/contracts/MapleRouterStorage.sol
+    </template>
+  </content-for>
+</page>
+
+
+
+
+
+
+
