@@ -1,0 +1,45 @@
+<page
+  clientName="Seven Seas"
+  reportDate="June 6, 2025"
+  auditTitle="Seven Seas A-47"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on June 6th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Level Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/328">PR 328</a>)</b> </br>
+        Commit Hash: <code>c54949f556cbc9a5e752ef1d6e8c09d64f4975b7</code>
+        <template type="file-hashes">
+            96ae58a1aa53424fefc79b07f3f92a43a41076bcf23f346154b950f3cbf8b91f  src/base/DecodersAndSanitizers/Protocols/LevelDecoderAndSanitizer.sol
+            7c9d9e8debfdf3a154d0c6d8373a38f675188bbb5e89f69413a50cd055712979  src/interfaces/DecoderCustomTypes.sol
+        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>CCTP Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/318">PR 318</a>)</b> </br>
+        Commit Hash: <code>c4a1f1bb5d9b8be7d793545b43786485ebd3b040</code>
+        <template type="file-hashes">
+            d0265c7155021c93dbc96897c71a0a8b60a1a7902aec7f429c6c6b67e0c324d8  src/base/DecodersAndSanitizers/Protocols/CCTPDecoderAndSanitizer.sol
+        </template>
+      </li>
+    
+      
+    </ul>
+  </content-for>
+</page>
