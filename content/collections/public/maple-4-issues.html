@@ -1,0 +1,11 @@
+<item>
+    <field name="topic">Best practices</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/maple-labs/fixed-term-loan/commit/fc08a0425a86c4fa916b13750bbc547eeb3315c5</field>
+    <field name="content">
+      ## [I-1] Missing functionality for allowing BorrowerActions to call rejectNewTerms() for a fixed-term loan
+  
+      In the `MapleLoan` contract of the fixed-term-loan repository, `BorrowerActions` actor has been added to act on behalf of the borrower. However, `rejectNewTerms()` has not been updated, and the necessary functionality to allow the `BorrowerActions` actor to execute this operation is missing. Since the `MapleBorrowerActions` contract does not yet support this functionality, it does not introduce any issues. However, for consistency, it should follow a similar logic from the open-term `MapleLoan` contract.
+    </field>
+  </item>
+  
