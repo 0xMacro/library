@@ -1,0 +1,35 @@
+<page
+  clientName="StableCoin"
+  reportDate="June 12, 2025"
+  auditTitle="Stable Coin A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/stablecoinxyz/paymaster-service"
+  layout="/library/audits/_layout.html" 
+  passwordEncrypt="env:PAGE_PASS_STABLECOIN_1"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on May 28th to May 30th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Signature Verifying Paymaster</b> </br>
+        Commit Hash: <code>a0d722dbf1181e6aa95e2ae13bc36fe9e67e701b</code>
+        <template type="file-hashes">
+            060cbfe9e4cecb0c16820b9beff4f136179b05cbefaec9f4b370baae2fe92f07  contracts/SignatureVerifyingPaymasterV07.sol      </template>
+      </li>
+      
+    </ul>
+  </content-for>
+</page>
