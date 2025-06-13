@@ -1,0 +1,58 @@
+<page
+  clientName="Clanker"
+  reportDate="June 13, 2025"
+  auditTitle="Clanker A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/clanker-devco/contracts"
+  repoCommitHash="f5e83b922844a7fb30f442f6effcd7d6a13561b4"
+  repoCommitHashFinal=""
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_CLANKER_2"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from May 19, 2025 to June 12, 2025.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the Clanker team.</li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within the repository:</p>
+
+  <template type="file-hashes">
+    0947d31c19c2e403883ff9b0e0dd8d5758f5fc3ada26fdcd5e9e71ee9bd2e3a9  src/Clanker.sol
+    1b9b3dac9cbf425053f34d6032e8924a0bad4e079fd0e5b4ccd754cc6f2c0507  src/ClankerFeeLocker.sol
+    3d9244a291c05150bc7946898d6a81a2e9bda132af3a1abd487f81b227008459  src/ClankerLpLockerMultiple.sol
+    2cf930dfa592b3a6fc4166797c8f9cadc2e79691b9c5ba898f8b3a66e2d97646  src/ClankerToken.sol
+    f00c5451ee9019cbabd301fa282edad59d1d07e36f291446ebd72feec931822f  src/extensions/ClankerAirdrop.sol
+    e82b7971e0ac003fb0d75ce5391d65d654e3022acd7f4b5b4862bed44a97d578  src/extensions/ClankerPresaleEthToCreator.sol
+    205a72d980037b282675e0a3bf9094de1deb503cc79610e5144154097278f150  src/extensions/ClankerUniv4EthDevBuy.sol
+    47a9c9ba746444d6f4cd40debe9bcc91daa63852bb6307a8debb1d4e118cc939  src/extensions/ClankerVault.sol
+    3ef48b0be8d2643c4b61ffb6394aea544308a347b3eb80aeefb717d18ef13cb9  src/extensions/interfaces/IClankerAirdrop.sol
+    7f5be72652cd0f6640bc5e6fc35da9dfe0749a93948a521a183909cf62b50c41  src/extensions/interfaces/IClankerPresaleEthToCreator.sol
+    b97e73497a30a9aba18f6017c9d683fdf201c121e084b54bcc7d546e782a15e1  src/extensions/interfaces/IClankerUniv4EthDevBuy.sol
+    30eee815a6f574ce1e8a258b3c70fbb6f65825cf8cbe4a801e9a225cfafd29be  src/extensions/interfaces/IClankerVault.sol
+    f97ba769c33847e09eea0d0767db4315f095aa2a58842fe371b4aaa28cabe7a8  src/hooks/ClankerHook.sol
+    2f32974da48ad5353f7032c90f480b48706a8b81475bc7122148980d1be44665  src/hooks/ClankerHookDynamicFee.sol
+    ac1ec39055d02c25b875b1872ab8c90c6227e40d8c649088fc47117c4fd3d651  src/hooks/ClankerHookStaticFee.sol
+    8b561ea49d0f109854600eb07c9001d74947718d19210407353dc372c10fdcd0  src/hooks/interfaces/IClankerHookDynamicFee.sol
+    f72496f7d50e5eaf07a857943e010da5df36e5cb109f1d2ad068da8d180a9e4a  src/hooks/interfaces/IClankerHookStaticFee.sol
+    2b9f5cd46b6f6294f580da5fbba00b0174ca54c7d978bf1057475a0eadd03a1c  src/interfaces/IClanker.sol
+    2b3eb89e40c86fb0986a5ad85876981e3e87205e7e3d696a522fdb778633f51e  src/interfaces/IClankerExtension.sol
+    9c3fe07b76cdb7d0b525aa077c8145b6cf80b95f8b055a745577dce2eaff6796  src/interfaces/IClankerFeeLocker.sol
+    813898debf30d2bcaebe049448c0a8fc3eade801678164fc9c93373bd98ddf55  src/interfaces/IClankerHook.sol
+    6a767b462a0fb04019f820f747f03a01dc0e4fe271ca88a0128d7a80945be2d4  src/interfaces/IClankerLPLocker.sol
+    b3027ae8aeeaa7d7b97d509ae7b1c9c666dd4c8ef913e00aaad4149ef1471ae1  src/interfaces/IClankerLpLockerMultiple.sol
+    bf2f969bd46fb1c575ff21751db6deb664c0c1248b70a4c7c881324b97cd88e6  src/interfaces/IClankerMevModule.sol
+    8727d451f7a76b3c51cdf4efabbee6d5a3e72a668a0ebe62601e2c527c85e67a  src/interfaces/IOwnerAdmins.sol
+    2003122acb446bec4b11bec57a6dbc1aca27189f57f09510ac0a3bdd6b26a768  src/mev-modules/ClankerMevBlockDelay.sol
+    a8f58bb2937a7adae57487e6f3c6457627ede84dd7a0331561c087f30cedc37d  src/utils/ClankerDeployer.sol
+    362ba39eff554f8a0f45c6bb9fd8e3d9d69f8d843a253c40999d1019fc52fddb  src/utils/OwnerAdmins.sol
+  </template>
+</content-for>
+
