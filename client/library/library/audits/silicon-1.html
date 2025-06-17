@@ -1,0 +1,49 @@
+<page
+  clientName="Silicon"
+  reportDate="Jun 6, 2025"
+  auditTitle="Silicon A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/berkeleycompute/pooling"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="cb201800cd5d9c03fd6bd173d0f4f5cc6e422927"
+  passwordEncrypt="env:PAGE_PASS_SILICON_1"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from Jun 3rd to Jun 6th 2025.
+</content-for>
+
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash:</b> </br>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+    </ul>
+  </content-for>
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+   
+  </content-for>
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+        58e621d0afe0cfe054dfe3737e83ab4288962bde6f5bc8470a83eee9f6be8410  pooling/src/SiliconNFTPoolEpoch.sol
+    </template>
+
+    <p>
+        The team has decided to rewrite the contract and undergo a subsequent re-audit to ensure optimal security. As a result, no issues from this report have been resolved.
+    </p>
+  </content-for>
+</page>
