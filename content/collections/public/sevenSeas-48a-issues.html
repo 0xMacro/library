@@ -1,0 +1,121 @@
+<item>
+    <field name="topic">Missing Functionality</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7083b98754fc76ae08c643fcb70d33ecd412149c</field>
+    <field name="content">
+        ## [L-1] JitoSol doesn’t support deposits with slippage protection
+
+        The JitoSol integration only supports the regular `DepositSol` operation without providing any slippage protection.
+
+        **Remediation to Consider**
+
+        Add [`DepositSolWithSlippage` operation](https://github.com/solana-program/stake-pool/blob/main/program/src/instruction.rs#L709) to enable slippage protection and prevent potential loss of funds.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Missing Functionality</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7083b98754fc76ae08c643fcb70d33ecd412149c</field>
+    <field name="content">
+        ## [L-2] JitoSol doesn’t support withdrawals
+
+        The JitoSol integration only handles basic deposits but doesn’t support any form of withdrawals. 
+
+        **Remediation to Consider**
+
+        Consider supporting withdrawal operations to convert JitoSol back to SOL.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Sanitization</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Veda-Labs/boring-vault-svm-tools/commit/40113a4ee8e0d82f374f816db0d02b774115440d</field>
+    <field name="content">
+        ## [L-3] Lending market not sanitized in all functions
+
+        The `lending_market` is not being sanitized for the following operations:
+
+        - `refresh_reserve`
+        - `refresh_obligation` and
+        - `repay_obligation_liquidity_v2`
+
+        Transactions initiated by the boring vault should only be made to trusted lending markets. Thus, sanitization for the parameter `lending_market` is useful. 
+
+        **Remediation to Consider**
+
+        Add the `lending_market` parameter to the `ix_operators` vector for the above three operations.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Limiting usage</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">f231c160b5f9ff876a9f38be812c3a738e1c7a0d</field>
+    <field name="content">
+        ## [L-4] Kamino’s “refresh obligation” operation doesn’t support multiple reserves
+
+        The protocol's function `refresh_obligation` accepts multiple `lend_reserve` and `deposit_reserve` accounts based on the obligation's active borrows and deposits. However, the [client integration](https://github.com/Veda-Labs/boring-vault-svm-tools/blob/1e860a8ba5c21544dd22ba6f1b8052605fde2da6/crates/svm-core/src/instructions/manage/kamino.rs#L458-L459) currently supports only one account of each type. This limitation restricts function usage.
+
+        **Remediation to Consider**
+
+        Consider adding support for passing multiple reserve values.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Broken functionality</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [L-5] Kamino’s borrow operation uses static values for dynamic parameters
+
+        The integration of `borrow_obligation_liquidity_v2` [passes the static value `KAMINO_LEND_PROGRAM_ID`](https://github.com/Veda-Labs/boring-vault-svm-tools/blob/1e860a8ba5c21544dd22ba6f1b8052605fde2da6/crates/svm-core/src/instructions/manage/kamino.rs#L754-L755) for the optional accounts `obligation_farm_user_state` and `reserve_farm_state`. However, different values should be passed depending on the reserve being used. 
+
+        **Remediation to Consider**
+
+        Allow for passing dynamic values based on the reserve used.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Useless code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">40113a4ee8e0d82f374f816db0d02b774115440d</field>
+    <field name="content">
+        ## [Q-1] Kamino unnecessarily adds program id into remaining accounts
+
+        [KaminoInitObligation](https://github.com/Veda-Labs/boring-vault-svm-tools/blob/1e860a8ba5c21544dd22ba6f1b8052605fde2da6/crates/svm-core/src/instructions/manage/kamino.rs#L148) and [KaminoInitObligationFarmsForReserve](https://github.com/Veda-Labs/boring-vault-svm-tools/blob/1e860a8ba5c21544dd22ba6f1b8052605fde2da6/crates/svm-core/src/instructions/manage/kamino.rs#L237) adds `ix_program_id` as the last item into the accounts vector. However, this is not required by the protocol and thus can be removed. 
+
+        **Remediation to Consider**
+
+        Remove adding the `ix_program_id` to the accounts vector.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Inconsistency</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">40113a4ee8e0d82f374f816db0d02b774115440d</field>
+    <field name="content">
+        ## [Q-2] Unnecessary sanitization of reserve
+
+        In `repay_obligation_liquidity_v2`, [`repay_reserve` is sanitized](https://github.com/Veda-Labs/boring-vault-svm-tools/blob/1e860a8ba5c21544dd22ba6f1b8052605fde2da6/crates/svm-core/src/instructions/manage/kamino.rs#L977), while the reserve parameter isn't sanitized in all the other functions.
+
+        **Remediation to Consider**
+
+        Consider removing the reserve value from `ix_operators` vector.
+    </field>
+</item>
