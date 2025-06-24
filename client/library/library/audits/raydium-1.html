@@ -1,0 +1,53 @@
+<page
+  clientName="Raydium"
+  platform="Solana"
+  reportDate="June 10th, 2025"
+  auditTitle="Raydium A-1"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/raydium-io/raydium-clmm/tree/support_allowlist_feature"
+  repoCommitHash="eb7c392be9c8ef8af6eefb92ff834fc41ab975e3"
+  repoCommitHashFinal="fd26a2a843602709212308bc8620a1d93903ea85"
+  customRepoInfo
+  passwordEncrypt="env:PAGE_PASS_RAYDIUM_1"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from June 9th to June 10th, 2025.
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b> Commit Hash (Initial):</b> <code>{{page.repoCommitHash}}</code></br>
+      </li>
+
+      <li class="break-words break-all">
+        <b> Commit Hash (Final):</b> <code>{{page.repoCommitHash}}</code> </br>
+      </li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the difference between the initial and final commits for the following contracts:</p>
+
+    <template type="file-hashes">
+        e616f991293571962417f573e825f1032e7af8e14cf6128619badfc1f29b2f2d  programs/amm/src/instructions/create_pool.rs
+        bf6ae7de79d9cdf9d8d1caab272a6d53867d7e3172406e9bbfd9d31494ac1f59  programs/amm/src/instructions/initialize_reward.rs
+        daf6e02868e84d506f7f1bcb458ffd9f87bb54fd9f19cb7c492f6c1a649e16fe  programs/amm/src/instructions/open_position_v2.rs
+        e20ec7357dc2732b83627d63d2cdea879f0b76d7836ee9de85fcd4c8df7dfe93  programs/amm/src/instructions/open_position_with_token22_nft.rs
+        e92242d49a13b36622dd1985ccdd425c036a9ef74fd7cdefc7bb01f5d3ab6fdd  programs/amm/src/util/token.rs
+    </template>
+  </content-for>
+</page>
