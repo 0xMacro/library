@@ -1,0 +1,50 @@
+<item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d711c78fd86ab1ae335b93df8ab4571ce6cdda48</field>
+    <field name="content">
+      ## [Q-1] Remove unnecessary index increment pattern
+    
+      In the `Bundler.sol` contract, in the `_addKeys()` function the unchecked increment pattern is unnecessary since [Solidity version 0.8.22](https://docs.soliditylang.org/en/latest/internals/optimizer.html#unchecked-loop-increment).
+  
+      ```solidity
+      // Safety: i can be incremented unchecked since it is bound by signerParams.length.
+      unchecked {
+          ++i;
+      }
+      ```
+  
+      Consider removing it and updating for loop to the most common syntax:
+  
+      ```solidity
+      for (uint256 i; i < signersLen; ++i) {
+      ...
+      }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d711c78fd86ab1ae335b93df8ab4571ce6cdda48</field>
+    <field name="content">
+      ## [Q-2] Add indexed attribute to the payer parameter of PurchasedTier event
+  
+      In the `ITierRegistry`, `PurchasedTier` event is defined without indexed attribute for the `payer` parameter.
+  
+      ```solidity
+      event PurchasedTier(
+        uint256 indexed fid,
+        uint256 indexed tier,
+        uint256 forDays,
+        address payer // <= missing indexed attribute
+      );
+      ```
+  
+      Consider adding indexed attribute to facilitate offchain tracking and monitoring.
+    </field>
+  </item>
+  
