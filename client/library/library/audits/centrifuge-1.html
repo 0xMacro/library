@@ -1,0 +1,40 @@
+
+<page
+  clientName="Centrifuge"
+  reportDate="June 25, 2025"
+  auditTitle="Centrifuge-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/centrifuge/protocol-v3"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_CENTRIFUGE"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on June 23rd, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Merkle Proof Manager (from <a href="https://github.com/centrifuge/protocol-v3/pull/379">PR #379</a></b> </br>
+        Commit Hash: <code>a0d722dbf1181e6aa95e2ae13bc36fe9e67e701b</code>
+        <template type="file-hashes">
+            0cbf8ba27b68718780e4dfc0a1785e02537527590fd82ca01c69b2f98a94ec9d  src/managers/MerkleProofManager.sol
+            9aa4379b225d4f0e65a771294f6c63b45752e230d57109d6b595a2a5ed173f61  src/managers/decoders/BaseDecoder.sol
+            15986e8b9dfe042e9b9f7ca62ab92f8a2a709031df9928908a68a0b83abba0fe  src/managers/decoders/CircleDecoder.sol
+            41a49d9e02f029fb9f2b191a697be5ff94fa0642338db64eecf9d08b0b77b9a8  src/managers/decoders/VaultDecoder.sol      
+        </template>
+      </li>
+      
+    </ul>
+  </content-for>
+</page>
