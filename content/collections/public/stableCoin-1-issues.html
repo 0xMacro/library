@@ -1,0 +1,124 @@
+<item>
+    <field name="topic">Signature Replay</field>
+    <field name="impact">critical</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">ab05ca96fb7b94aae18431114266ffdb90f314ae</field>
+    <field name="content">
+      ## [C-1] Paymaster signatures can be reused
+  
+      The [paymaster](https://github.com/stablecoinxyz/paymaster-service/blob/main/contracts/SignatureVerifyingPaymasterV07.sol) is intended to cover gas costs for users that meet specific requirements, like holding their SBC token for a sufficient duration. The flow is that a user makes a request for a transaction and the paymaster generates a signature and accompanying paymaster data. However, the signature only includes the sender address, and its validUntil and validAfter parameters. It does not contain a nonce, nor does it contain the intended transactions calldata.
+  
+      ```solidity
+      function getHash(
+          uint48 validUntil,
+          uint48 validAfter,
+          address paymasterAddress,
+          address senderAddress
+      ) public view returns (bytes32) {
+          return keccak256(abi.encode(
+              validUntil,
+              validAfter,
+              block.chainid,
+              paymasterAddress,
+              senderAddress
+          ));
+      }
+      ```
+      Reference: [SignatureVerifyingPaymasterV07.sol#L125-138](https://github.com/stablecoinxyz/paymaster-service/blob/main/contracts/SignatureVerifyingPaymasterV07.sol#L125-L138)
+  
+      Since nonce and calldata are not included, it allows for the sender to reuse this paymaster signature repeatedly on any transaction. This can allow for users to exploit or grief the ETH held in the paymaster, draining it with no cost to themselves.
+  
+      **Remediations to Consider**
+  
+      Add the operations nonce and calldata found in the [PackedUserOperation](https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/interfaces/PackedUserOperation.sol) struct to the signature to prevent replay attacks, and potentially limit the calls the paymaster will cover.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Signature expiry</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">ab05ca96fb7b94aae18431114266ffdb90f314ae</field>
+    <field name="content">
+
+    ## [H-1] Signatures never expire
+    As mentioned in C-1, the paymaster signature is composed of the sender address, and validUntil and validAfter parameters. The intent of these validity parameters is to create a range of time the signature is valid for. However, after signature validation these values are adjusted to ensure they are always valid and thus the signature will never expire:
+  
+    ```solidity
+        /**
+        * TIMESTAMP ADJUSTMENT MECHANISM
+        * 
+        * This section implements automatic adjustments to the validity window timestamps
+        * to prevent common validation errors. These adjustments happen AFTER signature
+        * verification is complete, so they don't affect the cryptographic validation.
+        * 
+        * The original timestamps from paymasterData were used to verify the signature.
+        * Now we may modify them before returning to the EntryPoint.
+        */
+        
+        // Convert current block timestamp to uint48 for comparison with our timestamps
+        uint48 now48 = uint48(block.timestamp);
+    
+        // EXPIRED TIMESTAMP HANDLING:
+        // If validUntil is in the past or too close to now, extend it
+        // This prevents "AA32 paymaster expired" errors
+        if (validUntil <= now48 || validUntil < now48 + 60) {
+            validUntil = now48 + 3600; // Add 1 hour from now
+        }
+  
+        // FUTURE ACTIVATION HANDLING:
+        // If validAfter is in the future, adjust it to be valid now
+        // This prevents "AA32 paymaster not due" errors
+        if (validAfter > now48) {
+            validAfter = now48 > 60 ? now48 - 60 : 0; // Set to 60 seconds in the past
+        }
+    ```
+    Reference: [SignatureVerifyingPaymasterV07.sol#L197-223](https://github.com/stablecoinxyz/paymaster-service/blob/main/contracts/SignatureVerifyingPaymasterV07.sol#L197-L223)
+  
+    Without the ability for paymaster signatures to expire, once a signature has been given to a user, they are able to have the paymaster cover their gas costs indefinitely which may not be the intent. It is likely that some users could abuse this especially coupled with issue C-1.
+  
+    **Remediations to Consider**
+
+    Remove the timestamp adjustment mechanism, the entrypoint should not return errors if valid timestamps are given. It is important for signatures to expire to prevent griefing.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Griefing</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">ab05ca96fb7b94aae18431114266ffdb90f314ae</field>
+    <field name="content">
+      ## [M-1] Paymaster accepts any gas cost
+  
+      Considering the paymaster signature currently does not consider the users calldata, any transaction from the user can be executed using the paymaster signature and the paymaster will cover the gas costs. This allows for potentially malicious high gas transactions to be accepted and drain the paymaster of its ETH.
+  
+      **Remediations to Consider**
+  
+      Consider using the maxGas value passed into the `validateUserOp()` function, and validate it against a set max gas value the paymaster is willing to execute on.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Standards</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ab05ca96fb7b94aae18431114266ffdb90f314ae</field>
+    <field name="content">
+      ## [L-1] Does not follow EIP712 signature pattern
+  
+      It is best practice to follow [EIP712](https://eips.ethereum.org/EIPS/eip-712) signature pattern for smart contract. This pattern is used to ensure the signature is limited to only a specific contract, version, and chain id, so it cannot be used by any unintended ways. For the most part this is handled, however the version is missing from the signature which is important considering the paymaster is upgradeable, and you may not want signatures to be valid after an upgrade.
+  
+      **Remediations to Consider**
+  
+      Update the signature to follow EIP712, Openzepelin’s [EIP712](https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/master/contracts/utils/cryptography/EIP712Upgradeable.sol) is suggested to inherit to generate the proper domain separator.
+  
+    </field>
+  </item>
+  
