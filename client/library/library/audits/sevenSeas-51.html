@@ -22,7 +22,7 @@
   <content-for name="repo-info">
     <ul>
       <li class="break-words break-all">
-        <b>Agglayer decoder (from <a href="https://github.com/Veda-Labs/boring-vault/commit/fe2fc0ca867e45da0126bb88cea0a0bbf0dfef68"> This commit</a>) specifically regarding a change to sanitize the token address decoded from the metadata. It is our understanding that some protocols are using the decoder from this commit. This commit is safe to use as is, however it is suggested to use the bridgeAsset and claimAsset functions over the others.</b> </br>
+        <b>Agglayer decoder (from <a href="https://github.com/Veda-Labs/boring-vault/commit/fe2fc0ca867e45da0126bb88cea0a0bbf0dfef68"> This commit</a>) specifically regarding a change to sanitize the token address decoded from the metadata. This report has been generated to reflect the informational changes that were given to previous report A-44. Those changes were to help with future proofing but had no security issues reflected. Both were safe to use, but this updated report is to reflect this informational change.</b> </br>
         <template type="file-hashes">
             9e3229d27f16cb6d5eea08a8435b35193f4be793c19424c379eab365bead493d  src/base/DecodersAndSanitizers/Protocols/AgglayerDecoderAndSanitizer.sol      </template>
         </li>
