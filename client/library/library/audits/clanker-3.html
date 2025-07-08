@@ -1,0 +1,72 @@
+<page
+  clientName="Clanker"
+  reportDate="July 8, 2025"
+  auditTitle="Clanker A-3"
+  auditVersion="1.0.0"  
+  layout="/library/audits/_layout.html"
+
+  repoUrl1="https://github.com/clanker-devco/contracts"
+  repoCommitHash1="2699fdfb8a545682a5ea81d8c7141b98d95d9433"
+  repoCommitHashFinal1="fd573064215a55dbba82b9fc0fbe2c97f54a58b6"
+
+  repoUrl2="https://github.com/clanker-devco/lp-lockers-v0-v1"
+  repoCommitHash2="6a9622fd4e1325aadb884594546bc2562704299c"
+  repoCommitHashFinal2="f021bfdcdc03369e3b104d59d5b48edc18d9f62e"
+
+  customRepoInfo
+  passwordEncrypt="env:PAGE_PASS_CLANKER_3"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 27, 2025 to July 7, 2025.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Telegram with the Clanker team.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <a href="{{page.repoUrl1}}" target="_blank"> contracts repository </a>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal1}}</code>
+      </li>
+    </ul>
+
+    <ul>
+      <a href="{{page.repoUrl2}}" target="_blank"> lp-lockers-v0-v1 repository </a>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash2}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal2}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within these repositories:</p>
+  <template type="file-hashes">
+    ff04fe3055e1de6da1de6dd5eebcc30d328f0693f00e376d040c9d5bea08396f  lp-lockers-v0-v1/src/v0/SingeltonLpLocker.sol
+    807f540f783ae5f03860999bdec76b70c8ca5f4a9d0176b720678587748cb634  lp-lockers-v0-v1/src/v1/LpLockerV1Owner.sol
+    154c7c21dfbbf2d5402b2af7eafe2c0fc1da16055ecf0bc99eb2c943b8b21082  contracts/src/mev-modules/ClankerSniperAuctionV0.sol
+    a6805d2610d08854bdb2c013b15ebc230d2cc806d69749fab9f136dfaefbbb74  contracts/src/mev-modules/interfaces/IClankerSniperAuctionV0.sol
+    61ea0b8b43998fe2d45d227dbfe571992ea01020b52b8d019327dba35eb64d74  contracts/src/mev-modules/sniper-utils/ClankerSniperUtilV0.sol
+    306b24da384a0359b132a58f46747bff4b619c5e17aafa7c4c2ea535118aa186  contracts/src/lp-lockers/ClankerLpLockerFeeConversion.sol
+  </template>
+</content-for>
+
