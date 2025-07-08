@@ -1,0 +1,428 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/commit/ee49de575c79ad8113e45f14970c3d3f2661ef9d</field>
+    <field name="content">
+      ## [M-1] Incorrect reward distribution when no swaps
+  
+      In the `ClankerLpLockerFeeConversion` contract, `_handleFees()` function contains an off-by-one error in the implementation of reward distribution for the edge case when there are no swaps.
+  
+      The current code handles specifically the last recipient of the reward to be distributed. However, the index with which it is accessed is off-by-one, as it is unnecessarily decremented. Due to this error, when there are multiple recipients, the reward for the last recipient is sent to the recipient who precedes it. When there is a single recipient, the whole transaction is reverted, as the code will try to execute `0 - 1` when evaluating `distributeLoop - 1` expression in the following code:
+  
+      ```solidity
+      if (toSwapCount == 0) {
+          // if there is no bps to swap, distribute the last reward inclusive of the dust
+          SafeERC20.forceApprove(IERC20(rewardToken), address(feeLocker), tokenToSwap);
+          feeLocker.storeFees(
+              tokenRewardInfo.rewardRecipients[toDistributeIndexes[distributeLoop - 1]],
+              address(rewardToken),
+              tokenToSwap
+          );
+          rewardTokenIsToken0
+              ? rewards0[toDistributeIndexes[distributeLoop - 1]] += tokenToSwap
+              : rewards1[toDistributeIndexes[distributeLoop - 1]] += tokenToSwap;
+      }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [M-2] Missing validation on the auction bid payee allows paying and winning the auction with unauthorized 3rd party assets
+  
+      In the `ClankerSniperAuctionV0` caller may bid and pay in the auction with other users’ approved tokens, if there is already preexisting approval granted to the `ClankerSniperAuctionV0`. The reason is that there is no validation of what address auctionData encodes.
+  
+      ```solidity
+      function _pullPayment(PoolId poolId, bytes calldata auctionData)
+          internal
+          returns (uint256 paymentAmount)
+      {
+          (address payee) = abi.decode(auctionData, (address));
+  
+          // calculate the expected payment for the given gas price
+          int256 gasSignal = int256(tx.gasprice) - int256(gasPeg[poolId]);
+  
+          // shouldn't be negative
+          if (gasSignal < 0) {
+              revert GasSignalNegative();
+          }
+  
+          // calculate the expected payment for the given swap params
+          paymentAmount = uint256(gasSignal) * PAYMENT_PER_GAS_UNIT;
+  
+          // pull payment from the payee
+          SafeERC20.safeTransferFrom(IERC20(weth), payee, address(this), paymentAmount);
+  
+          emit AuctionWon(poolId, payee, paymentAmount, round[poolId]);
+      }
+  
+      ```
+  
+      As a result, if other users/snipers have preauthorized a token transfer to `ClankerSniperAuctionV0` in a separate transaction, for example to have a more efficient bid transaction, they may become vulnerable, and their assets may be used without their authorization.
+  
+      Consider clearly emphasizing in the documentation the potential risks for the end users if approving `ClankerSniperAuctionV0` for token transfers.
+    </field>
+    <field name="response">
+        Noted in documentation, it's expected that snipers can handle this complexity and we provided them an example of how to properly use the contract.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/commit/ee49de575c79ad8113e45f14970c3d3f2661ef9d</field>
+    <field name="content">
+      ## [M-3] Incorrect condition check will perform the collection of rewards during the MEV module delay period
+  
+      **Note: Discovered by the project team**
+  
+      In the `ClankerLpLockerFeeConversion` contract, the `_mevModuleOperating()` function performs several checks to determine if the MEV module is operating. If it is operating, rewards collection should be skipped; otherwise, the rewards collection process should be performed.
+  
+      When the MEV module is disabled, rewards collection should be allowed. This is implemented with the first check in `_mevModuleOperating()`
+  
+      ```solidity
+      // if the mev module is disabled, the swap backs cannot be blocked
+      if (!IClankerHook(address(_tokenRewards[token].poolKey.hooks)).mevModuleEnabled(poolId)) {
+          return false;
+      }
+      ```
+  
+      There is an additional edge case when mevModule is enabled, but the MEV block delay period has expired, which also represents an inactive mevModule.
+  
+      ```solidity
+      if (
+          poolCreationTimestamp
+              + IClankerHook(address(_tokenRewards[token].poolKey.hooks)).MAX_MEV_MODULE_DELAY()
+              **>** block.timestamp
+      ) {
+          return false;
+          ...
+      ```
+  
+      However, this check is implemented incorrectly, since the expired MEV block delay period should be checked in the following way:
+  
+      ```solidity
+      if (
+          poolCreationTimestamp
+              + IClankerHook(address(_tokenRewards[token].poolKey.hooks)).MAX_MEV_MODULE_DELAY()
+              **<=** block.timestamp
+      ) {
+          return false;
+          ...
+      ```
+  
+      As a result, reward collection will be incorrectly allowed during the MEV block delay period.
+  
+      Consider updating condition operator to represent properly system intent.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/commit/fd573064215a55dbba82b9fc0fbe2c97f54a58b6</field>
+    <field name="content">
+      ## [L-1] Unspent native asset may get locked in ClankerSniperUtilV0
+
+      In the `ClankerSniperUtilV0` contract, ETH/WETH assets that are transferred to the ClankerSniperUtilV0 but not spent during the transaction, will be locked in the contract, and it won’t be possible to withdraw these assets as the contract does not feature corresponding functionality for withdrawing native assets (ETH/WETH).
+  
+      Combined with the M-2 issue, a malicious attacker may use this approval to win the auction and transfer the assets to the reward recipients.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/commit/ee49de575c79ad8113e45f14970c3d3f2661ef9d</field>
+    <field name="content">
+      ## [L-2] Skip zero amount token transfers within _handleFees()
+  
+      In the `ClankerLpLockerFeeConversion` contract, `_handleFees()` performs multiple operations for splitting and distributing corresponding shares of rewards. 
+  
+      Due to calculations involving potentially small amounts of rewards and corresponding small percentages for recipients, there is a high probability that some of the calculated results may end up being 0.
+  
+      Additionally, some of the unusual ERC20 behaviors include reverting 0 token transfers, which may disrupt the entire swap flow, as reward collection is an integral part of that same flow.
+  
+      Consider adding validation to prevent attempting zero amount token transfers within `_handleFees()` which may fail and block overall system operation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/commit/ee49de575c79ad8113e45f14970c3d3f2661ef9d</field>
+    <field name="content">
+      ## [L-3] Incorrect event data in the FeesSwapped event
+  
+      In the `ClankerLpLockerFeeConversion` contract, `_handleFees()` reports incorrect data when emitting `FeesSwapped` event in a specific edge case when there were no swaps, but there was reward distribution.
+  
+      ```solidity
+      emit FeesSwapped(token, rewardToken, tokenToSwap, tokenToSwapInto, swapAmountOut);
+      ```
+  
+      In this edge case `tokenToSwap` amount would be non-zero value because distribution logic does not deduct from `tokenToSwap` the amount of reward distributed to the last reward recipient. 
+  
+      ```solidity
+      if (toSwapCount == 0) {
+          // if there is no bps to swap, distribute the last reward inclusive of the dust
+          SafeERC20.forceApprove(IERC20(rewardToken), address(feeLocker), tokenToSwap);
+          feeLocker.storeFees(
+              tokenRewardInfo.rewardRecipients[toDistributeIndexes[distributeLoop - 1]],
+              address(rewardToken),
+              tokenToSwap
+          );
+          rewardTokenIsToken0
+              ? rewards0[toDistributeIndexes[distributeLoop - 1]] += tokenToSwap
+              : rewards1[toDistributeIndexes[distributeLoop - 1]] += tokenToSwap;
+      }
+      ```
+  
+      This deduction is present for non-last recipients, but it is missing from the code block that handles dust defined within `if (toSwapCount == 0)` branch. 
+  
+      Consider emitting `FeesSwapped` event only within the `if (toSwapCount > 0)` block where fee swaps occur, or update `if toSwapCount == 0` block so that proper event argument data is available when the event is emitted.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/lp-lockers-v0-v1/commit/702b3ce0b75397f0a0dc979acf0d0ea8d0cbd492</field>
+    <field name="content">
+      ## [L-4] Wrong event data due to incorrect order of event parameters
+  
+      The event declaration and event emission are not aligned within `SingletonLpLocker`  and `LpLockerV1Owner` contracts. `ClaimedFee`  event has `totalAmount1` first, followed by the `totalAmount0` event argument. However, when the event is emitted, the arguments provided are reversed, first `amount0` followed by the `amount1`.
+  
+      ```solidity
+      event ClaimedFees(
+          address indexed token0,
+          address indexed token1,
+          uint256 amount0,
+          uint256 amount1,
+          uint256 **totalAmount1**,
+          uint256 **totalAmount0**
+      );
+  
+      emit ClaimedFees(token0, token1, recipientFee0, recipientFee1, **amount0**, **amount1**);
+      ```
+  
+      Consider updating the event declaration to match the order of arguments in event emission.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/commit/ee49de575c79ad8113e45f14970c3d3f2661ef9d</field>
+    <field name="content">
+      ## [L-5] Remove unsupported native assets handling
+  
+      In the `ClankerLpLockerFeeConversion` contract, `_uniSwapLocked()` function contains code that incorrectly indicates that it is meant to support native assets handling.
+  
+      ```solidity
+      universalRouter.execute{
+          value: Currency.unwrap(poolKey.currency0) == address(0) ? amountIn : 0
+      }(commands, inputs, block.timestamp);
+      ```
+  
+      Consider removing this code, as the specification does not support native assets.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/lp-lockers-v0-v1/commit/f021bfdcdc03369e3b104d59d5b48edc18d9f62e</field>
+    <field name="content">
+      ## [Q-1] LpLockerV1Owner should use SafeERC20 for token transfers
+  
+      In the wrapper contract `LpLockerV1Owner`, tokens are transferred within `_collectFeesPostRelease()` function without checking the return value of the operation, potentially resulting in the success of the overall transaction even when the token transfer has failed, which would violate core system invariants and result in unexpected behavior. 
+  
+      ```solidity
+      ...
+      feeToken0.transfer(creatorFeeRecipient, recipientFee0);
+      feeToken1.transfer(creatorFeeRecipient, recipientFee1);
+  
+      feeToken0.transfer(protocolFeeRecipient, protocolFee0);
+      feeToken1.transfer(protocolFeeRecipient, protocolFee1);
+  
+      emit ClaimedFees(
+          creatorFeeRecipient, token0, token1, recipientFee0, recipientFee1, amount0, amount1
+      );
+      ```
+  
+      Consider using SafeERC20 or checking the operation return value to ensure that the token transfer has been successfully completed in all cases, even when underlying transfer functions do not revert but return `false`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/commit/ee49de575c79ad8113e45f14970c3d3f2661ef9d</field>
+    <field name="content">
+      ## [Q-2] Inconsistent determination of currency order
+  
+      In `ClankerLpLockerFeeConversion` contract, determination of currency order in `_uniSwapUnlocked()` and `_uniSwapLocked()` is performed differently.
+  
+      ```solidity
+      \\ In 1. 
+      bool zeroForOne = tokenIn < tokenOut;
+  
+      \\ In 2
+      bool tokenInIsToken0 = Currency.unwrap(poolKey.currency0) == tokenIn;
+  
+      ```
+  
+      Consider updating the implementation in the `_uniSwapUnlocked()` to match the approach used across other functions in the same contract.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/commit/ee49de575c79ad8113e45f14970c3d3f2661ef9d</field>
+    <field name="content">
+      ## [Q-3] Unused code can be removed
+  
+      Unused code is present in several contracts that are in the scope of the audit:
+  
+      - within `SingletonLpLocker` contract:
+      
+          ```solidity
+          error NotAuthorized();
+          event CreatorFeeRecipientUpdated(
+              address indexed previousRecipient, address indexed newRecipient
+          );
+          event TokenReceived(address indexed from, uint256 id);
+          ```
+      
+      - within `LpLockerV1Owner` contract:
+      
+          ```solidity
+          error NotAuthorized();
+          event TokenReceived(address indexed from, uint256 id);
+          ```
+      
+      - in `ClankerSniperAuctionV0` contract:
+      
+          ```solidity
+          import {console} from "forge-std/console.sol";
+          ```
+      
+      - in `IClankerSniperAuctionV0` contract:
+      
+          ```solidity
+          error InvalidPayment();
+          ```
+      
+      - In `ClankerLpLockerFeeConversion` contract:
+      
+          ```solidity
+          // import
+          import {TransientStateLibrary} from "@uniswap/v4-core/src/libraries/TransientStateLibrary.sol";
+          // usage
+          using TransientStateLibrary for IPoolManager;
+          ```
+      
+      - In `ClankerLpLockerFeeConversion` contract consider replacing
+      
+          ```solidity
+          // this
+          zeroForOne: tokenInIsToken0 ? true : false, // swapping tokenIn -> tokenOut
+          // with
+          zeroForOne: tokenInIsToken0 // swapping tokenIn -> tokenOut
+          ```
+    </field>
+    <field name="response">
+        Additional changes performed in the following commits: https://github.com/clanker-devco/lp-lockers-v0-v1/commit/3882ad9fdb85a35c37772995eef90d5a19676105 and https://github.com/clanker-devco/contracts/commit/fd573064215a55dbba82b9fc0fbe2c97f54a58b6
+    </field>
+
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/commit/ee49de575c79ad8113e45f14970c3d3f2661ef9d</field>
+    <field name="content">
+      ## [G-1] Reduce the number of forceApprove operations
+  
+      1. In the `ClankerLpLockerFeeConversion` contract, `_handleFees()` contains two loops in which each iteration executes `forceApprove()` and authorises the same contract `feeLocker`.
+      
+          Consider using a single forceApprove per loop with the sum of all token transfers performed within the loop.
+      
+      2. Similarly, in the `ClankerSniperAuctionV0` there are also multiple approve statements within the loop.
+      
+          ```solidity
+          // distribute the rewards
+          for (uint256 i = 0; i < tokenRewardInfo.rewardBps.length; i++) {
+              IERC20(weth).approve(address(feeLocker), rewardsSplit[i]);
+              feeLocker.storeFees(tokenRewardInfo.rewardRecipients[i], weth, rewardsSplit[i]);
+          }
+          ```
+      
+          replace with
+      
+          ```solidity
+          // distribute the rewards
+          IERC20(weth).approve(address(feeLocker), lpPayment);
+          for (uint256 i = 0; i < tokenRewardInfo.rewardBps.length; i++) {
+              feeLocker.storeFees(tokenRewardInfo.rewardRecipients[i], weth, rewardsSplit[i]);
+          }
+          ```
+    </field>
+    <field name="response">
+        Additional changes performed in the following commit: https://github.com/clanker-devco/contracts/commit/fd573064215a55dbba82b9fc0fbe2c97f54a58b6.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/commit/ee49de575c79ad8113e45f14970c3d3f2661ef9d</field>
+    <field name="content">
+      ## [G-2] Avoid repeating calculation operations
+  
+      In the `ClankerLpLockerFeeConversion` contract, `_handleFees()` contains the following piece of code, which performs the same calculation three times.
+  
+      ```solidity
+        SafeERC20.forceApprove(
+            IERC20(tokenToSwapInto), address(feeLocker), **swapAmountOut - swapDistributed**
+        );
+        feeLocker.storeFees(
+            tokenRewardInfo.rewardRecipients[toSwapIndexes[toSwapCount - 1]],
+            address(tokenToSwapInto),
+            **swapAmountOut - swapDistributed**
+        );
+    
+    
+        rewardTokenIsToken0
+            ? rewards1[toSwapIndexes[toSwapCount - 1]] += **swapAmountOut - swapDistributed**
+            : rewards0[toSwapIndexes[toSwapCount - 1]] += **swapAmountOut - swapDistributed**;
+      ```
+  
+      Consider memoizing the calculation result using a local variable and reusing it instead of repeating the calculation.
+    </field>
+  </item>
+  
