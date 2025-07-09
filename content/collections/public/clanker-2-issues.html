@@ -1,0 +1,487 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5905d98c29a2294e33d6188c33b342f6053bc2ee</field>
+    <field name="content">
+      ## [M-1] Unsafe transfers of ERC20 tokens
+
+      In multiple system contracts, such as `Clanker`, `ClankerAirdrop`, `ClankerUniv4EthDevBuy`, and `ClankerPresaleEthToCreator`, tokens are transferred without checking the return value of the operation, potentially resulting in the success of the overall transaction even in the case when the token transfer has failed, which would violate core system invariants and result in unexpected behavior.
+  
+      - `Clanker.claimTeamFees()`
+      
+          ```solidity
+          IERC20(token).transfer(teamFeeRecipient, balance);
+          ```
+      
+      - `ClankerAirdrop.receiveTokens()`
+      
+          ```solidity
+          // pull in token
+          IERC20(token).transferFrom(msg.sender, address(this), extensionSupply);
+          ```
+      
+      - `ClankerAirdrop.claim()`
+      
+          ```solidity
+          // transfer tokens
+          IERC20(token).transfer(recipient, claimableAmount);
+          ```
+      
+      - `ClankerUniv4EthDevBuy.receiveTokens()`
+      
+          ```solidity
+          // transfer the token to the recipient
+          IERC20(token).transfer(devBuyData.recipient, tokenAmount);
+          ```
+      
+      - `ClankerPresaleEthToCreator.claimTokens()`
+      
+          ```solidity
+          // send tokens to user
+          IERC20(presale.deployedToken).transfer(msg.sender, tokenAmount);
+          ```
+      
+      - `ClankerPresaleEthToCreator.receiveTokens()`
+      
+          ```solidity
+          // pull in token supply
+          IERC20(token).transferFrom(msg.sender, address(this), extensionSupply);
+          ```
+      
+  
+      **Remediations to Consider**
+  
+      - Consider using SafeERC20 or checking the operation return value to ensure that the token transfer has been successfully completed in all cases, even when underlying transfer functions do not revert but return `false`.
+    </field>
+    <field name="response">
+        Fixed for Clanker.claimTeamFees(), for other places the only token being transferred are ClankerToken instances which fail if the transfers fail.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6718ca49cb0e63dd0984fe08f496f8d19e79c854</field>
+    <field name="content">
+      ## [L-1] Missing validation for the implicit requirement that tickLower config values are sorted
+  
+      In the `ClankerLpLockerMultiple` contract, `placeLiquidity()` and `_mintLiquidity()` functions are responsible for configuring corresponding liquidity positions in the just-created pool.
+  
+      ```solidity
+        int24 startingTick =
+            token0IsClanker ? lockerConfig.tickLower[0] : -lockerConfig.tickLower[0];
+  
+        for (uint256 i = 0; i < lockerConfig.tickLower.length; i++) {
+            // add mint action
+            actions = abi.encodePacked(actions, uint8(Actions.MINT_POSITION));
+  
+            // determine token amount for this position
+            uint256 tokenAmount = poolSupply * lockerConfig.positionBps[i] / BASIS_POINTS;
+            uint256 amount0 = token0IsClanker ? tokenAmount : 0;
+            uint256 amount1 = token0IsClanker ? 0 : tokenAmount;
+  
+            // determine tick bounds for this position
+            int24 tickLower_ =
+                token0IsClanker ? lockerConfig.tickLower[i] : -lockerConfig.tickLower[i];
+            int24 tickUpper_ =
+                token0IsClanker ? lockerConfig.tickUpper[i] : -lockerConfig.tickUpper[i];
+            int24 tickLower = token0IsClanker ? tickLower_ : tickUpper_;
+            int24 tickUpper = token0IsClanker ? tickUpper_ : tickLower_;
+            uint160 lowerSqrtPrice = TickMath.getSqrtPriceAtTick(tickLower);
+            uint160 upperSqrtPrice = TickMath.getSqrtPriceAtTick(tickUpper);
+  
+            // determine liquidity amount
+            uint256 liquidity = LiquidityAmounts.getLiquidityForAmounts(
+                startingTick.getSqrtPriceAtTick(), lowerSqrtPrice, upperSqrtPrice, amount0, amount1
+            );
+       ...
+      ```
+  
+      When `getLiquidityForAmounts()` is called, the `startingTick` value is based on the value of the first element in `the tickLower[]` array. If values are not sorted, the startingTick value would not be correct, and overall, the operation would result in unexpected reverts.
+  
+      Consider adding corresponding validation to more explicitly report this configuration error.
+  
+      ```solidity
+      for (uint256 i = 1; i < lockerConfig.tickLower.length; i++) {
+          if (lockerConfig.tickLower[i] < lockerConfig.tickLower[i-1]) {
+              revert TicksNotSorted();
+          }
+      }
+      ```
+    </field>
+    <field name="response">
+        Fixed by using the starting price as the lower tick.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] ClankerMevBlockDelay can be used without initialization
+  
+      In `ClankerMevBlockDelay`, the `beforeSwap()` function can be executed without first calling `initialize()`.
+  
+      Currently, `ClankerHook` properly calls `initialize()` first, before invoking `beforeSwap()`. However, initialization is not enforced within the `ClankerMevBlockDelay` contract itself.
+  
+      Consider updating the implementation to ensure that initialization is completed before executing any operations that rely on it.
+    </field>
+    <field name="response">
+        This is intentional to allow extensions to perform pool actions before the MevModule potentially locks the pool
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">498098dc507baaa2cb166db1e7acca7b4e54ed64</field>
+    <field name="content">
+      ## [Q-2] ClankerAirdrop.amountAvailableToClaim()
+  
+      In the `ClankerAirdrop`, `amountAvailableToClaim()` may return a valid value (such as 0) even for tokens that do not have an airdrop yet configured.
+  
+      Consider generating an error if the airdrop for the token is not configured.
+    </field>
+  </item>
+  
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">f98067b88011566c5c8ccd15ca7f4f2b453f1684</field>
+    <field name="content">
+        ## [Q-3] Inconsistent msg.value validation
+
+        In `ClankerVault`, the check validates that the config value for `msg.value` is not set. However,  it does not check that the actual `msg.value` is also not 0.
+        ```solidity
+        // ensure that the msgValue is zero
+        if (deploymentConfig.extensionConfigs[extensionIndex].msgValue != 0) {
+            revert IClankerExtension.InvalidMsgValue();
+        }
+        ```
+        
+        On the other hand, in `ClankerAirdrop.receiveTokens()`, both the config value and the actual `msg.value` are validated,
+
+        ```solidity
+        // ensure that the msgValue is zero
+        if (deploymentConfig.extensionConfigs[extensionIndex].msgValue != 0 || msg.value != 0) {
+          revert IClankerExtension.InvalidMsgValue();
+        }
+        ```
+  
+        Similar implementation is also present in `ClankerPresaleEthToCreator.receiveTokens()` 
+    
+        ```solidity
+        // ensure that the msgValue is zero
+        if (deploymentConfig.extensionConfigs[extensionIndex].msgValue != 0 || msg.value != 0) {
+            revert IClankerExtension.InvalidMsgValue();
+        }
+        ```
+    
+        Similarly, in `ClankerUniv4EthDevBuy.receiveTokens()`, both the config and actual value are checked.
+    
+        ```
+        // ensure that the msgValue matches what was requested and is not zero
+        if (
+            deploymentConfig.extensionConfigs[extensionIndex].msgValue != msg.value
+                || deploymentConfig.extensionConfigs[extensionIndex].msgValue == 0
+        ) {
+            revert IClankerExtension.InvalidMsgValue();
+        }
+        ```
+    
+        In addition, the `Clanker` contract (factory) is the only caller of these functions, and the only place where these functions are triggered is `_triggerExtensions()`.
+    
+        ```solidity
+        // trigger the extension
+        IClankerExtension(deploymentConfig.extensionConfigs[i].extension).receiveTokens{
+            value: deploymentConfig.extensionConfigs[i].msgValue
+        }(deploymentConfig, poolKey, token, extensionSupply, i);
+        ```
+    
+        Based on how these functions are invoked, `msg.value` is guaranteed to be equal to the `msgValue` config value, and therefore, checking only one variable is enough. Just consider making checks consistent.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6652c0c77aabb3722c3369b8ea510774e3157515</field>
+    <field name="content">
+      ## [Q-4] Unnecessary cast in _setFee()
+  
+      - In the `ClankerHookDynamicFee`, `_setFee()` function contains unnecessary cast of `lpFee`, which is `uint24` value, to `uint24`.
+      
+          ```solidity
+          IPoolManager(poolManager).updateDynamicLPFee(poolKey, uint24(lpFee));
+          ```
+      
+      - In the `ClankerHookDynamicFee`, an unnecessary cast is performed in `_getLpFee()` after the type update of `feeControlNumerator` (from uint24 to uint256).
+      
+          ```solidity
+          uint256 variableFee = uint256(poolConfigVars_.feeControlNumerator) * (volAccumulator ** 2)
+            / FEE_CONTROL_DENOMINATOR;
+          ```
+      
+  
+      Consider removing unnecessary casts.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">96f1f91244cffa9b8060647995effcf09e6ef355</field>
+    <field name="content">
+      ## [Q-5] Constant value does not match the natspec description
+  
+      In the `ClankerHookDynamicFee`, `MIN_BASE_FEE` is set to 2500. Correspondingly, the natspec comment describing this constant indicates this value represents 0.025% of the unit represented in 1_000_000 basis points. 
+  
+      ```solidity
+      uint24 public constant MIN_BASE_FEE = 2500; // 0.025%;
+      ```
+  
+      However, comment and value do not match as the set value actually represents 0.25% and not 0.025% of the FEE unit.
+  
+      Consider updating the constant value or changing the corresponding code comment.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5c6f80c4859dc074116d7c03c3555631798a26a5</field>
+    <field name="content">
+      ## [Q-6] Unused code
+  
+      - Unused imports In `ClankerHookStaticFee`.
+      
+          ```solidity
+          import {BeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
+          import {console} from "forge-std/console.sol";
+          ```
+      
+      - Duplicate import in `ClankerUniv4EthDevBuy`.
+      
+          ```solidity
+          import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+          import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+          ```
+      
+      - The following errors are defined in `IClankerFeeLocker` but are never used.
+      
+          ```solidity
+          error ClaimAmountTooHigh();
+          error InvalidRecipient();
+          ```
+      
+      - `IClankerExtension` is unnecessary in the contract inheritance declaration within `ClankerPresaleEthToCreator`, as it is already present in the `IClankerPresaleEthToCreator`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1ee9691532c63e30cddb64e07a91e5b763379122</field>
+    <field name="content">
+      ## [Q-7] Incomplete interface definitions
+  
+      Multiple interfaces across the codebase do not contain all the public methods of the underlying contracts.
+  
+      - `IClankerHookStaticFee` does not contain a function declaration for functions corresponding to the public variables, such as accessors for `clankerFee` and `pairedFee` mappings.
+      - `IClankerHookDynamicFee` does not contain a function declaration for functions corresponding to the public variables, such as accessors for `poolFeeVars` and `poolConfigVars` mappings or any of the public constants.
+      - Missing function declarations in `IClankerMevModule` interface for public variables `poolUnlockTime` and `blockDelay`.
+      - Missing function declarations in `IClanker` interface for public variables.
+      - Multiple important public and contract functions are not declared in the `IClankerPresaleEthToCreator` interface.
+      - The same applies to other interfaces too.
+    </field>
+    <field name="response">
+        Added missing definitions for `IClankerHookStaticFee` and `IClankerHookDynamicFee`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5a25f9f6cdd083383d532ee1d115dee47232237e</field>
+    <field name="content">
+      ## [Q-8] Improve Event definitions
+  
+      - `ClankerPresaleEthToCreator` - does not feature any events. Currently, events are missing for important state changes, such as changes in presale status.
+      - `IClankerLpLockerMultiple` - missing indexed attribute for Events
+          - `ClaimedRewards` - token
+          - `RewardRecipientUpdated` - token, oldRecipient, newRecipient
+          - `RewardAdminUpdated` - token, oldAdmin, newAdmin
+      - `ClankerAirdrop` - consider emitting an AirdropFullyClaimed(address token) event in the claim function when airdrop.totalClaimed becomes equal to airdrop.totalSupply. Off-chain systems might find it useful to know when an airdrop is fully depleted.
+    </field>
+    <field name="response">
+        Fixed `IClankerLpLockerMultiple`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8d9f132513c899e6a0c6dcf2f0bbcefa73d49c45</field>
+    <field name="content">
+      ## [Q-9] Update buyIntoPresale implementation to follow CEI pattern
+  
+      In the `ClankerPresaleEthToCreator` contract, the `buyIntoPresale()` function implementation currently does not follow the Check-Effects-Interaction pattern, as an external call to refund eth to `msg.sender` is performed before important state updates.
+  
+      ```solidity
+      // refund excess eth
+      if (msg.value > ethToUse) {
+          // refund excess eth
+          payable(msg.sender).transfer(msg.value - ethToUse);
+      }
+  
+      // record a user's eth contribution
+      presaleBuys[presaleId][msg.sender] += ethToUse;
+  
+      // update eth raised
+      presale.ethRaised += ethToUse;
+      ```
+  
+      The risk of reentrancy in this case is limited by using a `transfer` that has a limited gas stipend. However, best practice is to avoid having potentially reentrant code in case of future code updates.
+  
+      Consider updating `buyIntoPresale()` implementation and moving the refund piece of logic to the end of the function.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5666d782b5999ef409efece3e4b8370b57b896c8</field>
+    <field name="content">
+      ## [Q-10] PresaleId set twice unnecessarily
+  
+      In the `ClankerPresaleEthToCreator`, the `startPresale()` function encodes the `presaleId` value and sets it on the corresponding extension config from the stored deploymentConfig. Immediately after this, the deployment config is stored as part of the overall presale struct record.
+  
+      ```
+      deploymentConfig.extensionConfigs[deploymentConfig.extensionConfigs.length - 1]
+        .extensionData = abi.encode(presaleId);
+  
+      ```
+  
+      In addition, in the `endPresale()` function, where the presale struct record is loaded, presaleId is again set to the same value.
+  
+      ```solidity
+      // encode presale id into extension config data
+      presale.deploymentConfig.extensionConfigs[presale.deploymentConfig.extensionConfigs.length
+        - 1].extensionData = abi.encode(presaleId);
+      ```
+  
+      Consider removing the unnecessary `presaleId` update in the `endPresale()` method.
+    </field>
+  </item>  
+
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">da1558ffaec81664e88061d8808933a071e9d8e0</field>
+    <field name="content">
+      ## [Q-11] Improve the enabledLockers mapping variable naming
+  
+      In the `Clanker` contract, the `enabledLockers` mapping variable is defined in the following way:
+  
+      ```solidity
+      mapping(address locker => mapping(address pool => bool enabled)) public enabledLockers;
+      ```
+  
+      However, when used, it isn't clear if the `pool` variable within the mapping represents the actual Uniswap V4 pool or the associated `hook`.
+  
+      In `setLocker()`, this mapping is used in the following way.
+  
+      ```solidity
+      enabledLockers[locker][pool] = enabled;
+      ```
+  
+      While in `_initializeLiquidity()` it is used with a different variable naming, notice `poolConfig.hook`
+  
+      ```solidity
+      enabledLockers[lockerConfig.locker][poolConfig.hook]
+      ```
+  
+      Consider revising the definition of this mapping and using it consistently throughout the contract.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1210c142121ab0799310218ecc6434496a1559be</field>
+    <field name="content">
+      ## [Q-12] Unnecessary initialize() function in Clanker contract
+  
+      In the `Clanker` contract, the `initialize()` function’s only role is to be a wrapper for calling `setDeprecated()` and `setTeamFeeRecipient()` underlying methods. Additionally, following recent changes and the removal of the locker check, the `initialize()` function may be called multiple times, which is not expected.
+  
+      Consider removing the `initialize()` function and relying on direct calls to the underlying `setDeprecated()` and `setTeamFeeRecipient()` functions.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1c80674edb22b18ae69cbace1db527c20b8afd87</field>
+    <field name="content">
+      ## [Q-13] Make _tokenRewards variable internal
+  
+      In the `ClankerLpLockerMultiple`, the `tokenRewards` public variable has been renamed to `_tokenRewards`. Additionally, the custom `tokenRewards()` function has been introduced. However, since public variables obtain automatically generated getters that means `_tokenRewards()` function is also present which might be confusing and unnecessary.
+  
+      Consider making the `_tokenRewards` variable internal to prevent direct external access to it.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="content">
+      ## [I-1] ClankerAirdrop does not provide guarantees that all allocations set in MerkleTree would be claimable
+  
+      In the `ClankerAirdrop` contract, there is no validation that the sum of allocations, which are set as leaves of the MerkleTree, is equal to the configured extension supply. If this supply is smaller than the sum of allocations, `ClankerAirdrop` will act according to the First In First Out (FIFO) principle, and the first users to claim will receive tokens, while later users may not be able to claim the allocation in full or partially.
+    </field>
+    <field name="response">
+        Acknowledged - Noted in documentation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="content">
+      ## [I-1] ClankerAirdrop does not provide guarantees that all extension supply provided to it may be claimable
+  
+      In the `ClankerAirdrop` contract, there is no validation that sum of allocations, that are set as leafs of the MerkleTree, is equal to the configured extension supply. If this supply exceeds the sum of allocations, `ClankerAirdrop` will lock the surplus extension supply.
+    </field>
+    <field name="response">
+        Acknowledged - Noted in documentation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="content">
+      ## [I-3] ClankerAirdrop will allow claiming the largest allocation in case the receiver has multiple allocations
+  
+      In the `ClankerAirdrop` contract, in situations where MerkleTree has multiple entries for the user with a particular address, the user will be able to claim the maximum out of all his allocations.
+    </field>
+    <field name="response">
+        Acknowledged - Noted in documentation.
+    </field>
+  </item>
+  
