@@ -1,0 +1,304 @@
+<item>
+    <field name="topic">Account Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">35496aa58f9d646046f9620bc72865d4a74978cb</field>
+    <field name="content">
+        ## [C-1] Missing ownership validation in `PublicAllowedAccount` account
+
+        The `process_thaw()` function in `@program/src/allowlist/processor.rs` contains a critical vulnerability where it fails to properly validate the Program Derived Address (PDA) of the public allowed account. This oversight allows an attacker to bypass the frozen account restrictions by providing a maliciously crafted account.
+        
+        The root cause lies in the validation logic for the public allowed account PDA. While the code checks if the account data can be deserialized into a `PublicAllowedAccount` structure, it does not verify that the provided account is owned by the program. This means an attacker can create an account outside the program with valid `PublicAllowedAccount` data at any address and use it to bypass the frozen account restrictions.
+        
+        As a result, any frozen token account can be thawed by its owner, which defeats the entire purpose of the program.
+        
+        **Remediations to Consider**
+        
+        While the root cause is the missing ownership validation of the `PublicAllowedAccount` account, the better fix is to derive the expected PDA address using the same seeds as when the account was created and verify that the provided account matches this address. Validating the `owner` field in the `PublicAllowedAccount` account will not be needed in this case.
+        
+        ```diff
+        pub fn process_thaw(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
+            ...
+        
+            if *is_private_instrument_mint {
+                ...
+            } else {
+        +      let (allowed_account_pda, _) = get_public_allowed_account_pda(user_account_info.key, program_id);
+        +      if allowed_account_pda != *user_public_allowed_account_pda.key {
+        +           return Err(AllowlistError::IncorrectAllowedAccountPda.into());
+        +       }
+        
+                // check for public instruments
+                if let Ok(public_account_data) = &user_public_allowed_account_pda.data.try_borrow_mut()
+                {
+        -           if let Ok(public_allowed_account) =
+        -               borsh::from_slice::< PublicAllowedAccount>(public_account_data)
+        -            {
+        -               if public_allowed_account.owner == user_associated_token_account.base.owner {
+        -                   user_is_allowed = true;
+        -               }
+        -           }
+        
+        +           if borsh::from_slice::< PublicAllowedAccount>(public_account_data).is_ok(){
+        +               user_is_allowed = true;
+        +           }
+                }
+            }
+        
+            if !user_is_allowed {
+                return Err(AllowlistError::UserNotAllowed.into());
+            }
+        
+            ...
+        }
+        
+        ```
+        
+        **Reference: [src/allowlist/processor.rs#L290-L411](https://github.com/superstateinc/solana-allowlist-program-audit/blob/cab1688223db9f988c9038c411111dabac7089a2/program/src/allowlist/processor.rs#L290-L411)**
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Account Validation</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">35496aa58f9d646046f9620bc72865d4a74978cb</field>
+    <field name="content">
+        ## [C-2] Missing validations in `PrivateAllowedAccount` account
+
+        The `process_thaw()` function in `@program/src/allowlist/processor.rs` contains a critical vulnerability where it fails to properly validate the Program Derived Address (PDA) of the private allowed account. This oversight allows an attacker to bypass the frozen account restrictions by providing a maliciously crafted account.
+        
+        The root cause lies in the validation logic for the private allowed account PDA. It stems from two separate missing validations, causing two different impacts:
+        
+        1. Similar to the C-1 issue, the `PrivateAllowedAccount` account is missing validation to verify that the provided account is owned by the program. This means an attacker can create an account outside the program with valid `PrivateAllowedAccount` data at any address and use it to bypass the frozen account restrictions. As a result, any frozen token account can be thawed by its owner, which defeats the entire purpose of the program.
+        2. Additionally, the `PrivateAllowedAccount` account is missing validation to check that the `mint` field of the account matches the `mint_info` account provided. This means that an attacker can use a `PrivateAllowedAccount` from another token to bypass the restriction. As a result, attackers who are allowed for only one private instrument can thaw their token account for any private instrument.
+
+        **Remediations to Consider**
+        
+        While the root cause is the missing ownership validation of the `PrivateAllowedAccount` account, the better fix is to derive the expected PDA address using the same seeds as when the account was created and verify that the provided account matches this address. Validating the `owner` field in the `PrivateAllowedAccount` account will not be needed in this case.
+        
+        ```diff
+        pub fn process_thaw(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
+          ...
+        
+          if *is_private_instrument_mint {
+        
+            +       let (allowed_account_pda, _) = get_private_allowed_account_pda(user_account_info.key, mint_info.key, program_id);
+            +       if allowed_account_pda != *user_private_allowed_account_pda.key {
+            +           return Err(AllowlistError::IncorrectAllowedAccountPda.into());
+            +       }
+            
+            -       if let Ok(private_allowed_account) = borsh::from_slice::< PrivateAllowedAccount>(
+            -           &user_private_allowed_account_pda.data.borrow_mut(),
+            -       ) {
+            -           if private_allowed_account.owner == user_associated_token_account.base.owner {
+            -               user_is_allowed = true;
+            -           }
+            -       }
+            
+            +       if borsh::from_slice::< PrivateAllowedAccount>(&user_private_allowed_account_pda.data.borrow_mut()).is_ok() {
+            +           user_is_allowed = true;
+            +       }
+        
+          ...
+        }
+        ```
+        
+        **Reference: [src/allowlist/processor.rs#L290-L411](https://github.com/superstateinc/solana-allowlist-program-audit/blob/cab1688223db9f988c9038c411111dabac7089a2/program/src/allowlist/processor.rs#L290-L411)**
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Account Creation</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">35496aa58f9d646046f9620bc72865d4a74978cb</field>
+    <field name="content">
+        ## [H-1] Frontrunning attack on PDA account creation leads to DOS
+
+        The `create_pda_account()` function in `allowlist/tools/account.rs` contains a vulnerability in its account creation logic that can be exploited through frontrunning. The function attempts to create PDA accounts for private allowlists, public allowed accounts, and private allowed accounts, but fails to properly handle cases where a malicious user donates to an uninitialized account.
+        
+        ```rust
+        pub fn create_pda_account<'a>(
+            payer: &AccountInfo<'a>,
+            rent: &Rent,
+            space: usize,
+            owner: &Pubkey,
+            system_program: &AccountInfo<'a>,
+            new_pda_account: &AccountInfo<'a>,
+            new_pda_signer_seeds: &[&[u8]],
+        ) -> ProgramResult {
+            ...
+            if new_pda_account.data_is_empty() && new_pda_account.lamports() == 0 {
+                ...
+            } else if new_pda_account.owner != system_program.key {
+                ...
+            } else {
+                invoke_signed(
+                    &system_instruction::transfer(payer.key, new_pda_account.key, lamports_required),
+                    &[
+                        payer.clone(),
+                        new_pda_account.clone(),
+                        system_program.clone(),
+                    ],
+                    &[new_pda_signer_seeds],
+                )?;
+                invoke_signed(
+                    &system_instruction::assign(new_pda_account.key, owner),
+                    &[
+                        payer.clone(),
+                        new_pda_account.clone(),
+                        system_program.clone(),
+                    ],
+                    &[new_pda_signer_seeds],
+                )?;
+            }
+        ```
+        
+        **Reference: [src/allowlist/tools/account.rs#L9-L68](https://github.com/superstateinc/solana-allowlist-program-audit/blob/cab1688223db9f988c9038c411111dabac7089a2/program/src/allowlist/tools/account.rs#L9-L68)**
+        
+        The root cause lies in the conditional logic of `create_pda_account()`. When a PDA account is empty and has zero lamports, it correctly creates a new account. However, if a malicious user frontruns the transaction by donating lamports to an uninitialized account (with zero lamports but non-empty data), the function enters the `else` branch. This branch only transfers lamports and reassigns ownership, but crucially misses the account allocation step. As a result, the transaction fails when attempting to write data to the account, effectively causing a Denial of Service (DOS) attack.
+        
+        As a result, malicious users can prevent the creation of essential accounts, disrupting the entire allowlist system's functionality.
+       
+        
+        **Remediations to Consider**
+        Consider using best practices when creating a PDA like [the Associated Token Account program](https://github.com/solana-program/associated-token-account/blob/85db69e4f99ac8881c2cd04c15119a94c73c4f60/program/src/tools/account.rs#L19-L73)
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">35496aa58f9d646046f9620bc72865d4a74978cb</field>
+    <field name="content">
+        ## [L-1] Freezing accounts is missing proper validation for `user_account_info`
+
+        The `process_admin_freeze()` function in `@program/src/allowlist/processor.rs` does not adequately validate the `user_account_info` parameter. This omission may result in incorrect behavior, such as freezing an unintended account if an admin supplies a `user_account_info` that does not correspond to the owner of the associated token account.(`user_associated_token_account_info`).
+        
+        **Remediation to Consider**
+        
+        Add a check to verify that `user_account_info` matches the owner of the `user_associated_token_account`, similar to the validation in the `process_admin_burn` function.
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Frontrun</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [L-2] Frontrunning vulnerability in admin initialization
+
+        The `process_initialize_admin_authority()` function in `src/allowlist/processor.rs` contains a frontrunning vulnerability in the admin initialization process. The function allows any user to become the initial admin authority of the program by being the first to call this function after program deployment.
+        
+        The root cause lies in the lack of a predefined initial authority or a constant signer requirement. Currently, the function only verifies that the `initial_admin_authority` is a signer, but does not validate against any predefined authority. This means that any malicious actor can frontrun the legitimate admin initialization transaction and claim the admin role. As a result, the protocol will have to redeploy the program.
+        
+        **Remediations to Consider**
+        
+        The most secure solution would be to hardcode the initial admin authority in the program. This ensures that only the intended authority can initialize the admin state.
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Sanity Check</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">35496aa58f9d646046f9620bc72865d4a74978cb</field>
+    <field name="content">
+        ## [L-3] Missing token validation in private allowlist initialization
+
+        The `process_add_private_allowlist()` function in `src/allowlist/processor.rs` fails to validate critical properties of the mint token account before adding it to the private allowlist. This oversight could lead to the program accepting invalid or maliciously configured tokens, potentially breaking core security assumptions.
+        
+        The root cause lies in the function's account validation logic, where it only checks basic account properties but omits crucial token-specific validations. Specifically, the function should verify:
+        
+        1. The mint account's owner is the Token-2022 program
+        2. The mint account can be properly parsed as a `PodAccount`
+        3. The mint has required extensions configured:
+            - `ImmutableOwner` to prevent ownership changes
+            - `DefaultAccountState` with frozen as default state
+            - `PermanentDelegate` with the allowlist program as delegatee
+            - `ScaledUiAmount`
+        
+        Without these sanity checks, an admin can potentially allow flawed tokens which could lead to broken behavior. For example, if the allowed token doesn't have the `ImmutableOwner` extension, an attacker could thaw their token account and transfer ownership to another address, breaking the program's security model.
+        
+        **Remediations to Consider**
+        
+        Consider adding these validations to the `process_add_private_allowlist()` function. Note that with the current account design, public instruments cannot have these validations added unless they are checked every time a user attempts to thaw their account.
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Redundant logic</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">35496aa58f9d646046f9620bc72865d4a74978cb</field>
+    <field name="content">
+        ## [Q-1] Unnecessary `program_id` in PDA seeds
+
+        The codebase contains several PDA derivation functions that include the `program_id` in their seeds unnecessarily. This occurs in multiple functions including `get_private_allowlist_pda()`, `get_public_allowed_account_pda()`, `get_private_allowed_account_pda()`, and `get_admin_pda()`.
+        
+        When deriving a PDA using `Pubkey::find_program_address()`, the `program_id` is automatically included in the hash calculation by the runtime. Therefore, explicitly including it in the seeds array is redundant and does not provide any additional security or functionality.
+        
+        Consider removing the `program_id` from the seeds array in all PDA derivation functions to reduce storage costs and improve code clarity while maintaining the same security guarantees.
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Redundant logic</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-2] PDA bump calculation inefficiency in admin authority derivation
+
+        The program recalculates the canonical bump seed for derived accounts on every invocation, resulting in unnecessary CU consumption.
+        
+        A canonical bump is the highest valid bump seed (0-255) that, when combined with other seeds, produces a valid PDA that lies off the ed25519 curve. The `find_program_address()` function iterates through possible bump seeds to find this value. While this calculation is necessary during account creation, recalculating it for existing PDAs is inefficient.
+        
+        Consider storing the canonical bump in the account's data structure and reusing it for subsequent derivations.
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Redundant logic</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">35496aa58f9d646046f9620bc72865d4a74978cb</field>
+    <field name="content">
+        ## [Q-3] Redundant signer validation in admin authority update
+
+        The `process_update_admin_authority()` function contains redundant signer validation checks. The function first explicitly checks if `current_admin_authority_info` is a signer, then calls `validate_admin_authority()` which performs the same check again. While not a security risk, these duplicate checks should be eliminated to improve code efficiency and maintainability.
+        Consider removing the initial explicit signer check since `validate_admin_authority()` already performs this validation.
+    </field>
+</item>
+
+
+<item>
+    <field name="topic">Redundant logic</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">35496aa58f9d646046f9620bc72865d4a74978cb</field>
+    <field name="content">
+        ## [Q-4] Unnecessary data clearing in account deletion
+
+        The `remove_pda_account()` function in `@program/src/allowlist/tools/account.rs` includes an unnecessary step of clearing account data before deletion. This operation is redundant.
+        
+        This finding is supported by examining best practices from major Solana projects like [Token_2022 implementation](https://github.com/solana-program/token-2022/blob/788c6feceb26e11e68441a8c968166a3f9d0e02c/program/src/processor.rs#L1271-L1278) and [Anchor implementation](https://github.com/solana-foundation/anchor/blob/649b9d6c5ef19d8e15ea35888f0b1a846cd03b48/lang/src/common.rs#L6-L15). Both implementations follow the inverse steps of account creation without explicitly clearing data, focusing instead on the essential steps of transferring lamports, reassigning ownership, and reallocating size.
+        
+        Consider following the best practices provided above to fix the issue.
+    </field>
+</item>
