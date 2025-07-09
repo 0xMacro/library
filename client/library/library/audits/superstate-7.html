@@ -1,0 +1,67 @@
+<page
+  clientName="Superstate"
+  reportDate="May 5th, 2025"
+  auditTitle="Superstate A-7"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/superstateinc/solana-allowlist-program-audit"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="cab1688223db9f988c9038c411111dabac7089a2"
+  repoCommitHashFinal="35496aa58f9d646046f9620bc72865d4a74978cb"
+  customRepoInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from April 5th to April 8th, 2025. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        The Allowlist Program allows for token burning by leveraging the `PermanentDelegate` Token Extension and assigning the Admin Authority to the Allowlist Program itself. While this design grants significant control to Superstate, they are trusted to act in the best interests of users. As outlined in the design document:
+        > Superstate must be able to forcibly burn tokens held by an address. This would
+        only be done in seizure (i.e. via court order) or customer support scenarios
+        (reconstitution) , and would not be done if the tokens were held in a DeFi
+        protocol. Similar functionality exists on ETH with our private fund tokens.
+        >
+    </template>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the following contracts within this repository:</p>
+    <template type="file-hashes">
+        ff2f4fc800048d4075dbd3c9ea0dc7ba69e84b52845fa33ac14e4f19354c676b  api/src/address.rs
+        3b40bf513bf3e845d5691fdd4a04fb65aa0575a5940b376c573488169e53f898  api/src/instruction.rs
+        1369a473734280b7656720d34f7f9062787e5388e68de77fa6fb78757586ae0c  api/src/lib.rs
+        e090b8811820e2941af8694df200c3251d6bed4052e5b4fc9c45569857aa6273  program/src/lib.rs
+        d36f999fefb6f2fd4740f0c99e9f80a613314c3883c9eacf28e0958ecc76d845  program/src/allowlist/entrypoint.rs
+        f1fd80de42ae4e83e584450fc5f0c6e7a526b7ca7d596336d14e70baccdac82c  program/src/allowlist/error.rs
+        89981ccb188748fb7c6489948bab41da42cb440bf75407eed552250018d4b902  program/src/allowlist/mod.rs
+        c27e0636411888c5e863e222ef862f8ec51e2e3f3d5c05d697517178e64edb2e  program/src/allowlist/processor.rs
+        2b6b2a9ee8fa6b9cf3e4741339b0f23fc382b47f9faf2a2af8d78bb1c8c3c4c8  program/src/allowlist/state.rs
+        c915b7870f037f758025c4706159b41a6eae0e532f7889cd1d9b1b183f672053  program/src/allowlist/tools/account.rs
+        c3934dc434fc44d460ca9182cc33953336b1f96d18f31faa3d54ee12e12a4753  program/src/allowlist/tools/mod.rs
+    </template>
+  </content-for>
+</page>
