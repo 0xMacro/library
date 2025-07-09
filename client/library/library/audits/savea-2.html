@@ -1,0 +1,35 @@
+<page
+  clientName="Savea"
+  reportDate="July 9, 2025"
+  auditTitle="Savea A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/xsavea/Savea-Contracts"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="576fad9af93f756ea2d043e6c936a39e49283459"
+  repoCommitHashFinal="a8d9aae9b4ec0383976a19a6f1d3dc30fb2f97f5"
+  passwordEncrypt="env:PAGE_PASS_SAVEA_2"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from July 7th to July 8th, 2025.
+
+    <p><b>Note:</b> The scope of the audit was limited to the changes made to the contracts since the last audit. All non-addressed issues found in the <a href="https://0xmacro.com/library/audits/savea-1">Savea A-1</a> audit are still valid and are expected to be addressed in the future project updates.</p>
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within this repository:</p>
+    <template type="file-hashes">
+        5c78efcaa788b5ef2eda78b743cee308cf6c55bb9b6df8bb0426cd3c47aa3ccd  contracts/Management.sol
+        0d5ac9b87243f05cd2f0fd72cb147d882abbe5faaba3c7ba33615fa5c479f7db  contracts/SaveaToken.sol
+        981d472da4be55714a39ca3f3a93e432161983e2c73e23dc93ce939f9deffd97  contracts/interfaces/ISaveaToken.sol
+        73c249349783d661337c1057271d8139507f64e7a4da03f19a4f7b918fc19ca5  contracts/libraries/Errors.sol
+    </template>
+  </content-for>
+</page>
