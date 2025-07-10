@@ -1,0 +1,50 @@
+<item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">cbdaf604d7378afab7a9eb814c3946f1794c5cbf</field>
+    <field name="content">
+      ## [Q-1] Incorrect natspec for _authorizeUpgrade()
+  
+      In the `Management` contract, natspec comment indicates that caller with UPGRADER_ROLE is the expected caller and only actor that will be authorized to perform `_authorizeUpgrade()` call.
+  
+      ```solidity
+      /// @dev Allows only the UPGRADER_ROLE to upgrade the contract
+      function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+      ```
+  
+      However, `Management` contract does not implement role based access control, and in fact only the contract owner is the actor who can authorize upgrade.
+  
+      Consider updating natspec comment to align with the implementation, or update implementation to be in line with the expressed intent in the natspec documentation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">e7e88b33e0a57cb6a76cfcb603c7e1955c235ead</field>
+    <field name="content">
+      ## [Q-2] Use named mapping arguments
+
+      In the `Management` contract, state of the contract is represent by the `ManagementStorage` struct
+  
+      ```solidity
+      /// @custom:storage-location erc7201:savea.storage.Management
+      struct ManagementStorage {
+          /// @notice Mapping to store settings
+          mapping(uint256 => uint256) settings;
+          /// @notice Mapping to store supported NFT contracts
+          mapping(address => bool) supportedNFTContracts;
+          /// @notice Mapping to store paidAt made by wallets
+          mapping(address => uint256) paidAt;
+          /// @notice Mapping to store redemptions made by wallets
+          mapping(address => mapping(uint256 => DataTypes.Redemption)) redemptions;
+          ...
+      }
+      ```
+  
+      Consider using named mapping arguments for better code readability.
+    </field>
+  </item>
+  
