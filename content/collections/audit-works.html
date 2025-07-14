@@ -1,4 +1,108 @@
-<!-- <item>
+<item>
+  <field name="logo">
+    savea.jpg
+  </field>
+  <field name="title">
+    Savea-2
+  </field>
+<field name="subtitle">
+    Secure and scalable fine wine investment - powered by blockchain technology
+  </field>
+  <field name="date">
+    2025-07-09
+  </field>
+  <field name="about">
+    We performed a diff audit of the Management.sol and SaveaToken.sol contracts, which underwent major architectural upgrades from standard OpenZeppelin contracts to upgradeable versions implementing the UUPS proxy pattern with ERC-7201 namespaced storage layout. The Management contract was refactored to use structured storage access patterns, automatic token minting during purchases, simplified multi-setting updates, and enhanced getter functions while removing the NFT burning capability. The SaveaToken contract was updated by replacing custom IterableMapping with Solady's EnumerableMapLib, implementing role-based upgradeability with dedicated UPGRADER_ROLE, expanding minting permissions to include MANAGEMENT_ROLE alongside DEFAULT_ADMIN_ROLE, and transitioning from constructor-based initialization to proxy-compatible initializer patterns for both contracts
+  </field>
+  <field name="report">
+    /library/audits/savea-2
+  </field>
+  <field name="attachments">
+    [Github Organization](https://github.com/xsavea) | Repo private as of July 14, 2025
+
+    [Website](https://www.savea.com)
+  </field>
+</item>
+
+<item>
+  <field name="logo">
+    savea.jpg
+  </field>
+  <field name="title">
+    Savea-1
+  </field>
+<field name="subtitle">
+    Secure and scalable fine wine investment - powered by blockchain technology
+  </field>
+  <field name="date">
+    2024-11-18
+  </field>
+  <field name="about">
+    We performed an audit of the Management.sol and SaveaToken.sol contracts. These implement a token management ecosystem where the Management contract facilitates currency-to-token exchanges with configurable buy/sell rates, monthly redemption allowances with percentage-based limits, and an automated periodic fee charging system for token holders, while also providing NFT management capabilities including withdrawal and burning of supported ERC721 tokens. The SaveaToken contract implements a standard ERC20 token with role-based access control using OpenZeppelin's AccessControl, featuring automatic token holder tracking through an iterable mapping system that enables the Management contract to efficiently charge fees across all active token holders using batch processing functions
+  </field>
+  <field name="report">
+    /library/audits/savea-1
+  </field>
+  <field name="attachments">
+    [Github Organization](https://github.com/xsavea) | Repo private as of July 14, 2025
+
+    [Website](https://www.savea.com)
+  </field>
+</item>
+
+<item>
+  <field name="logo">
+    superstate.png
+  </field>
+  <field name="title">
+    Superstate-7
+  </field>
+<field name="subtitle">
+  Investment products that benefit from the speed, programmability, and compliance advantages of blockchain tokenization.
+  </field>
+  <field name="date">
+    2025-05-05
+  </field>
+  <field name="about">
+    We reviewed the Solana allowlist program, which enables admins to restrict token transfers to only accounts that have been added to a private or public allow list.
+  </field>
+  <field name="report">
+    /library/audits/superstate-7
+  </field>
+  <field name="attachments">
+    [Github Organization](https://github.com/superstateinc/) | Repo private as of July 14, 2025
+
+    [Website](https://superstate.co)
+  </field>
+</item>
+
+<item>
+  <field name="logo">
+    clanker.jpg
+  </field>
+  <field name="title">
+    Clanker-3
+  </field>
+<field name="subtitle">
+  A smart contract system that enables ERC-20 token deployment on Base and rewards creators based on trading volume. Tokens can be deployed via Farcaster, partner APIs, or direct contract interaction.
+  </field>
+  <field name="date">
+    2025-07-08
+  </field>
+  <field name="about">
+    We performed audit of ClankerSniperAuctionV0.sol, ClankerSniperUtilV0.sol contracts which implement a sophisticated MEV protection where the auction contract creates gas-price-based bidding rounds for token sniping while the utility contract facilitates user participation in these auctions. Also, we reviewed ClankerLpLockerFeeConversion.sol which implements fee distribution system where the LP locker manages liquidity positions while automatically converting and distributing collected fees based on recipient preferences. In addition, we reviewed two custom LpLocker implementations that address limitations of earlier v0 and v1 LpLocker implementations.
+  </field>
+  <field name="report">
+    /library/audits/clanker-3
+  </field>
+  <field name="attachments">
+    [Website](https://www.clanker.world)
+
+    [Github Organization](https://github.com/clanker-devco/) | Private Repo
+  </field>
+</item>
+
+<item>
   <field name="logo">
     farcaster.webp
   </field>
@@ -9,7 +113,7 @@
    A protocol for decentralized social apps
   </field>
   <field name="date">
-
+    2025-06-12
   </field>
   <field name="about">
     We have reviewed a new component of Farcaster protocol that implements "Farcaster Pro" subscription tiers, through Farcaster Pro payments contract
@@ -22,7 +126,7 @@
 
     [Website](https://farcaster.xyz/)
   </field>
-</item> -->
+</item>
 
 <item>
   <field name="logo">
@@ -38,7 +142,7 @@
     2025-06-13
   </field>
   <field name="about">
-
+    We have reviewed, refactored and enhanced Clanker token launch system that integrates with Uniswap V4. Review included detailed analysis of individual system components, consisting of different Clanker extensions (vault, airdrop, presale to creator, dev buy) and alternative Clanker hooks (with static and dynamic fee logic). We have also reviewed core Clanker modules, such as ClankerToken, ClankerFeeLocker, ClankerLpLockerMultiple and related utility modules, such as MEV protection mechanism implemented by ClankerMevBlockDelay contract.
   </field>
   <field name="report">
     /library/audits/clanker-2
