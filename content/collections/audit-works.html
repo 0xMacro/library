@@ -1,5 +1,57 @@
 <item>
   <field name="logo">
+    savea.jpg
+  </field>
+  <field name="title">
+    Savea-2
+  </field>
+<field name="subtitle">
+    Secure and scalable fine wine investment - powered by blockchain technology
+  </field>
+  <field name="date">
+    2025-07-09
+  </field>
+  <field name="about">
+    We performed a diff audit of the Management.sol and SaveaToken.sol contracts, which underwent major architectural upgrades from standard OpenZeppelin contracts to upgradeable versions implementing the UUPS proxy pattern with ERC-7201 namespaced storage layout. The Management contract was refactored to use structured storage access patterns, automatic token minting during purchases, simplified multi-setting updates, and enhanced getter functions while removing the NFT burning capability. The SaveaToken contract was updated by replacing custom IterableMapping with Solady's EnumerableMapLib, implementing role-based upgradeability with dedicated UPGRADER_ROLE, expanding minting permissions to include MANAGEMENT_ROLE alongside DEFAULT_ADMIN_ROLE, and transitioning from constructor-based initialization to proxy-compatible initializer patterns for both contracts
+  </field>
+  <field name="report">
+    /library/audits/savea-2
+  </field>
+  <field name="attachments">
+    [Github Organization](https://github.com/xsavea) | Repo private as of July 14, 2025
+
+    [Website](https://www.savea.com)
+  </field>
+</item>
+
+<item>
+  <field name="logo">
+    savea.jpg
+  </field>
+  <field name="title">
+    Savea-1
+  </field>
+<field name="subtitle">
+    Secure and scalable fine wine investment - powered by blockchain technology
+  </field>
+  <field name="date">
+    2024-11-18
+  </field>
+  <field name="about">
+    We performed an audit of the Management.sol and SaveaToken.sol contracts. These implement a token management ecosystem where the Management contract facilitates currency-to-token exchanges with configurable buy/sell rates, monthly redemption allowances with percentage-based limits, and an automated periodic fee charging system for token holders, while also providing NFT management capabilities including withdrawal and burning of supported ERC721 tokens. The SaveaToken contract implements a standard ERC20 token with role-based access control using OpenZeppelin's AccessControl, featuring automatic token holder tracking through an iterable mapping system that enables the Management contract to efficiently charge fees across all active token holders using batch processing functions
+  </field>
+  <field name="report">
+    /library/audits/savea-1
+  </field>
+  <field name="attachments">
+    [Github Organization](https://github.com/xsavea) | Repo private as of July 14, 2025
+
+    [Website](https://www.savea.com)
+  </field>
+</item>
+
+<item>
+  <field name="logo">
     superstate.png
   </field>
   <field name="title">
