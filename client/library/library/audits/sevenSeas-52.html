@@ -1,0 +1,66 @@
+<page
+  clientName="Seven Seas"
+  reportDate="July 15, 2025"
+  auditTitle="Seven Seas A-52"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security review was performed by the Macro security team on July 10th 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team, and the provided contract addresses to assess.</li>
+    </ul>
+  </content-for>
+
+  <template type="audit-markdown">
+
+    ## Security Assessment:
+    ### **[Kinetiq](https://kinetiq.xyz/)**
+
+    - **General**
+        - Documentation: No available documentation
+        - A liquid staking protocol allowing users to stake the HyperEVM’s native HYPE token to be used by trusted validators to stake tokens and distribute yield to KHYPE holders.
+        - Main components are:
+            - Staking Manager: Contract where users stake their HYPE and receive KHYPE, and manages validators as well as executing L1 staking operations.
+            - KHYPE: The erc20 token users receive on staking
+            - Validator Manager: Manages validators, can activate/deactivate validators as well as  handling validator performance and slashing events.
+            - Staking Accountant: Keeps track of stacked amount and claims, and uses validator manager values to determine exchange rate of Hype to KHYPE.
+            - Oracle Manager: Keeps track of oracles used to calculate a validators performance.
+    - **Security Evaluation**
+        - [Audited by Zenith, Spearbit, Pashov, and Code4Arena](https://audits.kinetiq.xyz/)
+        - Contracts:
+            - [PauserRegistry](https://www.hyperscan.com/address/0x752E76ea71960Da08644614E626c9F9Ff5a50547?tab=contract): `0x752E76ea71960Da08644614E626c9F9Ff5a50547`
+                - [Implementation](https://www.hyperscan.com/address/0x5e6D0eAc0ef26F49cbE2B772ED897330389f87E7?tab=contract): `0x5e6D0eAc0ef26F49cbE2B772ED897330389f87E7`
+            - [StakingManager](https://www.hyperscan.com/address/0x393D0B87Ed38fc779FD9611144aE649BA6082109?tab=contract_code): `0x393D0B87Ed38fc779FD9611144aE649BA6082109`
+                - [Implementation](https://www.hyperscan.com/address/0x9eC8bA489327120908B8E6c9Cdf6214770cd6984?tab=contract): `0x9eC8bA489327120908B8E6c9Cdf6214770cd6984`
+            - [KHYPE](https://www.hyperscan.com/address/0xfD739d4e423301CE9385c1fb8850539D657C296D?tab=contract_code): `0xfD739d4e423301CE9385c1fb8850539D657C296D`
+                - [Implementation](https://www.hyperscan.com/address/0x210461FcA55b84F4F03a19fF3DFAe6d0FfAE3675?tab=contract): `0x210461FcA55b84F4F03a19fF3DFAe6d0FfAE3675`
+            - [ValidatorManager](https://www.hyperscan.com/address/0x4b797A93DfC3D18Cf98B7322a2b142FA8007508f?tab=contract): `0x4b797A93DfC3D18Cf98B7322a2b142FA8007508f`
+                - [Implementation](https://www.hyperscan.com/address/0xF30bc7F7ce14B05937D84820ae43207d7b83aF9A?tab=contract): `0x4b797A93DfC3D18Cf98B7322a2b142FA8007508f`
+            - [StakingAccountant](https://www.hyperscan.com/address/0x9209648Ec9D448EF57116B73A2f081835643dc7A?tab=contract): `0x9209648Ec9D448EF57116B73A2f081835643dc7A`
+                - [Implementation](https://www.hyperscan.com/address/0xecaa7Cd734668E086812Bd4241D6FC0260DBa513?tab=contract): `0xecaa7Cd734668E086812Bd4241D6FC0260DBa513`
+            - [OracleManager](https://www.hyperscan.com/address/0x192826e470bd65FDC2CB472eDd834D096233049b?tab=contract): `0x192826e470bd65FDC2CB472eDd834D096233049b`
+                - [Implementation](https://www.hyperscan.com/address/0x96b64DCfBf93eeAD60E3d0474334Fc081161c814?tab=contract): `0x96b64DCfBf93eeAD60E3d0474334Fc081161c814`
+            - [DefaultOracle](https://www.hyperscan.com/address/0xefbcCc6E33DA1C1ef638cBc0F044968D0f590fED?tab=read_write_proxy): `0xefbcCc6E33DA1C1ef638cBc0F044968D0f590fED`
+        
+        All the above contracts except the `DefaultOracle` are deployed as a [`TransparentUpgradeableProxy`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/proxy/transparent/TransparentUpgradeableProxy.sol) each with the same [EOA address](https://www.hyperscan.com/address/0xb05cb1a8188110ac2cB062996526b43179162509) as the admin, which has upgrade privileges. This leaves a singular point of failure for the entire protocol. It is better practice to use a multi-sig timelocked wallet for important permissions like contract upgrades. 
+        
+        These contracts require a permissioned functions to be called and uses [AccessControl](https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/master/contracts/access/AccessControlUpgradeable.sol) to manage different permissioned roles. This is good practice, however the admin and each specific role throughout the protocol is all the same [EOA address](https://www.hyperscan.com/address/0xb05cb1a8188110ac2cB062996526b43179162509) as of this review. It is expected to have these roles be distributed across multiple secure addresses. This may be the case for now as it is yet to be publicly launched, and roles could be distributed in the near future.
+        
+        It is notable that most of these contracts are able to be paused, including the KHYPE token and staking manager, and withdrawals from the staking manager can be prevented by a permissioned address, but these are standard and good practice provided the trusted addresses are acting in the best interest of the protocol. 
+        
+        These contracts have been sufficiently reviewed by many notable auditing firms, and have resolved the issues presented, giving confidence that there are no lingering exploits and the contract will operate as expected.
+        
+    
+    Rating: C ****(Single point of failure, lack of role distribution, early stages of protocol)
+    
+    Suggestion: Use a more secure proxy admin owner and diversify protocol roles to multiple trusted and secure addresses, ideally using a timelock where able.
+
+     </template>
+</page>
