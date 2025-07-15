@@ -6,6 +6,7 @@
 {{var issues = collection(`${page.passwordEncrypt ? 'private/' : 'public/'}${auditId}-issues`).map(Issues.normalize)}}
 {{issues.map(Issues.validate) && ''}}
 
+
 {{(function() {
   page.platform = page.platform || 'Solidity'
   page.contracts = page.platform === 'Solana' ? 'programs' : 'contracts'
@@ -59,9 +60,11 @@
           <a href="#issue-list" class="hover:underline">Issue Descriptions and Recommendations</a>
         </li>
       </if>
+      <if cond = page.hideReference != "true">
       <li class="text-xl">
         <a href="#security-levels" class="hover:underline">Security Levels Reference</a>
       </li>
+      </if>
       <if cond="issues.length > 0">
         <li class="text-xl">
           <a href="#issues" class="hover:underline">Issue Details</a>
@@ -74,9 +77,11 @@
           </li>
         </for>
       </if>
+      <if cond = page.hideReference != "true">
       <li class="text-xl">
         <a href="#disclaimer" class="hover:underline">Disclaimer</a>
       </li>
+      </if>
     </ul>
   </section>
 
