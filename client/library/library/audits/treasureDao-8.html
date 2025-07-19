@@ -1,0 +1,39 @@
+<page
+  clientName="Treasure DAO"
+  reportDate="July 18, 2025"
+  auditTitle="TreasureDAO A-8"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/TreasureProject/magic-contracts"
+  repoCommitHash="de3e1c3b42e493bc2ed1ba6a43248d39cd455e20"
+  passwordEncrypt="env:PAGE_PASS_TREASUREDAO_8"
+
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from July 7, 2025 to July 10, 2025.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+  </ul>
+
+</content-for>
+
+
+<content-for name="source-code">
+
+ <p>
+      Specifically, we audited the changes for the following contracts in <a href="https://github.com/TreasureProject/magic-contracts/pull/4/">PR 4</a>.
+</p>
+  <template type="file-hashes">
+0dd4339ccd4b39b5974c346a50684394c9ac8c81b685347d5bfb2eac4cfc7856  contracts/bridge/MagicBridge.sol
+f4a01d430b96aa7d6f219c37fd5974296212e52964c4610fe87b68dba6aa949f  contracts/bridge/MagicBridgeArb.sol
+0be2e1e79a7d6c7706bcd42c234fc5a7bccbc2cc45fd4e3e7291ad561503f606  contracts/bridge/MagicBridgeL1.sol
+c83a2b11921c9c7cea5accb9236fc2076160f69f3636ed3a9ea6b782f8786a0b  contracts/bridge/MagicBurner.sol
+1a737e1f119b8ca0154c32aef2d41731ace50380bb4880c4442beb0b5ddf5d8c  contracts/facets/MagicBridgeFacet.sol
+11607fee0aab4ee16def8de4647b0b127771627b29128fa74cc42884e7d8b6f6  contracts/dependencies/hyperlane/client/MailboxClient.sol
+4f024d2804a9a5bab56d4151980e12f1e7fff333fa54056f2a2d8f98e308f0ef  contracts/dependencies/hyperlane/token/libs/TokenRouter.sol
+</template>
+</content-for>
