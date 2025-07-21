@@ -1,88 +1,77 @@
-<page
-  clientName="Seven Seas"
-  reportDate="July 21, 2025"
-  auditTitle="Seven Seas A-53"
-  auditVersion="1.0.0"
-  repoUrl="https://github.com/Veda-Labs/boring-vault"
-  layout="/library/audits/_layout.html" 
-  finalRepoCommitHash="cc0d62f9ab6be114891553ef602f47cb0d14b93f"
-  customRepoInfo
->
+<item>
+    <field name="topic">Sanitization</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">cf2bf324b9ad2b7b58a756ae8c2307d57c0346f1</field>
+    <field name="content">
+      ## [M-1] Missing sanitization checks allow bridging any NFT
+  
+      [TacCrossChainLayerDecoderAndSanitizer](https://github.com/Veda-Labs/boring-vault/blob/9e36ad4138b06dcace8f1a6bb795eb9a9ae10d69/src/base/DecodersAndSanitizers/Protocols/TacCrossChainLayerDecoderAndSanitizer.sol) is a decoder for the Cross Chain layer bridging contract on the TAC network. The current intended use case is to transfer USDT to and from TAC to ETH mainnet. There is no current intention to bridge NFTs, however [sendMessage()](https://github.com/Veda-Labs/boring-vault/blob/9e36ad4138b06dcace8f1a6bb795eb9a9ae10d69/src/base/DecodersAndSanitizers/Protocols/TacCrossChainLayerDecoderAndSanitizer.sol#L11-L38) allows for NFTs to be bridged as defined by the encoded [NFTAmount](https://github.com/Veda-Labs/boring-vault/blob/9e36ad4138b06dcace8f1a6bb795eb9a9ae10d69/src/interfaces/DecoderCustomTypes.sol#L694-L698) parameter. This value is not sanitized, allowing any value to be used in the NFTAmount array, resulting in allowing strategists to bridge any supported NFT without merkle tree authorization.
+  
+      **Remediations to Consider**
+  
+      Add a check that reverts if the NFTAmount array length is nonzero.
 
-<content-for name="schedule">
-  The security assessment of TAC bridging was performed by the Macro security team on July 10th 2025.
-</content-for>
-
-  <content-for name="spec">
-
-    <template type="audit-markdown">
-
-        ## Security Analysis
-
-        ### TAC CrossChainLayer bridge
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sanitation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b6a7108104684ca12ac8184838083e7e77f826b7</field>
+    <field name="content">
+      ## [M-2] Incomplete decoding of `tvmTarget` address
+  
+      In [sendMessage()](https://github.com/Veda-Labs/boring-vault/blob/9e36ad4138b06dcace8f1a6bb795eb9a9ae10d69/src/base/DecodersAndSanitizers/Protocols/TacCrossChainLayerDecoderAndSanitizer.sol#L11-L38), the `tvmTarget` is decoded from a string of arbitrary size into 2 separate addresses to cover the larger sized addresses used on the TON network:
+  
+      ```solidity
+         //convert ton address to bytes 
+            bytes memory tvmBytes = bytes(messageV1.tvmTarget);
         
-        - General
-            - Documentation: No available documentation
-            - A bridging protocol on the TAC chain, allowing bridging to and from the TON network
-            - Main components are:
-                - Cross Chain Layer: Contract that allows sending and receiving messages to and from TON.
-        - Security Evaluation
-            - Audited by Trail of Bits
-          
-            
-            Although it is a fairly standard bridging contract, it is upgradeable and is setup to allow for additional message types in future upgrades. It has minimal owner priviledged functions allowing a protocol fee to be set, a tokenUtils contract to be initialized, and protocol fees to be withdrawn, all fairly standard functions where the only concern would be a unexpected raise to the protocol fee, or a malicious upgrade that could steal locked assets. The owner is [currently a 2:2 safe](https://explorer.tac.build/address/0x592e0D5f382E83406eADC6532a559A457aae7d3b?tab=contract_code) contract without a timelock, which is better than an EOA, but should be watched for malicious activity before interacting with the bridge.
-            
-            This has been audited by a notable and trusted auditing firm, Trail of Bits, and all issues found have been resolved, giving confidence that there are no lingering issues.
-            
-            It also should be noted that interacting with bridges requires trust that a call on the destination chain are made as expected, so interacting with bridges in general has some inherent risk.
-            
+            //sanity check
+            if (tvmBytes.length < 20) revert TacCrossChainLayerDecoderAndSanitizer__TvmBytesLengthTooShort(); 
+      
+            address tvmTarget0;
+            assembly {
+                tvmTarget0 := mload(add(tvmBytes, 32)) 
+            }
         
-        Rating: C (Upgradeable with semi-secure ownership, bridge protocols are inherently risky and require outside trust)
-        
-        ### TAC intermediate USDT bridging contracts on TON
-        
-        - General
-            - Documentation: No available documentation
-            - An intermediate bridging protocol on the TON chain, intended to be used to bride USDT from TAC to ETH or ETH to TAC by first receiving a bridge request and forwarding USDT to the appropriate chain using Layer 0 when interacting with ETH mainnet and the Cross Chain Layer when interacting with TAC.
-            - Main components are:
-                - ETH USDT Treasury: Contract that sends USDT received to ETH mainnet via layer 0.
-                - TAC USDT Treasury: Contract that sends USDT received to TAC via the cross chain layer bridge
-        - Security Evaluation
-            - Audited by Quantstamp
-            - Contracts:
-                - [**tac_usdt_treasury**](https://github.com/TacBuild/lz-bridge/blob/main/treasury_contracts/contracts/tac_usdt_treasury.fc)
-                - [**eth_usdt_treasury**](https://github.com/TacBuild/lz-bridge/blob/main/treasury_contracts/contracts/eth_usdt_treasury.fc)
-            
-            Straight forward bridging forwarder contract. Notably the 3 issues found by Quantstamp have not been resolved but they are minor and should net effect user interactions.
-            
-        
-        Rating: B (bridge protocols are inherently risky and require outside trust)
-    
-         </template>
-  </content-for>
-
-  <content-for name="repo-info">
-    <p>Specifically, we conducted a security review based the following TAC and TON contracts:</p>
-    
-    <template type="audit-markdown">
-
-        - [CrossChainLayer](https://explorer.tac.build/address/0x9fee01e948353E0897968A3ea955815aaA49f58d?tab=contract_code): `0x9fee01e948353E0897968A3ea955815aaA49f58d`
-        - [Implementation](https://explorer.tac.build/address/0xDd57514b2Bee6b4575651cB58c68B390815589e9?tab=contract): `0xDd57514b2Bee6b4575651cB58c68B390815589e9`
-
-        - [**tac_usdt_treasury**](https://github.com/TacBuild/lz-bridge/blob/main/treasury_contracts/contracts/tac_usdt_treasury.fc)
-        - [**eth_usdt_treasury**](https://github.com/TacBuild/lz-bridge/blob/main/treasury_contracts/contracts/eth_usdt_treasury.fc)
-
-    </template>
-
-    <ul>
-        <li class="break-words break-all">
-
-            <b>Additionally, we audited the associated TACTON decoder and Sanitiser (from <a href="https://github.com/Veda-Labs/boring-vault/pull/389/"> PR 392</a>) </b> </br>
-
-            <template type="file-hashes">
-                b160b73b8f593dfc7bdd7c36a5f664d2fbc1811b3f01838bd730d57093b6704f  src/base/DecodersAndSanitizers/TacTONDecoderAndSanitizer.sol
-            </template>
-        </li>
-
-    </ul>
-</page>
+            // Extract second address (bytes 20-39) if available
+            address tvmTarget1;
+            if (tvmBytes.length >= 40) {
+                assembly {
+                    tvmTarget1 := mload(add(tvmBytes, 52)) // skip length prefix + 20 bytes
+                }
+            }
+      ```
+      Reference: [TacCrossChainLayerDecoderAndSanitizer.sol#L18-35](https://github.com/Veda-Labs/boring-vault/blob/9e36ad4138b06dcace8f1a6bb795eb9a9ae10d69/src/base/DecodersAndSanitizers/Protocols/TacCrossChainLayerDecoderAndSanitizer.sol#L18-L35)
+  
+      However TON addresses are 48 bytes, larger than the 40 bytes covered by decoding 2 addresses, and the first address decoding at location 32 cuts of the first 12 bytes when it gets cast from bytes32 to an address, resulting in an incomplete decoding of the target address, allowing bridging to an unintended address that matches the last 36 bytes.
+  
+      **Remediations to Consider**
+  
+      Use 3 addresses, loading from memory location increments of 20, 40, and 60.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">cc0d62f9ab6be114891553ef602f47cb0d14b93f</field>
+    <field name="content">
+      ## [L-1] Constrain message version
+  
+      The [Cross chain layer contract](https://explorer.tac.build/address/0xDd57514b2Bee6b4575651cB58c68B390815589e9?tab=contract) currently only allows for one version of message, however it is upgradeable and setup to be upgraded to include additional message types which is specified by the `messageVersion` parameter. The decoder assumes the message is version 1, and decodes it as if it is, however if there are additional message versions added in the future, a differing version number could be called and the decoder would decode the message improperly, likely resulting in an error but could allow for unexpected and unverified actions to be made if verification passes.
+  
+      **Remediations to Consider**
+  
+      Constrain the version number to be equal to 1.
+    </field>
+  </item>
+  
