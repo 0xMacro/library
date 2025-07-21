@@ -1,0 +1,83 @@
+<page
+  clientName="Seven Seas"
+  reportDate="July 21, 2025"
+  auditTitle="Seven Seas A-53"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  finalRepoCommitHash="cc0d62f9ab6be114891553ef602f47cb0d14b93f"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security assessment of TAC bridging was performed by the Macro security team on July 10th 2025.
+</content-for>
+
+  <content-for name="spec">
+
+    <template type="audit-markdown">
+
+        ## Security Analysis
+
+        ### TAC CrossChainLayer bridge
+        
+        - General
+            - Documentation: No available documentation
+            - A bridging protocol on the TAC chain, allowing bridging to and from the TON network
+            - Main components are:
+                - Cross Chain Layer: Contract that allows sending and receiving messages to and from TON.
+        - Security Evaluation
+            - Audited by Trail of Bits
+          
+            
+            Although it is a fairly standard bridging contract, it is upgradeable and is setup to allow for additional message types in future upgrades. It has minimal owner priviledged functions allowing a protocol fee to be set, a tokenUtils contract to be initialized, and protocol fees to be withdrawn, all fairly standard functions where the only concern would be a unexpected raise to the protocol fee, or a malicious upgrade that could steal locked assets. The owner is [currently a 2:2 safe](https://explorer.tac.build/address/0x592e0D5f382E83406eADC6532a559A457aae7d3b?tab=contract_code) contract without a timelock, which is better than an EOA, but should be watched for malicious activity before interacting with the bridge.
+            
+            This has been audited by a notable and trusted auditing firm, Trail of Bits, and all issues found have been resolved, giving confidence that there are no lingering issues.
+            
+            It also should be noted that interacting with bridges requires trust that a call on the destination chain are made as expected, so interacting with bridges in general has some inherent risk.
+            
+        
+        Rating: C (Upgradeable with semi-secure ownership, bridge protocols are inherently risky and require outside trust)
+        
+        ### TAC intermediate USDT bridging contracts on TON
+        
+        - General
+            - Documentation: No available documentation
+            - An intermediate bridging protocol on the TON chain, intended to be used to bride USDT from TAC to ETH or ETH to TAC by first receiving a bridge request and forwarding USDT to the appropriate chain using Layer 0 when interacting with ETH mainnet and the Cross Chain Layer when interacting with TAC.
+            - Main components are:
+                - ETH USDT Treasury: Contract that sends USDT received to ETH mainnet via layer 0.
+                - TAC USDT Treasury: Contract that sends USDT received to TAC via the cross chain layer bridge
+        - Security Evaluation
+            - Audited by Quantstamp
+            - Contracts:
+                - [**tac_usdt_treasury**](https://github.com/TacBuild/lz-bridge/blob/main/treasury_contracts/contracts/tac_usdt_treasury.fc)
+                - [**eth_usdt_treasury**](https://github.com/TacBuild/lz-bridge/blob/main/treasury_contracts/contracts/eth_usdt_treasury.fc)
+            
+            Straight forward bridging forwarder contract. Notably the 3 issues found by Quantstamp have not been resolved but they are minor and should net effect user interactions.
+            
+        
+        Rating: B (bridge protocols are inherently risky and require outside trust)
+    
+         </template>
+  </content-for>
+
+  <content-for name="repo-info">
+    <p>Specifically, we conducted a security review based the following TAC and TON contracts:</p>
+    
+    <template type="audit-markdown">
+
+        - [CrossChainLayer](https://explorer.tac.build/address/0x9fee01e948353E0897968A3ea955815aaA49f58d?tab=contract_code): `0x9fee01e948353E0897968A3ea955815aaA49f58d`
+        - [Implementation](https://explorer.tac.build/address/0xDd57514b2Bee6b4575651cB58c68B390815589e9?tab=contract): `0xDd57514b2Bee6b4575651cB58c68B390815589e9`
+
+        - [**tac_usdt_treasury**](https://github.com/TacBuild/lz-bridge/blob/main/treasury_contracts/contracts/tac_usdt_treasury.fc)
+        - [**eth_usdt_treasury**](https://github.com/TacBuild/lz-bridge/blob/main/treasury_contracts/contracts/eth_usdt_treasury.fc)
+
+    </template>
+
+    <p>Additionally, we audited the associated TACTON decoder and Sanitiser (from <a href="https://github.com/Veda-Labs/boring-vault/pull/389/"> PR 392</a>)
+
+        <template type="file-hashes">
+        <li>    b160b73b8f593dfc7bdd7c36a5f664d2fbc1811b3f01838bd730d57093b6704f  src/base/DecodersAndSanitizers/TacTONDecoderAndSanitizer.sol </li>
+        </template>
+
+</page>
