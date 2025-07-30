@@ -1,0 +1,59 @@
+<page
+  clientName="Infinex"
+  reportDate="July 8, 2025"
+  auditTitle="Infinex A-17"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="76def92dab4b9d6c66b0c517b594da2d208ce123"
+  repoCommitHashFinal="61fab12836bb8e9a8b99b60e671f1cada2224a33"
+  customRepoInfo
+  customReviewInfo
+  passwordEncrypt="env:PAGE_PASS_INFINEX"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on July 8th 2025. 
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial) Patron Vesting Cwg batch movements:</b> </br>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b> </br>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts:
+    </p>
+    
+    <template type="file-hashes">
+        392d56337afd374bb50a87dca3aaf999c8d36f5863a7af4ae15f2571861f0a9b  src/patron/PatronVesting.sol
+        a93c4f303bb43474295634a4742d14c4e84dcb20f7afa65d70dacb204ec9945d  src/patron/PatronVestingStorage.sol
+    </template>                 
+  </content-for>
+</page>
