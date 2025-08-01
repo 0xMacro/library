@@ -1,0 +1,55 @@
+<page
+  clientName="Santora"
+  reportDate="Aug 1, 2025"
+  auditTitle="Santora A-1"
+  auditVersion="1.0.0"
+  repoUrl=""
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on July 23rd - 29th 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Provided project files</li>
+    </ul>
+
+    <template type="audit-markdown">
+
+        ## Trusted Entities:
+
+        - Executor: Has the ability to call functions that facilitate strategies and rebalancing of assets amongst contracts, each contract in the project is expected to be an executor for the other contracts, as well as other trusted users. There is trust required that executors act in the best interest of the protocol.
+        - Owner: Can call every function an executor can as well as administrative functions, and has the ability to pull assets out of contracts it owns. The owner is expected to be a boring vault that uses merkle tree verification on every call to ensure calls are not made maliciously. It is trusted that the owner of the boring vault sets up this merkle tree correctly and calls made are in the interest of the protocol. It is important to note that if maliciously setup, assets can be stolen from the contracts, however, Veda is expected to manage this and has done so without issue for multiple other protocols.
+
+    </template>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts from the provided project files.
+    </p>
+
+    <template type="file-hashes">
+        4db9836b1d46b97b07c9d25659579f0072ba3106ac4b052aad51f0d456d8522b  contracts/0.8.21/ITBCommon/ITBContract.sol
+        0c6a84d1a24a9509065a0b5814461cd568e349a233a9babbec9370586f8f4bbb  contracts/0.8.21/ITBCommon/utils/Executable.sol
+        f8ad6b814264784c97271795d412940b3eba12adfc2682ca97f82967b1d6450b  contracts/0.8.21/ITBCommon/utils/Withdrawable.sol
+        057500222af1c17aa6c71fd364d55fb48ab7ca3f2631b24f3f8c93acb13e2470  contracts/0.8.21/ITBDecoders/ITBContractDecoderAndSanitizer.sol
+        29c6090f63a77dfbdca4fdda68563cb8787d6115b59592e4989d44c4b7be5b5c  contracts/0.8.21/ITBDecoders/SupervisedLoanDecoderAndSanitizer.sol
+        f1d25883c40572e3865c58df9350e3b41f62652992f2061f4ec44cefe6df67ea  contracts/0.8.21/ITBDecoders/SupervisedLoanMinOutsDecoderAndSanitizer.sol
+        f97f4d1efd0b1db4e5fe6b3c5cf4eb7f761cc0b9078a293d3e79208f2860baf1  contracts/0.8.21/ITBDecoders/common/ExecutableDecoderAndSanitizer.sol
+        616c2a96c894c1b6a9eeebad9561968edf6f560d17b8bff4d5314ba1e478797f  contracts/0.8.21/ITBDecoders/common/Ownable2StepDecoderAndSanitizer.sol
+        140c49eec8844d9c344a8d401a3182d591a36dcc4a395e2f77e55aaacd9e0979  contracts/0.8.21/ITBDecoders/common/WithdrawableDecoderAndSanitizer.sol
+        fb6b34f9d7286432a1787289c3fef86345fc7ca4ccf2246621614f3e5c50f041  contracts/0.8.21/LoanManager/LoanManager.sol
+        5797bfe8648b3a8acbf60162950dc8c80823c15b0e6e9ec6551fcc7138e1a1bb  contracts/0.8.21/LoanManager/LoanManagerV3.sol
+        99cb8b86c7b0554e5f609532007be68b914d0a7e19cd2849eeb0d057e39a6a9c  contracts/0.8.21/SupervisedLoan/SupervisedLoanPositionManager.sol
+        65aa6a78ef241fcd8cc798a1e4a2933abf6f7d4eab7cf48d690cade619e400e6  contracts/0.8.21/SupervisedLoan/SupervisedLoanPositionManagerMinOuts.sol
+        c1ff436256bdabd092d1fb4e2a14e4419072ed016586bf3084748366f810a44b  contracts/0.8.21/YieldPosition/PositionManager.sol
+        802c44dee913e2ceddce72aeffd66e49d96be194458bdf829844a63c9b1c3bca  contracts/0.8.21/YieldPosition/PositionManagerHolder.sol
+        fde042ec29aae1163bc5b0655a4b1c4b7ffdf5fb74f9539b26dbaf8715c8890c  contracts/0.8.21/YieldPosition/YieldPosition.sol
+    </template>
+  </content-for>
+</page>
