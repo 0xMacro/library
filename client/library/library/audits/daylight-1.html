@@ -1,0 +1,106 @@
+<page
+  clientName="Daylight"
+  reportDate="August 4, 2025"
+  auditTitle="Daylight A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/daylight-energy/daylight-protocol-contracts"
+  repoCommitHash="c69f56bba7b2228ee80e0daaf06497b1c8b2c085"
+  repoCommitHashFinal="dad43d5efeb42d248c2fc542838bdbc080b61eb0"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_DAYLIGHT_1"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 27, 2025 to July 11, 2025.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    <li>Technical documentation provided by {{page.clientName}} team.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        ### **Owner (Protocol Owner)**
+
+        Highly trusted. This is the entity that deployed and has administrative control over the core contracts, currently a single owner address via `Owned` contract.
+        
+        **Capabilities:**
+        
+        - State Management (`DaylightState`): Can update the `cummulativeUsageRoot`, which represents the authenticated stream of all energy usage data.
+        - Asset & Data Configuration (`DaylightDevices`, `DaylightMeters`, `UtilityVerifier`, `FlexibleCapacityChallenger`): Can update the manifests that define the expected data structures from off-chain services (Texture, Arcadia).
+        - Tokenomics (`DayToken`, `TokenRebates`, `ClaimPool`): Can manage minters/burners for `DayToken`, set rebate rates and token prices, apply penalties, and manage the `ClaimPool`.
+        - Oracle Management (`RegionalValueIndex`): Can add or remove trusted oracles that provide regional energy value data. Initially, the owner will also be the oracle.
+        - Challenge Parameters (`FlexibleCapacityChallenger`): Can configure the parameters used for flexible capacity challenges and issue them.
+        - Staking (`RegionalStaking`): Can disburse rewards for specific regions.
+        
+        **Trust Assumptions:**
+        
+        - Trusted to act in the best interest of the protocol.
+        - Trusted to provide valid and correct data for state updates and to configure all parameters fairly and securely.
+        - A compromised or malicious owner could disrupt the protocol by publishing invalid data, setting unfair parameters, or abusing administrative and economic functions. Daylight intends to decentralize the owner entity in future upgrades as the protocol matures.
+        
+        ### **Oracle (Regional Value Provider)**
+        
+        Trusted. These are external accounts authorized by the Protocol Owner to provide regional energy value data to the `RegionalValueIndex`. During the protocol's initial phase, the protocol owner will act as the initial oracle. Therefore, the same trust assumptions as the Protocol Owner entity itself.
+        
+        - Oracles can submit the latest energy value for a specific region.
+        - Oracles are trusted to provide accurate and timely data.
+        - Malicious or faulty oracles could submit incorrect values, leading to unfair reward distribution.
+        
+        ### **Off-Chain Services & APIs**
+        
+        These are highly trusted external dependencies. Includes the Opacity Network (for BLS signatures) and data providers Texture and Arcadia. 
+        
+        ### **Opacity Network (BLS Oracle)**
+        
+        - Provides cryptographic attestations (BLS signatures) for data coming from services like Texture.
+        - The Opacity network is trusted to be secure and to only sign valid data. Its underlying cryptography is assumed to be sound.
+        - A vulnerability in the Opacity network could lead to unauthorized on-chain actions, such as fraudulent device minting.
+        - Signature validity, malleability, and replayability are entrusted to the Opacity BLS registry contract.
+        
+        ### **Texture & Arcadia (Off-Chain Data Providers)**
+        
+        - Act as the source of truth for physical device data (identity, location, capacity) and utility usage data.
+        - These services are trusted to provide accurate, timely, and non-malicious data.
+        - Their APIs are assumed to be stable and available.
+        - The protocol's integrity is fundamentally reliant on these data sources. Downtime, inaccuracies, or malicious data from these services could disrupt the system, leading to incorrect reward calculations or failed challenges.
+        - zkTLS proofs (via Opacity) help ensure data integrity from the correct API endpoints, mitigating man-in-the-middle attacks.
+        - On-chain checks prevent and reject invalid data (e.g., data from the future).
+        
+        ### **Smart Contracts Assumptions**
+        
+        - The protocol relies on third-party libraries (`Solmate`, `OpenZeppelin`), which are trusted to be secure and well-audited.
+        - Minor precision errors in on-chain calculations could lead to small losses of earnings for users.
+    </template>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within the repository:</p>
+
+  <template type="file-hashes">
+    f28ea34f254fa972d0dedd03ba3f0792716cda1105aa19dcc254a50ae03abe9a  ./src/assets/DaylightDevices.sol
+    f955778a3392d60fbad3173444ab9a89cc698e6a16dca9ccaffb7ae0978ea4fe  ./src/assets/DaylightHosts.sol
+    630b93e9f6d46bf515c1e03b78925d890299185f9c8e42988df3e128f52cc957  ./src/assets/DaylightMeters.sol
+    541611db752aacd31c364bebe422542757b29552fb5cd261cbdb0c2ca38f209f  ./src/DaylightState.sol
+    095fdeea9172b5bc93ad429ebc672493590f97acd3ce21b098303b40e59a7301  ./src/DayToken.sol
+    425ef01b9696816038d2161f8c2d6f6f71ee252a5dc8f4f306b301fdf76e510b  ./src/interfaces/IDaylightDevices.sol
+    2369a1319cb164d239a92813eefe7b7b4347d8a330cceaeb3ce65b05de68118c  ./src/interfaces/IDaylightHosts.sol
+    35592123d4299bc6b12e4010e06407ab3ff15b1abca97e2aad35c79dbd355732  ./src/interfaces/IDaylightMeters.sol
+    17ff0df85d27d7847631a24ce57086fdda1d6028cccbca68661442a6ee673c30  ./src/interfaces/IDaylightState.sol
+    89b7ea897db8749fd58ae32fb090e71f43062f98d085498b05085d47d0393862  ./src/interfaces/IERC20.sol
+    0fd703c2327bcd9dcfa5f6fa942dccda7d72995f6757bf89016af7d0598674d8  ./src/interfaces/IERC721.sol
+    c3c84e2b85f7e88e31bb5302f9903f7c31fb845e90c80dc88151e7dd497de6ed  ./src/interfaces/IRegionalStaking.sol
+    8e2f62bd2b2cd6b17cf77f5861c3a32f6dba4f7ea02cf5fba89e99f21a966715  ./src/interfaces/IRegionalValueIndex.sol
+    a455009da4c5cdce9d063a726652591ef21580d24612919ca3b06a6e8df65f46  ./src/issuance/ClaimPool.sol
+    e2e5ce3540eca4bdc9f1d66700c0b0a0ccc367b4702979cbc0d7dc6aac291a60  ./src/issuance/FlexibleCapacityChallenger.sol
+    495390fe058c9b37581ddb5f2c3ab801e9fec189b58dc713b4fe8e9d60a49409  ./src/issuance/RegionalStaking.sol
+    a99b37af0d7208b2ffcdf9a13f1532e175c9ffc93a227c6362f2e522ffd582a8  ./src/issuance/RegionalValueIndex.sol
+    acf38087d526f9e528cb23e8dcaae82ce53ed7de618758f1589594926c49dd80  ./src/issuance/TokenRebates.sol
+    d2eb41f573b9f8b867de1a5f37dcccce2fca89b685963352780e28f6db5bc261  ./src/issuance/UtilityVerifier.sol
+  </template>
+
+</content-for>
+
