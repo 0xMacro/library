@@ -1,0 +1,34 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c57c323813da3087f2ffdbb58352123dab75b2e2</field>
+    <field name="content">
+      ## [Q-1] Unnecessary imports and code
+
+      1. In the ClankerHookV2 and ClankerMevDescendingFees contracts, the following import is unnecessary.
+      
+          ```jsx
+          import {console} from "forge-std/console.sol";
+          ```
+      
+      2. In the ClankerHookV2, explicit call syntax is used to access StateLibrary functions, therefore following is unnecessary
+      
+          ```jsx
+          using StateLibrary for *;
+          ```
+      
+      3. In the ClankerHookV2, there is a duplicate import from BeforeSwapDelta.sol contract and second import with related usage can be removed as it unnecessary:
+      
+          ```jsx
+          // duplicate import which can be removed
+          import {
+             BeforeSwapDelta, BeforeSwapDeltaLibrary
+          } from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
+      
+          // usage
+          using BeforeSwapDeltaLibrary for BeforeSwapDelta;
+          ```
+    </field>
+  </item>
+  

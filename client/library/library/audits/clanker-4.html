@@ -1,0 +1,38 @@
+<page
+  clientName="Clanker"
+  reportDate="August 18, 2025"
+  auditTitle="Clanker A-4"
+  auditVersion="1.0.0"  
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/clanker-devco/contracts"
+  repoCommitHash="b5fe9897d292b57a4425637103db762c27ce73b3"
+  repoCommitHashFinal="c57c323813da3087f2ffdbb58352123dab75b2e2"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from August 6, 2025 to August 11, 2025.
+</content-for>
+  
+<content-for name="spec">
+<ul>
+    <li>Discussions on Telegram with the Clanker team.</li>
+</ul>
+</content-for>
+  
+<content-for name="source-code">
+  
+    <p>Specifically, we audited the following contracts within the repository:</p>
+  
+    <template type="file-hashes">
+        118e93cfe1a1f6f28369a982cabe9f0085fb4f5c08285c5fad82fe5c5a6aae4d  src/hooks/ClankerHookDynamicFeeV2.sol
+        0d5ef6870201512399a05c3ee060d715c5586eb40f287c907a5ac9651935b403  src/hooks/ClankerHookStaticFeeV2.sol
+        0bf744bf8531294ac3e90e0703a5240a8ff2c2a84ec3bf581b3e7d01008ce9ef  src/hooks/ClankerHookV2.sol
+        d057a501b4e2dcf4d43b811303379ef759e7883ce05ab77cfb057c118f50b792  src/hooks/interfaces/IClankerHookV2.sol
+        503abc915b849673b5e06b3338a9dfe5d7fd0c8809169d0fc4bbf92e1da1bc91  src/hooks/interfaces/IClankerHookV2PoolExtension.sol
+        5280e5dc867dd8efa241e40c334d0222d9e03cf053ee9f09c1699cf14968ca77  src/hooks/pool-extension-examples/UniV3SwapBack.sol
+        e3433c35d491548398dc6817a5e1012ef97f8a64c63a9d9b3a93e31b36aedfaa  src/mev-modules/ClankerMevDescendingFees.sol
+        fd3402c8b98a01ce6043872a3983e82b019213658bbd64a07a4beec6336fa044  src/mev-modules/ClankerSniperAuctionV2.sol
+        65cb614002481f16f64015494099bf1f82f8da8fd224fe9c338798916ff42ce7  src/mev-modules/sniper-utils/ClankerSniperUtilV2.sol
+    </template>
+</content-for>
+
