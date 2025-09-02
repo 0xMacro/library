@@ -1,0 +1,86 @@
+<page
+  clientName="towns"
+  reportDate="July 25, 2025"
+  auditTitle="Towns A-10"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/towns-protocol/towns"
+  repoCommitHash="5356aa3d56ee92c078be75b2762d348428807957"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_TOWNS_10"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from June 24, 2025 to June 26, 2025.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the HNT team.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      ### **End User**
+
+      Considered untrusted and potentially malicious. The system is designed defensively against potential malicious actors. These can be Space’s members executing a swap through their Space or EOA executing swaps directly through the Router.
+      
+      - The user is responsible for the approvals they sign, and the parameter input amounts are correctly passed to the swap functions.
+      - Address inputs (`router`, `approvedTarget`, and `recipient`) are validated, and execution flow is strictly controlled.
+      - Slippage is validated to ensure the result of the swap yields the expected amounts, despite being selected by the user.
+      - Poster fee configuration is bounded to the user signature.
+      
+      ### **Protocol Governance**
+      
+      Highly trusted. The protocol owner entity that manages the core protocol rules through the PlatformRequirements contract. It is trusted to:
+      
+      - Only add legitimate, non-malicious, and correctly functioning DEX router contracts to the whitelist.
+      - Configure reasonable protocol swap fees.
+      - Ensure the spaceFactory and feeRecipient addresses are correct and secure.
+      
+      ### **Space Owner**
+      
+      Trusted within the scope of their own space. A Space Owner configures fee parameters (`posterFeeBps`, `forwardPosterFee`) only for swaps initiated through their space's `SwapFacet`. 
+      
+      - They are trusted to set fee configurations, but are limited to the hardcoded constant `MAX_FEE_BPS` (2% fee).
+      - Their actions cannot affect other spaces or the `SwapRouter` behavior.
+      
+      ### **Whitelisted Routers**
+      
+      Highly trusted. The security model of the `SwapRouter` relies on the integrity of the external contracts on the router whitelist. These routers are trusted to:
+      
+      - The router is trusted to execute swaps at a fair market rate. The slippage check is a user-defined safety net, not a guarantee of the best possible price.
+      - The router is trusted not to execute malicious code within the `swapData` call. While approvals and balances are cleared after the swap, the system trusts the router not to misuse them during the transaction itself.
+      - The internal `nonReentrant` guard prevents direct re-entry but does not control the router's interactions with the external contracts.
+      - Reliably return any unused input tokens to the `SwapRouter` after the swap.
+      
+      ### **Permit2 Contract**
+      
+      Trusted infrastructure. The `SwapRouter` relies on the canonical `PERMIT2` contract at its hardcoded address ([0x000000000022D473030F116dDEE9F6B43aC78BA3](https://basescan.org/address/0x000000000022D473030F116dDEE9F6B43aC78BA3)). 
+      
+      - It is trusted to be secure and to correctly implement the signature verification and token transfer logic as specified by Uniswap. Any vulnerability in `PERMIT2` would be directly inherited.
+      
+      ### **Space Factory & Points Contracts**
+      
+      Trusted core infrastructure.  The `SwapRouter` and `SwapFacet` trust these contracts to perform their functions correctly and non-maliciously.
+      
+      - `Architect` is trusted to accurately identify which callers are valid Spaces.
+      - `TownsPoints` is trusted to implement a secure and economically sound points calculation and minting system.
+      - `SpaceFactory` is trusted to get a valid and secure `SwapRouter` address implementation.
+    </template>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within <i>packages/contracts/</i> repository directory:</p>
+
+  <template type="file-hashes">
+    2b9f0668b730a046798e9d340fee68446c20b0fa2f035ba29a8cab7d6a3f4c70  src/router/SwapRouter.sol
+    9225a3a7426187386602c391f55c2e8c05c4d0e85e3f9eddde3a50c5893936dc  src/router/SwapRouterStorage.sol
+    a76ceb0a78460dc6b2723997e8761fd09daa3f2421a9634c4759dab1724df6a0  src/spaces/facets/swap/SwapFacet.sol
+    57c64fecba1e9882c7dabb174fc838c6148e97bb57e2bafcf8c1d46a3e999211  src/spaces/facets/swap/SwapFacetStorage.sol
+    b057e532074c111acce79c3867fa3eb0cec2091cace33e13f632399950710b20  src/spaces/facets/membership/MembershipStorage.sol
+    fe04f7f327a67c071b21b878f0ed39ef93d97bf384f260102ddb5122c1586fd4  src/spaces/facets/points/PointsBase.sol
+  </template>
+
+</content-for>
+
