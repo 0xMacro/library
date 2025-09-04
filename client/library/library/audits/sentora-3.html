@@ -1,0 +1,48 @@
+<page
+  clientName="Sentora"
+  reportDate="July 8, 2025"
+  auditTitle="Sentora A-3"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on August 29th - 30th 2025. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+    </ul>
+
+  </content-for>
+
+  <h2 id="tmaar">Roles</h2>
+  <template type="audit-markdown">
+          <ul>
+              <li>Owner: Controller of main functions with the ability to set configurations, approve tokens for protocols, and can withdraw assets out. </li>
+              <li>Executor: Have the ability to move assets held into and out of protocols like Aave with the intent to earn yield and accumulate value for the owner. They are trusted to act in the best interest of the owner.</li>
+          </ul>
+  </template>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts:
+    </p>
+    
+    <template type="file-hashes">
+      9f10fb91dd1f73ed27a05b8667848e3142e9a97288a265a432603c1c0c54c27c  contracts/0.8.21/AaveYieldPosition/BasePositionManager.sol
+      398201f99e9acd066ae31769337bca6747f105155d001aefefe646b6ec9197e1  contracts/0.8.21/AaveYieldPosition/single/PositionManager.sol
+      fade09db5cc83f4bd0b6e4e83b04f6b835bdd5e0ee57f1f780119275955cf297  contracts/0.8.21/AaveYieldPosition/single/PositionManagerV3.sol
+      800675d5b79d86519237572556faa267f8aedacb9f108f18adba6fc968072d70  contracts/0.8.21/AaveYieldPosition/single/PositionManagerV3Merkl.sol
+      d12550d25a4805f2d89bda548e4280027dd3e2e5eabd5153d7140ea28f8797a5  contracts/0.8.21/LoanManager/LoanManager.sol
+      ab5db0eb11c600b5b49d240b73f7f9aa6b7376cd7dc6d7a1294b40ab9d77f37f  contracts/0.8.21/LoanManager/LoanManagerV3.sol
+      4a3ea284ef80883066625d2758b6f3db3207156a141592c0c4d5707338330bf9  contracts/0.8.21/SupervisedLoan/SupervisedLoanPositionManager.sol
+      823a2b5e8de0c11d4647fb046b865c8eae9142b28a0aaa0f4677b7e043d7b7d9  contracts/0.8.21/SupervisedLoan/SupervisedLoanPositionManagerSwapBorrow.sol
+
+    </template>                 
+  </content-for>
+</page>
