@@ -1,0 +1,52 @@
+<item>
+    <field name="topic">Accounting</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">54dcb98862d25e4fce4dcd011f6e05cbed210479</field>
+    <field name="content">
+      ## [L-1] Potential loss of undistributed rewards when `totalSupply` is zero
+  
+      In the StakingRewards contract, the `REWARDS_DISTRIBUTOR` is entrusted to provide tokens and initiate the reward accrual through the `notifyRewardAmount()` function. This function sets the `rewardRate`, `lastUpdateTime`, and `periodFinish` to start accruing rewards per token per second. 
+  
+      ```solidity
+      function notifyRewardAmount(uint256 reward)
+          external
+          onlyRole(REWARDS_DISTRIBUTOR)
+          updateReward(address(0))
+      {
+          if (block.timestamp >= periodFinish) {
+              rewardRate = reward / rewardsDuration;
+          } else {
+              uint256 remaining = periodFinish - block.timestamp;
+              uint256 leftover = remaining * rewardRate;
+              rewardRate = (reward + leftover) / rewardsDuration;
+          }
+  
+          // Ensure the provided reward amount is not more than the balance in the contract.
+          // This keeps the reward rate in the right range, preventing overflows due to
+          // very high values of rewardRate in the earned and rewardsPerToken functions;
+          // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
+          uint256 balance = rewardsToken.balanceOf(address(this));
+          require(rewardRate <= balance / rewardsDuration, RewardTooHigh());
+  
+          lastUpdateTime = block.timestamp;
+          periodFinish = block.timestamp + rewardsDuration;
+          emit RewardAdded({ reward: reward });
+      }
+      ```
+  
+      **Reference:** StakingRewards.sol#L251-274
+  
+      However, if the total deposits are zero before calling `notifyRewardAmount()` or drop to zero between reward cycles, the rewards that accrue during this zero-deposit period will not be distributed when new stakes are made; these rewards will remain undistributed. 
+  
+      It's worth noting that users have no incentives to withdraw stakes during an active reward cycle. Additionally, any unscheduled rewards can be redistributed in a new reward cycle by including them in the `reward` parameter when calling `notifyRewardAmount()`.
+  
+      **Remediations to Consider:**
+  
+      1. Implement a mechanism to track pending rewards in `notifyRewardAmount` when no supply exists, and begin distributing these accrued rewards upon the first stake. *This only mitigates the initial reward distribution cycle with zero supply.*
+      2. Document this potential pitfall properly and redistribute the pending rewards when necessary.
+
+    </field>
+  </item>
+  
