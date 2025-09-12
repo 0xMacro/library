@@ -5,13 +5,12 @@
   auditVersion="1.0.0"
   repoUrl="https://github.com/fleek-platform/fleek-contracts/"
   repoCommitHash="01fee29dc3bdf912aafa8415f236f46ed12e2bf5"
-  passwordEncrypt="env:PAGE_PASS_FLEEK_1"
 
   layout="/library/audits/_layout.html"
 >
 
 <content-for name="schedule">
-  The security audit was performed by the Macro security team from January 23, 2023 to February 3, 2023.
+  The security audit was performed by the Macro security team on September 11, 2025.
 </content-for>
 
 <content-for name="spec">
@@ -22,7 +21,7 @@
 
   <template type="audit-markdown">
     <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
-    
+
     ## FLKToken
   
     The protocol ERC20 token that incorporates OpenZeppelin's Permit, Burnable, and ERC1363 extensions. The total supply is fixed at `100_000_000` tokens, which are minted during deployment to the recipient address specified in the constructor.
