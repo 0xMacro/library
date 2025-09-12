@@ -19,42 +19,45 @@
       <li>Discussions on Telegram with the {{page.clientName}} team.</li>
       <li>Available documentation in the repository.</li>
   </ul>
+
+  <template type="audit-markdown">
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    
+    ## FLKToken
+  
+    The protocol ERC20 token that incorporates OpenZeppelin's Permit, Burnable, and ERC1363 extensions. The total supply is fixed at `100_000_000` tokens, which are minted during deployment to the recipient address specified in the constructor.
+  
+    ## StakingRewards
+  
+    ### **End User (Staker)**
+  
+    Considered untrusted and acting in their own self-interest. The system is designed to be defensive against users attempting to withdraw stakes or claim rewards outside of the rules.
+  
+    - A user's ability to withdraw is strictly enforced by the `lockPeriod`. The system verifies that `block.timestamp` is greater than or equal to `stakeTimestamp + lockPeriod` before allowing a withdrawal.
+    - A user's reward calculation is deterministic, based on their proportional stake (`balanceOf`) and the time it has been staked relative to the global `rewardPerToken` value.
+    - User's actions (staking, withdrawing, claiming) are confined to their own account's state. While their actions influence the global `_totalSupply` (which affects the `rewardRate` for all), they cannot directly alter the balances or earned rewards of other users.
+    - When users submit a new stake, they deliberately choose to further participate in the system, which resets their lock timer. This is a known and accepted design choice that should be clearly communicated in any user interface.
+  
+    ### **Admin (`DEFAULT_ADMIN_ROLE`)**
+  
+    Highly trusted. The Admin is a privileged role, intended to be a Foundation Multisig, with significant administrative control over the operational state of the `StakingRewards` contract. This entity is trusted to:
+  
+    - Pause and unpause the `stake()` function in emergencies or deprecation.
+    - Set and manage the `REWARDS_DISTRIBUTOR` role.
+    - Update the `rewardsDuration` parameter.
+    - Securely manage its own role by utilizing the transfer delay from `AccessControlDefaultAdminRules`, which prevents immediate takeovers.
+    - Use the `recoverERC20` function responsibly.
+  
+    ### **Rewards Distributor (`REWARDS_DISTRIBUTOR`)**
+  
+    Trusted, specialized role. This actor is responsible for the liveness and solvency of the rewards program. The entire incentive mechanism depends on its reliable operation. This entity is trusted to:
+  
+    - Continuously and promptly fund the contract by calling `notifyRewardAmount()` to ensure there are no gaps in reward distribution.
+    - Ensure sufficient FLK tokens are transferred to the `StakingRewards` contract before calling `notifyRewardAmount()` to meet the contract's internal balance verification.
+  </template>
 </content-for>
 
-<template type="audit-markdown">
-  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
-  ## FLKToken
 
-  The protocol ERC20 token that incorporates OpenZeppelin's Permit, Burnable, and ERC1363 extensions. The total supply is fixed at `100_000_000` tokens, which are minted during deployment to the recipient address specified in the constructor.
-
-  ## StakingRewards
-
-  ### **End User (Staker)**
-
-  Considered untrusted and acting in their own self-interest. The system is designed to be defensive against users attempting to withdraw stakes or claim rewards outside of the rules.
-
-  - A user's ability to withdraw is strictly enforced by the `lockPeriod`. The system verifies that `block.timestamp` is greater than or equal to `stakeTimestamp + lockPeriod` before allowing a withdrawal.
-  - A user's reward calculation is deterministic, based on their proportional stake (`balanceOf`) and the time it has been staked relative to the global `rewardPerToken` value.
-  - User's actions (staking, withdrawing, claiming) are confined to their own account's state. While their actions influence the global `_totalSupply` (which affects the `rewardRate` for all), they cannot directly alter the balances or earned rewards of other users.
-  - When users submit a new stake, they deliberately choose to further participate in the system, which resets their lock timer. This is a known and accepted design choice that should be clearly communicated in any user interface.
-
-  ### **Admin (`DEFAULT_ADMIN_ROLE`)**
-
-  Highly trusted. The Admin is a privileged role, intended to be a Foundation Multisig, with significant administrative control over the operational state of the `StakingRewards` contract. This entity is trusted to:
-
-  - Pause and unpause the `stake()` function in emergencies or deprecation.
-  - Set and manage the `REWARDS_DISTRIBUTOR` role.
-  - Update the `rewardsDuration` parameter.
-  - Securely manage its own role by utilizing the transfer delay from `AccessControlDefaultAdminRules`, which prevents immediate takeovers.
-  - Use the `recoverERC20` function responsibly.
-
-  ### **Rewards Distributor (`REWARDS_DISTRIBUTOR`)**
-
-  Trusted, specialized role. This actor is responsible for the liveness and solvency of the rewards program. The entire incentive mechanism depends on its reliable operation. This entity is trusted to:
-
-  - Continuously and promptly fund the contract by calling `notifyRewardAmount()` to ensure there are no gaps in reward distribution.
-  - Ensure sufficient FLK tokens are transferred to the `StakingRewards` contract before calling `notifyRewardAmount()` to meet the contract's internal balance verification.
-</template>
 
 <content-for name="source-code">
 
