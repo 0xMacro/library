@@ -1,0 +1,55 @@
+<page
+  clientName="Seven Seas"
+  reportDate="June 18, 2025"
+  auditTitle="Seven Seas B-48"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-svm"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="ee8d3624629d8b5ad1d811cbf09622d298e3807b"
+  customReviewInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on June 3rd, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash:</b> </br>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+    </ul>
+  </content-for>
+
+    <content-for name="source-code">
+    <p>
+      Specifically, we audited the changes for the following files in <a href="https://github.com/Veda-Labs/boring-vault-svm/pull/10">PR 10</a>.
+    </p>
+
+    <template type="file-hashes">
+        236c97404c28219c75ff818c1e397885e10eeca7ba914f7add5bc2d88e1a2ef6  Anchor.toml
+        0717fc65cbd6b31ed113fcdaeef0a3cefbfc209989c3cfdea6d47799cae9562f  Cargo.toml
+        e062568eb60ad1a5288f895e89d05f2034b040f72fa90cae35459d3d4208371b  package.json
+        9136e77a17c478728f94052fdce804760315f73e135b4763c558fca89f9ec2c0  programs/boring-onchain-queue/Cargo.toml
+        67c51bb3505aeac75dccb45a96b0a9869e95695ae8039bec7958ca5a79bfbc9a  programs/boring-vault-svm/Cargo.toml
+        30ee882370f918f5d24c08116eeb471085f509db1959cb7aed2cfbb617dcbda3  programs/boring-vault-svm/src/lib.rs
+    </template>
+
+    <p>
+        <b>Note:</b> This document contains an audit solely of the files listed above.
+    </p>
+  </content-for>
+</page>
