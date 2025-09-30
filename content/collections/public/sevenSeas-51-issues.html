@@ -1,0 +1,18 @@
+<item>
+    <field name="topic">Sanitation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">0560106f3e66909cf240632910973f02e3a2dab8</field>
+    <field name="content">
+      ## [L-1] Sanitizing metadata that is may not be present
+  
+      In [bridgeMessageWETH()](https://github.com/Veda-Labs/boring-vault/blob/fe2fc0ca867e45da0126bb88cea0a0bbf0dfef68/src/base/DecodersAndSanitizers/Protocols/AgglayerDecoderAndSanitizer.sol#L53-L62) and [claimMessage()](https://github.com/Veda-Labs/boring-vault/blob/fe2fc0ca867e45da0126bb88cea0a0bbf0dfef68/src/base/DecodersAndSanitizers/Protocols/AgglayerDecoderAndSanitizer.sol#L64-L79), and [bridgeMessage()](https://www.notion.so/SevenSeas-50-Internal-Prelim-Report-21672f2c7fd180408ca7d6ea980e5781?pvs=21) the metadata is decoded into a token address and add to the addresses to be sanitized. These functions, however, can be used with an empty metadata field, in cases where bridging ETH, which when sanitizing would fail when attempting to decode.  
+  
+      **Remediations to Consider**
+  
+      Remove the metadata sanitation as it is unnecessary for these functions and can cause issues for cases where there is no metadata present.
+  
+    </field>
+  </item>
+  
