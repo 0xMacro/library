@@ -1,0 +1,96 @@
+<page
+  clientName="Sentora"
+  reportDate="September 25, 2025"
+  auditTitle="Sentora A-4"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/Into-The-Block-Corp/ITBKamino"
+  repoCommitHash="293e0c96356c4caed4cae4c6a775cfd42de32478"
+  customReviewInfo
+  issueSummaryFormat="table"
+  passwordEncrypt="env:PAGE_PASS_SENTORA_4_5"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on September 10th - 12th 2025.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      ### Entities
+
+      - Program Owner
+        - Single, top-level, Sentora-controlled account.
+        - Can grant the Program Executor role to accounts.
+        - Can act as a Program Executor itself.
+      - Program Executor
+        - Sentora-controlled account.
+        - Can initialize new Positions controlled by a Position Owner..
+      - Position Owner
+        - Customer-controlled account.
+        - Can grant the Position Executor role to accounts.
+        - Can act as a Position Executor itself.
+        - Can perform certain Position-sensitive actions such as withdraw and arbitrary CPI.
+      - Position Executor
+        - Expected to be a Sentora-controlled account.
+        - Can perform certain Position managing actions such as initializing and depositing into Kamino positions.
+
+      ### Trust Model
+
+      - The Program Owner can add any account as a Program Executor.
+      - The Position Owner can add any account as a Position Executor.
+      - The Position Owner fully controls all funds within the Position.
+      - Funds **must** be deposited into a specific Position's supply_token_account PDA before a Position Executor can deposit those funds into Kamino.
+      - Position Executors can deposit funds and redeem Kamino rewards, but never withdraw them.
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts for the Initial commit:</p>
+
+    <template type="file-hashes">
+      b249ae8f44c163f0a7e89c785ddc353f82af427b4291b2df333c47e5e0a258bb  programs/position-manager/src/common/create_token_account.rs
+      133c4df05b0493058455b481f452147996698d41dd060fb9f805a67166fa5696  programs/position-manager/src/common/execute.rs
+      acf9324deef6a27dd8b5f1c43663c7e26d9e438c1614ff94934636b242e41416  programs/position-manager/src/common/mod.rs
+      51e6b9e4eb2149b6b3177bc2564de334cc4c8b24b8e66c398f6849564b13b80f  programs/position-manager/src/common/withdraw.rs
+      5ed0246164e3db2435a02f59cfdbeb716f3e38223b4190bc04b48e009b3a9dea  programs/position-manager/src/common/wsol.rs
+      53af29e933d4a9b1149e2bc3edc08cdb40e5cba4a0a9e8086e17dcba10319d3e  programs/position-manager/src/instructions/deposit.rs
+      1f470ba4d20fcc05611477d9142dc921f92cd9064f99e364219a380aaba4eb70  programs/position-manager/src/instructions/harvest.rs
+      f61a6d64e704dea362e046fd20aa23d4389bc1ad78fc48fbd33f5d8fca3f9ad7  programs/position-manager/src/instructions/initialize_farm_obligation.rs
+      417da6824542574c23a3c32289387fd38ccf3673bab13ec8b1da5c672e2b6c62  programs/position-manager/src/instructions/initialize_obligation.rs
+      91fe37ced4c61ab395ff49d91f3a8c9292dea6cf61f15e90e16cf04c48ab37f3  programs/position-manager/src/instructions/initialize_position.rs
+      f9fe15cdb9a6929481cd9e46a46c7d94ad89c39d6e3ba45fdd1e911b00d7731a  programs/position-manager/src/instructions/initialize_reserve_user.rs
+      0f2ec28b7e6924ac69676b058840ce9af5b3ffe358004347f4911cc2e00265fc  programs/position-manager/src/instructions/initialize.rs
+      25aa0b848673da845700451d6497be6629e418fbd35fbd268b44bea91dd485dc  programs/position-manager/src/instructions/mod.rs
+      cb4bbc649e058bffa61ede12ce27bef1179f8e1518c9f4294948065b0a00f4b7  programs/position-manager/src/instructions/redeem.rs
+      d1d1c15eb020f046b16b00cba732282239a34c0dac9d4c46e3d4c5644d572d01  programs/position-manager/src/kamino/farms_import.rs
+      2d86a4f68f90eba89d6e681ac61ec05b00d1cfae056ff28ecac9e3403cb27060  programs/position-manager/src/kamino/kamino_lending_import.rs
+      3295e3c35e4f56eba61c4bb53ddd9ec732be8eda7b25b930a9ee4d0930600965  programs/position-manager/src/kamino/mod.rs
+      262f08bc1578a2bb2fc8a7bd0a156ed40721d6a9fd0a4a05b0353c698baca68b  programs/position-manager/src/lib.rs
+      c298a22ce0295dbdf1afbd947968f4ee2c579a8940e197909721981cdfed8e0e  programs/position-manager/src/ownable/errors/mod.rs
+      4496d58f7ef5a7e540111496d11742c1d26935b21644ea16811eddaebaa2b84e  programs/position-manager/src/ownable/errors/ownable_error.rs
+      fde3d0c08aa4624ea7cc7f25e52073159c5fc69aaf12af65d948a36a7d8a6f96  programs/position-manager/src/ownable/events/mod.rs
+      9d1619764fce776d6da4761b4849d28a36ab4d8c7b2225dcb3607cc9649fb210  programs/position-manager/src/ownable/events/ownership_transfer_started.rs
+      02c7a8d53c9fae500be4c389e1773840c30ee79a35a31fbc87754e1cf102aaeb  programs/position-manager/src/ownable/events/ownership_transferred.rs
+      08f50c0a4f02cb6db706df955c7a95957a09b06a09be74937c53622953445729  programs/position-manager/src/ownable/instructions/accept_ownership.rs
+      2d6c60a8a58a792af4c3e1c99d693a391c5a26ba28532c9d5a1dd4ab227c1f3e  programs/position-manager/src/ownable/instructions/add_executor.rs
+      86713a43da843f334ebf578f1ed2c132e0ec4b6e2c84851eca344c7a01db8427  programs/position-manager/src/ownable/instructions/mod.rs
+      e3883210df9ea2d9cfb84fbb686ef58b6593d5f7c948fc0c83e92c5c3bd76884  programs/position-manager/src/ownable/instructions/modifiers.rs
+      9e2e96a88359a1393aa7df3ba5706092d094f6a6050e37ed38028664e2e5be2a  programs/position-manager/src/ownable/instructions/remove_executor.rs
+      19792bb48a6dde181b468f5fdfa7669f90e5bdb9d52575511712f2c842161760  programs/position-manager/src/ownable/instructions/transfer_ownership.rs
+      2154911586e75e783a4e4273219900d4bb6c07e420f63bcb438259b17353049c  programs/position-manager/src/ownable/internal/_transfer_ownership.rs
+      8271ed7fcf6cc9a6ab75c490cdda74bd4628746affae057b05e9d6dbb3727c9f  programs/position-manager/src/ownable/internal/mod.rs
+      cbd5a767869e94206124b85cd8bfc63d6e2a52ec602e75db4ef965d5938aaee3  programs/position-manager/src/ownable/mod.rs
+      87b7951cc4eb3e0dc18ace57b30d6ccfb41a2860aa2eca93d6f134407bcc2e79  programs/position-manager/src/ownable/state/acl.rs
+      2ac1be53a1bcab477e6f7e8780365a9f21155bbf1042c86bebd6a3adcb075f1a  programs/position-manager/src/ownable/state/mod.rs
+      cf47aebff5e7e3007ad22c3b786bf65fae4d2d567b388ba0c295a694d5a5e5a4  programs/position-manager/src/state/mod.rs
+      dac4c75809b07df9601218da6982633e499b2e09ffe172831181ce47433ae499  programs/position-manager/src/state/position_config.rs
+
+    </template>
+  </content-for>
+</page>
