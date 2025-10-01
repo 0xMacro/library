@@ -1,0 +1,35 @@
+<page
+  clientName="Seven Seas"
+  reportDate="September 30th, 2025"
+  auditTitle="Seven Seas A-59"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team from August 20th to 25th 2025.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li class="break-words break-all">
+        <b>Instant Withdraw Accountant (from <a href="https://github.com/Veda-Labs/boring-vault/pull/419">PR 419</a>)</b> </br>
+        Commit Hash: <code>98b572caf553b34891203c1aaf5dbe69d004276c</code>
+        <template type="file-hashes">
+            baed6a244d40dc0cc6f5b402f47676b55dd96cd6a72fe948f48f064a10723c0e  src/base/Roles/AccountantWithYieldStreaming.sol
+            04f1ea8b9d6242da7bb890c5aa2356fbcf35f3042ad755da7b404e6dbb52618a  src/base/Roles/TellerWithYieldStreaming.sol
+            bfaf1092ad162ee4ef7271b5a3486eb4e3fc769fbf78a7aa1ba48b7ad4857eec  src/base/Roles/TellerWithBuffer.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
