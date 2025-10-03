@@ -1,0 +1,45 @@
+<page
+  clientName="Polynomial"
+  reportDate="Oct 3, 2025"
+  auditTitle="Polynomial A-7"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Polynomial-Protocol/fx-contracts"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="4d7e3512dfcbe3b2d009252f846fd64dc5d3b722"
+  finalRepoCommitHash="015e17891683f99970db6e4568c39e732c1ebefb"
+  passwordEncrypt="env:PAGE_PASS_POLYNOMIAL"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on September 24-26th 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+      627b85eb428a0a12ecbe4cd76df4f075eb73fc0c1d34dba21cadeb25e301109f  markets/perps-market/contracts/interfaces/IMarketCloseModule.sol
+      3e52757af1bfbe6ed8b22def142f1d9a682216d7b3a36ac9ffb840bb7b1447f6  markets/perps-market/contracts/modules/LimitOrderModule.sol
+      179092881e60907fbdb90ed42d1b1a2df16ed115ecb17fd9f9fffbbd069213df  markets/perps-market/contracts/modules/LiquidationModule.sol
+      b1151e40518b3772915c7289581484b013d43456b8a17bff507593ccedb0bfa8  markets/perps-market/contracts/modules/MarketCloseModule.sol
+      b04ee7f619c7f072e2c88cf2af23dae296f2a9572ffb5e10a92569f9140133ae  markets/perps-market/contracts/modules/MarketConfigurationModule.sol
+      5d17eff7c642d062bf117bb78cdf6f73093c642c2e2740259aa87d91b9aa906f  markets/perps-market/contracts/modules/OffchainLimitOrderModule.sol
+      5864c6ce51f838a09fa16b917cee963673adc899934cbcd8c7b949edb9111405  markets/perps-market/contracts/modules/PythLazer/OffchainLimitOrderPythLazerModule.sol
+      d596fe427d98f67a80eb74df862f3518353d69c89b611bc82052ce5e8554139b  markets/perps-market/contracts/storage/AsyncOrder.sol
+      9f83bee8743cd449fb8f71c0d934f3839a12c7a4e0be966c9cc6073e953794c0  markets/perps-market/contracts/storage/MarketClose.sol
+      01b3fd9163b25e8c20aae672fe3b2866c172988baaa4a9c79c33a0e22f80f7b8  markets/perps-market/contracts/storage/PerpsAccount.sol
+      09f2de3b69d341f7924bc2008c67c9b2d7b86591b8018004683608d4aaaabc07  markets/perps-market/contracts/storage/PerpsPrice.sol
+      97d81e4aef63df64b6d36399aca3ea037195c620ff7d74f46027107003eaaf81  markets/perps-market/contracts/storage/Position.sol
+    </template>
+  </content-for>
+</page>
