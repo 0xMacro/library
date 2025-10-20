@@ -1,0 +1,84 @@
+<page
+  clientName="towns"
+  reportDate="October 20, 2025"
+  auditTitle="Towns A-12"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/towns-protocol/towns"
+  repoCommitHash="571d65e38e62dbbe5c5af68bd9965716991ace44"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_TOWNS"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from October 7, 2025 to October 10, 2025.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the HNT team.</li>
+  </ul>
+
+  <template type="audit-markdown">
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+
+    The `SubscriptionModule` is a smart contract module designed to be installed on a user's Modular Account (ERC-6900), enabling automated, recurring payments for spaces NFT based memberships. The system relies on trusted operators to trigger renewals, but is designed to ensure the operator cannot act without the user's pre-approved consent as defined by the subscription parameters.
+  
+    - Renewals are triggered by a trusted off-chain Operator, but executed with the user's own funds from their Modular Account.
+    - The module validates that the user still owns the membership NFT before processing a renewal.
+    - The module checks that the renewal is within the expected time window (after `nextRenewalTime` but before `GRACE_PERIOD` ends) to prevent spamming and premature renewals.
+    - The renewal process is routed through the user's Modular Account using `executeWithRuntimeValidation`, ensuring the user's account, not the operator, is the `msg.sender` for the final `renewMembership` call.
+    - The core parameters of the renewal, the target `space` contract and the `tokenId`, are immutable after the subscription is installed.
+  
+    ## Actors
+  
+    ### **Protocol Owner**
+  
+    The Protocol Owner is the entity that deployed and controls the `SubscriptionModule` diamond contract itself. This is a highly trusted role responsible for maintaining and upgrading the module's logic and the diamonds facets.
+  
+    - Is trusted to maintain and upgrade the module's logic securely. As the owner of the diamond, this role has the absolute power to change any part of the module's implementation at any time by performing a diamond cut (adding, replacing, or removing facets). Users trust that the owner will not introduce malicious code that could steal funds, modify subscription parameters without consent, or otherwise compromise the security of their accounts.
+    - Is trusted to manage the operator whitelist responsibly. The Protocol Owner controls which addresses are designated as operators and are authorized to call `batchProcessRenewals`.
+    - Cannot directly access user funds or change individual subscription parameters. The owner's power is over the contract's logic, not its state. Any malicious action would require deploying new, malicious code to the diamond first.
+    - If compromised, a malicious Protocol Owner could replace the entire `SubscriptionModule` logic with a contract that drains funds from all subscribed users on the next renewal cycle. The primary mitigation is the security of the protocol's multisig process itself which governs the owner account.
+  
+    ### **Operator (`operator` role)**
+  
+    The Operator is a trusted, whitelisted off-chain entity responsible for monitoring all active subscriptions and triggering the on-chain renewal process. The contract is designed to limit its power, making it a transaction facilitator rather than a decision-maker.
+  
+    - Can trigger the `batchProcessRenewals` function for any subscription that is due.
+    - Cannot renew a subscription that is not due, is paused, or for which the user is no longer the owner of the membership NFT.
+    - Cannot alter the terms of a subscription (e.g., change the price or duration).
+    - Cannot access or spend user funds directly; it can only initiate a transaction that the user's own account must validate and execute.
+    - If compromised, an attacker could temporarily disrupt the service by failing to process renewals. However, they cannot steal funds or renew subscriptions against the rules of the contract. The primary mitigation is that any other authorized operator can process the due renewals and its role can be modified by the protocol owner.
+  
+    ### **Space Contract**
+  
+    The `space` is the target contract that manages the actual membership. It is trusted by the `SubscriptionModule` to provide accurate information about the membership's status and terms.
+  
+    - Can define the price and duration of a membership renewal.
+    - Can verify ownership and execute the `renewMembership` function.
+    - The `SubscriptionModule` checks for the `space` to be a legitimate contract.
+    - The `SubscriptionModule` includes internal logic to handle changes in membership terms. If the `space` modifies the price or duration, the module will automatically pause renewals and emit appropriate events to notify the user.
+  
+    ### **End User (`ModularAccount` owner)**
+  
+    The User is the owner of the Modular Account and the ultimate principal in the system. They are trusted to make their own financial decisions by installing and configuring the module.
+  
+    - Can install the `SubscriptionModule` for a specific NFT membership, defining the `entityId`.
+    - Can pause, resume, and uninstall the module at any time, giving them full control over their automated payments.
+    - Cannot be forced into a subscription; installation is a voluntary, user-initiated action.
+    - The primary risk for the user is a loss of funds through multiple renewals due to misconfiguration. The primary risk for the user is a loss of funds through multiple renewals due to misconfiguration. The module's internal checks protect against interacting with a malicious `space` contract or unexpected changes in the membership's terms (price/duration), serving as the primary mitigation against operator error.
+  </template>
+</content-for>
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within <i>contracts/src/apps/modules</i> repository directory:</p>
+
+  <template type="file-hashes">
+  a880a4de3839ab8f6ab31671459e7368cd0199129e9ffde81f9b6064edb59f27  /subscription/ISubscriptionModule.sol
+  7a09015e00f310b007cf829d6f063ce6faf07fe445679062abc54ed74c1a12bd  /subscription/SubscriptionModuleFacet.sol
+  fcac773dcfdf83cbb8b05f205437a6db0be983f98c4c841aab17e1c53b5e1abc  /subscription/SubscriptionModuleStorage.sol
+  </template>
+
+</content-for>
+
