@@ -1,0 +1,129 @@
+<item>
+    <field name="topic">Protocol design</field>
+    <field name="impact">critical</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">76f33b892aa0c94201ebda9d9c53d46eb034e9de</field>
+    <field name="content">
+      ## [C-1] Stale price of closed markets results in breaking core protocol functionality
+  
+      This update is intended to allow for markets that use assets outside of crypto, that are not traded and thus priced 24/7, and instead have market operating hours, like US stocks. This results in the oracle no longer updating the price once the markets have closed, resulting in stale data errors when querying the prices normally. In order to allow for important functionality like liquidations of accounts that contain positions in these markets while they are closed, the function [getCurrentPricesWithClosedMarkets()](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/storage/PerpsPrice.sol#L85-L131) is used, where the owner can close markets via [closeMarkets()](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/modules/MarketCloseModule.sol#L48-L63) which stores the current price as the price at market close and closes the market. This allows for position value to still be calculated when markets close and allows liquidations to occur. However other important functionality like [reportedDebt()](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/modules/PerpsMarketFactoryModule.sol#L114-L138), used by the core protocol to determine markets it supports debt, would revert if any market that is closed, locking key functionality for the protocol.
+  
+      **Remediations to Consider**
+  
+      Allow for closed market handling in [getCurrentPrices()](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/storage/PerpsPrice.sol#L45-L83) rather then use custom handling for liquidations via [getCurrentPricesWithClosedMarkets()](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/storage/PerpsPrice.sol#L85-L131).
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Error Recovery</field>
+    <field name="impact">critical</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">015e17891683f99970db6e4568c39e732c1ebefb</field>
+    <field name="content">
+      ## [H-1] Not closing markets in time can lock key protocol functionality
+  
+      For the reasons described in C-1, once markets are closed the oracle will no longer update the price and would resulting stale pricing which effects core functionality. [closeMarkets()](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/modules/MarketCloseModule.sol#L48-L63) is intended to be called at market close to store the last price and mark as close to allow for custom handling via [getCurrentPricesWithClosedMarkets()](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/storage/PerpsPrice.sol#L85-L131). However, if for whatever reason the owner does not manage to call to close a market within 60 seconds of the market close price being updated, then they will be prevent from doing so, as it will revert due to the stale closing price. This would then result in the same issues described in C-1, even if resolved as suggested, until the market is able to be opened.
+  
+      **Remediations to Consider**
+  
+      Allow for a market to be closed even if the data is stale to prevent locking the protocol if a market is missed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">pricing</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">76f33b892aa0c94201ebda9d9c53d46eb034e9de</field>
+    <field name="content">
+      ## [H-2] Wrong pricing tolerance
+  
+      [getCurrentPricesWithClosedMarkets()](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/storage/PerpsPrice.sol#L85-L131) is intended to be the same as [getCurrentPrices()](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/storage/PerpsPrice.sol#L45-L83), with the exception of handling closed markets and use of strict tolerance as it is supposed to be used for liquidations which only use strict price tolerance:
+  
+      ```solidity
+       bytes32[] memory runtimeKeys = new bytes32[](0);
+        // tolerance is STRICT (no runtime keys supplied here; mirrors previous behavior)
+        NodeOutput.Data[] memory outputs = oracleManager.processManyWithRuntime(
+            feedIds,
+            runtimeKeys,
+            runtimeKeys
+        );
+      ```
+  
+      Reference: [PerpsPrice.sol#L118-124](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/storage/PerpsPrice.sol#L118-L124)
+  
+      However, it is using the logic for default tolerance, as the logic for anything other than `Tolerance.DEFAULT` uses non-zero keys and values:
+  
+      ```solidity
+       if (priceTolerance != Tolerance.DEFAULT) {
+            bytes32[] memory sharedRuntimeKeys = new bytes32[](1);
+            sharedRuntimeKeys[0] = bytes32("stalenessTolerance");
+  
+            bytes32[][] memory runtimeKeys = new bytes32[][](marketIds.length);
+            bytes32[][] memory runtimeValues = new bytes32[][](marketIds.length);
+  
+            for (uint256 i = 0; i < marketIds.length; i++) {
+                bytes32[] memory newRuntimeValues = new bytes32[](1);
+                newRuntimeValues[0] = toleranceBytes(load(marketIds[i].to128()), priceTolerance);
+                runtimeKeys[i] = sharedRuntimeKeys;
+                runtimeValues[i] = newRuntimeValues;
+            }
+  
+            outputs = oracleManager.processManyWithManyRuntime(feedIds, runtimeKeys, runtimeValues);
+        } else {
+             bytes32[] memory runtimeKeys = new bytes32[](0);
+              // do the process call
+              outputs = oracleManager.processManyWithRuntime(feedIds, runtimeKeys, runtimeKeys);
+              }
+      ```
+  
+      Reference: [PerpsPrice#L57-76](https://github.com/Polynomial-Protocol/fx-contracts/blob/4d7e3512dfcbe3b2d009252f846fd64dc5d3b722/markets/perps-market/contracts/storage/PerpsPrice.sol#L57-L76)
+  
+      This can result in inaccurate pricing for liquidations, and wrong determinations if an account should be liquidated or not. 
+  
+      **Remediations to Consider**
+  
+      Use the strict tolerance logic of `getCurrentPrice()`, or alternatively adjust getCurrentPrice() to handle closed markets and remove `getCurrentPricesWithClosedMarkets()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Inconsistency</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-1] Potentially inconsistent rollover fees
+  
+      Currently rollover fees are only applied when an account is updated, using the value of the markets rollover fees at the time of update. This is fine if the rollover fee does not change since the last position update, however if it does change potentially to incentivize LPs during high volatility, then the user would be charged the new fee, be it higher or lower than the last, when they next update their position. This leads to potential over or under charging of fees, and inconsistent rewards for LP providers. It could also result in cases where if the rollover fee is increased temporarily, for high volatility, then a user may delay updating their position until the rollover fee is reduced in order to reduce the fees charged to them. 
+  
+      **Remediations to Consider**
+  
+      Consider keeping tabs of a cumulative fee rather than just a last updated timestamp, if the account and market each has a cumulative fee of time * current rolloverFee, then after a fee change the new fee would only be applied for time after the update, and not used for the entire time since an account was last updated, resulting in accurate fees. Additionally, you could consider adding a public method that allows charging fees owed by an account, since fees to the protocol are only applied on update which could never occur. Allowing for inactive accounts with large fees to be collected.
+
+    </field>
+    <field name="response">
+        rolloverFee is operated as static for now and we do not expect changes soon.
+Interim: We will not modify rolloverFee until the cumulative accounting fix is live. If an urgent change is required, we will announce the effective block in advance.
+Planned fix: Add a cumulative rolloverFeeIndex with per-account lastIndex, and a keeper method to charge inactive accounts. Targeted for the next upgrade window.
+</field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      ## [I-1] Positions in closed markets cannot be modified until the market is reopened
+  
+      The intended behaviour of handling closed markets is that positions cannot be modified while they are closed, acting similarly to traditional stock markets the underlying assets are traded on. This is to prevent trading on information that would effect price but is not tracked by the oracle, leading to an unfair edge. Although this behaviour is not explicitly handled, when querying the price of the asset will revert due to stale data, preventing updating the position as intended.
+  
+      Users should be aware that these positions are limited to the hours of the traditional markets they are traded on, unlike other markets on polynomial.
+    </field>
+    <field name="response">
+        This is intended. During off-market hours the oracle is stale. The app will display data based on the last official close price and clearly indicate “Market closed.” Users cannot modify positions during this period.
+        Planned: Add explicit market-hours checks with clear errors and a read API for next open and close times.
+    </field>
+  </item>
+  
