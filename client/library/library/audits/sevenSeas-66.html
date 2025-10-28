@@ -1,0 +1,42 @@
+<page
+  clientName="Seven Seas"
+  reportDate="October 27th, 2025"
+  auditTitle="Seven Seas A-66"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  issueSummaryFormat="table"
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on October 23rd, 2025.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li class="break-words break-all">
+        <b>A new DvStETH decoder function (from <a href="https://github.com/Veda-Labs/boring-vault/pull/500">PR 500</a>)</b> </br>
+        Commit Hash: <code>49dcf0d8e823852f78218eecacd82ec61db7fc8f</code>
+        <template type="file-hashes">
+            0922f519abe32719ab6b1a51718ddc89d1cd29523b3d7d42cc1bd53fdb9b1fcb  src/base/DecodersAndSanitizers/Protocols/DvStETHDecoderAndSanitizer.sol
+        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>A new FluidDex decoder function (from <a href="https://github.com/Veda-Labs/boring-vault/pull/501">PR 501</a>)</b> </br>
+        Commit Hash: <code>258c2fe9ea1d206123eb6e1047ec62d1789712e4</code>
+        <template type="file-hashes">
+            9b0c088eafa05e965fd152c58b3ff2817a8f40a21511a9a7953025b2f232c904  src/base/DecodersAndSanitizers/Protocols/FluidDexDecoderAndSanitizer.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
