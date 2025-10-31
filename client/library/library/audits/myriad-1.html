@@ -1,0 +1,47 @@
+<page
+  clientName="Myriad"
+  reportDate="Oct 31, 2025"
+  auditTitle="Myriad A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/web3-consulting/myriad-contracts"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="6fc4543d95e7763bb03f490205bcb4a66aee57bd"
+  finalRepoCommitHash="d9f4e6096c7ec4c5f6f80ebbd67cadfb6bb33f42"
+  passwordEncrypt="env:PAGE_PASS_MYRIAD_1"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on October 21-22 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+     <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+       ### Actors
+        - **`ClaimableFactory` Owner**: The owner of the factory contract. They are trusted to deploy new Claimable contracts with the correct implementation logic and legitimate parameters (Merkle root, token, and role addresses).
+        - **`Claimable` Owner / Upgrader**: The owner of an individual Claimable contract. They can upgrade the contract's logic and change its Merkle root at any time. This is a highly trusted role, relied upon not to introduce malicious code or alter claim rules to their benefit.
+        - **Pauser**: The holder of the `PAUSER_ROLE` for a Claimable contract. They are trusted to only pause or unpause claiming during a legitimate emergency and not to cause a denial of service.
+        - **Withdrawer**: The holder of the `WITHDRAWER_ROLE` for a Claimable contract. They can withdraw all tokens from a contract, but only if it is paused. They are trusted to act only in emergencies and to handle funds responsibly.
+        - **Token Deployer**: The initial creator of the Myriad (MYR) token. They are trusted to mint the correct supply, making it immutable and setting the total supply on deployment.
+    </template>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+    5a5c28dfed3e68340e2bfc3df29bc894a915e6414dda35d235eab19b1d98c114  contracts/Claimable.sol
+    ea81e536b36e3422aadc4a137f6a51a9da7f7072909e47855d66e6f06a070c7a  contracts/ClaimableFactory.sol
+    78802d4c12bdd9f4a5bf015bde1e9a945a5af3d531f4d14f44d946f14b37e2d5  contracts/Lock.sol
+    16da4e4b13479fad7d63a3173deb5798f9bae65fa9265ce66f66610a62ac41c9  contracts/Myriad.sol
+    </template>
+  </content-for>
+</page>
