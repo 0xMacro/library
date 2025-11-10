@@ -1,0 +1,38 @@
+<page
+  clientName="Pool Fans"
+  reportDate="October 29, 2025"
+  auditTitle="Pool Fans A-1"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/pool-fans/clanker-revenue-shares-tokenizer"
+  repoCommitHash="23696f1e40beedee6f678cb1b456e37ffd6e68bc"
+  repoCommitHashFinal="9bd282f98c2c2c330670e487e0e7121947b565b0"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from October 15, 2025 to October 21, 2025.
+</content-for>
+  
+<content-for name="spec">
+<ul>
+    <li>Discussions on Telegram with the Pool Fans team.</li>
+</ul>
+</content-for>
+  
+<content-for name="source-code">
+  
+    <p>Specifically, we audited the following contracts within the repository with focus on the following changes:</p>
+  
+    <template type="file-hashes">
+        369a93055b18b2f0689017b17dc527a8f4865e15e00f5fbd1ca51c1ef1bee565  contracts/access/AccessControlled.sol
+        c96bf90c132996c82e7617f8f9ac27a44a67b7d7008600a534265483313495d6  contracts/interfaces/IClankerTokenizerV3_1_0.sol
+        c96bf90c132996c82e7617f8f9ac27a44a67b7d7008600a534265483313495d6  contracts/interfaces/tokenizers/IClankerTokenizerV3_1_0.sol
+        f4263322c1bc46c1b0e4172639b584fabbaf6234d37508a1c94261ed58a38b6d  contracts/revenue/registry/RevenueShareRegistry.sol
+        bf93192a7f64136209fd78792c6f284eaceb88bd87626da15496e91633a09081  contracts/revenue/tokenizers/BaseTokenizer.sol
+        175bb7cca6117717ec8dd0ce8db93fa4da0ccea62424a4ee664d5e52202d6215  contracts/revenue/tokenizers/v3.1.0/ClankerTokenizerV3_1_0.sol
+        d6d8499f35185f0ab5d0e1099459a838d026e5dbc9e7d9860f62e4409e9f7808  contracts/revenue/tokenizers/v4/ClankerV4Tokenizer.sol
+        f6dde38453c275380dbaf11c223fccc8715b55201d93d1702af254456402d931  contracts/revenue/vaults/BaseRevenueShareVault.sol
+        b5c83fd5dc31f8f4784dc15cc4b0005126856b324df34c33cfe9552ec81ee9ae  contracts/revenue/vaults/v3.1.0/RevenueSharesVaultV3_1_0.sol
+        11b8854300d27af594d18a3313d78c4ef1d6de889b0272114142675be659bf47  contracts/revenue/vaults/v4/RevenueSharesVaultV4..sol
+    </template>
+</content-for>
