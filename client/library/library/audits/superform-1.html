@@ -1,0 +1,56 @@
+<page
+  clientName="Superform"
+  reportDate="November 27, 2025"
+  auditTitle="Superform A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/superform-xyz/v2-periphery"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="50a50fe31e4f661f6f339dc59d9eeaf1011db4bd"
+  passwordEncrypt="env:PAGE_PASS_SUPERFORM"  
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on November 10-27th 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+        5aef0f5c866a86bbed9337112302ec3453ebe0f3b6deba2eb9ca5cb678641107  src/Bank.sol
+        cb8ef4b611d8af50944c7bfc1d695911e514a5021b4ce30791f477786b6eccd3  src/SuperBank.sol
+        b9658c31555ceafdf4a640b2b1cf79c98099002a5e64be0e5e17082d99d2534c  src/SuperGovernor.sol
+        138c257dd1873d8fd0afeb8202a7faa9517437fce64cb3a152afe96f6697e26f  src/SuperVault/SuperVault.sol
+        eb51620340329a4fbf1ed5dba4a0032499833373a821e0d6c9cecf36787c9da6  src/SuperVault/SuperVaultAggregator.sol
+        1334406f55194b0197e67640e6f084cc02982f856dcabad164079cf6e814b6a7  src/SuperVault/SuperVaultEscrow.sol
+        a5005f2b33a657a5e1b3c5aa88083212193effa936da94f9106eda683dc10ee3  src/SuperVault/SuperVaultStrategy.sol
+        9d6cdb17c021c83abd5b3feaf33e2a706e5cdb3b55a3220cc3ad9ea407d97b3f  src/UP/Up.sol
+        8c10aa245d8376e9f67035e0999803d3e9a0b5aba0f486eb8475e095bf813e23  src/interfaces/IHookExecutionData.sol
+        3b1af18d8e0332b1247f592469dbab109d561b22e7276e65ee9b82aca51b494e  src/interfaces/ISuperBank.sol
+        f84c45a9fb3ac72617716b8ac24cfe344ba79017902607980b4eeb8ceb001379  src/interfaces/ISuperGovernor.sol
+        021873ce6182b29a91b6be1d78eb23ad06f2de8e8de9d3826b5483a88aea57c3  src/interfaces/SuperVault/ISuperVault.sol
+        d43a152dd37f7da2aed10a5a8320f90a695dcd83d51112243992c9dd5cb43924  src/interfaces/SuperVault/ISuperVaultAggregator.sol
+        543d1c8b3580f081fcd98d6f870f06bb0798754357f0f6ad2f2f6f6570465fce  src/interfaces/SuperVault/ISuperVaultEscrow.sol
+        9aaee94c3a6053aaf2f8bf24ad4496c81e11aecb699695db8c935f853bafc577  src/interfaces/SuperVault/ISuperVaultStrategy.sol
+        61dd021df05fd4a4cbd90b304608f05d89619f93b3dd7ecdcffe3b5c058c5e9a  src/interfaces/oracles/IECDSAPPSOracle.sol
+        da7bb85a8364127adc34ba28770328310e09ad65052c44cd41e86d7177ff5a0a  src/interfaces/oracles/ISuperOracle.sol
+        cd62cccc4b2e4c056ed6a811534792c585da28b297c7e71032d2b759fa00fb73  src/interfaces/oracles/ISuperOracleL2.sol
+        18cf781c1807eb3ab7c59d65d95835f11e50faab5494e72c7f0210aa77c67d2a  src/libraries/AssetMetadataLib.sol
+        18ff77e9d8d6127555b0774f836b6180f3296b78a12ffb7d81cef10bd84d727f  src/libraries/SuperVaultAccountingLib.sol
+        ddc96944bc82c463178829b75924613c6b3fe7d9582b9f54ab43db70e4488f4c  src/oracles/ECDSAPPSOracle.sol
+        5bfd2cf0ede99e518710ffe3ee8b31e10455f2fcdbee17506a05e0ad610ecd02  src/oracles/SuperOracle.sol
+        45df47d61618e37a91ad6fa5592196bb302daf6314abcb6cd055a100d759d56b  src/oracles/SuperOracleBase.sol
+        73f6b7c40edaf8d4bca02c1476fd3d6c4d64724aeb6ca7d446b629bf815e0699  src/oracles/SuperOracleL2.sol
+    </template>
+  </content-for>
+</page>
