@@ -1,0 +1,45 @@
+<page
+  clientName="Fleek"
+  reportDate="Dec 2, 2025"
+  auditTitle="Fleek A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/fleek-platform/fleek-contracts"
+  repoCommitHash="f6ede261b4f069e4238f4f2e3f01805478f4a662"
+  repoCommitHashFinal="e0fa18f2b4ac2fd390660b7abdfb686b02f292d2"
+  passwordEncrypt="env:PAGE_PASS_FLEEK_2"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from November 3rd - 9th, 2025.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+  </ul>
+
+</template>
+</content-for>
+
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    4b9481d81cd6d879c89fdd48085144648302db66c71951ca8bbe7c836a1ac251  src/creator-tokens/core/BondingCurveFactory.sol
+    ba2a2860f4e75fdcd05ed0e906e7c4af91d8a78417df46d71fa3db6a4c9a5b12  src/creator-tokens/core/CreatorCoinFactory.sol
+    2940ce8c4503781f9d697180e4eb10f1449909b11a35a8420449a1644900b0e4  src/creator-tokens/core/CreatorTokenFactory.sol
+    34313005b5e263703d83fe08f4a19d90e27d9c7ebed9e881334c6d8c6eb433c8  src/creator-tokens/curve/BondingCurve.sol
+    2d8e74268b70f8ba5f76b089b45dd47b20cbadc3d9f1ca6f68bd81abdd72e8fd  src/creator-tokens/hooks/UniversalAntiFlipFeeHook.sol
+    a4e822f9ca919a937bb506bebfbbd4f19ee66c16cc938cc014822639d4464300  src/creator-tokens/libraries/AntiFlipFeeLib.sol
+    bb8fd4f624ee252d5bf8ed16522e42a8960e736735ea451a2b30d415c8f370b8  src/creator-tokens/libraries/BaseUniswapDeployments.sol
+    ddfb95146a4153db5e3ac60553dcb9605c9e6957e15a8ee78eec7d486a2952ff  src/creator-tokens/libraries/Config.sol
+    be15351082e81533aa09346accf20fa923c2530f88575c1c9519be77fa6e56e6  src/creator-tokens/libraries/LinearCurveMath.sol
+    d09b450b3f09107084239d3aa2cd8ed14c657ba408e46608cdf7f2fa16fdfd97  src/creator-tokens/tokens/CreatorCoin.sol
+    72fb0f5995cc21668cc6531eb5f6d16bea3561f002071caa4702989d062afbcd  src/creator-tokens/tokens/CreatorVesting.sol
+  </template>
+</content-for>
