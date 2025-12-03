@@ -1,0 +1,70 @@
+<page
+  clientName="Seven Seas"
+  reportDate="April 9, 2025"
+  auditTitle="Seven Seas A-38"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team over multiple days starting on March 25th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Update Teller Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/199">PR 199</a>)</b> </br>
+        Commit Hash: <code>2e1aefc93c797f7b9dcf326e4ecafb089f9b3050</code>
+        <template type="file-hashes">
+          e9441676ec8cc20d6cea06fde3386a33bc9059ede8e7b766de06b3a3850ed7cb  src/base/DecodersAndSanitizers/Protocols/TellerDecoderAndSanitizer.sol        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>BGT Reward Vault Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/196">PR 196</a>)</b> </br>
+        Commit Hash: <code>940440698d9d60251403d88281c59e7cf5c00215</code>
+        <template type="file-hashes">
+          6aaec9182ff537784ecf726b58ec8167df3ddb8b5fc2349c77c36ee109e39d6e  src/base/DecodersAndSanitizers/Protocols/BGTRewardVaultDecoderAndSanitizer.sol    </template>
+        </li>
+
+      <li class="break-words break-all">
+        <b>Ooga Booga Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/213">PR 213</a>)</b> </br>
+        Commit Hash: <code>1d1af4d49c3a733e84fdea80d841ac6b0c0462ca</code>
+        <template type="file-hashes">
+          7a0c176c5e4318489d52b0c8e7d907831256f4fd7c9977a4e9f894f411016e14  src/base/DecodersAndSanitizers/Protocols/OogaBoogaDecoderAndSanitizer.sol        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Derive Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/215">PR 190</a>)</b> </br>
+        Commit Hash: <code>a6d2c5e0a0a2453e4daeccd571d21e0693cfef85</code>
+        <template type="file-hashes">
+          1eeedf888cd31aed41acacf1a6401737d8d08e1cd6a0572fea921e02a7d6f834  src/base/DecodersAndSanitizers/Protocols/DeriveDecoderAndSanitizer.sol
+        </template>
+      </li>
+      <li class="break-words break-all">
+        <b>USDT Solver fix (from <a href="https://github.com/Veda-Labs/boring-vault/pull/222">PR 222</a>)</b> </br>
+        Commit Hash: <code>ce98633c047b78c73a11a1f1db4ead531e709d1b</code>
+        <template type="file-hashes">
+          48bafa7fdc8326f4c5c5150fb2bf858cf6386654957613ac00ae00c71d149dad  src/base/Roles/BoringQueue/BoringSolver.sol
+        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>EigenLayer ELIP update</b> </br>
+        Commit Hash: <code>4372c11b0aee697696b6bf84a22cf88b2b336e9d</code>
+        <template type="file-hashes">
+          badd34ed1cb36ca1964832c3c33e16e02de1b7b8ef03126aab8d6c4426f50010  src/base/DecodersAndSanitizers/Protocols/EigenLayerLSTStakingDecoderAndSanitizer.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
