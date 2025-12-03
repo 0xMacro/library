@@ -1,0 +1,34 @@
+<page
+  clientName="Seven Seas"
+  reportDate="September 29th, 2025"
+  auditTitle="Seven Seas A-62"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on September 9th, 2025.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Merkle Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/445">PR 445</a>)</b> </br>
+        Commit Hash: <code>8266d27ad6e2d780dedb38480bca932e2a545b8a</code>
+        <template type="file-hashes">
+            cf0b15775fda6e2840afc414dfcc846063c51e642a0615479047db20dc8f096d  src/base/DecodersAndSanitizers/Protocols/MerklDecoderAndSanitizer.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
