@@ -1,0 +1,34 @@
+<page
+  clientName="Sentora"
+  reportDate="December 19, 2025"
+  auditTitle="Sentora A-7"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/Into-The-Block-Corp/ITBKamino"
+  repoCommitHash="2c7a3378b143dd50b081255358f2b302a5924bca"
+  customReviewInfo
+  issueSummaryFormat="table"
+  passwordEncrypt="env:PAGE_PASS_SENTORA_6"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on November 26th 2025.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts for the Initial commit:</p>
+
+    <template type="file-hashes">
+        f25c00284baedf4778a0b8e52d96048e0b66d0e4ff9512619346ab6815252a51  programs/position-manager/src/instructions/vault_position/withdraw_liquidity.rs
+    </template>
+
+    <p>This was a review of a single commit, designed to upgrade a breaking change caused by a 3rd party dependency's upgrade.</p>
+
+  </content-for>
+</page>
