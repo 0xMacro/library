@@ -1,0 +1,34 @@
+<page
+  clientName="Sentora"
+  reportDate="September 25, 2025"
+  auditTitle="Sentora A-5"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/Into-The-Block-Corp/ITBSupervisedLoan"
+  repoCommitHash="2400147db8b2d233d1b9cb97c954d44c26342861"
+  issueSummaryFormat="table"
+  passwordEncrypt="env:PAGE_PASS_SENTORA_4_5"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on September 16th, 2025.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts for the Initial commit:</p>
+
+    <template type="file-hashes">
+      bcedb2d74c421a85682e20c1fa49324eb4e3a2c31341ea75ab31cde0395342da  contracts/0.8.21/PendleYieldPosition/pendle/PendleMarketV3.sol
+      284052820861da843830d804aebf5888bc9e2c5b07c9ca4059a50ec2818a0b41  contracts/0.8.21/PendleYieldPosition/pendle/PendleRouterV3.sol
+      b9d45e0a68712deb98ba335a28a93a187c27ec6bc708f47588d796a6cb96f2cf  contracts/0.8.21/PendleYieldPosition/pendle/PendleSY.sol
+      947473cfad8a2717422e310af4774b54510051f1272231542696cf75532543cf  contracts/0.8.21/PendleYieldPosition/pendle/PTOracle.sol
+      7b494401027e795dbd0b5b8bd50a1030d14c99b81bd8a3eb5fc73c03a0b42358  contracts/0.8.21/PendleYieldPosition/PositionManager.sol
+    </template>
+  </content-for>
+</page>
