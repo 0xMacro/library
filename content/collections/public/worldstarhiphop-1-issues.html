@@ -1,0 +1,37 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">ff34a548f080a16a8f8f46a828b0311f05b8194c</field>
+    <field name="content">
+     ## [M-1] Total supply would be larger than intended
+
+        The total supply is defined as a constant:
+
+        ```jsx
+        uint256 public constant TOTAL_SUPPLY = 2_005_377_000 * 10**18;
+        ```
+
+        The supply is minted in the constructor and sent to the multisig address. The assumption is that the total supply should be across all deployed chains. With the current design, however, the supply will be minted on each chain, leading to a much larger supply than intended.
+
+        **Remediation to Consider**
+
+        Pass the total supply as a constructor argument and only set the actual amount on the “main” chain. For any other chains on which the contract will be deployed, set the amount to 0.</field>
+    </item>
+
+<item>
+    <field name="topic">Redundant Code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d78270caf466c0ad73bd745b1f808a7d53014cdc</field>
+    <field name="content">
+## [Q-1] Unnecessary `require` statement
+
+The constructor includes a `require` statement to verify that a valid `_delegate` address was passed. However, this check is redundant, as it is already checked in OAppCore.sol; see [here](https://github.com/LayerZero-Labs/LayerZero-v2/blob/main/packages/layerzero-v2/evm/oapp/contracts/oapp/OAppCore.sol#L29).
+
+**Remediation to Consider**
+
+Remove the `require` statement for the `_delegate` address from the constructor.
+ </field>
+</item>
