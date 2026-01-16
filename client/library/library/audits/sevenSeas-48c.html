@@ -1,0 +1,42 @@
+<page
+  clientName="Seven Seas"
+  reportDate="June 18, 2025"
+  auditTitle="Seven Seas C-48"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault-ui"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="5a0a5b4ac3367fd2bd248aad3d7bb6de39778773"
+  customReviewInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on June 3rd, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash:</b> </br>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+    </ul>
+  </content-for>
+
+    <content-for name="source-code">
+    <p>
+        We were specifically tasked by the team to examine the potentially vulnerable spl-token package import and assess whether it poses any security risks to the program.    
+    </p>
+
+  </content-for>
+</page>
