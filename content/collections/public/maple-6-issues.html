@@ -1,0 +1,30 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">42136fbec446d397ce553dd72c48e8e06f88930f</field>
+    <field name="content">
+        ## [L-1] Compromised tokenWithdrawer cannot be recovered
+
+       In the `GovernorTimelock`, only the current `tokenWithdrawer` can propose a new pending `tokenWithdrawer`.
+   
+       ```solidity
+       function setPendingTokenWithdrawer(address newPendingTokenWithdrawer_) external override {
+           require(msg.sender == tokenWithdrawer, "GT:SPTW:NOT_AUTHORIZED");
+   
+           pendingTokenWithdrawer = newPendingTokenWithdrawer_;
+   
+           emit PendingTokenWithdrawerSet(newPendingTokenWithdrawer_);
+       }
+       ```
+   
+       Therefore, if the current `tokenWithdrawer` is compromised, it would not be possible to replace it without redeploying the contract.
+   
+       **Remediations to consider**
+   
+       - Update `setPendingTokenWithdrawer()` to use the `GovernorTimelock` proposal mechanism or use the existing and available role-based access control to grant permission access to the `setPendingTokenWithdrawer()`.
+     </field>
+    </field>
+  </item>
+  

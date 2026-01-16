@@ -1,0 +1,266 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">f58203a5350d8be9d19f74eb4c706962dc249ed2</field>
+    <field name="content">
+      ## [H-1] Incorrect baselineBalance update allows revenue distribution to be manipulated
+  
+      In the `BaseRevenueShareVault`, revenue accounting is implemented across several internal functions which includes `distributeRevenue()`, `executeClaim()`, `updateRewards()` and `calculateUnclaimedRewards()`. 
+  
+      The accrued revenue that needs to be distributed and that has accumulated after previous execution, is tracked with the help of two variables, `currentBalance` and `baselineBalance` for the token. `baselineBalance` is immediately updated to the `currentBalance` value after calculating and updating incremental revenue per share.
+  
+      ```solidity
+      // In the _distributeRevenue()
+      uint256 currentBalance = IERC20(token).balanceOf(address(this));
+      uint256 delta = currentBalance - baselineBalance[token];
+      if (delta > 0) {
+          cumulativeRewardPerShare[token] += (delta * SCALE) / supply;
+          baselineBalance[token] = currentBalance;
+          emit RevenueDistributed(token, delta);
+      }
+      ```
+  
+      In order to correctly track new revenue, `baselineBalance` also needs to be continuously updated whenever token balance is claimed by users and tokens are transferred out of the vault. This is done in `executeClaim()` function.
+  
+      ```solidity
+      address token = rewardTokens[i];
+      uint256 reward = unclaimedRewards[user][token];
+      if (reward > 0) {
+          unclaimedRewards[user][token] = 0;
+          IERC20(token).safeTransfer(user, reward);
+          baselineBalance[token] -= reward;
+          emit RewardsClaimed(user, token, reward);
+      }
+      ```
+  
+      However, in an edge case when user address is the address of the vault itself, system invariants  are broken. In this case when vault has shares (obtained by accident or transferred to the vault by malicious attacker) and claim is made for the vault, `baselineBalance` of the token is reduced even though current balance does not change. Malicious attacker may manipulate reward distribution by calling `distributeRevenue()` in the loop (together with the `executeClaim(vault)`) in order to inflate `cumulativeRewardPerShare[token]` value. This would allow him to claim reward assets from all users of the vault.
+  
+      **Remediations to consider**
+  
+      - Disallow claiming to the vault in `executeClaim()` or in child `claimRewards()` , or
+      - Compute actual sent via balance-before/after and decrement  `baselineBalance[token]` by actual sent only.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">bec6430e36d9668fd3f51a88d9d482cd0baca5e0</field>
+    <field name="content">
+      ## [M-1] Stale fee preference can cause tokenization in incorrect vault
+  
+      In the `ClankerV4Tokenizer`, admin can update fee preference after calling the `initTokenization()` and before `finalizeTokenization()`. Admin can achieve this by calling `updateFeePreference()` on the `ClankerLpLockerFeeConversion` contract.
+  
+      In the `finalizeTokenization()` implementation, pending vault associated with the now stale fee preference will be used even though it is incorrect. Reward admin’s shares will be minted in a different vault than the expected according to the last fee preference.
+  
+      **Remediations to consider**
+  
+      - Take into account up to date value of fee preference at the time of `finalizeTokenization()` invocation, or
+      - Refactor implementation so that tokenization process is done in a single step.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">bec6430e36d9668fd3f51a88d9d482cd0baca5e0</field>
+    <field name="content">
+      ## [M-2] Two step tokenization can lead to permanently incomplete state
+  
+      In the `ClankerTokenizerV3_1_0` and `ClankerV4Tokenizer` , tokenization process is three step process. First step deploys or retrieves address of the appropriate vault in which future shares would be minted. Second step (done out of channel) requires from the admin of the rewards, to call corresponding Clanker contract to delegate permission to the new vault. Third and final step is for the reward recipient to invoke tokenization finalization on Tokenizer contract.
+  
+      However, this three step tokenization process for both 3.1 and 4.0 versions of tokenizer, comes with significant risk. The risk is that process may lead to permanently incomplete state in case the finalization cannot be successfully processed, after admin has already transferred his permission to the new vault. For example, this may happen in case reward receiver is a contract which does not have functionality and therefore cannot call `finalizeTokenization()`.
+  
+      **Remediations to consider**
+  
+      - Consider updating implementation to a two step process where reward admin transfers admin permission to tokenizer instead of vault, and then tokenizer performs all or nothing tokenization procedure, which if successful permanently grants admin and recipient rights to the new vault, otherwise allows original admin to transfer back to himself permission rights.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a4e75d038a7c13568e245105f279d0ad4e0509d4</field>
+    <field name="content">
+      ## [L-1] getAdminShareBps() may return incorrect value
+  
+      In the `ClankerV4Tokenizer` contract, getAdminShareBps() is implemented in the following way returning rewardBps of the first entry where admin address matches in the array of rewardAdmins.
+  
+      ```solidity
+      function getAdminShareBps(
+          address clanker,
+          address admin
+      ) external view returns (uint256) {
+          IClankerLpLockerFeeConversion.TokenRewardInfo
+              memory tokenRewardInfo = _getTokenRewardsData(clanker);
+          uint256 len = tokenRewardInfo.rewardAdmins.length;
+  
+          for (uint256 i = 0; i < len; i++) {
+              if (tokenRewardInfo.rewardAdmins[i] == admin) {
+                  return tokenRewardInfo.rewardBps[i];
+              }
+          }
+          return 0;
+      }
+      ```
+  
+      However, duplicate entries are possible in rewardAdmins array. As a result, output of the function will not be correct in cases when specific admin is present multiple times in the rewardAdmins array.
+  
+      **Remediations to consider:**
+  
+      - Update implementation to take into account multiple entries with the same admin value.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a4e75d038a7c13568e245105f279d0ad4e0509d4</field>
+    <field name="content">
+      ## [L-2] Deflation/rebase or external balance decrease may corrupt contract accounting
+  
+      In the `BaseRevenueShareVault`,  `distributeRevenue()` function is implemented in a way which may lead to contract becoming corrupted if deflation/rebase or external balance decrease can happen for the registered token.
+  
+      ```solidity
+      function _distributeRevenue() internal virtual {
+          uint256 supply = totalSupply();
+  
+          // Skip distribution if no shares minted yet (prevents division by zero)
+          // Note: Prevents dos attack since vault address uses create2 pattern, that allows to send tokens before tokenize
+          if (supply == 0) {
+              return;
+          }
+          uint256 len = rewardTokens.length;
+          for (uint256 i = 0; i < len; i++) {
+              address token = rewardTokens[i];
+              uint256 currentBalance = IERC20(token).balanceOf(address(this));
+              uint256 delta = currentBalance - baselineBalance[token];
+              if (delta > 0) {
+                  cumulativeRewardPerShare[token] += (delta * SCALE) / supply;
+                  baselineBalance[token] = currentBalance;
+                  emit RevenueDistributed(token, delta);
+              }
+          }
+      }
+      ```
+  
+      If a reward token is deflationary, rebases downward, or otherwise reduces the vault’s `balanceOf` without the vault explicitly updating `baselineBalance[token]` first, `currentBalance - baselineBalance[token]` underflows and reverts. This breaks distribution/updates and can permanently block future accrual/transfers.
+  
+      **Remediations to consider**
+  
+      - Make delta computation clamp to zero and realign the baseline on decreases, e.g., if `currentBalance <= baseline`, set `baseline = currentBalance` and continue without reward distribution. This gracefully handles deflation/rebase and maintains accounting invariants.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">bec6430e36d9668fd3f51a88d9d482cd0baca5e0</field>
+    <field name="content">
+      ## [Q-1] Use `DEFAULT_ADMIN_ROLE` named constant
+  
+      Both `BaseRevenueShareVault` and `BaseTokenizer` contracts implement `onlyAdmin` modifer which refers to admin role by using hardcoded constant value of 0.
+  
+      ```solidity
+      modifier onlyAdmin() {
+          if (!AccessControl(address(registry)).hasRole(bytes32(0), msg.sender))
+              revert OnlyAdmin();
+          _;
+      }
+      ```
+  
+      Since `AccessControl` is already imported in both contracts, consider using `DEFAULT_ADMIN_ROLE` constant instead of literal value 0.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">bd03e92ad5b18843455d57eeec91a893680bfb6d</field>
+    <field name="content">
+      ## [Q-2] BaseTokenizer defines owner which is not used
+  
+      ```solidity
+      // In BaseTokenizer.sol
+  
+      /// @notice Contract owner
+      address public immutable owner;
+  
+      ...
+      constructor(address _registry, address _lpLocker) {
+          registry = IRevenueShareRegistry(_registry);
+          lpLocker = _lpLocker;
+          owner = msg.sender;
+      }
+      ```
+  
+      Consider removing owner variable definition and its initialization unless it is necessary.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6752b1287aaf956613030815929aa328e1f261e7</field>
+    <field name="content">
+      ## [Q-3] Unnecessary code can be removed
+
+      1. The following errors are declared in `ClankerTokenizerV3_1_0` and `ClankerV4Tokenizer` but never used:
+          - VaultAddressMismatch
+          - AlreadyTokenized
+      2. The following errors are declared in `ClankerTokenizerV3_1_0` but never used:
+          - InvalidParticipantType
+          - LockerNotSupported
+          - InvalidFeePreference
+      3. The following errors are declared in `ClankerV4Tokenizer` but never used:
+          - VaultAlreadyExists
+          - NotRewardAdmin
+          - InvalidAdminCount
+          - InvalidRecipientCount
+          - RecipientNotVault
+      4. The following event is declared in `RevenueSharesVaultV3_1_0` but never used:
+          - FeesCollected
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">b8748b978fcbee0cddd7427b175cf83930dd9a31</field>
+    <field name="content">
+      ## [Q-4] Add mechanism to recover incorrectly transferred admin
+  
+      As a part of 2 step tokenization process, users are required to transfer admin rights to specific address of the corresponding `RevenueSharesVaultV3_1_0` or `RevenueSharesVaultV4` instance. 
+  
+      However, if in this process mistake is made there is no mechanism in the current implementation to recover admin rights.
+  
+      Consider, implementing feature similar to the currently present `rescueFunds()` for recovering incorrectly assigned `revenue admin` while preventing `revenue admin` transfers for operational vaults where tokenization has been previously completed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="content">
+      ## [I-1] Tokens with exotic ERC20 behavior are not supported
+  
+      Tokens that have not common mechanics are not supported.
+  
+      - Fee on transfer tokens - can cause incorrect reward distribution
+      - Deflationary tokens - can brick reward distribution
+    </field>
+  </item>
+  

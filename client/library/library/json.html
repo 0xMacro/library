@@ -1,5 +1,18 @@
-{{var sortedAudits = AuditMarkdown.sortByAndTransformDate(collection('audit-works'))}}
+{{var allAudits = collection('audit-works').map(a => ({...a, isPrivate: !a.report}))}}
+{{var auditsWithLogos = allAudits.filter(a => a.logo)}}
+{{var sortedAudits = AuditMarkdown.sortByAndTransformDate(auditsWithLogos)}}
 {{JSON.stringify(sortedAudits.map(audit => {
+  if (audit.isPrivate) {
+    return {
+      title: audit.title,
+      subtitle: audit.subtitle,
+      date: audit.date,
+      about: 'Private report (as requested by client)',
+      reportUrl: null,
+      vendorLogoUrl: `https://0xmacro.com/library/vendor/${audit.logo}`,
+      issues: null
+    }
+  }
   var match = audit.report.match('/library/audits/([^)]+)')
   return {
     title: audit.title,
@@ -7,7 +20,7 @@
     date: audit.date,
     about: audit.about && AuditMarkdown.renderIssueContent(audit.about),
     reportUrl: `https://0xmacro.com${audit.report}`,
-    vendorLogoUrl: audit.logo && `https://0xmacro.com/library/vendor/${audit.logo}`,
+    vendorLogoUrl: `https://0xmacro.com/library/vendor/${audit.logo}`,
 
     issues: match && (() => {
       var output = {}
