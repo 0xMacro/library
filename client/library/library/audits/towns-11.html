@@ -1,0 +1,71 @@
+<page
+  clientName="towns"
+  reportDate="September 11, 2025"
+  auditTitle="Towns A-11"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/towns-protocol/towns"
+  repoCommitHash="0288990f2fe6972a297eb5c99a6b39f7ac119857"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from July 28 to July 29, 2025.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Slack with the HNT team.</li>
+  </ul>
+  <template type="audit-markdown">
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    
+    ### End User
+  
+    Considered untrusted and potentially malicious. The system is designed to be defensive against users attempting to claim tokens for which they are not eligible.
+  
+    - The user's eligibility is strictly enforced by a cryptographic Merkle proof. The system assumes but also verifies that the user cannot forge a valid proof for an account they do not control or for an amount they were not allocated.
+    - The user is responsible for providing the correct claim data (`conditionId`, `proof`, etc.) to the contract functions. The contract validates these inputs against the protocol owner configuration in the drop conditions.
+    - A malicious user's actions are confined to their own claim attempts. They cannot impact the state or eligibility of any other user.
+    - When calling `claimWithPenalty`, the user is responsible for using the correct `expectedPenaltyBps`. The contract verifies the expected bps against the claim condition bps match.
+  
+    ### Protocol Governance (Owner)
+  
+    Highly trusted. The owner is a privileged role and authorized entity that has complete administrative control over the airdrop conditions. This entity is trusted to:
+  
+    - Set, add, and overwrite claim conditions (`setClaimConditions`, `addClaimCondition`). This includes setting all parameters: start/end times, penalty rates, and the token to be distributed.
+    - Correctly generate a unique Merkle root for each distinct airdrop campaign.
+    - Provide the contract with a sufficient balance of the designated token to satisfy the `maxClaimableSupply` for all active claim conditions.
+  
+    ### Rewards Distribution Contract
+  
+    Trusted core infrastructure. The `DropFacet` trusts the `rewardsDistribution` contract (set during initialization) to perform staking operations correctly.
+  
+    - It is trusted to securely handle the staking of tokens on behalf of users via the `stakeOnBehalf` function. This includes correctly managing deposits, rewards, and withdrawals.
+    - While the `DropFacet` can implement its own reentrancy guard, the security model inherently trusts that the `rewardsDistribution` contract will not perform malicious re-entrant calls.
+    - Given the current implementation, no signature logic validation is present and the passed data is kept for backwards compatibility.
+  
+    ### Points Contract (TownsPoints)
+  
+    Trusted core infrastructure. The `DropFacet` trusts this contract to handle the burning of points associated with a claim.
+  
+    - Reviewed during the audit, points burn performs balance checks and proper balance deduction logic.
+  </template>
+</content-for>
+
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within <i>./packages/contracts/src/</i> repository directory:</p>
+
+  <template type="file-hashes">
+    d567406654a56893f42fd8c061173627beb2d2fad55f9343ba9ba344e33189ad  /airdrop/drop/DropBase.sol
+    29674b4c298502093c6286821a0de2bc09a0fa22fa95c3a5387b3642f7f9d0ff  /airdrop/drop/DropClaim.sol
+    79f7c838ad5aa2139fced50d188018fdaae2aaa7fc245c1638205ade686e0e93  /airdrop/drop/DropFacet.sol
+    ee4752225abde1a205d5fbd9d6473e3ef2a2521f0a93ccf1324067cec7d5e18d  /airdrop/drop/DropGroup.sol
+    5ef288ac3443365cd0657b790032eb81d7068681de1d6494df80256dfcb80fb9  /airdrop/drop/DropStorage.sol
+    db0e2473fdf0e130ce71e8846c17b3714448641133bd5a9618f3678487b7b729  /airdrop/drop/IDropFacet.sol
+  </template>
+
+</content-for>
+

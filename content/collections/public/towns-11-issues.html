@@ -1,0 +1,88 @@
+<item>
+    <field name="topic">Leaf robustness</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] **Leaf generation does not include `conditionId`**
+
+  
+      In `DropClaim` contract, the function `createLeaf()` currently excludes the `conditionId` parameter. This means a proof is not cryptographically tied to a specific claim condition. If two different claim conditions were to accidentally have the same Merkle root, a user's proof will be valid for both. 
+  
+      ```solidity
+      function createLeaf(Claim calldata claim) internal pure returns (bytes32 leaf) {
+          address account = claim.account;
+          uint256 quantity = claim.quantity;
+          uint256 points = claim.points;
+          assembly ("memory-safe") {
+              let fmp := mload(0x40)
+              mstore(0, account)
+              mstore(0x20, quantity)
+              mstore(0x40, points)
+              leaf := keccak256(0, 0x60)
+              mstore(0, leaf)
+              leaf := keccak256(0, 0x20)
+              mstore(0x40, fmp)
+          }
+      }
+      ```
+  
+      Because claims are tracked by `groupId` in the `supplyClaimedByWallet` mapping, this would allow users to make multiple claims. Although the protocol owner must set the same root multiple times, and it’s assumed that this trusted entity will set proper values, this leaves a limited replay vector that could enable token draining. 
+  
+      Consider including the `conditionId` in the leaf generation.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Data Availability</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] Insufficient view functionality for retrieving active conditions
+      Consider implementing a view function to fetch available active conditions to help interoperability with off-chain components. 
+  
+      *Suggested draft code:*
+      
+      ```solidity
+      function _getActiveClaimConditions()
+              internal
+              view
+              returns (DropGroup.ClaimCondition[] memory activeConditions)
+          {
+          (uint48 conditionStartId, uint48 conditionCount) = _getStartIdAndCount();
+          if (conditionCount == 0) {
+              DropFacet__NoActiveClaimCondition.selector.revertWith();
+          }
+          activeConditions = new DropGroup.ClaimCondition[](conditionCount);
+      
+          uint256 activeIndex;
+          for (uint256 i; i < conditionCount; ++i) {
+              DropGroup.ClaimCondition storage condition =
+                  _getClaimConditionById(conditionStartId + i);
+              uint256 endTimestamp = condition.endTimestamp;
+      
+              if (
+                  block.timestamp >= condition.startTimestamp &&
+                  (endTimestamp == 0
+      | block.timestamp < endTimestamp)
+              ) {
+                  // Add the active condition to the array and increment the index
+                  activeConditions[activeIndex] = condition;
+                  activeIndex++;
+              }
+          }
+  
+          if (activeIndex == 0) {
+              DropFacet__NoActiveClaimCondition.selector.revertWith();
+          }
+  
+          // Truncate the array to the actual number of active conditions
+          assembly {
+              mstore(activeConditions, activeIndex)
+          }
+      }
+      ```
+    </field>
+  </item>
+  
