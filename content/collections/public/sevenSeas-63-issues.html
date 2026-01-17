@@ -1,0 +1,36 @@
+<item>
+  <field name="topic">Trust Model</field>
+  <field name="content">
+    ## [I-1] Delegated signer can bypass decoder validation through alternative execution paths
+
+    The `EthenaMintingDecoderAndSanitizer` validates order parameters when the vault calls Ethena's `mint()` or `redeem()` functions through the ManagerWithMerkleVerification. However, once a vault sets a delegated signer, that signer can create and submit orders through alternative execution paths that bypass all decoder protections.
+
+    According to Ethena's source code, an order signed by the delegated EOA is valid for the vault, regardless of:
+
+    - Who submits the transaction onchain
+    - What the `order.beneficiary` address is
+    - What the `order.collateral_asset` is
+
+    According to Ethena's API documentation, "orders must be submitted by the benefactor address." This means a compromised delegated EOA cannot directly submit orders to Ethena's API - only the vault (benefactor) can submit orders through the API.
+
+    However, Ethena's onchain `mint()` and `redeem()` functions are permissioned with `onlyRole(MINTER_ROLE)`. If there are multiple MINTER_ROLE holders (e.g., the vault itself and Ethena's hot wallets), a compromised delegated EOA could:
+
+    1. Sign an order with arbitrary parameters (e.g., `beneficiary = attackerAddress`)
+    2. Submit this signed order to another MINTER_ROLE holder
+    3. If that MINTER_ROLE holder executes it onchain, the vault's decoder is bypassed
+
+    This would require either:
+    - Tricking Ethena's systems into executing a malicious order (e.g., through social engineering or exploiting their validation logic)
+    - Finding another compromised/malicious MINTER_ROLE holder
+
+    ### Trust Model
+
+    According to the development team:
+
+    - Their vaults will be whitelisted for MINTER_ROLE
+    - The delegated signer will be their own trusted EOA
+    - There is no other way to mint through Ethena
+
+    **Given the above trust assumptions, this design is acceptable.** The delegated EOA is explicitly trusted, so its ability to bypass decoder validation is a known and accepted risk of the system.
+  </field>
+</item>
