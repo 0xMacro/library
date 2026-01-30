@@ -1,0 +1,14 @@
+<item>
+    <field name="topic">Vulnerable Import</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [I-1] Vulnerable Dependency in `boring-vault-ui`
+
+        The [boring-vault-ui repo](https://github.com/Se7en-Seas/boring-vault-ui/) uses a version of `spl-token` that imports a vulnerable library named `bigint-buffer`. Examining the specific usage shows that each instance of `AccountLayout.decode` interacts with the `toBigIntLE()` function, which contains the vulnerable code. 
+
+        The vulnerability should not be exploitable if the code prevents malicious users from supplying buffer overflow values. However, since the off-chain JavaScript portion was outside the audit's scope, Macro did not investigate this further.
+    </field>
+    <field name="response">
+        The usage of spl-token functions always take in publicKey types, which have defined limits. The buffer overflow is not possible because it doesn’t allow arbitrary lengths. 
+    </field>
+</item>

@@ -1,0 +1,52 @@
+<page
+  clientName="Seven Seas"
+  reportDate="June 18, 2025"
+  auditTitle="Seven Seas A-48"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-svm-tools"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="1e860a8ba5c21544dd22ba6f1b8052605fde2da6"
+  customReviewInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team over multiple days starting on June 3rd, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash:</b> </br>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+    </ul>
+  </content-for>
+
+    <content-for name="source-code">
+    <p>
+        Specifically, we audited the following files within this repository:
+    </p>
+
+    <template type="file-hashes">
+    a007f51c4d56cbac3c5498019ad4e4347180f932e6409ee75b0a5541486eb852  crates/svm-core/src/instructions/manage/jito.rs
+    16cf03b156c9fac0cf8cac0d1b99cd5cb89ea370136e458d3d99fd5f071f94ec  crates/svm-core/src/instructions/manage/kamino.rs 
+    </template>
+
+    <p>
+        <b>Note:</b> This document contains an audit solely of the Rust files listed above.
+    </p>
+
+  </content-for>
+</page>
