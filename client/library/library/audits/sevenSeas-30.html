@@ -1,0 +1,42 @@
+<page
+  clientName="Seven Seas"
+  reportDate="Mar 18, 2025"
+  auditTitle="Seven Seas A-30"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit performed by the Macro security team on February 12th 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li class="break-words break-all">
+        <b>UniwapV3 Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/117">PR 117</a>)</b> </br>
+        Commit Hash: <code>3b4600e77b8c9ef2c688e8b22399d2a31c9ef531</code>
+        <template type="file-hashes">
+          ea3b0e3d4a8818a118bdd240ba6190bacc36d0331cb16a6b76a485e7c14e05b6  src/base/DecodersAndSanitizers/Protocols/UniswapV3SwapRouter02DecoderAndSanitizer.sol
+        </template>
+      </li>
+      </br>
+      <li class="break-words break-all">
+        <b>LBTC Bridge Decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/120">PR 120</a>)</b> </br>
+        Commit hash: <code>1ac1f8f3a6fb88abac800a0099f42603a050b541</code>
+      <template type="file-hashes">
+        fe6ba4ee3a38203217a50a2e785019a5e77ff8dafc7e06e54acd92bffa72a8e1  src/base/DecodersAndSanitizers/Protocols/LBTCBridgeDecoderAndSanitizer.sol
+     </template>
+    </li>
+      
+    </ul>
+  </content-for>
+</page>
