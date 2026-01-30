@@ -1,0 +1,68 @@
+<page
+  clientName="Invention"
+  reportDate="December 15, 2025"
+  auditTitle="Invention A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/open-ip/invent-token"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="645644810876ec28cfa538c8cd9e2671d39d5d5e"
+  repoCommitHashFinal= "67179b0f386014efa8656a51b3838330762c60f8"
+  passwordEncrypt="env:PAGE_PASS_INVENTION_1"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on December 14th 2025. 
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Initial Commit Hash:</b> </br>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+
+      <li class="break-words break-all">
+        <b>Final Commit Hash:</b> </br>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+
+
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts:
+    </p>
+    
+    <template type="file-hashes">
+        9941115ac1b84f35c7d008d531ffe215ced49f246419a4d8995bde2b9f3c5e50  programs/invent-token/src/instructions/initialize.rs
+        b9423ecc6e39fcac728d490599ac187e8b70c26192f8f40c169a3c583f8eb26a  programs/invent-token/src/instructions/mint_to.rs
+        44ac16d59c189a3905541a13bc42fe199dccf73b1797a70f3dd0eacc677415de  programs/invent-token/src/instructions/mod.rs
+        424b0f659c7a8ee5c9b0c75ddf131cd9eeec7705006dcb16741e0339910a49c9  programs/invent-token/src/instructions/update_authority.rs
+        e54499fdc9b82b10b4bdfb8bcf1d9e116dc26698fa013a2b9c900aab4c424d15  programs/invent-token/src/instructions/update_metadata.rs
+        e2956f2c4ad5b0759a9701a9c81c517a971a6dff5f04f0cada3a8c1d560357f2  programs/invent-token/src/state/mod.rs
+        7b83a03a387d6ab891ee4251f79a0adf28f7af19ba89027ad9d4e3783934a52c  programs/invent-token/src/state/token_config.rs
+        cb05094a51e1ffb7c27d21755fe850c1169872252fb054dbfbbcbab0796fd217  programs/invent-token/src/constants.rs
+        92b8c487fec0fee46f43833d8011db310f3a82b760131b2454b8797cdd3e138e  programs/invent-token/src/errors.rs
+        674c304be122a8a45ca73de56154b34aea068ba58621e5c2676b7ba7d6cf2b2b  programs/invent-token/src/lib.rs
+    </template>                 
+  </content-for>
+</page>

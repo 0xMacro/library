@@ -1,0 +1,52 @@
+<page
+  clientName="Silicon"
+  reportDate="Jan 20, 2026"
+  auditTitle="Silicon A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/berkeleycompute/pooling"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash="17dff0be87f7fd1578db7bf455e6430eb0faf147"
+  passwordEncrypt="env:PAGE_PASS_SILICON_3"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from Dec 26th 2025 to Jan 9th 2026.
+</content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash:</b> </br>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+    </ul>
+  </content-for>
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+        ab173ab8a57787af5fb945bfe7e5be246e7d220fa1d1f4601352aff24ff706a1  src/CollectionRegistry.sol
+        5de155bebde2006f89949964480314cafaf7bdb02246b87349e3cb66508551f6  src/NftVaultV1.sol
+        6cad805e8cac9c2b263813f660cc8b3fde243f62d2fbaf037241519d4f986a8e  src/PayableNFT.sol
+        209d66a3adbef20c95794b02dff04d0fd33c8a207826714ba14699e269689563  src/PayableNFTLogic.sol
+        36d8c9fb7cc8527754601cd3d5538a82e972757f8128c693708682762f101a2e  src/PayableNFTModule.sol
+        16ac0c6750783d3fc5d4fd5ea5c1e46204e25e4013e60300d13230f486d4eb83  src/PoolToken.sol
+        02ef8ca0527bfafbf843c7e723078312557c6fb5bfc261482f92cacd721f0be5  src/RevenueVaultV1.sol
+        b941fec275903008b63b676e53245ff57bf79758a23bcd274c001c311044ac80  src/SmartWalletRegistry.sol    
+    </template>
+
+  </content-for>
+</page>
