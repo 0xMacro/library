@@ -1,0 +1,33 @@
+<item>
+  <field name="topic">3rd Party Control</field>
+  <field name="impact">info</field>
+  <field name="content">
+    ## [I-1] Watch out for Whitelist-enabled Vaults
+
+    The new `deposit` function for DvStETHDecoderAndSanitizer is designed to integrate with DVstETH's WhitelistedEthWrapper.
+
+    However, there is one thing to note. WhitelistedEthWrapper has a DVstETH-admin-only feature that enables a vault to have a depositor whitelist. For these vaults, a boring vault would not be able to interact with it (unless it is whitelisted as a depositor).
+
+    From the WhitelistedEthWrapper source code:
+
+    ```
+    function deposit(
+        address depositToken,
+        uint256 amount,
+        address vault,
+        address receiver,
+        address referral
+    ) public payable override returns (uint256 shares) {
+        require(depositToken == ETH || depositToken == WETH, "EthWrapper: invalid depositToken");
+        require(
+            !depositWhitelist[vault] || isDepositWhitelist[vault][msg.sender],
+            "WhitelistedEthWrapper: deposit not whitelisted"
+        );
+        shares = super.deposit(depositToken, amount, vault, address(this), referral);
+        IERC20(vault).safeTransfer(receiver, shares);
+    }
+    ```
+
+    Consider always checking if the `vault` parameter from DvStETHDecoderAndSanitizer's `deposit` function is not one of these vaults, which are specified by WhitelistedEthWrapper's onchain `depositWhitelist` mapping.
+  </field>
+</item>
