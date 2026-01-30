@@ -1,0 +1,59 @@
+<page
+  clientName="Seven Seas"
+  reportDate="May 28, 2025"
+  auditTitle="Seven Seas A-44"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team over multiple days starting May 15th, 2025 to May 20th 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Compound V2 decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/291">PR 291</a>)</b> </br>
+        Commit Hash: <code>b9eafd46e656c532ea2c28a1bd66ce271ebedbc7</code>
+        <template type="file-hashes">
+          90597f5148ed5aa54607183dc2eceae0fee08deb67a882da2414ae18b77afe5c  src/base/DecodersAndSanitizers/Protocols/CompoundV2DecoderAndSanitizer.sol       </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Boring Solver (from <a href="https://github.com/Veda-Labs/boring-vault/pull/292">PR 292</a>)</b> </br>
+        Commit Hash: <code>7e6f6700f6332bb912fe8eb331fc14d60c246bb7</code>
+        <template type="file-hashes">
+          67f7f97b5b2d0fda0cdfc2a9367a2202c78462aa005d4596709af9de61e2909d  src/base/Roles/BoringQueue/BoringSolver.sol      </template>
+        </li>
+
+       <li class="break-words break-all">
+          <b>rFLR decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/295">PR 295</a>)</b> </br>
+          Commit Hash: <code>8dc2fc14479637571fcada1c2d501ea7bd9f27ba</code>
+          <template type="file-hashes">
+            55dee56028422dc57e2694cd5d3d0bbf84727c1c196740c75b3826c022840b09  src/base/DecodersAndSanitizers/Protocols/rFLRDecoderAndSanitizer.sol      </template>
+        </li>
+      <li class="break-words break-all">
+        <b>Agglayer decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/297">PR 297</a>)</b> </br>
+        Commit Hash: <code>44e391a69a1143e33f2f548aa118e5ab99bf24ec</code>
+        <template type="file-hashes">
+          a359a089573d7ca628ff8d04068bdfb20b756549b0ad26d393a39d15b5f39d1f  src/base/DecodersAndSanitizers/Protocols/AgglayerDecoderAndSanitizer.sol      </template>
+        </li>
+        <li class="break-words break-all">
+          <b>Beraborrow managed vault decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/298">PR 298</a>)</b> </br>
+          Commit Hash: <code>53cee812d378c7c2f2ce8acaa5355cc7a34dfee2</code>
+          <template type="file-hashes">
+            7db84a6dc27d4e461702b58c182b7a21990e48c1d52d173809ba1d55cccfdbcc  src/base/DecodersAndSanitizers/Protocols/BeraborrowDecoderAndSanitizer.sol      </template>
+          </li>
+    </ul>
+  </content-for>
+</page>
