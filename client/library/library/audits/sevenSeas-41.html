@@ -1,0 +1,66 @@
+<page
+  clientName="Seven Seas"
+  reportDate="May 5, 2025"
+  auditTitle="Seven Seas A-41"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team over two days starting on April 25th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Mellow's dvStETH vault decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/251">PR 251</a>)</b> </br>
+        Commit Hash: <code>478f3a4a1457fd2dd296fc48d43ad5689998cc4a</code>
+        <template type="file-hashes">
+            38baba1ff4fbc624b2287956735fab8c1cef679b588c0ac6f0b1b72f92c6db41  src/base/DecodersAndSanitizers/Protocols/DvStETHDecoderAndSanitizer.sol
+        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Generic rate provider with decimal scaling (from <a href="https://github.com/Veda-Labs/boring-vault/pull/254">PR 254</a>)</b> </br>
+        Commit Hash: <code>63b8a392581db533ad64a5371bef3a17d6a746d7</code>
+        <template type="file-hashes">
+            b5fa65ad59eb27e216e88b294be5909db2f9775b09a77de4bd295190864add26  src/helper/GenericRateProviderWithDecimalScaling.sol
+        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Teller Decoder fix (from <a href="https://github.com/Veda-Labs/boring-vault/pull/261">PR 261</a>)</b> </br>
+        Commit Hash: <code>75a57946ea4d4f8416c34bc18ab13c42f07ee3de</code>
+        <template type="file-hashes">
+            a60d2e60d92d27c3b9eb28438862f2b7f21e0196c6560f7fea2eed13a50f2b00  src/base/DecodersAndSanitizers/Protocols/TellerDecoderAndSanitizer.sol
+        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Permissioned transfers for teller (from <a href="https://github.com/Veda-Labs/boring-vault/pull/256">PR 256</a>)</b> </br>
+        Commit Hash: <code>b719f64af56f49781ca74604ec50ea7927818aa2</code>
+        <template type="file-hashes">
+            b4f6b373696ce73a739901bc5b1d118b5d83ccd9282b840a08ef25b9c9a1647b  src/base/Roles/TellerWithMultiAssetSupport.sol
+        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Beraborrow decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/258">PR 258</a>)</b> </br>
+        Commit Hash: <code>e70b91e6173ac13d15038c05473bc5b0a8d47a1c</code>
+        <template type="file-hashes">
+            f57f1547b5472b8fdc12f4358829ffd3316a0804c6aa58e20cab5ed216e6ad36  src/base/DecodersAndSanitizers/Protocols/BeraborrowDecoderAndSanitizer.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
