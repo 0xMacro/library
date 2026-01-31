@@ -1,0 +1,12 @@
+<item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      ## [I-1] Clear approvals before changing assemble or borrow token
+      `SupervisedLoanPositionManagerSwapBorrow` allows for arbitrary swaps with a router, intended to be via 1Inch, limited to swapping the set assemble token with the borrow token, or vice versa. Balance before and after the swap are checked and validated with expected values, however if there are prior approvals and balance of a assemble token changed via `updateAssembleToken()`, could result in executors using malicious swap data to drain these tokens. 
+  
+      **Remediations to Consider**
+  
+      Always removal approvals from the router if changing up assemble token, or any config token as a precaution.
+    </field>
+</item>
+  
