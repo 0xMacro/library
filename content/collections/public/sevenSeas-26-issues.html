@@ -1,0 +1,35 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Veda-Labs/boring-vault/pull/33/commits/aa3960a746974b96ed7e9cfbd5ad8dc8990cc0cf</field>
+    <field name="content">
+        ## [M-1] EulerEVK decoder doesn’t support disabling controller and collateral
+
+        The EulerEVK decoder implements the `enableController` and `enableCollateral` functions, which are needed to link a collateral vault to a controller vault for strategy formation. However, the decoder lacks functionality to disable controllers or collateral. This limitation is particularly important since only 10 controllers and 10 collaterals can be defined at once. As a result, the boring vault cannot modify its strategy and add new vaults to the strategy once the limit of 10 controllers or collaterals has been reached.
+        
+        **Remediations to Consider**
+        
+        Implement the `disableController` and `disableCollateral` functions in the decoder to prevent reaching the maximum limit of 10 controllers or collaterals
+
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [Q-1] SkyMoney decoder doesn’t support earning SKY token rewards
+        The SkyMoney decoder can utilize the existing ERC4626 decoder to deposit USDS into the [sUSDS Vault](https://etherscan.io/address/0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD) to generate yields. While the SkyMoney protocol offers the [UsdsSkyRewards](https://etherscan.io/address/0x0650CAF159C5A49f711e8169D4336ECB9b950275) contract for earning SKY token rewards on staked USDS, this functionality is not currently supported by the SkyMoney decoder.
+
+        **Remediations to Consider**
+
+        If earning SKY token rewards should be supported by the decoder, implement the required functions for interacting with the [UsdsSkyRewards](https://etherscan.io/address/0x0650CAF159C5A49f711e8169D4336ECB9b950275) contract.
+    </field>
+    <field name="response">
+        The team confirmed that this feature is currently not needed.
+    </field>
+  </item>

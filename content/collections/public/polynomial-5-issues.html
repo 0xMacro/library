@@ -1,0 +1,78 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">6a44848eb512e04fff4d7ebebcfcb9a8da762572</field>
+    <field name="content">
+      ## [H-1] Limit order price is used for PnL of entire position
+  
+      For limit orders both long and short parties make a order of matching amount, but the price can be diverged from the current market price of the asset. The PnL is calculated for the change in position for the desired price on each side, however when settling the order the entire positions PnL is also evaluated at this desired price:
+  
+      ```solidity
+      (runtime.pnl, , runtime.chargedInterest, runtime.accruedFunding, , ) = oldPosition.getPnl(
+          order.acceptablePrice
+      );
+      ```
+      Reference: [OffchainLimitOrderModule.sol#L354-356](https://github.com/Polynomial-Protocol/fx-contracts/blob/212dcf662263aedfa2f83a135ea5d0dc47bdcc34/markets/perps-market/contracts/modules/OffchainLimitOrderModule.sol#L354-L356)
+  
+      ```solidity
+      function getPnl(
+          Data storage self,
+          uint256 price
+      )
+          internal
+          view
+          returns (
+              int256 totalPnl,
+              int256 pricePnl,
+              uint256 chargedInterest,
+              int256 accruedFunding,
+              int256 netFundingPerUnit,
+              int256 nextFunding
+          )
+      {
+          nextFunding = PerpsMarket.load(self.marketId).calculateNextFunding(price);
+          netFundingPerUnit = nextFunding - self.latestInteractionFunding;
+          accruedFunding = self.size.mulDecimal(netFundingPerUnit);
+  
+          int256 priceShift = price.toInt() - self.latestInteractionPrice.toInt();
+          pricePnl = self.size.mulDecimal(priceShift);
+  
+          chargedInterest = interestAccrued(self, price);
+  
+          totalPnl = pricePnl + accruedFunding - chargedInterest.toInt();
+      }
+      ```
+      Reference: [Position.sol#L66-91](https://github.com/Polynomial-Protocol/fx-contracts/blob/212dcf662263aedfa2f83a135ea5d0dc47bdcc34/markets/perps-market/contracts/storage/Position.sol#L66-L91)
+  
+      This results in the potential for an order to be filled at a extreme price that benefits a position when PnL is calculated at this arbitrary price.
+  
+      **Remediations to Consider**
+  
+      For calculating the whole positions PnL use the mark price rather than the limit order price to properly update the position.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Signature</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">80982c43a89504475d4ef6dfa91bc57799bacc07</field>
+    <field name="content">
+      ## [L-1] Signature malleability
+  
+      `ecrecover()` is known to be vulnerable to [signature malleability](https://medium.com/draftkings-engineering/signature-malleability-7a804429b14a) attacks which can lead to signature input while maintaining the same signer. Typically it is suggested to use Openzeppelins [ECDSA library,](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol) or a similar solution that handles signature malleability.
+  
+      ```solidity
+      address signingAddress = ecrecover(digest, sig.v, sig.r, sig.s);
+      ```
+      Reference: [**OffchainLimitOrderModule.sol#L502**](https://github.com/Polynomial-Protocol/fx-contracts/blob/212dcf662263aedfa2f83a135ea5d0dc47bdcc34/markets/perps-market/contracts/modules/OffchainLimitOrderModule.sol#L502)
+  
+      **Remediations to Consider**
+  
+      Handle signature malleability similar to how Openzeppelin does in [ECDSA](https://www.notion.so/Polynomial-4-Internal-Prelim-Report-19d72f2c7fd1803b95fccce0fac64623?pvs=21).
+    </field>
+  </item>
+  

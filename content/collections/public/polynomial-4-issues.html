@@ -1,0 +1,165 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">6a44848eb512e04fff4d7ebebcfcb9a8da762572</field>
+    <field name="content">
+      ## [H-1] Limit order price is used for PnL of entire position
+  
+      For limit orders both long and short parties make a order of matching amount, but the price can be diverged from the current market price of the asset. The PnL is calculated for the change in position for the desired price on each side, however when settling the order the entire positions PnL is also evaluated at this desired price:
+  
+      ```solidity
+      (runtime.pnl, , runtime.chargedInterest, runtime.accruedFunding, , ) = oldPosition.getPnl(
+          order.price
+      );
+      ```
+      Reference: [**LimitOrderModule.sol#L346-348**](https://github.com/Polynomial-Protocol/fx-contracts/blob/5da0e70d7f4ad04fcc8f723ba8af28506e21f80d/markets/perps-market/contracts/modules/LimitOrderModule.sol#L346-L348)
+  
+      ```solidity
+      function getPnl(
+          Data storage self,
+          uint256 price
+      )
+          internal
+          view
+          returns (
+              int256 totalPnl,
+              int256 pricePnl,
+              uint256 chargedInterest,
+              int256 accruedFunding,
+              int256 netFundingPerUnit,
+              int256 nextFunding
+          )
+      {
+          nextFunding = PerpsMarket.load(self.marketId).calculateNextFunding(price);
+          netFundingPerUnit = nextFunding - self.latestInteractionFunding;
+          accruedFunding = self.size.mulDecimal(netFundingPerUnit);
+  
+          int256 priceShift = price.toInt() - self.latestInteractionPrice.toInt();
+          pricePnl = self.size.mulDecimal(priceShift);
+  
+          chargedInterest = interestAccrued(self, price);
+  
+          totalPnl = pricePnl + accruedFunding - chargedInterest.toInt();
+      }
+      ```
+      Reference: [Position.sol#L66-91](https://github.com/Polynomial-Protocol/fx-contracts/blob/5da0e70d7f4ad04fcc8f723ba8af28506e21f80d/markets/perps-market/contracts/storage/Position.sol#L66-L91)
+  
+      This results in the potential for an order to be filled at a extreme price that benefits a position when PnL is calculated at this arbitrary price.
+  
+      **Remediations to Consider**
+  
+      For calculating the whole positions PnL use the mark price rather than the limit order price to properly update the position.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Authorization</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">760495741820090d6dd5ccd90fc5978985977611</field>
+    <field name="content">
+      ## [H-2] Missing check if relayer is caller
+  
+      For a limit order each party signs a relayer they trust to bring the other side of the order together and execute on it. It is verified that both orders have set the same relayer in `validateLimitOrderPair()`:
+  
+      ```solidity
+      if (shortOrder.relayer != longOrder.relayer) {
+          revert LimitOrderDifferentRelayer(shortOrder.relayer, longOrder.relayer);
+      }
+      ```
+      Reference: [LimitOrderModule.sol#L222-224](https://github.com/Polynomial-Protocol/fx-contracts/blob/5da0e70d7f4ad04fcc8f723ba8af28506e21f80d/markets/perps-market/contracts/modules/LimitOrderModule.sol#L222-L224)
+  
+      However there is no check to ensure that the caller is actually the relayer. This could lead to anyone settling orders provided they have the signatures, potentially leading to front-running orders pairing them pairs at potentially worse prices.
+  
+      **Remediations to Consider**
+  
+      Ensure that `msg.sender` is the requested trusted relayer.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Fees</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">10d6381172e6a2450b76e6084737b5e4f4d647e3</field>
+    <field name="content">
+      ## [M-1] `_collectRelayerFees()` is defined but never called
+  
+      **GlobalPerpsMarketConfiguration.sol was updated with the** [`_collectRelayerFees()`](https://github.com/Polynomial-Protocol/fx-contracts/blob/mubaris/order-book/markets/perps-market/contracts/storage/GlobalPerpsMarketConfiguration.sol#L238-L253) function, intended to allow for the relayer to receive fees owed. However this function is not called anywhere, preventing the relayer from receiving fees in the current state
+  
+      **Remediations to Consider**
+  
+      Add the ability for the relayer to receive fees owed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Price bounds</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">4eb16de322bf2e083850152e6c70b2065aa9c6be</field>
+    <field name="content">
+      ## [M-2] Limit order prices should be bounded
+  
+      Limit orders currently assume that the long price is larger than the short price for a given pair being settled. However there is no actual check to ensure that is the case. 
+  
+      **Remediations to Consider**
+  
+      Ensure the short price is less than the long price when validating in `validateLimitOrderPair()`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Signature</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b3b56cfb51b8bada7d650b16f7eeee57d12967b0</field>
+    <field name="content">
+      ## [L-1] Signature malleability
+  
+      `ecrecover()` is known to be vulnerable to [signature malleability](https://medium.com/draftkings-engineering/signature-malleability-7a804429b14a) attacks which can lead to signature input while maintaining the same signer. Typically it is suggested to use Openzeppelins [ECDSA library,](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/ECDSA.sol) or a similar solution that handles signature malleability.
+  
+      **Remediations to Consider**
+  
+      Handle signature malleability similar to how Openzeppelin does in [ECDSA](https://www.notion.so/Polynomial-4-Internal-Prelim-Report-19d72f2c7fd1803b95fccce0fac64623?pvs=21).
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Complexity</field>
+    <field name="impact">low</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [Q-1] Nonces using unnecessary bitmap logic
+
+  
+      [`Limitorder.sol`](https://github.com/Polynomial-Protocol/fx-contracts/blob/mubaris/order-book/markets/perps-market/contracts/storage/LimitOrder.sol#L1) uses bitmaps to determine of an order has been filled for a accountId. This makes sense if the nonces are intended to be sequential, however the team intends to use non-sequential nonces which defeats the purpose of using a bitmap setup.
+  
+      **Remediations to Consider**
+  
+      Remove the use of bitmaps for nonces and use a conventional bool flag instead.
+  
+    </field>
+    <field name="response">
+        Not fixing to keep the storage logic same but will fix later
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Comments</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c199150b92a0514af11c24217e6d52f7cde32bd9</field>
+    <field name="content">
+      ## [Q-2] Lingering comments
+      - Remove [commented out console statements](https://github.com/Polynomial-Protocol/fx-contracts/blob/5da0e70d7f4ad04fcc8f723ba8af28506e21f80d/markets/perps-market/contracts/modules/LimitOrderModule.sol#L124-L125).
+      - [TODO statement](https://github.com/Polynomial-Protocol/fx-contracts/blob/5da0e70d7f4ad04fcc8f723ba8af28506e21f80d/markets/perps-market/contracts/modules/LimitOrderModule.sol#L205)
+    </field>
+  </item>
+  

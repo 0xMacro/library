@@ -1,0 +1,96 @@
+<!-- @format -->
+
+<page
+  clientName="thirdweb"
+  reportDate="April 25th, 2025"
+  auditTitle="thirdweb 22"
+  auditVersion="1.0.0"
+  repoUrl1="https://github.com/thirdweb-dev/contracts-pay-gateway"
+  repoUrl2="https://github.com/thirdweb-dev/contracts-modular-account"
+  repoUrl3="https://github.com/thirdweb-dev/contracts-zksync"
+  repoCommitHash1="c1726ac7c04e723a488db15e768245dfe92d81e4"
+  repoCommitHash2="7b8bf237204c5bf330d85ea0cc2366b50c60a9f5"
+  repoCommitHash3="d7dbdeb4df087b821bb5c4c9e74f2ab299d88efb"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from April 7 to April 17, 2025.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the thirdweb team.</li>
+      <li>Audit handoff documentation provided through Notion.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl1}}" target="_blank">
+          {{page.repoUrl1.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+  
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl2}}" target="_blank">
+            {{page.repoUrl2.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>{{page.repoCommitHash3}}</code>
+      </li>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl3}}" target="_blank">
+            {{page.repoUrl3.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash:
+        <code>{{page.repoCommitHash3}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+    <template type="audit-markdown">
+        <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+        ### MinimalAccount assumptions
+
+        For session creations, the account owner must carefully submit proper rules and constraints. It is assumed that any session created has the potential to manage the user’s funds, depending on the configuration set, and is entrusted within the session configuration limits.
+    </template>
+
+  <content-for name="source-code">
+    <p>We audited the changes related to the following repositories.</p>
+    <p><b>{{page.repoUrl1.split('/').slice(-1)[0]}}</b> repository:</p>
+
+    <template type="file-hashes">
+        5b73d81c540dc7d4da1cf509a5876e8b5a83b2aecc18b3a9d59b7b17c0ce188f  ./src/UniversalBridgeProxy.sol
+        f4e7f67e89074e178584581d17864dfe8ecfc9da6484e298f61ddff27e2fbad1  ./src/UniversalBridgeV1.sol
+    </template>
+
+    <p><b>{{page.repoUrl2.split('/').slice(-1)[0]}}</b> repository:</p>
+    <template type="file-hashes">
+        66d526345d2fa2ab79219fc4bac09b750911ba0d674b1edf1cf5a0281f92b89c  ./src/7702/MinimalAccount.sol
+        33054a8ef841130c934183669901e3aa6f195665b06652b9b59bbbd09cf86925  ./src/lib/SessionLib.sol
+        1cb25bf8ef95ecee1da42813ed0262872027c671120f3264f643163f7df66fab  ./src/paymaster/BasePaymasterV6.sol
+        c5839095952783ab78e6f5a956dfb9ff2006d4caedfd339a3808622479126833  ./src/paymaster/BasePaymasterV7.sol
+        e8ae55d92ef52c30eb7e721db949242e036035b87dd384f651f99dd4b048f233  ./src/paymaster/VerifyingPaymasterV6.sol
+        9a93c71a3522e3ac23ac07136f3a581b875d1db6785b4481f6e3e5c433eb0a48  ./src/paymaster/VerifyingPaymasterV7.sol
+    </template>
+
+    <p><b>{{page.repoUrl3.split('/').slice(-1)[0]}}</b> repository:</p>
+    <template type="file-hashes">
+        d5f35e7ff90aff31daf857ad544191dbb6d2a2e5ad7d461c8bfe1b9a5f0cb0f8  ./contracts/SignatureBasedPaymaster.sol
+    </template>
+
+  </content-for>
+</page>

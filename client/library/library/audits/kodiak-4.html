@@ -1,0 +1,32 @@
+<page
+  clientName="Kodiak-4"
+  reportDate="Feb 7th, 2025"
+  auditTitle="Kodiak A-4"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Kodiak-Finance/kodiak-periphery"
+  repoCommitHash="32ac0e409422ca56a162a47e94a05463c3383a91"
+  repoCommitHashFinal=""
+  layout="/library/audits/_layout.html"
+
+  passwordEncrypt="env:PAGE_PASS_KODIAK_4"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on February 5th, 2025. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within this repository:</p>
+
+    <template type="file-hashes">
+        9998499e32f57ec4bf0771152adef21f2a7a9ab8820f6b39f2d04848acb39b57  src/vaults/IslandRouter.sol
+        28ef1dfc8d6b2e86341b104f2e169ada8bdcebe549b074c05b0beff6017243be  src/vaults/interfaces/IIslandRouter.sol
+    </template>
+  </content-for>
+</page>

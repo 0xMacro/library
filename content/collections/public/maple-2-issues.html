@@ -36,7 +36,7 @@
       }
       ```
   
-      **Reference:** [MplUserActions.sol#L127-133](https://github.com/maple-labs/syrup-utils-private/blob/b3d1bc1baebd4597181c626101a8b66dcddadbf7/contracts/MplUserActions.sol#L127-L133)
+      **Reference:** [MplUserActions.sol#L127-133](https://github.com/maple-labs/syrup-utils/blob/b3d1bc1baebd4597181c626101a8b66dcddadbf7/contracts/MplUserActions.sol#L127-L133)
   
       If the allowance covers the amount intended to be transferred, users' valid signatures will not be used, nor will their nonce be set, potentially allowing the same function to be executed twice with the same parameters. Although not likely, if the front end or client mistakenly sends the transaction twice with the same data, this call could succeed with the same passed signature. 
   

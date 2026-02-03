@@ -1,0 +1,194 @@
+  
+  <item>
+    <field name="topic">Logic Bug</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">d8b3a97c24bb62e814d6e14a45e3b3732243dda8</field>
+    <field name="content">
+    ## [H-1] Multiple unauthorized renewals possible due to flawed buffer calculation
+
+    The `SubscriptionModuleFacet` contract's logic for calculating the renewal buffer currently has issues related to short memberships or specific scenarios that would cause the buffer to be larger than the membership's duration. When this occurs, a safety check within the contract sets the next renewal time to `block.timestamp`, signaling that the subscription is immediately due again. This allows to loop renewals within a single transaction or across subsequent calls, which can unexpectedly drain a user's account balance for renewals they did not intend to authorize.
+
+    The vulnerability originates from two places: the static `installTime` used in `_getRenewalBuffer` and the lack of a minimum duration check. The flawed logic is handled by `_calculateNextRenewalTime`, which, instead of failing, resets the renewal time to `block.timestamp`, creating a hole where operators can, even non-maliciously, generate multiple renewals until the next `expiresAt` is no longer susceptible to this or the user’s balance is drained.
+
+    ```solidity
+    function _calculateNextRenewalTime(
+        uint256 expirationTime,
+        uint256 installTime
+    ) internal view returns (uint40) {
+        if (expirationTime <= block.timestamp) return uint40(block.timestamp);
+
+        uint256 buffer = _getRenewalBuffer(expirationTime, installTime);
+        uint256 timeUntilExpiration = expirationTime - block.timestamp;
+
+        if (buffer >= timeUntilExpiration) return uint40(block.timestamp);
+
+        return uint40(expirationTime - buffer);
+    }
+    ```
+
+    **Reference:** [SubscriptionModuleFacet.sol#440-452](https://github.com/towns-protocol/towns/blob/571d65e38e62dbbe5c5af68bd9965716991ace44/packages/contracts/src/apps/modules/subscription/SubscriptionModuleFacet.sol#L440-L452)
+
+    This design leads to three potential distinct scenarios:
+
+    1. **On short memberships**: A user subscribes to a membership with a duration shorter than the contract's minimum buffer (for example, a 1-minute duration, while `BUFFER_IMMEDIATE` is 2 minutes).
+        - Upon the first renewal, the contract will always find that the buffer (2 minutes) is greater than or equal to the time until expiration (1 minute).
+        - `nextRenewalTime` is immediately set to `block.timestamp`, and the operator bot will continue to renew the membership back to back until the user’s balance is depleted or `expiresAt` membership becomes greater than the minim buffer.
+    2. **Via growing duration**: A user subscribes to a 5-hour membership.
+        - On the first renewal**,** `originalDuration` is 5 hours, correctly selecting a 1-hour buffer. The renewal happens as expected.
+        - On the second renewal, the calculated `originalDuration` is now `~10 hours`. The module now incorrectly selects a 6-hour buffer**.**
+        - The contract checks if the new buffer (6 hours) is greater than or equal to the time until expiration (the 5-hour membership duration). The condition `6 hours >= 5 hours` is true.
+        - `nextRenewalTime` is set to `block.timestamp`, triggering the same loop described above.
+    3. **Upon duration change**: A user has a long-running 30-day membership. The space owner shortens the membership duration to 10 hours.
+        - On the next renewal, an operator processes a renewal for the new 10-hour period.
+        - The module's `_getRenewalBuffer` function, still using the original `installTime`, calculates an `originalDuration` of many months and selects the `BUFFER_LONG` (12 hours). The safety check `if (12 hours >= 10 hours)` becomes true.
+        - `nextRenewalTime` is set to `block.timestamp`, triggering the same loop described above.
+    4. **Upon re-activation after duration change**: A user has a long-running 30-day membership that becomes inactive. While inactive, the space owner shortens the membership duration to 10 hours.
+        - The user later re-activates their subscription by calling `activateSubscription`. The module correctly sets `nextRenewalTime` to `block.timestamp`, making it immediately due.
+        - An operator processes the renewal. The space contract, applying its new rules, extends the membership by 10 hours.
+        - To schedule the next renewal, the module calculates the buffer. It still uses the original `installTime`, resulting in a calculated `originalDuration` of many months and selecting the `BUFFER_LONG` (12 hours).
+        - The safety check if (`12 hours >= 10 hours`) becomes true, setting `nextRenewalTime` back to `block.timestamp` and triggering the same loop described above.
+
+    This vulnerability could lead to multiple unauthorized renewals processing in rapid succession, draining users' funds without respecting the actual membership expiration period. The impact is severe because users might unknowingly authorize continuous payments far exceeding their expectations. The situation becomes even more dangerous without price or duration configurations to protect users. 
+
+    **Remediations to Consider**
+
+    1. Source duration directly: Instead of inferring the duration with installation time, the `IMembership` interface should be updated with a `getMembershipDuration(uint256 tokenId)` view function. `_getRenewalBuffer` should use this explicit value, ensuring the buffer is always based on current, accurate terms. 
+    2. Enforcing a minimum duration: Add a check in `onInstall` to revert if the `space`'s membership duration is less than the `BUFFER_IMMEDIATE`, preventing the most immediate fund-drain scenario. And potentially enforce minimum duration directly on the membership contract.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Edge Case</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1f555aa179ea8ff85e6be88f985bc598fc8f5be9</field>
+    <field name="content">
+    ## [H-2] Syncing memberships with active subscription results in double charging
+
+    In the `SubscriptionModuleFacet` contract, the `batchProcessRenewals` function handles multiple cases where the subscriptions passed by the operator are indeed due to renewal. If not the logic performs different operations such as pausing the subscription and emits a proper event. However if a user manually renews their membership directly on the `space` contract while having an active automated subscription, the module will fail to recognize the manual renewal and will process another renewal when the next renewal time is due, causing the user to renew their subscription twice. 
+
+    The vulnerability is caused by a sync logic, since it first confirms that a renewal is due based on its stale, stored `nextRenewalTime`. It then correctly syncs its state with the actual membership expiration, accounting for the new expiration time from the user's manual renewal but it fails to re-evaluate and proceeds to process the renewal.
+
+    ```solidity
+    uint256 expiresAt = membershipFacet.expiresAt(sub.tokenId);
+    uint40 correctNextRenewalTime = _calculateNextRenewalTime(expiresAt, sub.installTime);
+
+    if (sub.nextRenewalTime != correctNextRenewalTime) {
+        sub.nextRenewalTime = correctNextRenewalTime;
+        emit SubscriptionSynced(params[i].account, params[i].entityId, sub.nextRenewalTime);
+    }
+
+    _processRenewal(sub, params[i], membershipFacet, actualRenewalPrice);
+    ```
+
+    **Reference:** [SubscriptionModuleFacet.sol#L244-252](https://github.com/towns-protocol/towns/blob/571d65e38e62dbbe5c5af68bd9965716991ace44/packages/contracts/src/apps/modules/subscription/SubscriptionModuleFacet.sol#L244-L252)
+
+    A user whose subscription is due might renew it manually. Shortly after, an operator bot includes that subscription in a batch. The module will see the subscription was due, sync its state to reflect the manual renewal, and then immediately charge the user a second time, effectively syncing but ignoring the newly synced `correctNextRenewalTime`.
+
+    **Remediations to Consider**
+
+    Consider evaluating the updated `nextRenewalTime` after syncing with the expiration and skipping the renewal if it's not due.   
+    </field>
+  </item>
+    
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">110af373e1cdc9d0205b5ad6a2fb099552317604</field>
+    <field name="content">
+    ## [H-3] Lack of user-defined price and time limits exposes users to unexpected renewal costs
+
+    The `SubscriptionModule` design requires users to trust that their subscribed membership's price and duration (which together determine the total cost) will remain consistent. However, the renewal price is fetched dynamically at each renewal, with no mechanism for users to set a maximum acceptable price—the only check being whether the user's balance can cover the cost. Similarly, expiration and next renewal times are determined based on membership data at the time of renewal and installation.
+
+    The `batchProcessRenewals` function calls the external `getMembershipRenewalPrice` function on the `space` contract to determine the renewal cost. While the current membership implementation stores the membership price paid when joining a space, this logic could be changed through upgrades. There are no strict enforcements or state checks within the module's renewal cycle.
+
+    ```solidity
+    uint256 actualRenewalPrice = membershipFacet.getMembershipRenewalPrice(sub.tokenId);
+
+    if (params[i].account.balance < actualRenewalPrice) {
+        // ...
+    }
+    // ...
+    _processRenewal(sub, params[i], membershipFacet, actualRenewalPrice);
+    ```
+
+    **Reference:** [SubscriptionModuleFacet.sol#L232-252](https://github.com/towns-protocol/towns/blob/571d65e38e62dbbe5c5af68bd9965716991ace44/packages/contracts/src/apps/modules/subscription/SubscriptionModuleFacet.sol#L232-L252)
+
+    This issue extends to duration and next renewal time calculations as well. Currently, the expiration is set during renewal, and the logic verifies the new expiration by calling the `expiresAt` function. However, the space owner can change the membership duration at any given moment:
+
+    ```solidity
+    // Get the actual new expiration time after successful renewal
+    uint256 newExpiresAt = membershipFacet.expiresAt(sub.tokenId);
+    sub.nextRenewalTime = _calculateNextRenewalTime(newExpiresAt, sub.installTime);
+    sub.lastRenewalTime = uint40(block.timestamp);
+    sub.spent += actualRenewalPrice;
+    ```
+
+    **Reference:** [SubscriptionModuleFacet.sol#L389-393](https://github.com/towns-protocol/towns/blob/571d65e38e62dbbe5c5af68bd9965716991ace44/packages/contracts/src/apps/modules/subscription/SubscriptionModuleFacet.sol#L389-L393)
+
+    Ultimately, users who install this module cannot trust the immutability of price parameters after installation or a renewal is processed giving the module permission to manage their funds at the `space`’s will. They can still deactivate or uninstall the subscription, but this depends on their reaction time after configuration changes occur. Users might be unable to respond if changes happen in short spans of time.
+
+    **Remediations to Consider**
+
+    Consider implementing logic that allows users to set maximum price limits and minimum duration parameters when installing the module. All renewals should be required to comply with these values, and the subscription should automatically pause if these conditions are not met.
+    </field>
+  </item>
+    
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1f555aa179ea8ff85e6be88f985bc598fc8f5be9</field>
+    <field name="content">
+    ## [M-1] Missing verification of `space` address authenticity
+
+    The `SubscriptionModule` does not validate that a `space` address provided during installation corresponds to a legitimate, canonical space created by the Towns Protocol. This could allow user to be tricked into setting up automated payments to a malicious contract, leading to a loss of funds.
+
+    The `onInstall` function accepts any arbitrary `space` address. While it checks that the address is not zero through `Validator.checkAddress()`, it performs no verification to ensure the contract at that address is a genuine `space`.
+    
+    ```solidity
+    function onInstall(bytes calldata data) external override nonReentrant {
+        (uint32 entityId, address space, uint256 tokenId) = abi.decode(
+            data,
+            (uint32, address, uint256)
+        );
+    
+        Validator.checkAddress(space);
+    ```
+    
+    **Reference:** [SubscriptionModuleFacet.sol#L70-76](https://github.com/towns-protocol/towns/blob/571d65e38e62dbbe5c5af68bd9965716991ace44/packages/contracts/src/apps/modules/subscription/SubscriptionModuleFacet.sol#L70-L76)
+    
+    An attacker can deploy a contract that mimics the `IMembership`/`IERC721` interfaces and use social engineering (e.g., a phishing website) to convince a user to install the Towns subscription module. Additionally any external actor can spam `onInstall()` subscriptions and populate indexers and storage of arbitrary corrupted data potentially causing issues with batch renewals. 
+    
+    ### **Remediations to Consider**
+    
+    Consider ensuring the `space` address is a canonical Towns Space.
+    </field>
+  </item>
+    
+  <item>
+    <field name="topic">User Error</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1f555aa179ea8ff85e6be88f985bc598fc8f5be9</field>
+    <field name="content">
+    ## [M-2] Duplicated `tokenId`/`space` keys can be used with different `entityId`s
+
+    In the `SubscriptionModuleFacet` contract, users can accidentally create multiple subscriptions for the same space membership (`space`-`tokenId`) by using different `entityId`s for each installation. The contract doesn't enforce asset uniqueness, which can result in users installing and renewing multiple times the subscription for the same membership.
+
+    While the `onInstall` function ensures that each `account`-`entityId` pair is unique, it fails to verify if the underlying asset (`space`-`tokenId`) has already been subscribed to by the account under a different `entityId`.
+
+    **Remediations to Consider**
+
+    1. Implementing a new mapping `account -> space -> tokenId` to ensure they can only be subscribed once.
+    2. Adding external view functions to retrieve existing subscriptions for verification off-chain and documenting this potential pitfall in the user documentation.
+    </field>
+  </item>
+  

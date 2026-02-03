@@ -1,0 +1,15 @@
+<item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] Improve natspec for setUserPermissionForInstrument()
+
+      The `setUserPermissionForInstrumen()` function of `Allowlist.sol` contract implements multiple use cases relying on the internal `_routeUserPermission()` function.
+  
+      While the function’s natspec is extensive it does not indicate that in case it is necessary to remove entity’s permission, this action should not be paired with the dissociation of the address as permission reset would not be processed. This is expected behavior, however due to asymmetry unexpected and potentially error prone.
+  
+      Consider updating natspec documentation for the `setUserPermissionForInstrument()` to indicate more clearly this edge case behavior.
+    </field>
+  </item>
+  

@@ -1,0 +1,35 @@
+<page
+  clientName="Seven Seas"
+  reportDate="May 13, 2025"
+  auditTitle="Seven Seas A-42"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Se7en-Seas/boring-vault"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash=""
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on May 7th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+   
+
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+
+        The goal of this half-day review was to assess the security of Silo Vaults (https://docs.silo.finance/docs/vaults/intro) and determine whether they can be safely integrated into the boring vault. Here is Macro's conclusion:</br>
+        Overall, the project looks solid and trustworthy. The multiple audits conducted (Code4rena, Sigma Prime, Certora) and their vault role management system (https://docs.silo.finance/docs/vaults/core-concepts/roles) demonstrate a strong commitment to security. While all high-severity audit issues have been resolved, the Code4rena findings remain unpublished at the time of the review. As for privileged users (owner, curator, etc.), the security depends on which specific vault the boring vault will integrate with and its multisig setup. The currently available vaults are managed by either VarlamoreCap or Apostro. VarlamoreCap, for instance, uses a 2/3 multisig setup for both Owner and Curator roles.
+    
+    </p>
+    <template type="file-hashes">
+    </template>
+
+  </content-for>

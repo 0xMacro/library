@@ -1,0 +1,71 @@
+<page
+  clientName="Superstate"
+  reportDate="April 15th, 2025"
+  auditTitle="Superstate A-6"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+
+  repoUrl1="https://github.com/superstateinc/ustb"
+  repoCommitHash1="dee62bb58ec05f2d732847dd901ae40460d4d468"
+  repoCommitHashFinal1="78e8ca22a319efd265e7d6ba2c326475cb6b6e2e"
+
+  repoUrl2="https://github.com/superstateinc/onchain-redemptions"
+  repoCommitHash2="09a51c2092e64c1e51796994898c247530eaa466"
+  repoCommitHashFinal2="59534af26d209ff5d3da5fda311c3a98471c1e71"
+
+  customRepoInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on April 14th, 2025. 
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <a href="{{page.repoUrl1}}" target="_blank"> ustb repository </a>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal1}}</code>
+      </li>
+    </ul>
+
+    <ul>
+      <a href="{{page.repoUrl2}}" target="_blank"> onchain-redemptions repository </a>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial):</b>
+        <code>{{page.repoCommitHash2}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b>
+        <code>{{page.repoCommitHashFinal2}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts within these repositories:</p>
+    <template type="file-hashes">
+        3cc5b3ace0eeea34e30b7906a92f9cbc763cf19ebff75f9ebb2af70c97218908  ustb/src/SuperstateToken.sol
+        ddb4bf6ddc72f0d1b41c2363251643630dfa8a598e7d0a38e6de35116d15253b  ustb/src/interfaces/ISuperstateToken.sol
+        1fea5d532d733091401fb5d8d99fe7911cc3fc9dca795375350354a4fbeec2d8  onchain-redemptions/src/ISuperstateToken.sol
+        ab3e9f966829e6fae45579fa69a951d4c08fb64f80eb5073c3a62e766b3b06b1  onchain-redemptions/src/Redemption.sol
+        0c2dd1ff4a912eca4eac3ee196ab8351f5c9e353b9ec35a48f6c7b63eed474d9  onchain-redemptions/src/RedemptionIdle.sol
+        e7f72c4646b9de81a31017ecf2587e80619ae4e2d01f4b9113033fbb0183c620  onchain-redemptions/src/RedemptionYield.sol
+        345aa94afb137a8cc07e202d75ec56535b10157ba4a1d32c11badfe1f7bdb123  onchain-redemptions/src/interfaces/IRedemption.sol
+    </template>
+  </content-for>
+</page>

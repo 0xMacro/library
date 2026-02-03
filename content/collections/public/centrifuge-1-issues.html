@@ -1,0 +1,20 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">8d392e20168b2112a4a6663ad1679340bd6e4081</field>
+    <field name="content">
+      ## [M-1] MerkleTreeManager cannot handle native ETH as intended
+  
+      In [MerkleTreeManager](https://github.com/centrifuge/protocol-v3/blob/1bd77ad9a0d23f284c019d4c9c47fe7ac5e9ef74/src/managers/MerkleProofManager.sol), the [`execute()`](https://github.com/centrifuge/protocol-v3/blob/1bd77ad9a0d23f284c019d4c9c47fe7ac5e9ef74/src/managers/MerkleProofManager.sol#L60-L77) function is intended to be used by valid strategists to execute merkle tree validated transactions in order to interact with protocols or rebalance assets. The intent is that the Merkle Tree Manager will withdraw and/or deposit assets from the associated [BalanceSheet](https://github.com/centrifuge/protocol-v3/blob/1bd77ad9a0d23f284c019d4c9c47fe7ac5e9ef74/src/spoke/BalanceSheet.sol) contract, and hold assets intermittently to use in further transactions, with no intent to hold assets outside of when running `execute()`. In these arbitrary transactions, a native ETH value can be specified to send with as required:
+  
+      However there is currently no easy way for the MerkleTreeManager to receive ETH in order to execute a transaction that requires value, since it does not contain a receive() or fallback() function. This may prevent the manager from interacting with some protocols that require native ETH transfers.
+  
+      **Remediations to Consider**
+  
+      Add a receive() function to allow for the Manager to receive ETH as required.
+  
+    </field>
+  </item>
+  

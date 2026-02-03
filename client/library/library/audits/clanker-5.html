@@ -1,0 +1,40 @@
+<page
+  clientName="Clanker"
+  reportDate="September 15, 2025"
+  auditTitle="Clanker A-5"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/clanker-devco/contracts"
+  repoCommitHash="d6dc434e5936747ce18b54f5cfaf1c20ae794ae4"
+  repoCommitHashFinal="d6dc434e5936747ce18b54f5cfaf1c20ae794ae4"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from September 11, 2025 to September 12, 2025.
+</content-for>
+  
+<content-for name="spec">
+<ul>
+    <li>Discussions on Telegram with the Clanker team.</li>
+</ul>
+</content-for>
+  
+<content-for name="source-code">
+  
+    <p>Specifically, we audited the following contracts within the repository with focus on the following changes:</p>
+
+    <ul>
+        <li>Introduction of permissioned pool extensions.</li>
+        <li>Prevention of pool extension execution as part of internal fee swaps.</li>
+        <li>Differentiate regular LP and LP fee during MEV module usage.</li>
+    </ul>
+  
+    <template type="file-hashes">
+        49fda2ef1413b6f84320360fdcfa88ab3971e7c3ec05a4d746bf1ae5bc837b40  src/hooks/ClankerHookDynamicFeeV2.sol
+        337a7babd1e40d8eab273c38af287efe42d4c413df1f846a4c3f9a9f5c6f3102  src/hooks/ClankerHookStaticFeeV2.sol
+        c00767f3b3433556b3ee7e3d9d647e43c5f714db3017089d4064bd8c6eabbc07  src/hooks/ClankerHookV2.sol
+        532aed5ad293554ac7400e70ebfeb824b653c85b208e81469d73af1059021c48  src/hooks/ClankerPoolExtensionAllowlist.sol
+        42398bb9f2dfdec450eed39befda3707393ff205d68c32ac8d1abde7e77537bb  src/mev-modules/ClankerMevDescendingFees.sol
+        8a398609aa683edcd85cba53c87c4b748291a66f5b2a1d3853abed30af440562  src/mev-modules/ClankerSniperAuctionV2.sol
+    </template>
+</content-for>

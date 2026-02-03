@@ -1,0 +1,33 @@
+<page
+  clientName="Spexi"
+  reportDate="September 15, 2025"
+  auditTitle="Spexi A-1"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/spexigeo/macro-spexi-layerdrone-audit"
+  repoCommitHash="7c7e043547d4cf240f170fbd1f5d74883ad93f24"
+  repoCommitHashFinal="603ffe2c6883469f812fee872a16ae018f827336"
+  passwordEncrypt="env:PAGE_PASS_SPEXI"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from September 8, 2025 to September 11, 2025.
+</content-for>
+  
+<content-for name="spec">
+<ul>
+    <li>Discussions on Slack with the Spexi team.</li>
+</ul>
+</content-for>
+  
+<content-for name="source-code">
+  
+    <p>Specifically, we audited the following contracts within the repository:</p>
+  
+    <template type="file-hashes">
+        cac7bb746d8a092bc0fadd57f9f480eabfdd69c39e3165fdadd8c6258c5e05be  src/DroneCoin.sol
+        c4d1805bf0cff0b6111c8a688930322857f8c293baf13d6597812b2aeabcdad6  src/Flights.sol
+        b663577532dba1f3d4729d1391d4dd116522afa18a8e1722db67b48369468ef3  src/MissionData.sol
+        86291279c25b703caf4a98e93dff49219ffa01713c76b786a5f62905986bbfa6  src/MissionEscrow.sol
+    </template>
+</content-for>

@@ -73,7 +73,11 @@
             </if>
           </else>
         </td>
-        <td></td>
+        <td class="hidden xs:table-cell Copy --sm p-3 align-top text-sm">
+          <if cond="issue.status == 'wontdo' && issue.response">
+            <p class="italic">See client response below.</p>
+          </if>
+        </td>
       </tr>
     </if>
 

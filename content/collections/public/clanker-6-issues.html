@@ -1,0 +1,38 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5e0e14699aa6d327df1ec9419c4ab38993eea2c9</field>
+    <field name="content">
+      ## [Q-1] Inconsistent ordering of event parameters
+  
+      In the `ClankerPresaleEthToCreator` contract, `ClankerFeeRecipientUpdated` event has inconsistent order parameters compared to the other events across the codebase.
+  
+      ```solidity
+      event ClankerFeeRecipientUpdated(address recipient, address oldRecipient);
+      ```
+  
+      While convention is for the first parameter to represent old value and second new value, in the case of `ClankerFeeRecipientUpdated` it is reversed.
+  
+      Consider changing event declaration and corresponding usage to be according to the established convention.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5e0e14699aa6d327df1ec9419c4ab38993eea2c9</field>
+    <field name="content">
+      ## [G-1] Unnecessary recalculation
+
+      The `endPresale()` implementation in `ClankerPresaleEthToCreator` contract, contains calculation that can be avoided. Consider using just calculated `lockupEndTime` instead of recalculating it.
+  
+      ```solidity
+      // record lockup and vesting end times
+      presale.lockupEndTime = block.timestamp + presale.lockupDuration;
+      presale.vestingEndTime = **block.timestamp + presale.lockupDuration** + presale.vestingDuration;
+      ```
+    </field>
+  </item>
+  

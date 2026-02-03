@@ -1,0 +1,125 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] Blacklisted creatorRecipient or interfaceRecipient may prevent reward collection
+  
+      In the `LpLockerv2.sol` contract, the `collectRewards()` function retrieves liquidity provider rewards, calculates the proportional share of rewards for the creator, interface, and team, and distributes this to each actor. However, if any of these actors is blacklisted on reward tokens that support blacklisting (e.g., USDC), the corresponding token transfer would fail. As a result, none of the actors can collect rewards.
+  
+      If actors are non-malicious, the team, creator, or interface may update their recipient address and unblock the reward collection. Otherwise, reward collection will be permanently blocked if the actor cannot access the admin address to invoke the recipient update operation or is unwilling to do it for other reasons.
+  
+      **Remediations to Consider**
+  
+      - Update reward collection implementation to use assets pull instead of assets push pattern.
+    </field>
+    <field name="response">
+        The team decided this was an edge case as the majority of our pairs are not in USDC/USDT. We will plan a fix in our next release. 
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/pull/31/commits/946f7d06f4fbc02ee02a69e085e0206a41be787c</field>
+    <field name="content">
+      ## [L-2] Unexpected reward distribution in case of drift of constants defining reward share
+    
+      In the `LpLockerv2.sol` contract, the `collectRewards()` function calculates the team’s reward based on `TEAM_REWARD` constant defined in `LpLockerv2.sol`. On the other hand, `MAX_CREATOR_REWARD` constant is set in the constructor based on the value of `Clanker.MAX_CREATOR_REWARD` constant. In case when `MAX_CREATOR_REWARD` is 80, and the corresponding creator reward is equal to `MAX_CREATOR_REWARD`, the current implementation in `collectRewards()` would distribute shares as expected. 
+  
+      However, if `MAX_CREATOR_REWARD` in Clanker is set to 70 and the corresponding creator reward remains equal to `MAX_CREATOR_REWARD` (also 70 in this case), the current implementation in `collectRewards()` would distribute rewards in unexpected amounts. For example, in this specific case, the share of the reward for the team would remain at 20%, but the creator share would be 80% and not 70%, as defined by the `MAX_CREATOR_REWARD` constant value.
+  
+      **Remediations to Consider**
+  
+      - Add validation to `LpLockerv2.sol` constructor to verify that the sum of `MAX_CREATOR_REWARD` and the `TEAM_REWARD` is 100%.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/pull/31/commits/7bdbf16eeecb6042ec0b0327cafbc869a26d0a7f</field>
+    <field name="content">
+      ## [Q-1] ClankerToken does not indicate interface support for all implemented capabilities
+  
+      In the `ClankerToken.sol` contract, `supportsInterface()` is implemented in the following way and indicates support for IERC7802, IERC20, and IERC165.
+  
+      ```solidity
+      function supportsInterface(bytes4 _interfaceId) public pure returns (bool) {
+          return _interfaceId == type(IERC7802).interfaceId
+              || _interfaceId == type(IERC20).interfaceId || _interfaceId == type(IERC165).interfaceId;
+      }
+      ```
+  
+      However, as `ClankerToken` inherits `ERC20Votes`, it has additional capabilities represented by the `IERC5805` (IVotes and IERC6372) interface, which are not properly indicated as supported.
+  
+      **Remediations to Consider**
+  
+      - Consider updating `supportsInterface()` implementation to indicate `IERC5805` support.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/pull/31/commits/a967b8ebf3b4e608109359c7036ce0d67c681639</field>
+    <field name="content">
+      ## [Q-2] Missing events for important state changes
+  
+      Missing events for important state changes
+  
+      - In `Clanker.sol`, consider adding events for `setDeprecated()` and `setAdmin()` functions.
+      - In `ClankerToken.sol`, consider adding events for `updateImage()` and `updateMetadata()`
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/pull/31/commits/476e85993dec9dd4058e10a10ba3f98aa1826b2e</field>
+    <field name="content">
+      ## [Q-3] Missing validation for default team recipient
+
+      In `LpLockerv2.sol`, the `teamRecipient` storage variable contains an address where rewards for the team would be sent. In addition, this address is the default recipient of creator and interface reward shares if they are not set.
+  
+      Reward assets can be permanently lost if the `teamRecipient` value is incorrectly set or updated. Therefore, consider adding `teamRecipient` value validation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/clanker-devco/contracts/pull/31/commits/d8d3c66590e4141067aa1e3045f55c4de83bcf07</field>
+    <field name="content">
+      ## [Q-4] Inconsistent update events
+  
+      The codebase contains inconsistencies in defining events that treat storage variable updates. Sometimes, only a new value is emitted, e.g., `LpLockerv2.TeamRecipientUpdated`. On the other hand, in the events such as `ClankerVault.MinimumVaultTimeUpdated` or `ClankerVault.AllocationAdminUpdated`, both old and new, values are emitted.
+  
+      Consider updating event definitions to have more consistent implementation and to facilitate easier off-chain tracking and monitoring integration.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="content">
+      ## [I-1] Admin may reconfigure the Clanker system dynamically
+  
+      In the `Clanker` contract, the `initialize()` function is accessible only by the owner. This function allows the owner to configure references to important underlying components, such as ClankerVault, LpLockerv2, Uniswap V3 Factory, Position Manager, and Swap Router.
+  
+      The owner may invoke `initialize()` multiple times, reconfiguring the Clanker system with different underlying system contracts. As a result, the system is not immutable, and due to potential changes, it requires additional user trust.
+  
+      To minimize required user trust, consider not allowing multiple `initialize()` invocations or adding a feature to disable multiple invocations when the system becomes stable.
+    </field>
+    <field name="response">
+        The team decided that we want the ability to reconfigure if needed due to the complexity of multichain deployments.
+        If the owner keys get leaked to a malicious other party, we’d prefer our users to stop using the affected contracts as we’re no longer connected to them. 
+    </field>
+  </item>
+  

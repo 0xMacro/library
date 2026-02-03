@@ -1,0 +1,38 @@
+<page
+  clientName="Clanker"
+  reportDate="November 7, 2025"
+  auditTitle="Clanker A-7"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/clanker-devco/fee-sink"
+  repoCommitHash="dd620d519e992e4b99b7e2e5227e94343b868d2e"
+  repoCommitHashFinal="320a1be1ddc14f5f950e62b8c7eeb4b66bb6afa7"
+  passwordEncrypt="env:PAGE_PASS_CLANKER_7"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from November 3, 2025 to November 7, 2025.
+</content-for>
+  
+<content-for name="spec">
+<ul>
+    <li>Discussions on Telegram with the Clanker team.</li>
+</ul>
+</content-for>
+  
+<content-for name="source-code">
+  
+    <p>Specifically, we audited the following contracts within the repository:</p>
+  
+    <template type="file-hashes">
+        0b1033f39ed0e5a79408fa5976724107918275aa3abdc3dd188bfaf0521d7f7e  src/ClankerFeeSink.sol
+        80e4131988e2e9d26f09d4c6211791aa7b8b4ac1b6f30df6101d400d933def29  src/ClankerSafeErc20Spender.sol
+        3014307a03b9afe9fc92e79faad4f861c847313524914bc4c63196f1753a3b77  src/interfaces/IClankerFactoryV4.sol
+        cdce43cf6795c43352cc9267ad06695fad6aa89e28ce72693b2b5fb469c896ef  src/interfaces/IClankerFeeSink.sol
+        f831be60cd418d092f856701dab016791fce54ede5c110c773856087545a4402  src/interfaces/IClankerLpLockerIndividual.sol
+        8a2447756be091c039b027c8b8400920c756685428196c16cf22b8ff194ab92f  src/interfaces/IOwnerAdmins.sol
+        235525f5a0ce1d0e5f0e8f73b06de3d39a357d89c5fe6bb897ff43916b21ca37  src/interfaces/ISafe.sol
+        8934bccad95f04f4c26c8c742e482df2544acf6a448db0e074b1a572ea7d23c8  src/interfaces/ISwapRouter.sol
+        c33138e9ccf600ced274a8a5882e185139f2c8089a5304dc6bf0b61fe2ea020b  src/OwnerAdmins.sol
+    </template>
+</content-for>

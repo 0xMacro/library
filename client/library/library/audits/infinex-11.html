@@ -1,0 +1,74 @@
+<page
+  clientName="Infinex"
+  reportDate="October 17, 2024"
+  auditTitle="Infinex 11"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  repoCommitHashRewardCampaign="b012e54c8c10e88eef5c825b36c1ecfd1385c9b0"
+  finalRepoCommitHashRewardCampaign="ef135dfe1ef8a0523ca0817524d5dc67c9dacd6a"
+
+  repoCommitHashBlastpoint="d6ca8e9bbb2138a51b9dbe3933895c16991e9d11"
+  finalRepoCommitHashBlastpoint="1af229e71aa1867125da3830f0e4b127578bb8ba"
+
+
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from October 8th to October 11th, 2024.
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li>
+      <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Initial) Reward Campaign:</b> </br>
+      <code>{{page.repoCommitHashRewardCampaign}}</code>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Final) Reward Campaign:</b> </br>
+      <code>{{page.finalRepoCommitHashRewardCampaign}}</code>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Initial) Blast Point:</b> </br>
+      <code>{{page.repoCommitHashBlastpoint}}</code>
+    </li>
+
+    <li class="break-words break-all">
+      <b>Commit Hash (Final) Blast Point:</b> </br>
+      <code>{{page.finalRepoCommitHashBlastpoint}}</code>
+    </li>
+  </ul>
+</content-for>
+
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+  </ul>
+
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    9451bc40fd6ebea2ae788210f37aa397d0d60e6b94e767b3c7e0881f5809f04b  src/reward-campaign/IRewardCampaign.sol
+    dfe3e21500ae498297cb5de99e83954e7e659c3815fed7d33d54d36659d0ce3f  src/reward-campaign/RewardCampaign.sol
+    7d0099391365de892496ea30ab729bc3d39f70d2a194b77d0fc1adbc2098c3db  src/reward-campaign/RewardCampaignStorage.sol
+    f6c169daddae936639a37f369a78e679c990e334c4ee7efb56e194634906967f  src/forwarder/ERC2771BaseUpgradeable.sol
+    27bcca1ea4d1a61477b4195220c62d178384f0b386079cdad1c62205f48a1dc2  src/blast-points/BlastPointsDistributor.sol
+    63c33bee063d300315756931b8adde1c3c2be58f933609353a9b85eede77cfb3  src/blast-points/IBlastPointsDistributor.sol
+  </template>
+</content-for>
+
+</page>

@@ -1,0 +1,477 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [H-1] Redemption allowance restriction can be circumvented
+  
+      In the `Management` contract, the `sellTokensForCurrency()` allows redemption of Savea tokens up to the `Settings.REDEEM_PERCENTAGE` per month. See `isReedeemable()` , `_checkandUpdateRedemption()` and `checkRedemptionAllowance()`. When redemption is enabled, and the user tries to redeem for the first time within a particular month, the redemption allowance for that period is calculated and recorded.
+  
+      ```solidity
+      // checkRedemptionAllowance()
+      if (redemption.amountRedeemed == 0) {
+          // wallet didn't reedem this month so they can request the full redemption amount
+          return ((token.balanceOf(msg.sender) *
+              (settings[Settings.REDEEM_PERCENTAGE])) / 10 ** 20); // 20 is required to get to the correct decimals
+      }
+      ```
+  
+      In the `_checkAndUpdateRedemption()`, this allowance is decremented for the redeemed amount while the redeemed amount is tracked separately. On subsequent redemption attempts during the same month, the user’s `amountAllowed` is checked, and if it is greater or equal to the requested amount, the request is processed; otherwise, it is denied.
+  
+      However, the current implementation approach's issue implicitly assumes that users cannot transfer their tokens and that their token balance is fixed.
+  
+      Malicious users may redeem up to `REDEEM_PERCENTAGE` of tokens from one address, transfer the remaining balance to a different address, and repeat the process in the loop until the whole balance is redeemed. An alternative approach for them is to move the aggregated balance iteratively to multiple addresses and perform redemption with one wei to obtain max `REDEEM_PERCENTAGE` at each address. Afterward, they can split their token balance across those addresses and redeem it in one step.
+  
+      **Remediations to Consider**
+  
+      - Limit token transfers for a particular token holder and the current period if the redemption request has already been processed.
+    </field>
+    <field name="response">
+        Currently, all our investors are KYCed. However, we understand there’s no enforcement on this at the smart contract level. This is something we’re aiming to fix in the next version.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [H-2] Token holder fee charging can be circumvented
+  
+      In the `Management` contract, `chargeFeesAllBatch()` efficiently enables iterative processing and fee collection from all token holders. Related `chargeFeesAll()` function performs the identical operation. However, it is unsuitable when there are many token holders; therefore, `chargeFeesAllBatch()` is expected to be used more commonly.
+  
+      However, in the case of `chargeFeesAllBatch()`, users may exploit the fact that fee collection is performed in multiple transactions across different groups of token holders. Users may observe that the owner has a pending transaction `chargeFeesAllBatch()`, and they may front-run it with a transfer of their balance to the account address under their control but not specified as part of the batch to be processed. The token balance fee will not be applied as their initial address will now have 0 balance. Immediately after `chargeFeesAllBatch()` is complete, they transfer their tokens back to the initial address, which usually would not be processed again during the same time period.
+  
+      This issue impacts the core invariant of charging fees on all token balances not stored with the `Management` contract.
+  
+      **Remediations to consider**
+  
+      - Redesign the fee collection process. For example, in one approach, the system could mint a token equal to the fee percentage of all tokens in circulation and assign this newly minted asset balance to the `Management` contract.
+      - An alternative approach would be to use a rebase token system similar to stETH, where the token tracks the individual tokenholder's share. Then, based on changes in total supply (due to fee collection) meant for token holders, individual holder balance changes.
+    </field>
+    <field name="response">
+        At this phase this is not a threat for us but we aim to fix it in the next implementation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">91c7d11be24fd4c2109c0cfb31505cf771fbac1f</field>
+    <field name="content">
+      ## [H-3] For new token holders, a fee is incorrectly applied
+  
+      In the `Management` contract, `_chargeFee()` internal function is responsible for processing and recording fee collection for token holders. Implementation check if time delta between current `block.timestamp` and previous fee collection timestamp is greater than the defined `feeStructure.period` for fee collection.
+  
+      ```solidity
+      /**
+      * @notice Internal functon to charge a fee
+      @param wallet Address of the wallet to charge
+      **/
+      function _chargeFee(address wallet) internal {
+          // this contract will hold the tokens but we don't want to charge fees on them
+          if (wallet != address(this)) {
+              // check the last payment date to see if the fees are due
+              if (block.timestamp - payments[wallet] > feeStructure.period) {
+  
+                  uint256 feeAmount = ((token.balanceOf(wallet) / 100) *
+                      feeStructure.fee) / 10 ** token.decimals();
+  
+                  if (feeAmount > feeStructure.minimumTokens) {
+                      // charge the wallet
+                      token.update(wallet, address(this), feeAmount);
+  
+                      // update the last payment date
+                      payments[wallet] = block.timestamp;
+  
+                      // emit event
+                      emit FeeCharged(wallet, feeAmount);
+                  }
+              }
+          }
+      }
+      ```
+  
+      However, when the holder is processed for the first time, their `payments[wallet]` record will be 0 as it is not initialized. As a result, they would be eligible for fee collection since the time delta in this scenario would certainly be greater than the value of `feeStructure.period`. Consequently, when transferred between multiple token holders, the same token balance would be accounted for fee collection, resulting in excess fee charges per period.
+  
+      **Remediations to Consider**
+  
+      - Redesign fee collection system as described in [H-2].
+    </field>
+    <field name="response">
+        * This can happen only if the _chargeFee() method is called multiple times in a feeStructure.period period of time. If this is ran once a month then we should not worry about it as even though the user transferred his tokens to multiple addresses, each address will be charged independently. 
+        * On another note, we’re now initializing the payments mapping with the block.timestamp for new buyers.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">TODO</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [M-1] Hardcoded Savea token <> Listing currency exchange rate enables arbitrage opportunity
+  
+      In the `Management` contract, `buyTokensWithCurrency()` and `sellTokensForCurrency()` functions enable users to buy and sell Savea tokens in exchange for listing currency. Both of these functions rely on a fixed exchange rate defined by `Settings.EXCHANGE_RATE_BUY` and `Settings.EXCHANGE_RATE_SELL` to perform conversion. The contract owner controls these two settings and updates when necessary.
+  
+      However, when the exchange rate deviates from the configured value, external actors may exploit arbitrage opportunities and buy or sell tokens at favorable value. This opportunity exists even if the exchange rate value is updated frequently since malicious actors may front-run price update transactions.
+  
+      **Remediations to Consider**
+  
+      - Update implementation to rely on external oracles provided by 3rd parties (e.g. zk oracles, chainlink, etc.)
+    </field>
+    <field name="response">
+        We’re ok with this at the moment and we’ll rely on external oracles in the next version.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Input validation</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">38100bc16aaf261668448518c4b57ff75a136620</field>
+    <field name="content">
+      ## [M-2] Incorrect token balance check in `buyTokensWithCurrency()`
+   
+      In the `Management` contract, the `buyTokensWithCurrency()` function enables users to buy Savea tokens. This function contains several input validations, including a check, which validates if the contract’s token balance is enough to service the pending buy request.
+  
+      ```solidity
+      // calculate the token amount into the correct token decimals
+      uint256 tokenAmount = (currencyAmount * 10 ** token.decimals()) /
+          settings[Settings.EXCHANGE_RATE_BUY];
+  
+      // check if the contract has enough tokens
+      require(
+          token.balanceOf(address(this)) >= currencyAmount,
+          Errors.MANAGEMENT_AVAILABLE_TOKENS
+      );
+      ```
+  
+      However, the check implementation references the wrong variable, `currencyAmount`, instead of `tokenAmount`. If the exchange rate is such that one token is worth much more than currency, it may prevent processing purchase requests even if the contract has enough token balance.
+  
+      **Remediations to Consider**
+  
+      - Update check implementation
+  
+      ```solidity
+      // check if the contract has enough tokens
+      require(
+          token.balanceOf(address(this)) >= tokenAmount,
+          Errors.MANAGEMENT_AVAILABLE_TOKENS
+      );
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">7ddffb6ade113084799f1e6e159f479dd02e1718</field>
+    <field name="content">
+      ## [M-3] Incorrect implementation of `checkRedemptionAllowance()`
+
+      In the `Management` contract, `checkRedemptionAllowance()` determines the amount of tokens a specific wallet can sell within a particular redemption period.
+  
+      ```solidity
+      /**
+       * @notice Check the redemption allowance for the wallet
+       * @param wallet Wallet address to check
+       */
+      function checkRedemptionAllowance(
+          address wallet
+      ) public view returns (uint256 amountAllowed) {
+          // get redemption for address in the current month
+          DataTypes.Redemption storage redemption = redemptions[wallet][
+              settings[Settings.CURRENT_MONTH]
+          ];
+  
+          if (redemption.amountRedeemed == 0) {
+              // wallet didn't reedem this month so they can request the full redemption amount
+              return ((token.balanceOf(msg.sender) *
+                  (settings[Settings.REDEEM_PERCENTAGE])) / 10 ** 20); // 20 is required to get to the correct decimals
+          } else {
+              // wallet already reedemed this month so they can request up to the amount allowed already set
+              return (redemption.amountAllowed);
+          }
+      }
+      ```
+  
+      However, while the function accepts the `wallet` as a parameter, it performs calculations based on the token balance of `msg.sender` instead of the `wallet` address. As a result, the returned value for the provided `wallet` will differ from the correct one if the `wallet` and `msg.sender` are unequal.
+  
+      **Remediations to Consider**
+  
+      - Update implementation to reference to `token.balanceOf(wallet)` instead of `token.balanceOf(msg.sender)`, or
+      - Remove `wallet` parameter and `checkRedemptionAllowance()` only for `msg.sender`
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">TODO</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] Inappropriate fee values may affect user assets
+  
+      In the `Management` contract, the owner may update important system configurations using the `updateFeeStructure()` function. When the fee is set, it affects which percentage of assets is charged per period from each token holder balance.
+  
+      However, if this fee is by accident or due to a compromise set to an unexpectedly high value (e.g., 100%), it may result in a loss of assets for the end users.
+  
+      **Remediations to Consider**
+  
+      - Add limits (min, max) for the most important system configuration variables to indicate expected system conditions and reduce risks for managed assets.
+    </field>
+    <field name="response">
+        We’re ok with this for now. Fees are going to be subject to T&Cs.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">b999ead91b936c1b99f43918f2550e3a480b91fa</field>
+    <field name="content">
+      ## [L-2] Incorrect NFTWithdraw event definition and emission
+  
+      In the `Management` contract, the `withdrawNFTOnly()` and `withdrawAndBurnNFT()` functions enable users to withdraw their NFT token. As part of the implementation, `NFTWithdraw()` event is emitted.
+  
+      ```solidity
+      /** Emitted when nfts are withdrawn */
+      event NFTWithdraw(address to, address token, uint256 id);
+  
+      /* Event emission in withdrawNFTOnly() and withdrawAndBurnNFT() */
+      emit NFTWithdraw(to, address(token), tokenId);
+      ```
+  
+      However, both functions do not use a `token` (the address of the Savea token) but a `nftContract` associated with a specific token. As a result, second emitted parameter is incorrect and misleading for off-chain tracking and monitoring tools relying on event data.
+  
+      **Remediations to Consider**
+  
+      - Update the implementation of `withdrawNFTOnly()` and `withdrawAndBurnNFT()` to emit proper event data and event definition to more clearly indicate what is being emitted.
+  
+      ```solidity
+      /** Emitted when nfts are withdrawn */
+      event NFTWithdraw(
+          address indexed to,
+          address indexed nftContract,
+          uint256 indexed tokenId
+      );
+  
+      /* Event emission in withdrawNFTOnly() and withdrawAndBurnNFT() */
+      emit NFTWithdraw(to, nftContract, tokenId);
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">eb3663852b1f62e2c297a33992ecc8bbb1816653</field>
+    <field name="content">
+      ## [Q-1] Public view functions are unnecessarily access protected
+
+      The following public view functions are access controlled in `SaveaToken.sol`
+  
+      - `getTokenHolderSize()`
+      - `getTokenHolderAtIndex()`
+      - `getTokenHolderState()`
+  
+      Consider removing the `onlyRole(MANAGEMENT_ROLE)` modifier since it is unnecessary.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b9a98a133b0f1fb49eeeab4523b86a4fe6379c22</field>
+    <field name="content">
+      ## [Q-2] Unused code present in the implementation
+  
+      In the `Management` contract, the following code is present but unused:
+  
+      - commented out code
+          - checkBuyMinimum
+          - checkBuyMaximum
+      - unused code
+          - validateAddress() modifer
+          - checkAvailableFunds() modifier
+          - Errors.MANAGEMENT_FEES_INVALID_ADDRESS
+  
+      Consider removing this code unless it is needed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-3] Consider using Ownable2Step instead of Ownable
+
+      The `Management` contract, which relies heavily on a centralized owner, should support a safe owner transition to a more appropriate privileged operation handling account, such as one using a multi-sig. `Ownable2Step` can enable safer owner transition when it is necessary.
+    </field>
+    <field name="response">
+        We’re ok with this for now. Planning to use a multi-sig wallet as the owner of the Management contract so the transfer ownership process will require a quorum approval anyway.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">08e836e2e84a549e10c20ab8c2bd408d1b996bec</field>
+    <field name="content">
+      ## [Q-4] Disable unnecessary Ownable functionality
+  
+      The `Management` contract, which inherits from OpenZeppelin’s Ownable contract, has `renounceOwnership()` functionality. When this function is called, it permanently removes ownership of the contract.
+  
+      Since Savea’s `Management` contract is highly centralized and cannot operate without an owner, consider disabling the `renounceOwnership()` functionality by overriding it and reverting whenever it is called.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">9ad24d94c5f1cccea79f8bd365f08eb7c2f16e09</field>
+    <field name="content">
+      ## [Q-5] Inadequate parameter naming for TokensPurchased event
+  
+      In the `Management` contract, the `buyTokensWithCurrency()` emits `TokensPurchased` event:
+  
+      ```solidity
+      emit TokensPurchased(msg.sender, currencyAmount, tokenAmount);
+      ```
+  
+      When `TokensPurchased` event is defined as following with parameter names which are misleading or inadequately named.
+  
+      ```solidity
+      event TokensPurchased(
+          address indexed wallet,
+          uint256 price,
+          uint256 tokens
+      );
+      ```
+  
+      For comparison, `TokenSold` event has more appropriate parameter naming.
+  
+      ```solidity
+      event TokensSold(
+          address indexed seller,
+          uint256 tokenAmount,
+          uint256 currencyAmount
+      );
+      ```
+  
+      Consider updating `TokensPurchased` event emission.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Token standards</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">8abf19dc1e4562a0946cd6812704d699a5a78c23</field>
+    <field name="content">
+      ## [Q-6] Use OpenZeppelin’s SafeERC20 library
+  
+      In the `Management` contract, for general interaction with `token` and `currency` addresses, consider using `SafeERC20` to help deal with various ERC20 implementations unless they are under system control.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-7] Define constants for various numerical values
+  
+      In the `Management` contract, different numerical values are used as literals in several function implementations. While there is no currently negative impact on the system operation, consider replacing these literal values with well-defined constants. In the constructor, set immutable variable `TOKEN_PRECISION`. 
+  
+      - `checkRedemptionAllowance()` - replace 10**20 with TOKEN_PRECISION * PERCENTAGE_PRECISION (10**18 * 100)
+      
+          ```solidity
+          return ((token.balanceOf(msg.sender) *
+             (settings[Settings.REDEEM_PERCENTAGE])) / 10 ** 20); 
+          ```
+      
+      - `buyTokensWithCurrency()` - replace 10 ** token.decimals() with TOKEN_PRECISION
+      
+          ```solidity
+          uint256 tokenAmount = (currencyAmount * 10 ** token.decimals()) /
+              settings[Settings.EXCHANGE_RATE_BUY];
+          ```
+      
+      - `sellTokensForCurrency()` - replace 10 ** token.decimals() with TOKEN_PRECISION
+      
+          ```solidity
+          uint256 currencyAmount = (tokenAmount *
+              settings[Settings.EXCHANGE_RATE_SELL]) / 10 ** token.decimals();
+          ```
+    </field>
+    <field name="response">
+        We’ll be fixing this in the next implementation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas optimization</field>
+    <field name="impact">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-1] Inefficient fee collection implementation
+  
+      In the `Management` contract, fee collection is performed using `chargeFeesAllBatch()` and `chargeFeesAll()`, triggered by the owner for each period. The cost of operating, charging, and collecting fees is manageable for a few token holders. 
+  
+      However, the current implementation would not be scalable for any larger number of token holders, especially in the scenario of high gas fees on the Ethereum mainnet, where the project is currently deployed.
+  
+      Consider redesigning the fee collection system according to the design suggested in [H-2], as in that case, the complexity of operation would be O(1) instead of O(n).
+    </field>
+    <field name="response">
+        We’ll be fixing this in the next implementation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [I-1] Centralization risks
+  
+      The contracts in scope, `SaveaToken.sol` and `Management.sol`, feature extensive functionality under the system owner's direct control. In case of owner account compromise or incidental and/or malicious owner actions, user assets could be affected.
+  
+      Consider implementing various mechanisms for a more decentralized and less trust-demanding system:
+  
+      1. use a multi-sig account for an owner account instead of EOA, and enhance with governance features if possible
+      2. consider introducing a timelock mechanism for important system settings updates, so that end users may have the opportunity to react to undesirable system changes
+      3. introduce features that allow the system to be more decentralized, such as oracle for tracking exchange rate.
+      4. remove or set limits on owner operations and handling of user assets such as transfer of tokens, transfer of currency assets, and transfer of NFT tokens.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use case</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [I-2] Settings.CURRENT_MONTH should never repeat
+  
+      In the `Management` contract, the `Settings.CURRENT_MONTH` parameter is used to access various configuration parameters for each month. If `CURRENT_MONTH` always increases and never loops, there is no danger that some previously used and updated config variables will be reused in the new period. However, if that is not the case, it may negatively affect system behavior.
+  
+      Consider treating CURRENT_MONTH as a monotonically increasing value and do not reset it.
+    </field>
+    <field name="response">
+      We’ll be fixing this in the next implementation.
+    </field>
+  </item>
+  

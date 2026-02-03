@@ -1,0 +1,211 @@
+<item>
+    <field name="topic">Data Consistency</field>
+    <field name="impact">spec</field>
+    <field name="chance">na</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-pay-gateway/commit/348a4ff1cdcea9f8932f3fd48c451c06edd0d0ba</field>
+    <field name="content">
+      ## [M-1] No processed verification for transaction ids
+  
+  
+      One of the key changes introduced to the previously audited PayGateway contract, now UniversalBridgeV1, was removing the signature-based scheme for the function `initiateTransaction()`. By removing this, the `_verifyTransferStart()` internal function no longer checks that the `transactionId` has not been processed.
+  
+      ```diff
+      -       // verify data
+      -       if (!_verifyTransferStart(req, signature)) {
+      -           revert PayGatewayVerificationFailed();
+      -       }
+  
+              // mark the pay request as processed
+              PayGatewayModuleStorage.data().processed[req.transactionId] = true;
+  
+      ```
+  
+      [PayGatewayModule.sol#L198-L204](https://github.com/thirdweb-dev/contracts-pay-gateway/blob/507164254db2a4d83027662a446725744439a1e2/src/PayGatewayModule.sol#L198-L204)
+  
+      This allows the `transactionId` to be replayed or reused for different transaction payloads, breaking the uniqueness of transaction ids and corrupting the data consistency tracker identifier, potentially for multiple clients or apps that could use the universal bridge contract.
+  
+      **Remediations to Consider:**
+  
+      Consider validating that the `transactionId` has not been processed before setting it to true.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">DoS</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-modular-account/commit/b43fe3970c5599c19ccdfd7d2de8dca6789b84ca</field>
+    <field name="content">
+      ## [M-2] Valid signers can deny session changes
+  
+      In `MinimalAccount.sol`, since the `processed` mapping is shared for both `executeWithSig` and `createSessionWithSig`, and the `wrappedCalls.uid` alongside the `sessionSpec.uid` are arbitrary inputs (different from the `sessionUid` calculated and stored when adding a session based on the session parameters).  This allows any valid signer to deny a UID by executing a function within its allowed constraints. 
+  
+      **Remediation to Consider:**
+  
+      Consider separating processed UID for session generation and signer execution. 
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Errors</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-modular-account/commit/7893b02310803b2d0bb1f1b8f83d0568fef23db6</field>
+    <field name="content">
+      ## [M-3] No error verbosity for invalid calls
+  
+      While executing the parameter validation for signers, the current `MinimalAccount` and `SessionLib` implementations loop through all wrapped calls and validate their constraints and limits with the corresponding session spec signer. However, the `SessionLib` logic does not reverts and returns `false` or `true` for invalid and valid checks, respectively. 
+  
+      Test `test_revert_callPolicy_erc20Transfer_wrongSelector` should revert in the selector check, but it reverts in the target address check.
+  
+      ```solidity
+      calls[0].data = abi.encodeCall(MockERC20.mint, (address(0x1234), 100));
+      ```
+  
+      [MinimalAccount.t.sol#L286](https://github.com/thirdweb-dev/contracts-modular-account/blob/apr25-audit-macro/test/MinimalAccount.t.sol#L286)
+  
+      Test `test_revert_callPolicy_erc20Transfer_crossTxLimit` should revert in the limit checks, but it reverts in the target address check.
+  
+      ```solidity
+      calls[0].data = abi.encodeCall(ERC20.transfer, (address(0x1234), wrongAmount));
+      ```
+  
+      [MinimalAccount.t.sol#L331](https://github.com/thirdweb-dev/contracts-modular-account/blob/apr25-audit-macro/test/MinimalAccount.t.sol#L332)
+  
+      Additionally, since all errors revert with `InvalidSignature`, debugging and troubleshooting will be difficult.
+  
+      **Remediations to Consider**
+  
+      Consider using custom errors for each validation step, as all calls must be valid within session constraints and limits to execute calls. 
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Errors</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-modular-account/commit/6ae98ff7c046e16a80311a220b965ba3e57e9856</field>
+    <field name="content">
+      ## [L-1] Session specs can be partially overridden
+  
+      In `MinimalAccount`, when creating a new session, the `sessionUid` is calculated using the signer address and the `block.timestamp` to map and store the proper session data, transfer, and call policies. This creates a unique identifier for the signer’s session. If the EOA owner changes the signers session later, the policies will change to the new session UID.
+  
+      ```solidity
+      bytes32 sessionUid = keccak256(abi.encodePacked(sessionSpec.signer, block.timestamp));
+  
+      _minimalAccountStorage().sessionIds[sessionSpec.signer] = sessionUid;
+      _minimalAccountStorage().allSigners.add(sessionSpec.signer);
+      _minimalAccountStorage().sessionExpiration[sessionUid] = sessionSpec.expiresAt;
+      _minimalAccountStorage().isWildcard[sessionUid] = sessionSpec.isWildcard;
+  
+      for (uint256 i = 0; i < sessionSpec.callPolicies.length; i++) {
+          _minimalAccountStorage().callPolicies[sessionUid].push(sessionSpec.callPolicies[i]);
+          bytes32 targetHash = keccak256(
+              abi.encodePacked(sessionSpec.callPolicies[i].target, sessionSpec.callPolicies[i].selector, sessionUid)
+          );
+          _minimalAccountStorage().targetCallPolicy[targetHash] = sessionSpec.callPolicies[i];
+  
+          if (sessionSpec.callPolicies[i].selector == bytes4(0x00000000)) {
+              _minimalAccountStorage().anySelectorForTarget[sessionUid][sessionSpec.callPolicies[i].target] = true;
+          }
+      }
+  
+      for (uint256 i = 0; i < sessionSpec.transferPolicies.length; i++) {
+          _minimalAccountStorage().transferPolicies[sessionUid].push(sessionSpec.transferPolicies[i]);
+          bytes32 targetHash = keccak256(abi.encodePacked(sessionSpec.transferPolicies[i].target, sessionUid));
+          _minimalAccountStorage().targetTransferPolicy[targetHash] = sessionSpec.transferPolicies[i];
+      }
+      ```
+  
+      [MinimalAccount.sol#243-267](https://github.com/thirdweb-dev/contracts-modular-account/blob/apr25-audit-macro/src/7702/MinimalAccount.sol#L243-L267)
+  
+      Although unlikely, if a user submits two session specs for the same signer in the same block, the `sessionUid` will be the same. This could override the session expiration parameter that might not be intended to be the same for these session specs.
+  
+      **Remediations to Consider:**
+  
+      Consider adding the session parameters to the sessionUid hash to replace the previous policies and avoid this edge case completely, or documenting this potential pitfall.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust Assumptions</field>
+    <field name="content">
+      ## [I-1] Developer fee is not capped to max bps
+  
+      The developer fee is currently passed to the `initiateTransaction()` function call as a dynamic parameter, and it’s charged on top of the amounts intended to be swapped or bridged. This parameter is not capped to any value, potentially being higher than the maximum BPS coefficient, charging more than the actual token amount. It’s up to developers and integrators to properly set this value.
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] `TransactionInitiated` event may not emit the actual amount used for native transactions
+  
+      In the `UniversalBridgeV1` contract, for native token calls, `initiateTransaction()` could emit a `token amount` different from the one used for the `forwardAddress` call. The logic only ensures the `sendValue` is higher or equal to the `tokenAmount` properly as a sanity check, but the emitted event `TransactionInitiated` only logs the token amount, which may not be completely transparent. Consider emitting the `msg.value` to track all used parameters easily.
+  
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-modular-account/commit/9f1f648e796a4cad0414e50572598f63583bbedf</field>
+    <field name="content">
+      ## [Q-2] No length check for calls array
+  
+      In the `MinimalAccount` contract, passing an empty array of calls in the `wrappedCalls` parameter, when calling the `execute()` call, will silently succeed and emit events without executing any calls, generating ambiguous logs. Consider adding a length check to ensure at least one call is provided.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Data Availability</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/thirdweb-dev/contracts-modular-account/commit/a3f290f186097f3747ca7b5c840aec54445d5374</field>
+    <field name="content">
+      ## [Q-3] No view methods for wildcard signers
+  
+      Consider adding a view function to check whether a signer has wildcard permissions, enabling off-chain components to query signer status.
+      
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-4] Quality suggestions
+  
+      - In `VerifyingPaymasterV7.sol` the `UserOperationLib` is imported twice; consider removing the duplicated import.
+      
+          ```solidity
+      
+          import {UserOperationLib} from "account-abstraction-v0.7/core/UserOperationLib.sol";
+          import {UserOperationLib as UserOperationLibV07} from "account-abstraction-v0.7/core/UserOperationLib.sol"; 
+          ```
+      
+          [VerifyingPaymasterV7.sol#L6-7](https://github.com/thirdweb-dev/contracts-modular-account/blob/main/src/paymaster/VerifyingPaymasterV7.sol#L5-L6)
+      
+      - Paymaster versions have an inconsistent encoding order for `_userOp.callData` and `_userOp.initCode` parameters, which are shared across both versions. Consider using the same order for both to keep it consistent.
+    </field>
+  </item>
+  

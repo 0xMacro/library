@@ -1,0 +1,995 @@
+<item>
+    <field name="topic">Decimals handling</field>
+    <field name="impact">high</field>
+    <field name="impactNote">Users receive far more/less shares than intended</field>
+    <field name="chance">medium</field>
+    <field name="chanceNote">Occurs whenever depositing pegged assets with different decimals compare to the base asset</field>
+    <field name="status">fixed</field>
+    <field name="commit">29e5890efc78d0ebbd2db7079a3e5cbef10f80d6</field>
+    <field name="content">
+      ## [H-1] Incorrect Decimal Scaling in Pegged Asset Deposits Leads to Inflated/Deflated Share Minting
+  
+  
+  
+  
+      While depositing token to the vault, the `calculate_shares_and_mint()` function contains a critical decimal handling error when processing deposits of pegged assets with different decimal places than the base asset.
+  
+      ```rust
+      pub fn calculate_shares_and_mint<'a>(
+          is_base: bool,
+          args: DepositArgs,
+          exchange_rate: u64,
+          share_decimals: u8,
+          asset_decimals: u8,
+          asset_data: Account<'_, AssetData>,
+          price_feed: AccountInfo<'a>,
+          token_2022: AccountInfo<'a>,
+          share_mint: AccountInfo<'a>,
+          user_shares: AccountInfo<'a>,
+          boring_vault_state: AccountInfo<'a>,
+          boring_vault_state_bump: u8,
+      ) -> Result<u64> {
+  
+          ...
+  
+          } else if asset_data.is_pegged_to_base_asset {
+              // Asset is pegged to base asset, so just need to convert amount to be in terms of base asset decimals.
+              let deposit_amount = to_decimal(args.deposit_amount, asset_decimals)?;
+              let deposit_amount: u64 = from_decimal(deposit_amount, share_decimals)?;
+  
+              calculate_shares_to_mint_using_base_asset(
+                  deposit_amount,
+                  exchange_rate,
+                  asset_decimals,
+                  share_decimals,
+                  asset_data.share_premium_bps,
+              )?
+          } 
+      
+          ...
+      }
+      ```
+  
+      **Reference:** [boring-vault-svm/src/utils/teller.rs#L182-L193](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/utils/teller.rs#L182-L193)
+  
+      The function first converts the deposit amount to the base asset's decimal places but then incorrectly uses the deposit asset's decimals when calculating shares in `calculate_shares_to_mint_using_base_asset`. This causes a severe multiplication effect when the base asset has different decimal places than the deposit asset, leading to the depositor having far more or far fewer share tokens than expected
+  
+      For example, when depositing `USDC` (6 decimals) to a vault using `USDT` (9 decimals) (hypothetically, as USDT is not 9 decimals) as the base token:
+  
+      1. User deposits 1 USDC (1,000,000 units)
+      2. [The amount is converted to USDT decimals](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/utils/teller.rs#L185C9-L185C20): 1,000,000,000 units
+      3. When calculating shares, this amount is [interpreted as if it were in USDC decimals (6)](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/utils/teller.rs#L350)
+      4. Results in 1000x more shares being minted than intended
+  
+      This allows users to receive significantly more shares than they should, effectively stealing value from other vault depositors.
+  
+      - POC
+      
+          Put this test in a new folder and run `anchor test` 
+      
+          ```tsx
+          import * as anchor from "@coral-xyz/anchor";
+          import { Program } from "@coral-xyz/anchor";
+          import {
+            createMint,
+            getAccount,
+            getOrCreateAssociatedTokenAccount,
+            mintTo,
+            TOKEN_PROGRAM_ID,
+            TOKEN_2022_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID,
+            getAssociatedTokenAddressSync,
+          } from "@solana/spl-token";
+      
+          import { BoringVaultSvm } from "../target/types/boring_vault_svm";
+          import { expect } from "chai";
+      
+          describe("Test", () => {
+            // anchor
+            let provider;
+            let program;
+            let user;
+      
+            const LAMPORTS_PER_SOL = 1000000000;
+      
+            let programConfigAccount;
+            let boringVaultStateAccount;
+            let boringVaultShareMint;
+            let boringVaultAccount;
+            let userShareAta;
+      
+            let mintUSDC;
+            let mintUSDT;
+      
+            let userUSDCATA;
+            let userUSDTATA;
+      
+            let usdcAssetDataPda;
+            let usdtAssetDataPda;
+      
+            let vaultUSDCATA;
+            let vaultUSDTATA;
+      
+            let _;
+      
+            before(async () => {
+              anchor.setProvider(anchor.AnchorProvider.env());
+              provider = anchor.getProvider();
+              program = anchor.workspace.BoringVaultSvm as Program<BoringVaultSvm>;
+              user = anchor.web3.Keypair.generate();
+      
+              await provider.connection.confirmTransaction(
+                await provider.connection.requestAirdrop(
+                  user.publicKey,
+                  100 * LAMPORTS_PER_SOL
+                )
+              );
+      
+              mintUSDC = await createMint(
+                provider.connection,
+                user,
+                user.publicKey,
+                user.publicKey,
+                6
+              );
+      
+              mintUSDT = await createMint(
+                provider.connection,
+                user,
+                user.publicKey,
+                user.publicKey,
+                9
+              );
+      
+              [programConfigAccount, _] = anchor.web3.PublicKey.findProgramAddressSync(
+                [Buffer.from("config")],
+                program.programId
+              );
+              [boringVaultStateAccount, _] = anchor.web3.PublicKey.findProgramAddressSync(
+                [Buffer.from("boring-vault-state"), Buffer.from(new Array(8).fill(0))],
+                program.programId
+              );
+      
+              [boringVaultShareMint, _] = anchor.web3.PublicKey.findProgramAddressSync(
+                [Buffer.from("share-token"), boringVaultStateAccount.toBuffer()],
+                program.programId
+              );
+      
+              [usdcAssetDataPda, _] = anchor.web3.PublicKey.findProgramAddressSync(
+                [
+                  Buffer.from("asset-data"),
+                  boringVaultStateAccount.toBuffer(),
+                  mintUSDC.toBuffer(),
+                ],
+                program.programId
+              );
+              [usdtAssetDataPda, _] = anchor.web3.PublicKey.findProgramAddressSync(
+                [
+                  Buffer.from("asset-data"),
+                  boringVaultStateAccount.toBuffer(),
+                  mintUSDT.toBuffer(),
+                ],
+                program.programId
+              );
+              [boringVaultAccount, _] = anchor.web3.PublicKey.findProgramAddressSync(
+                [
+                  Buffer.from("boring-vault"),
+                  Buffer.from(new Array(8).fill(0)),
+                  Buffer.from([0]),
+                ],
+                program.programId
+              );
+      
+              userUSDCATA = await getOrCreateAssociatedTokenAccount(
+                provider.connection,
+                user,
+                mintUSDC,
+                user.publicKey
+              );
+      
+              userUSDTATA = await getOrCreateAssociatedTokenAccount(
+                provider.connection,
+                user,
+                mintUSDT,
+                user.publicKey
+              );
+      
+              vaultUSDCATA = await getOrCreateAssociatedTokenAccount(
+                provider.connection,
+                user,
+                mintUSDC,
+                boringVaultAccount,
+                true
+              );
+              vaultUSDTATA = await getOrCreateAssociatedTokenAccount(
+                provider.connection,
+                user,
+                mintUSDT,
+                boringVaultAccount,
+                true
+              );
+      
+              //mint 1$ worth of USDC
+              await mintTo(
+                provider.connection,
+                user,
+                mintUSDC,
+                userUSDCATA.address,
+                user,
+                1_000_000
+              );
+      
+              //mint 1$ worth of USDT
+              await mintTo(
+                provider.connection,
+                user,
+                mintUSDT,
+                userUSDTATA.address,
+                user,
+                1_000_000_000
+              );
+      
+              await program.methods
+                .initialize(user.publicKey)
+                .accounts({
+                  config: programConfigAccount,
+                  signer: user.publicKey,
+                  systemProgram: anchor.web3.SystemProgram.programId,
+                })
+                .signers([user])
+                .rpc();
+      
+              await provider.connection.confirmTransaction(
+                await program.methods
+                  .deploy({
+                    authority: user.publicKey,
+                    name: "Boring Vault",
+                    symbol: "BV",
+                    exchangeRateProvider: user.publicKey,
+                    exchangeRate: new anchor.BN(1_000_000_000), // 9 decimals cause base asset is 9 decimals
+                    payoutAddress: user.publicKey,
+                    allowedExchangeRateChangeUpperBound: 10050,
+                    allowedExchangeRateChangeLowerBound: 9950,
+                    minimumUpdateDelayInSeconds: 0,
+                    platformFeeBps: 0,
+                    performanceFeeBps: 0,
+                    strategist: user.publicKey,
+                    withdrawAuthority: anchor.web3.PublicKey.default, // permissionless
+                  })
+                  .accounts({
+                    config: programConfigAccount,
+                    boringVaultState: boringVaultStateAccount,
+                    shareMint: boringVaultShareMint,
+                    baseAsset: mintUSDT,
+                    signer: user.publicKey,
+                    systemProgram: anchor.web3.SystemProgram.programId,
+                    tokenProgram: TOKEN_2022_PROGRAM_ID,
+                  })
+                  .signers([user])
+                  .rpc()
+              );
+      
+              userShareAta = getAssociatedTokenAddressSync(
+                boringVaultShareMint,
+                user.publicKey,
+                true,
+                TOKEN_2022_PROGRAM_ID
+              );
+      
+              await program.methods
+                .updateAssetData({
+                  vaultId: new anchor.BN(0),
+                  assetData: {
+                    allowDeposits: true,
+                    allowWithdrawals: true,
+                    sharePremiumBps: 0,
+                    isPeggedToBaseAsset: true,
+                    priceFeed: anchor.web3.PublicKey.default,
+                    inversePriceFeed: false,
+                  },
+                })
+                .accounts({
+                  signer: user.publicKey,
+                  boringVaultState: boringVaultStateAccount,
+                  systemProgram: anchor.web3.SystemProgram.programId,
+                  asset: mintUSDC,
+                  assetData: usdcAssetDataPda,
+                })
+                .signers([user])
+                .rpc();
+      
+              await program.methods
+                .updateAssetData({
+                  vaultId: new anchor.BN(0),
+                  assetData: {
+                    allowDeposits: true,
+                    allowWithdrawals: true,
+                    sharePremiumBps: 0,
+                    isPeggedToBaseAsset: true,
+                    priceFeed: anchor.web3.PublicKey.default,
+                    inversePriceFeed: false,
+                  },
+                })
+                .accounts({
+                  signer: user.publicKey,
+                  boringVaultState: boringVaultStateAccount,
+                  // @ts-ignore
+                  systemProgram: anchor.web3.SystemProgram.programId,
+                  asset: mintUSDT,
+                  assetData: usdtAssetDataPda,
+                })
+                .signers([user])
+                .rpc();
+            });
+      
+            it("Depositing 1$ USDC get 1e12 share", async () => {
+              // deposting USDC with 6 decimals
+              await program.methods
+                .deposit({
+                  vaultId: new anchor.BN(0),
+                  depositAmount: new anchor.BN(1_000_000),
+                  minMintAmount: new anchor.BN(0),
+                })
+                .accounts({
+                  // @ts-ignore
+                  signer: user.publicKey,
+                  boringVaultState: boringVaultStateAccount,
+                  boringVault: boringVaultAccount,
+                  depositMint: mintUSDC,
+                  assetData: usdcAssetDataPda,
+                  userAta: userUSDCATA.address,
+                  vaultAta: vaultUSDCATA.address,
+                  tokenProgram: TOKEN_PROGRAM_ID,
+                  tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+                  systemProgram: anchor.web3.SystemProgram.programId,
+                  associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+                  shareMint: boringVaultShareMint,
+                  userShares: userShareAta,
+                  priceFeed: anchor.web3.PublicKey.default,
+                })
+                .signers([user])
+                .rpc();
+      
+              let shareAccountData = await getAccount(
+                provider.connection,
+                userShareAta,
+                undefined,
+                TOKEN_2022_PROGRAM_ID
+              );
+              let shareBalance = shareAccountData.amount;
+              expect(shareBalance).to.equal(BigInt(1_000_000_000_000)); //-> should be 1e9 instead
+            });
+      
+            it("Depositing 1$ USDT get 1e9 share", async () => {
+              // deposting USDT with 9 decimals
+              await program.methods
+                .deposit({
+                  vaultId: new anchor.BN(0),
+                  depositAmount: new anchor.BN(1_000_000_000),
+                  minMintAmount: new anchor.BN(0),
+                })
+                .accounts({
+                  signer: user.publicKey,
+                  boringVaultState: boringVaultStateAccount,
+                  boringVault: boringVaultAccount,
+                  depositMint: mintUSDT,
+                  assetData: usdtAssetDataPda,
+                  userAta: userUSDTATA.address,
+                  vaultAta: vaultUSDTATA.address,
+                  tokenProgram: TOKEN_PROGRAM_ID,
+                  tokenProgram2022: TOKEN_2022_PROGRAM_ID,
+                  systemProgram: anchor.web3.SystemProgram.programId,
+                  associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+                  shareMint: boringVaultShareMint,
+                  userShares: userShareAta,
+                  priceFeed: anchor.web3.PublicKey.default,
+                })
+                .signers([user])
+                .rpc();
+      
+              let shareAccountData = await getAccount(
+                provider.connection,
+                userShareAta,
+                undefined,
+                TOKEN_2022_PROGRAM_ID
+              );
+              let shareBalance = shareAccountData.amount;
+              expect(shareBalance).to.equal(BigInt(1_001_000_000_000)); //-> 1e12 + 1e9
+            });
+          });
+      
+          ```
+      
+  
+      **Remediations to Consider**
+  
+      Consider fixing the issue in one of these two ways:
+  
+      ```diff
+      } else if asset_data.is_pegged_to_base_asset {
+          let deposit_amount = to_decimal(args.deposit_amount, asset_decimals)?;
+          let deposit_amount: u64 = from_decimal(deposit_amount, share_decimals)?;
+  
+          calculate_shares_to_mint_using_base_asset(
+              deposit_amount,
+              exchange_rate,
+      -       asset_decimals,
+      +       share_decimals,
+              share_decimals,
+              asset_data.share_premium_bps,
+          )?
+      }
+      ```
+  
+      or
+  
+      ```diff
+      } else if asset_data.is_pegged_to_base_asset {
+      -   let deposit_amount = to_decimal(args.deposit_amount, asset_decimals)?;
+      -   let deposit_amount: u64 = from_decimal(deposit_amount, share_decimals)?;
+  
+          calculate_shares_to_mint_using_base_asset(
+      -       deposit_amount,
+      +       args.deposit_amount,
+              exchange_rate,
+              asset_decimals,
+              share_decimals,
+              asset_data.share_premium_bps,
+          )?
+      } 
+      ```
+    </field>
+  </item>
+  
+
+
+  <item>
+    <field name="topic">Account Storage</field>
+    <field name="impact">medium</field>
+    <field name="impactNote">Account creation will fail when vector exceeds space</field>
+    <field name="chance">medium</field>
+    <field name="chanceNote">Likely to occur with complex operations</field>
+    <field name="status">fixed</field>
+    <field name="commit">30cbd14b3c6b17864f9cc5608379888c18c89bcf</field>
+    <field name="content">
+      ## [M-1] Insufficient Account Space Allocation for CPI Digest Operations Vector
+  
+  
+  
+  
+      In the boring vault program, the `updraw_cpi_digest()` function initializes an account of type `CpiDigest` :
+  
+      ```rust
+      pub struct UpdateCpiDigest<'info> {
+          ...
+  
+          #[account(
+              init_if_needed,
+              payer = signer,
+              space = 8 + std::mem::size_of::<CpiDigest>(),
+              seeds = [
+                  BASE_SEED_CPI_DIGEST,
+                  &args.vault_id.to_le_bytes()[..],
+                  args.cpi_digest.as_ref(),
+              ],
+              bump,
+          )]
+          pub cpi_digest: Account<'info, CpiDigest>,
+      }
+      ```
+  
+      **Reference:** [boring-vault-svm/src/lib.rs#L1530-L1555](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1530-L1555)
+  
+      The `CpiDigest` struct contains a vector of operations:
+  
+      ```rust
+      #[account]
+      #[derive(Debug)]
+      pub struct CpiDigest {
+          pub operators: Operators,
+          pub expected_size: u16,
+      }
+  
+      #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+      pub struct Operators {
+          pub operators: Vec<Operator>,
+      }
+  
+      #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+      pub enum Operator {
+          Noop,
+          IngestInstruction(u32, u8), // (ix_index, length)
+          IngestAccount(u8),          // (account_index)
+      }
+      ```
+  
+      **Reference:** [boring-vault-svm/src/state.rs#L131-L136](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/state.rs#L131-L136) , [boring-vault-svm/src/utils/operators.rs#L4-L14](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/utils/operators.rs#L4-L14)
+  
+      While using `std::mem::size_of<CpiDigest>()` for space allocation is generally good practice, it becomes problematic when the struct contains a vector field. In Solana, vectors are stored as contiguous byte arrays with a 4-byte length prefix, unlike standard Rust, where vectors are pointer-based structures.
+  
+      Let's analyze the available space:
+  
+      - `std::mem::size_of<Operator>()` = 24 bytes
+      - 4 bytes for vector length prefix
+      - Leaving only 20 bytes for actual vector data
+  
+      However, each operation in the vector requires:
+  
+      - 1 byte for enum variant discriminator
+      - Up to 5 bytes for data (`IngestInstruction` stores u32 + u8)
+  
+      With only 20 bytes available for vector storage, the account can store at most 3 `IngestInstruction` operations. This is likely insufficient for complex vault management operations, causing account creation to fail when attempting to store larger operation sets.
+  
+      **Remediations to Consider**
+  
+      Since the program includes a `close_cpi_digest()` function to clean up accounts, it's acceptable to allocate more space than strictly needed. Consider making the account size configurable
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Missing logic</field>
+    <field name="impact">medium</field>
+    <field name="impactNote">Users cannot withdraw using pegged tokens</field>
+    <field name="chance">high</field>
+    <field name="chanceNote">Affects all pegged token withdrawals</field>
+    <field name="status">fixed</field>
+    <field name="commit">a4c104abfded35cf9fe138e79ff9ec7b010532b3</field>
+    <field name="content">
+      ## [M-2] Missing Pegged Asset Case in Exchange Rate Calculation in Boring Queue
+  
+  
+  
+  
+      When requesting a withdrawal to quote token in the Boring Queue program, the `request_withdraw()` function makes a CPI (Cross Program Invocation) to the Boring Vault’s `get_rate_in_quote_safe()` function to fetch the current exchange rate of quote token and share token. However, it fails to handle cases where the quote token is pegged to the base asset.
+  
+      ```rust
+      pub fn get_rate_in_quote(
+          boring_vault_state: Account<'_, BoringVault>,
+          quote: InterfaceAccount<'_, Mint>,
+          asset_data: Account<'_, AssetData>,
+          price_feed: AccountInfo,
+      ) -> Result<u64> {
+          if boring_vault_state.teller.base_asset == quote.key() {
+              get_rate(boring_vault_state)
+          } else {
+                  //**MISSING THE PEGGED TOKEN HANDLING HERE**
+              
+              let feed_account = price_feed.data.borrow();
+              let feed = PullFeedAccountData::parse(feed_account).unwrap();
+  
+              let price = match feed.value() {
+                  Some(value) => value,
+                  None => return Err(BoringErrorCode::InvalidPriceFeed.into()),
+              };
+  
+              let price = if asset_data.inverse_price_feed {
+                  Decimal::from(1).checked_div(price).unwrap()
+              } else {
+                  price
+              };
+  
+              let exchange_rate = to_decimal(
+                  boring_vault_state.teller.exchange_rate,
+                  boring_vault_state.teller.decimals,
+              )?;
+  
+              let rate = exchange_rate.checked_div(price).unwrap();
+  
+              // Scale rate to quote decimals.
+              let rate = from_decimal(rate, quote.decimals)?;
+  
+              Ok(rate)
+          }
+      }
+      ```
+  
+      **Reference:** [boring-vault-svm/src/utils/teller.rs#L299-L338](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/utils/teller.rs#L299-L338)
+  
+      The function currently only handles two scenarios:
+  
+      - Quote token is the base asset - uses a direct exchange rate
+      - Quote token is not the base asset - attempts to fetch external price data
+  
+      This creates a problem because pegged tokens don't have a direct price feed between them, yet they need a special conversion path that accounts for their pegged relationship and different decimals. When attempting to withdraw using a pegged token, the function will try to fetch a price feed that doesn't exist (since the [price feed account will likely be a default address](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L243-L248)). This will cause the withdrawal to fail.
+  
+      This effectively makes it a DOS to request withdrawal using pegged tokens. The vault admin can hotfix it by changing the price feed by calling to `update_asset_data()`, but it can depend on the availability of the price feed at that current time
+  
+      **Remediations to Consider**
+  
+      Consider adding a logic path for the pegged token in the `get_rate_in_quote()` function
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Oracle staleness</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">9240f0f416a7d754fca31e3cd28e886a9027c700</field>
+    <field name="content">
+      ## [M-3] Missing Price Feed Staleness Check Allows Trading with Outdated Oracle Data
+  
+
+  
+      The vault's price feed implementation in the Boring Vault program lacks staleness checks when fetching oracle prices for non-pegged assets. This could allow trades to execute with outdated price data in scenarios where the Switchboard Oracle feed becomes stale, potentially leading to incorrect share calculations and economic losses.
+  
+      The vulnerability exists in both deposit and withdrawal flows where price feeds are used:
+  
+      - In [`calculate_shares_and_mint()` function](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/utils/teller.rs#L196-L202) for deposits of non-pegged assets
+      - In [`calculate_assets_out()` function](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/utils/teller.rs#L264-L270) for withdrawals of non-pegged assets
+  
+      **Remediations to Consider**
+  
+      Consider following this [example](https://crates.io/crates/switchboard-on-demand) provided by the Switchboard team:
+  
+      ```rust
+      use switchboard_on_demand::PullFeedAccountData;
+      use rust_decimal::Decimal;
+  
+      pub fn solana_ix<'a>(mut ctx: Context< YourAccounts<'a>>, params: Params) -> Result<()> {
+          // Assume `account_info` is obtained from the Solana blockchain
+          let feed = PullFeedAccountData::parse(ctx.accounts.sb_feed)?;
+          let max_stale_slots = 100; // Define the maximum number of slots before data is considered stale
+          let min_samples = 5; // Set the minimum number of samples for data accuracy
+          let price: Decimal = feed.get_value(&Clock::get()?, max_stale_slots, min_samples, true)?;
+  
+          msg!("Oracle Price: {}", price);
+  
+          Ok(())
+      }
+      ```
+    </field>
+  </item>
+  
+
+  <item>
+    <field name="topic">Over constrained</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">63a8d6627714012185b7bf729d479af34ca54eaa</field>
+    <field name="content">
+      ## [L-1] Unnecessary pause check when closing CPI digest accounts
+
+  
+      The `CloseCpiDigest` struct includes a pause check that prevents closing CPI digest accounts when the vault is paused:
+  
+      ```rust
+      #[account(
+          seeds = [BASE_SEED_BORING_VAULT_STATE, &args.vault_id.to_le_bytes()[..]],
+          bump,
+          constraint = boring_vault_state.config.paused == false @ BoringErrorCode::VaultPaused,
+          constraint = signer.key() == boring_vault_state.config.authority.key() @ BoringErrorCode::NotAuthorized
+      )]
+      pub boring_vault_state: Account<'info, BoringVault>,
+      ```
+  
+      **Reference:** [boring-vault-svm/src/lib.rs#L1563-L1569](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1563-L1569)
+  
+      This is overly restrictive since:
+  
+      - Closing accounts is an administrative cleanup action
+      - The authority check already provides security
+      - Closing CPI digests doesn't affect vault assets
+  
+      **Remediations to Consider**
+  
+      Consider removing the pause check constraint and keeping only the authority verification.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sanity check</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">530954849b35140d7524e14ab404e12e6e0268f1</field>
+    <field name="content">
+      ## [L-2] Missing maximum deadline validation allows users to lock their funds indefinitely
+  
+ 
+  
+      The `request_withdraw()` function [only validates minimum deadline](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-onchain-queue/src/lib.rs#L223-L225) through `minimum_seconds_to_deadline` but lacks maximum deadline validation. Users can set arbitrarily long deadlines when requesting withdrawals, potentially locking their share tokens in the queue contract for extended periods if the request cannot be fulfilled by a solver (e.g. due to paused queue, etc).
+  
+      **Remediations to Consider**
+  
+      Consider adding a `maximum_seconds_to_deadline` parameter to `WithdrawAssetData` and validate against it in `request_withdraw()`
+    </field>
+  </item>
+  
+  
+  <item>
+    <field name="topic">Sanity check</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">35f3e94e7b71b435c224adfa761791c5af34b9ec</field>
+    <field name="content">
+      ## [Q-1] Inconsistent validation of strategist address between `deploy()` and `set_strategist()`
+  
+
+  
+      In `set_strategist()`, there is a validation check to [prevent setting the strategist address to the default address](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L513). However, this same validation is missing in the `deploy()` function when initially setting the strategist. Consider adding the same validation check in the `deploy()` 
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sanity check</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">700f01149c442c3ac06f2843a189b2d565af32f3</field>
+    <field name="content">
+      ## [Q-2] Inconsistent validation of exchange rate provider address
+  
+
+  
+      In `deploy()`, the exchange rate provider address is [validated to not be the default address](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L98-L100), but this check is missing in `update_exchange_rate_provider()`. This creates inconsistency in validation logic across the codebase. Consider adding the same validation check in the `update_exchange_rate_provider()` function
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">d5b056de0a8f3b760a2e5d87da7c4b28e693afa4</field>
+    <field name="content">
+      ## [Q-3] Unnecessary Clock Sysvar Account Inclusion in Instructions
+
+  
+      Multiple instructions in the program unnecessarily include the Clock Sysvar account in their instruction contexts when they could directly access it within the function using `Clock::get()?`. This includes Boring Queue’s [`RequestWithdraw`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-onchain-queue/src/lib.rs#L657), [`CancelWithdraw`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-onchain-queue/src/lib.rs#L831), [`FulfillWithdraw`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-onchain-queue/src/lib.rs#L750), and Boring Vault’s [`Deploy`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1196). Consider removing the Clock Sysvar account from the instructions and replacing it with direct access
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sanity check</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">50a344c38c89e4ddb855b60fad1bbb80a1559772</field>
+    <field name="content">
+      ## [Q-4] Missing sanity check on `update_withdraw_asset_data()`
+  
+
+  
+      In `update_withdraw_asset_data()`, there is no validation to ensure that `maximum_discount` is greater than `minimum_discount`. This could lead to a situation where the withdraw queue becomes unusable if misconfigured, as no valid discount value would exist that satisfies both minimum and maximum constraints. Consider adding the validation check.
+  
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Sanity check</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b27a19fc870e1e398baec264d932ef6ac360d930</field>
+    <field name="content">
+      ## [Q-5] Allow Default Price Feed for Base Asset
+  
+      In the `update_asset_data()` function, the price feed can be set to the default value only if `is_pegged_to_base_asset` is true. However, the base asset itself should also be allowed to have a default price feed since it doesn't need price conversion. Consider adding a check to allow default price feed for the base asset:
+  
+        ```diff
+            if args.asset_data.price_feed == Pubkey::default() {
+                require!(
+                    args.asset_data.is_pegged_to_base_asset || 
+        +               asset.key() == boring_vault_state.teller.base_asset,
+                    BoringErrorCode::InvalidPriceFeed
+                );
+            }
+        ```
+  
+      **Reference:** [boring-vault-svm/src/lib.rs#L243-L248](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L243-L248)
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">60638bc99d4aec0303ec5c707d70fd901771fe40</field>
+    <field name="content">
+      ## [Q-6] Inconsistent PDA Seed Structure Across Programs
+
+  
+      The programs use inconsistent seed ordering and derivation patterns for PDAs (Program Derived Addresses):
+  
+      - In the Boring Vault program, [`BoringVaultState`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1175), [`CPIDigest`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1547-L1551), and [`BoringVault`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1378-L1380) accounts use the vault’s ID to derive to those accounts, while [`AssetData`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1848-L1850) and [share mint](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1186) accounts use the vault’s address to derive
+      - In the Boring Queue program, [`WithdrawAssetData`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-onchain-queue/src/lib.rs#L556) accounts use the vault’s ID as the third seed, while other accounts use the vault’s ID as the second seed
+  
+      Consider making it more consistent for better maintainability and to reduce the potential for integration errors.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6d8dd256d74c1f3827f1ef97b6af3e19ec2dc6ee</field>
+    <field name="content">
+      ## [Q-7] Unnecessary `#[account(mut)]` field-level attributes
+
+  
+      Throughout the programs, some of the accounts in instructions unnecessarily use `#[account(mut)]` attributes. Here’s the exhaustive list:
+  
+      - In the Boring Vault program:
+          - `signer` account in `Pause`, `Unpause`, `TransferAuthority`, `AcceptAuthority`, `UpdateExchangeRateProvider`, `SetWithdrawSubAccount`, `SetPayout`, `SetFees`, `SetStrategist`, `ClaimFeesInBase`, `UpdateExchangeRate` instructions
+          - `boring_vault` account in `ClaimFeesInBase`, `Deposit`, `Withdraw`instructions
+          - `boring_vault_state` account in `Deposit`, `Withdraw`instructions
+      - In the Boring Queue program:
+          - `signer` account in `SetSolveAuthority`, `Pause`, `Unpause`instructions
+          - `queue` account in `RequestWithdraw`, `CancelWithdraw`instructions
+          - `share_mint` account in `RequestWithdraw`, `CancelWithdraw`instructions
+          - `boring_vault_state`, `boring_vault` accounts in `FulfillWithdraw`instruction
+  
+      Consider removing those attributes
+    </field>
+  </item>
+  
+
+
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b57bf7a56de326fb7357ed3bdebe0fd352ef4136</field>
+    <field name="content">
+      ## [Q-8] No need `init_if_needed` to user’s share account in `withdraw()`
+
+  
+      When withdrawing from the boring vault, the user’s share account will be used to burn the share token. This means that the share account is already initialized and no need for the `init_if_needed` tag. The initialization logic can be safely removed and replaced with the `mut` attribute:
+  
+      ```diff
+          #[account(
+      -       init_if_needed,
+      -       payer = signer,
+      +       mut,
+              associated_token::mint = share_mint,
+              associated_token::authority = signer,
+              associated_token::token_program = token_program_2022,
+          )]
+          pub user_shares: InterfaceAccount<'info, TokenAccount>,
+      ```
+  
+      **Reference:** [boring-vault-svm/src/lib.rs#L1511-L1518](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1511-L1518)
+  
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Sanity check</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">bcfc278e5ec648054f3b74889ee5f0572763739f</field>
+    <field name="content">
+      ## [Q-9] Missing validation for `share_premium_bps` upper bound in `update_asset_data()` function
+
+  
+      The `update_asset_data()` function allows setting `share_premium_bps` without any upper bound validation, while the EVM implementation [enforces a 1000 bps (10%) limit](https://github.com/Veda-Labs/boring-vault/blob/52c37848ffa1b1615974cd989f33e4de6970cb14/src/base/Roles/TellerWithMultiAssetSupport.sol#L213). This inconsistency between implementations could lead to confusion for protocol integrators. Consider adding a similar upper-bound check
+    </field>
+  </item>
+  
+
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">bbbee1bb5022f9b40ea87440419156dcb2f8c0db</field>
+    <field name="content">
+      ## [Q-10] Multiple accounts in instructions not used
+
+  
+      Several instructions in the program include accounts that are never utilized in their execution. This creates unnecessary overhead in transaction size and validation. Here’s the exhaustive list: 
+  
+      - In the Boring Vault program:
+          - `token_program` account in `Deploy` instruction
+          - `associated_token_program` account in `ClaimFeesInBase`, `DepositSol`, `Deposit`, `Withdraw` instructions
+          - `system_program` account in `ViewCpiDigest` instruction
+      - In the Boring Queue program:
+          - `queue` account in `Deploy` instruction
+          - `associated_token_program` account in `CancelWithdraw`, `FulfillWithdraw` instructions
+  
+      Consider removing unused account declarations from the affected instructions to improve code clarity and reduce transaction overhead
+    </field>
+  </item>
+  
+
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-11] No need to set some default state
+
+  
+      Multiple instances across the codebase where variables are explicitly initialized to their default values, which is redundant since Rust automatically initializes variables to their type's default value. Here’s the exhaustive list: 
+  
+      - [boring-vault-svm/src/lib.rs#L52](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L52)
+      - [boring-vault-svm/src/lib.rs#L94](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L94)
+      - [boring-vault-svm/src/lib.rs#L105](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L105)
+      - [boring-vault-svm/src/lib.rs#L106](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L106) (set to the share token’s current total supply, which is 0)
+      - [boring-onchain-queue/src/lib.rs#L87](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-onchain-queue/src/lib.rs#L87)
+      - [boring-onchain-queue/src/lib.rs#L165](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-onchain-queue/src/lib.rs#L165)
+    </field>
+    <field name="response">
+        Won't do, the default state setting will be left in, to make it very explicit what state we want used for the default.
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Redundant logic</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-12] Discount range mechanism is not relevant for Solana implementation
+
+  
+      The program implements a discount range mechanism where withdrawers must [specify a discount between `minimum_discount` and `maximum_discount`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-onchain-queue/src/lib.rs#L211-L215) when requesting withdrawals. This design was carried over from EVM implementation where discounts incentivize solvers by covering their gas costs.
+  
+      However, in the Solana implementation, the discount amount is sent to the vault instead of the solvers. Solvers are compensated through rent from closing the withdrawal request account rather than through discounts. This makes the flexible discount range unnecessary since it no longer serves its original purpose.
+  
+      Consider simplifying the design by using a fixed discount rate instead of a range, since the flexibility adds complexity without providing benefit in the Solana context.
+    </field>
+    <field name="response">
+        Won't do, it's true this isn't really needed but in an effort to have the code more closely resemble the EVM code I think it is fine to leave this.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3db7f0a52f9966ebba3bf17a35bc0072721d69ef</field>
+    <field name="content">
+      ## [Q-13] Inconsistent Error Handling Patterns
+
+  
+      The codebase uses two different patterns for handling validation errors:
+  
+      1. The `require!` macro pattern, for example:
+      
+          ```rust
+          require!(
+              expected_share_mint == args.share_mint,
+              QueueErrorCode::InvalidShareMint
+          );
+          ```
+      
+      2. The if-statement with an error return pattern, for example:
+      
+          ```rust
+          if current_time < maturity {
+              return Err(QueueErrorCode::RequestNotMature.into());
+          }
+          ```
+      
+  
+      Consider using only one pattern for a better uniform codebase
+    </field>
+  </item>
+
+
+  <item>
+    <field name="topic">Nitpicks</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">10df134b1ededb57dea7285da80a4abbfd4fb92c</field>
+    <field name="content">
+      ## [Q-14] Nitpicks
+
+      1. The [`name` and `symbol` fields](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/state.rs#L60-L61) in the `DeployArgs` struct are never used in the program, creating unnecessary bloat. Consider removing them
+      2. `close_cpi_digest()` reuses [`UpdateCpiDigestArgs`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L284) struct but doesn't utilize its `operators` and `expected_size` fields when a simpler dedicated struct would suffice.
+      3. [`Pause` and `Unpause`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1201-L1229) structs have identical implementations and could be consolidated into a single struct.
+      4. The [`#[instruction(args: DeployArgs)]`](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1158) annotation on the `Deploy` struct is unnecessary since the arguments are not used in any constraints. It can be safely removed.
+      5. [Withdraw mint validation](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-onchain-queue/src/lib.rs#L345-L347) in the `fulfill_withdraw()` function should be moved to account constraints for better efficiency and clarity in the validation flow.
+      6. [`require_keys_neq!` check](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L513) in `boring-vault-svm` lacks a custom error code, reducing error handling specificity.
+      7. Empty [`#[account()]` attribute](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1803) in the `cpi_digest` account adds no value and can be safely removed.
+      8. [`pending_authority` parameter](https://github.com/Veda-Labs/boring-vault-svm/blob/ea1e9036856accfaaf2767835230547fb59530a0/programs/boring-vault-svm/src/lib.rs#L1232) in the `TransferAuthority` struct is unused and should be removed to improve code cleanliness.
+    </field>
+  </item>
+  

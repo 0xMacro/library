@@ -1,0 +1,114 @@
+<page
+  clientName="Sentora"
+  reportDate="November 18, 2025"
+  auditTitle="Sentora A-6"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/Into-The-Block-Corp/ITBKamino"
+  repoCommitHash="e915b16154f420c35e526ae02646b7bbfceb7255"
+  customReviewInfo
+  issueSummaryFormat="table"
+  passwordEncrypt="env:PAGE_PASS_SENTORA_6"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on October 29th to November 5th 2025.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+    </ul>
+
+    <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+      ### Entities
+
+      - Program Owner
+        - Single, top-level, Sentora-controlled account.
+        - Can grant the Program Executor role to accounts.
+        - Can act as a Program Executor itself.
+      - Program Executor
+        - Sentora-controlled account.
+        - Can initialize new Positions controlled by a Position Owner..
+      - Position Owner
+        - Customer-controlled account.
+        - Can grant the Position Executor role to accounts.
+        - Can act as a Position Executor itself.
+        - Can perform certain Position-sensitive actions such as withdraw and arbitrary CPI.
+      - Position Executor
+        - Expected to be a Sentora-controlled account.
+        - Can perform certain Position managing actions such as initializing and depositing into Kamino positions.
+
+      ### Trust Model
+
+      - The Program Owner can add any account as a Program Executor.
+      - The Position Owner can add any account as a Position Executor.
+      - The Position Owner fully controls all funds within the Position.
+      - Funds **must** be deposited into a specific Position's supply_token_account PDA before a Position Executor can deposit those funds into Kamino.
+      - Position Executors can deposit funds and redeem Kamino rewards, but never withdraw them.
+    </template>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts for the Initial commit:</p>
+
+    <template type="file-hashes">
+        431c3639463aaafe8fb04691c086acf4017baa965d4acdf3bd694b5030c383e0  programs/position-manager/src/lib.rs
+        2dc0b664846540f6f770ad3cc0a74f2986d3733e421d07ffbce7825aed1a0581  programs/position-manager/src/common/constants.rs
+        a454f30d131cea9946d93fc497f3357d4eaa35a122133c237cbb0fd3dcd4ce0e  programs/position-manager/src/common/create_token_account.rs
+        29162a70f9ab304e90d7cb2839834a22b325ee10cae6df770bd93eae50412a89  programs/position-manager/src/common/errors.rs
+        d94195940d5bd5d207ee059df0614769f37471693e65ff9cdde14596216f5802  programs/position-manager/src/common/execute.rs
+        7d3506160dfb0d9efd68839e232ee08046133ee9ef9878c106df9805d7f0b5f3  programs/position-manager/src/common/mod.rs
+        dca0767f732d74e58faeff2a36f2853bb82f54020a523bc0e8148e901e04df45  programs/position-manager/src/common/modifiers.rs
+        e606c284279b59eae004e300cdfcfc646d2f3ae2b7c982520c59d33d41f03653  programs/position-manager/src/common/uint_types.rs
+        ccbc63492fe4e3a1be863defb8f8a4a3f0612bdbe50e773ba5ea4d89c45e6a3b  programs/position-manager/src/common/withdraw.rs
+        f027d69e47048a5ae06bc639da0a45b9e8c8a7814cdb59c1f5eb6230a4ee34c3  programs/position-manager/src/common/wsol.rs
+        4c7990eaa5bae2afbba83714f6223641695f69d26337a818eb20178de97b6e90  programs/position-manager/src/instructions/base_position/deposit.rs
+        75940c23a559d9f3b74e01a3bea2be424b735def63357d8af78784088468a1df  programs/position-manager/src/instructions/base_position/harvest.rs
+        75a0f30d451d973c12b8c323a95bb17a8c2c7aba319fc124ad66a417de3b21ce  programs/position-manager/src/instructions/base_position/initialize_farm_obligation.rs
+        d9d3640aad3d57a83cb32239e5d084c515262c7e3d64f75d206e680a04a0a836  programs/position-manager/src/instructions/base_position/initialize_obligation.rs
+        428e2ed74c3cef4860f6c150f09c847663a4dae7e9bbb1bdb2cf058f503fabcf  programs/position-manager/src/instructions/base_position/initialize_position.rs
+        ecf7015a78709d56d115dd2bc22d7c990d42a313659f501b7a160c23b13f2c05  programs/position-manager/src/instructions/base_position/initialize_reserve_user.rs
+        560440700d9f038dba9ba151ceaee1cbc22dd738d968bdb08b3170aa628a1936  programs/position-manager/src/instructions/base_position/initialize.rs
+        25aa0b848673da845700451d6497be6629e418fbd35fbd268b44bea91dd485dc  programs/position-manager/src/instructions/base_position/mod.rs
+        2e922310f59de61ce1b822c023f1926b466364840ef517d8cc6548ad77e16fd5  programs/position-manager/src/instructions/base_position/redeem.rs
+        9f5459286bbc325d1d5681f3f00920cf09265ae96cdbfbe435a5919ea13aa2df  programs/position-manager/src/instructions/loan_position/borrow.rs
+        ebc9212062e21cd4ce61f3bdfcb52ce286b7101d351262dc7bfe33b0ea715059  programs/position-manager/src/instructions/loan_position/initialize_loan_farm_obligation.rs
+        a3c51cc81358d9d6dce033d9b8447d8c3d424718adc5141393d414b33c09b721  programs/position-manager/src/instructions/loan_position/initialize_loan_position.rs
+        f3d069dee84cbc8c79048754efeb66a362005a369c72086972248008e15d7bb2  programs/position-manager/src/instructions/loan_position/mod.rs
+        230c7d5fb3129a65ec6352e4daf6aa00e0b5b2a633bc093e7344131f7fdb7cab  programs/position-manager/src/instructions/loan_position/repay.rs
+        56ecb05e02c391f7eb700b45f5ab57eea8e37161ce0985082f7fce7ba7478130  programs/position-manager/src/instructions/loan_position/set_min_health_factor.rs
+        7d3efdbdd94b4ce05e104bf24557bf8cab15b81e85548bec7fa42cbc58c66c27  programs/position-manager/src/instructions/mod.rs
+        c7fb1634eb13943f2c55cecb376aaca75b1f518d72ef713771abb5df3efe1814  programs/position-manager/src/instructions/refresh_instructions.rs
+        a3119cad617ceaf2325a309bd400121b5503d42bb70027a99a7db60b7df5659f  programs/position-manager/src/instructions/supervised_loan/initialize_supervised_position.rs
+        45388e84180d07d59ed920268e230d7b07e69d06a83a83c13919e304d1801058  programs/position-manager/src/instructions/supervised_loan/mod.rs
+        f1b05e01b64a9e88e445edc0d4c5e2bd29aeb23c96ca273f9822a14d0f030a11  programs/position-manager/src/instructions/supervised_loan/transfer_assets.rs
+        051105a80b37e1b13d564ee4385e6874a1c9c71f830915383ab047ca9e2dd563  programs/position-manager/src/instructions/vault_position/deposit_liquidity.rs
+        60bdce4cf3d140f41a756e16601409777bb741055c921d8ac294631ec168f2e4  programs/position-manager/src/instructions/vault_position/initialize_vault_farm_user.rs
+        d766823f07ec948ea0890982f49bd114e3790a968a15f8995e5b97a5ce00e389  programs/position-manager/src/instructions/vault_position/initialize_vault_position.rs
+        01678c5bad162a46c2c4e754f12507e20cd635d8f049ebd320b857e58331b4dd  programs/position-manager/src/instructions/vault_position/mod.rs
+        e10d5147b381cc8f84e7a81e2ff8ee614b7976edb46a7a07f9594a77ec40f0a2  programs/position-manager/src/instructions/vault_position/stake_shares.rs
+        87a99018398efd7f7bd08778050e2c58b21e0fb941d32097e196054583e68d0a  programs/position-manager/src/instructions/vault_position/unstake_shares.rs
+        a75bb8582b4242291378e848aafe2077441e7d0122aa3dc5ff2c1d605e5c8b7b  programs/position-manager/src/instructions/vault_position/withdraw_liquidity.rs
+        c298a22ce0295dbdf1afbd947968f4ee2c579a8940e197909721981cdfed8e0e  programs/position-manager/src/ownable/errors/mod.rs
+        4496d58f7ef5a7e540111496d11742c1d26935b21644ea16811eddaebaa2b84e  programs/position-manager/src/ownable/errors/ownable_error.rs
+        fde3d0c08aa4624ea7cc7f25e52073159c5fc69aaf12af65d948a36a7d8a6f96  programs/position-manager/src/ownable/events/mod.rs
+        9d1619764fce776d6da4761b4849d28a36ab4d8c7b2225dcb3607cc9649fb210  programs/position-manager/src/ownable/events/ownership_transfer_started.rs
+        02c7a8d53c9fae500be4c389e1773840c30ee79a35a31fbc87754e1cf102aaeb  programs/position-manager/src/ownable/events/ownership_transferred.rs
+        08f50c0a4f02cb6db706df955c7a95957a09b06a09be74937c53622953445729  programs/position-manager/src/ownable/instructions/accept_ownership.rs
+        2d6c60a8a58a792af4c3e1c99d693a391c5a26ba28532c9d5a1dd4ab227c1f3e  programs/position-manager/src/ownable/instructions/add_executor.rs
+        86713a43da843f334ebf578f1ed2c132e0ec4b6e2c84851eca344c7a01db8427  programs/position-manager/src/ownable/instructions/mod.rs
+        e3883210df9ea2d9cfb84fbb686ef58b6593d5f7c948fc0c83e92c5c3bd76884  programs/position-manager/src/ownable/instructions/modifiers.rs
+        5363afe8420e7f4e583e5c8c5200f415a0cb9cd0f581ee83c0bdbb636a099633  programs/position-manager/src/ownable/instructions/remove_executor.rs
+        19792bb48a6dde181b468f5fdfa7669f90e5bdb9d52575511712f2c842161760  programs/position-manager/src/ownable/instructions/transfer_ownership.rs
+        2154911586e75e783a4e4273219900d4bb6c07e420f63bcb438259b17353049c  programs/position-manager/src/ownable/internal/_transfer_ownership.rs
+        8271ed7fcf6cc9a6ab75c490cdda74bd4628746affae057b05e9d6dbb3727c9f  programs/position-manager/src/ownable/internal/mod.rs
+        cbd5a767869e94206124b85cd8bfc63d6e2a52ec602e75db4ef965d5938aaee3  programs/position-manager/src/ownable/mod.rs
+        87b7951cc4eb3e0dc18ace57b30d6ccfb41a2860aa2eca93d6f134407bcc2e79  programs/position-manager/src/ownable/state/acl.rs
+        2ac1be53a1bcab477e6f7e8780365a9f21155bbf1042c86bebd6a3adcb075f1a  programs/position-manager/src/ownable/state/mod.rs
+        cf47aebff5e7e3007ad22c3b786bf65fae4d2d567b388ba0c295a694d5a5e5a4  programs/position-manager/src/state/mod.rs
+        decba8e23ca2bf4cee29ddc8274ea3ed0e23f148012a5f7e8ce293e203c4a106  programs/position-manager/src/state/position_config.rs
+    </template>
+  </content-for>
+</page>

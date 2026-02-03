@@ -1,0 +1,57 @@
+<page
+  clientName="Infinex"
+  reportDate="October 20, 2025"
+  auditTitle="Infinex A-18"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="c7c7c003f776a4dc86da994617236fe5ed7d1043"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on October 17th 2025. 
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash for Patron Vesting Cwg claim date feature:
+        </b> </br>
+        <b> This limits CWG claims prior to a specified date. No other tiers' claiming is impacted </b> </br>
+        <b> by this change.</b> </br>
+        <code>{{page.repoCommitHash}}</code>
+      </li>
+
+
+
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts, where contracts not included had updated their formatting with no logic changes:
+    </p>
+    
+    <template type="file-hashes">
+      13fc207d6eb0261c918057d6bb5339326bf1667ac2fa1f556a6e44c33a5e3bf3  src/patron/IPatronVesting.sol
+      cc9fe4461693b3772231de58ef5bb31ca76d4994f074af87443d1ddfc1ce687a  src/patron/PatronVesting.sol
+      e0519fd830263b8c513690909b16129912f1b8b911f142edd9a42eeb022b491b  src/patron/PatronVestingStorage.sol
+    </template>                 
+  </content-for>
+</page>

@@ -1,0 +1,71 @@
+<page
+  clientName="Infinex"
+  reportDate="December 20, 2024"
+  auditTitle="Infinex A-15"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/infinex-xyz/infinex-contracts"
+  layout="/library/audits/_layout.html" 
+  repoCommitHash1="00a8bd9df742deeebc4000fdf7f9f3eb21929657"
+  repoCommitHash2="186a5898d243ac7558f3f2524890daca0ebd39b3"
+  repoCommitHash3="a6e8af197c10db763c0f4530856606a71f08ba3b"
+  repoCommitHashFinal="3205d8da2bc29688f905b64d446facaf0eb33b54"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team on November 4th, November 29th, 2024, and from December 17th to 19th, 2024. 
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <a href="{{page.repoUrl}}" target="_blank"> Repository </a>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Initial) Patron Vesting V2:</b> </br>
+        <code>{{page.repoCommitHash1}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Additional Changes) Patron Vesting V2:</b> </br>
+        <code>{{page.repoCommitHash2}}</code>
+      </li>      
+      
+      <li class="break-words break-all">
+        <b>Commit Hash (Additional Gas Changes) Patron Vesting V2:</b> </br>
+        <code>{{page.repoCommitHash3}}</code>
+      </li>
+
+      <li class="break-words break-all">
+        <b>Commit Hash (Final):</b> </br>
+        <code>{{page.repoCommitHashFinal}}</code>
+      </li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>
+      <br>
+      Specifically, we audited the following contracts for
+      <b>Patron Vesting V2</b> within commit <code>{{page.repoCommitHash2}}</code>:
+    </p>
+    
+      
+    <template type="file-hashes">
+        c7d5e53be1a9363d8a823d748b9dc1761752bfbd5db16a6b043f9d17376be528  src/patron/IPatronVesting.sol
+        d9750e97a07bc297cc10e6cd565cc3546457be66c05973dae43c0a7852c2f6a3  src/patron/PatronVesting.sol
+        3d032e120d34ed57266188d3465313363da64064c5b55dd326728a8fa087a977  src/patron/PatronVestingStorage.sol
+    </template>                 
+  </content-for>
+</page>

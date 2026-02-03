@@ -1,0 +1,281 @@
+<item>
+    <field name="topic">Signatures</field>
+    <field name="impact">spec</field>
+    <field name="chance">na</field>
+    <field name="status">fixed</field>
+    <field name="commit">d08bde067095c70c8ad03458311a118ceb7576f8</field>
+    <field name="content">
+      ## [M-1] `TransferRequest` signature verification is not EIP712 compliant
+  
+      In the `TransferModule`, when encoding the `requestHash` to verify and validate the user’s and cosign’s signature operations, the `requiresCoSigning()` modifier encodes the `_request` parameter directly with the typehash and message signature:
+  
+      ```solidity
+      modifier requiresCoSigning(
+          TransferRequest calldata _request,
+          bytes calldata _sudoKeySignature,
+          bytes calldata _platformKeySignature
+      ) {
+          if (!Cosigning._isValidNonce(_request.nonce)) revert InvalidNonce();
+  
+          **bytes32 requestHash = EIP712._hashTypedDataV4(keccak256(abi.encode(Cosigning._TRANSFER_REQUEST_TYPEHASH, msg.sig, _request)));**
+          SecurityUtils._validateCoSignature(requestHash, _sudoKeySignature, _platformKeySignature);
+  
+          Cosigning._consumeNonce(_request.nonce);
+  
+          _;
+      }
+      ```
+  
+      **Reference:** [TransferModule.sol#L48-61](https://github.com/infinex-xyz/infinex-contracts/blob/4f3f116579b91a9b25e0304fa0cff4f46c786357/src/accounts/modules/TransferModule.sol#L48-L61)
+  
+      However, the `TransferRequest` custom data type has two array parameters (`amounts` and `tokenIds`) and one dynamic type member (`data`), which should be handled separately as per [EIP712 specification](https://eips.ethereum.org/EIPS/eip-712#definition-of-encodedata):
+  
+      > The dynamic values `bytes` and `string` are encoded as a `keccak256` hash of their contents.
+      > 
+      > 
+      > The array values are encoded as the `keccak256` hash of the concatenated `encodeData` of their contents (i.e. the encoding of `SomeType[5]` is identical to that of a struct containing five members of type `SomeType`).
+      > 
+  
+      **Remediations to Consider:**
+  
+      Consider implementing the encoding and hashing of `tokenIds`, `amounts` and `data` as per EIP712 specification:
+  
+      ```solidity
+      keccak256(abi.encode(
+          Cosigning._TRANSFER_REQUEST_TYPEHASH,
+          msg.sig,
+          _request.nonce,
+          _request.token,
+          _request.destination,
+          _request.amount,
+          _request.tokenId,
+          keccak256(abi.encodePacked(_request.tokenIds)), // Array handling
+          keccak256(abi.encodePacked(_request.amounts)),  // Array handling
+          keccak256(request.data),                        // Dynamic bytes handling
+          request.nonStandardIndex
+      ));
+      ```
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Composability</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">225e02a81eacbeebe80a75d613a857db26d2fcbd</field>
+    <field name="content">
+      ## [L-1] No possible way to add data for ERC721 transferring
+  
+      The `transferERC721()` and `transferERC721ABatch()` functions in the `TransferModule` contract do not include a data parameter when calling the `ERC721.safeTransferFrom()` and `ERC721ABatchTransferable.safeBatchTransferFrom()` functions. This means the `onERC721Received()` hook will always receive empty data, potentially limiting hook functionality for contracts that rely on this parameter.
+  
+      ```solidity
+      function _transferERC721(TransferRequest calldata _request) internal {
+          ...
+      
+      >>  IERC721(_request.token).safeTransferFrom(address(this), _request.destination, _request.tokenId);
+      }
+  
+      function _transferERC721ABatch(TransferRequest calldata _request) internal {
+          ...
+      
+      >>  IERC721ABatchTransferable(_request.token).safeBatchTransferFrom(address(this), _request.destination, _request.tokenIds);
+      }
+      ```
+  
+      **Reference:** [TransferModule.sol#L219-L238](https://github.com/infinex-xyz/infinex-contracts/blob/42253373a0fec113f9fad879ff0fa1ece99a0892/src/accounts/modules/TransferModule.sol#L219-L238)
+  
+      **Remediations to Consider:**
+  
+      Consider using the `data` field in the `TransferRequest` struct for ERC721 transfers, similar to how it's handled for ERC1155 transfers.
+  
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Compatibility</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-2] Ownable not compatible with ERC2771
+  
+      [`Ownable.sol`](https://github.com/infinex-xyz/infinex-contracts/blob/0c3f73bf7443d4624d2bc29e1a2309c7c723e252/src/ownership/Ownable.sol) allows for ownership of contact that inherit, allowing functions that use the [`onlyOwner`](https://github.com/infinex-xyz/infinex-contracts/blob/0c3f73bf7443d4624d2bc29e1a2309c7c723e252/src/ownership/Ownable.sol#L69-L76) modifier to be gated to only be callable by the set owner. Ownership can allow be transferred via a nomination and acceptance process via [`nominateNewOwner()`](https://github.com/infinex-xyz/infinex-contracts/blob/0c3f73bf7443d4624d2bc29e1a2309c7c723e252/src/ownership/Ownable.sol#L99-L117) and [`acceptOwnership()`](https://github.com/infinex-xyz/infinex-contracts/blob/0c3f73bf7443d4624d2bc29e1a2309c7c723e252/src/ownership/Ownable.sol#L82-L97), with the nominee able to renounce a nomination via [`renounceNomination()`](https://github.com/infinex-xyz/infinex-contracts/blob/0c3f73bf7443d4624d2bc29e1a2309c7c723e252/src/ownership/Ownable.sol#L99-L117).  However, each permission check uses `msg.sender` rather than `_msgSender()`. This means that contracts that utilize a ERC2771 trusted forwarder, which many infinex contracts do, will not be able to use this forwarder to make owner permissioned calls, nor nominate, renounce, or accept ownership.
+  
+      **Remediations to Consider**
+  
+      Use `_msgSender()` and inherit Openzeppelin’s [`Context.sol`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/Context.sol), overriding it in contracts that use a trusted forwarder.
+    </field>
+    <field name="response">Infinex does not forsee using a forwarder for owner functions</field>
+  </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">38fce4abfdcd65ef281827d65fac0f91f0a1783f</field>
+    <field name="content">
+      ## [L-3] Cannot renounce ownership
+  
+      [`Ownable.sol`](https://github.com/infinex-xyz/infinex-contracts/blob/0c3f73bf7443d4624d2bc29e1a2309c7c723e252/src/ownership/Ownable.sol) offers no way to renounce ownership of the contract. Currently the owner can only nominate a new owner, which cannot be the zero address, and is only set once the nominee accepts, meaning the contract will always have an owner. 
+      Renouncing ownership is sometimes beneficial to prevent permissioned functions from being callable, reducing or eliminating the trust assumptions of the contract. 
+  
+      **Remediations to Consider**
+  
+      Add the ability for the owner to renounce their own ownership, leaving the contract without an owner.
+    </field>
+  </item>
+  
+  
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-1] `ERC721ABatchTransferred` event does not log `tokenIds`
+  
+      Consider including the `tokenIds` transferred in the event parameters, similar to the `ERC1155BatchTransferred` event.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-2] Avoid using zero as a control value
+  
+      When interacting with non-standard NFTs, the newly added functions `recoverNonStandardNFT()` and `transferNonStandardToken()` use a `zero` value in the `_nonStandardIndex` to transfer CryptoPunks. More specifically, in the `WithdrawUtil` contract:
+  
+      ```solidity
+      function _transferNonStandardNFT(address _transferAddress, address _token, uint256 _tokenId, uint256 _nonStandardIndex) internal {
+          emit TransferNonStandardNFTExecuted(_token, _transferAddress, _tokenId, _nonStandardIndex);
+          **if (_nonStandardIndex == 0) {**
+              ICryptoPunks(_token).transferPunk(_transferAddress, _tokenId);
+          } else if (_nonStandardIndex == 1) {
+              IEtherRocks(_token).giftRock(_tokenId, _transferAddress);
+          } else {
+              revert Error.UnsupportedNonStandardIndex();
+          }
+      }
+      ```
+      **Reference:** [WithdrawUtil.sol#L151-160](https://github.com/infinex-xyz/infinex-contracts/blob/4f3f116579b91a9b25e0304fa0cff4f46c786357/src/accounts/utils/WithdrawUtil.sol#L151-L160)
+  
+      Although the `msg.sig` is checked against the signed message, consider using non-zero values for each supported non-standard NFT.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Consistency</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">d08bde067095c70c8ad03458311a118ceb7576f8</field>
+    <field name="content">
+      ## [Q-3] Standardize selector verification across request types
+  
+      There are currently two different variations of the `msg.sig` sanity checks to ensure the calldata payload matches the request:
+  
+      - `requiresSudoKey()` utilizes the `_request._selector` and reverts if not valid.
+  
+      ```solidity
+      modifier requiresSudoKey(RequestTypes.Request calldata _request, bytes calldata _signature) {
+          **if (_request._selector != msg.sig) {
+              revert Error.InvalidRequest();
+          }**
+          bytes32 messageHash = EIP712._hashTypedDataV4(keccak256(abi.encode(SecurityKeys._SIGNATURE_REQUEST_TYPEHASH, _request)));
+              ...
+      }
+      ```
+  
+      **Reference:** [SecurityModifiers.sol#L34-49](https://github.com/infinex-xyz/infinex-contracts/blob/4f3f116579b91a9b25e0304fa0cff4f46c786357/src/accounts/utils/SecurityModifiers.sol#L34-L49)
+  
+      - `requiresCoSigning()` utilizes the `msg.sig`, encodes it in the `requestHash` and verifies the provided signature for both `TransferRequest` and `RecoveryRequest`.
+  
+      ```solidity
+      modifier requiresCoSigning(
+          TransferRequest calldata _request,
+          bytes calldata _sudoKeySignature,
+          bytes calldata _platformKeySignature
+      ) {
+          ...
+      
+          **bytes32 requestHash = EIP712._hashTypedDataV4(keccak256(abi.encode(Cosigning._TRANSFER_REQUEST_TYPEHASH, msg.sig, _request)));**
+      
+          ...
+      }
+      ```
+  
+      **Reference:** [TransferModule.sol#L48-61](https://github.com/infinex-xyz/infinex-contracts/blob/4f3f116579b91a9b25e0304fa0cff4f46c786357/src/accounts/modules/TransferModule.sol#L48-L61)
+  
+      Consider adding the `_selector` member to all requests to keep the code consistent with the previous implementation. Additionally, the `requestHash` and signed data would be consistent with the typehash contents(`_TRANSFER_REQUEST_TYPEHASH` and `_RECOVERY_REQUEST_TYPEHASH`). 
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sanity Checks</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-4] Inconsistent sanity checks in `TransferModule`
+  
+      In the `TransferModule` contract, the transfer functions implement inconsistent checks on the request parameters, specifically on the `destination` and `token` address.
+  
+      - `_transferERC20` lacks checks for both addresses.
+      - `_transferERC1155` and `_transferERC1155Batch` functions lack checks for `address(0)` for both addresses.
+  
+      Consider implementing these checks to be consistent across all transfer functions.
+    </field>
+    <field name="response">The contracts are intended for use by the Infinex platform only, and checks are done in the platform</field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Structure</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">71f4bc01e9253a1ea80a7df037f4b922356b200c</field>
+    <field name="content">
+      ## [Q-5] **Repetitive** nonstandard token transferring code logic
+  
+      The `transfer()` function in the `NonStandardToken` library duplicates the non-standard token transfer logic found in the `_transferNonStandardNFT()` function in the `WithdrawUtil` library. Currently, only two non-standard tokens (`CryptoPunks` and `EtherRocks`) are supported. When adding support for new non-standard tokens, both functions must be modified, which creates maintenance overhead and increases the risk of inconsistencies.
+  
+      Consider consolidating the non-standard token transfer logic into a single function that both libraries can reuse.
+  
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">References</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5a8dbe9f820c45c56b068670798eb5c7bd3647cd</field>
+    <field name="content">
+      ## [Q-6] `OwnedMockUpgreadable` is referencing wrong `UUPSImplementation`
+  
+      OwnedMockUpgreadable.sol is still referencing Synthetix’s UUPSImplementation instead of the local version, see [here](https://github.com/infinex-xyz/infinex-contracts/blob/fdc409bd66df3e364978e4f022c0f43d5f4afc3b/src/mocks/OwnedMockUpgreadable.sol#L5).
+  
+      Additionally, the file and contract name is spelled incorrectly. Consider renaming them to OwnedMockUpgradable.
+    </field>
+  </item>
+  
+  
+  <item>
+    <field name="topic">Compatability</field>
+    <field name="content">
+      ## [I-1] Implementation and Owner storage slots not compatible with prior synthetix based versions
+  
+      The infinex protocol used Synthetix based proxies and ownership for deployed contract which utilized its own storage slots for [implementation](https://github.com/Synthetixio/synthetix-v3/blob/main/utils/core-contracts/contracts/proxy/ProxyStorage.sol#L5-L6) and [owner](https://github.com/Synthetixio/synthetix-v3/blob/main/utils/core-contracts/contracts/ownership/OwnableStorage.sol#L7-L8). These new proxies will now be deployed using differing storage slots for these values, with [implementation](https://github.com/infinex-xyz/infinex-contracts/blob/0c3f73bf7443d4624d2bc29e1a2309c7c723e252/src/proxy/ProxyStorage.sol#L5) and [owner](https://github.com/infinex-xyz/infinex-contracts/blob/0c3f73bf7443d4624d2bc29e1a2309c7c723e252/src/ownership/OwnableStorage.sol#L9). This means that deployed contracts using the prior slots will be incompatible with contracts using this new version. If attempting to upgrade from the synthetix version to the new infinex the call will currently fail during the simulation. However, upgrading should be handled with extra caution, if incomparable upgrades are possible in the future they could cause ownership to be removed unintentionally.
+      Since there are now two incompatible storage versions it may require writing two variations of each contract for an update. It may be wise to instead create a method to migrate both the implementation and owner slots to the new version before or during an upgrade to allow for contracts to use the same codebase and remove the synthetix dependancy.
+    </field>
+    <field name="response">Storage slots were updated [here](https://github.com/infinex-xyz/infinex-contracts/pull/359/commits/85c3f66d3281f0db3fe433a88593e16e760de188) to allow for compatablility with prior deployed versions</field>
+  </item>
+  

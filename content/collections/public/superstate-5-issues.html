@@ -1,0 +1,42 @@
+<item>
+    <field name="topic">Best practices</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/superstateinc/ustb/commit/dacc959f8f6d96e27fd17364109fd686f21f62b9</field>
+    <field name="content">
+      ## [Q-1] Different use cases cannot be differentiated onchain
+  
+      In the `USTB.bridge()` function, there’s no check whether the `chainId` input is supported for bridging or not. In fact, when the `chainId` input is equal to zero or not supported for bridging by the Superstate backend, users’ USTB token will be converted to book entry token, which is an off-chain token handled by the Superstate team. If the `chainId` is supported for bridging, users’ USTB will be bridged to other chains as usual.
+  
+      Since the USTB contract doesn’t know which chain IDs the backend supports for bridging, it will emit the general `Bridge` event in both cases. Subsequently, it will be up to the backend to differentiate between those 2 cases offchain. This means users cannot determine which outcome their bridging transaction will result in at the smart contract level, which creates a potential for user mistakes. In addition, this results in less transparent system behavior onchain.
+  
+      **Remediations to Consider**
+  
+      Consider implementing logic to differentiate between the two cases at the smart contract level.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/superstateinc/ustb/commit/dacc959f8f6d96e27fd17364109fd686f21f62b9</field>
+    <field name="content">
+      ## [Q-2] View functions of deprecated variables are still visible
+
+      Some of the variables will be deprecated in this version of the USBT token. Since those variables have `public` visibility, users can still fetch their values in block explorers like Etherscan, which doesn’t add any value. Consider changing the visibility of deprecated variables to `private` or `internal`. Consider also removing all unnecessary function definitions from corresponding interfaces e.g. ISuperstateToken in `ustb` and `onchain-redemptions` repositories.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practice</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/superstateinc/ustb/commit/dacc959f8f6d96e27fd17364109fd686f21f62b9</field>
+    <field name="content">
+      ## [Q-3] Missing indexed attribute for Event parameters
+  
+      Events such as `OffchainRedeem`, `Bridge`, and `AdminBurn` are missing indexed attribute for address type parameters. Since these events are meant to be relied upon and heavily used for offchain functionality, it is recommended that they can be queried efficiently. 
+    </field>
+  </item>
+  

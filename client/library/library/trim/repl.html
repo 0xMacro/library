@@ -18,11 +18,8 @@
     <div class="flex-1 flex overflow-y-scroll">
       <!-- Left side -->
       <div class="flex-1 flex flex-col">
-        <textarea oninput="update()" id="input" class="repl-input flex-1 flex-shrink-0">
-(SUB CODESIZE #runtime)
-DUP1
-(CODECOPY 0x00 #runtime _)
-(RETURN 0x00 _)
+<textarea oninput="update()" id="input" class="repl-input flex-1 flex-shrink-0">
+(init-runtime-code)
 
 #runtime
 (CALLDATACOPY 0x1c 0x00 0x04)
@@ -37,7 +34,7 @@ REVERT ; No matching function selector
 JUMPDEST
 (MSTORE 0x00 "Hello, world!")
 (RETURN 0x00 0x20)
-        </textarea>
+</textarea>
         <pre id="errorOutput" class="p-5 mx-[1px] pre-output sticky bottom-0 bg-output">No compile errors.</pre>
       </div>
 

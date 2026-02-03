@@ -1,0 +1,29 @@
+<item>
+    <field name="topic">Gas</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">bebe81db5885515ecd34e60e3a951b8c12e907c5</field>
+    <field name="content">
+      ## [G-1] Duplicate checks
+  
+      In [PatronVesting.sol](https://github.com/infinex-xyz/infinex-contracts/blob/76def92dab4b9d6c66b0c517b594da2d208ce123/src/patron/PatronVesting.sol)’s [executeBatchOperation()](https://github.com/infinex-xyz/infinex-contracts/blob/76def92dab4b9d6c66b0c517b594da2d208ce123/src/patron/PatronVesting.sol#L416-L453) the available tokens for an operation are checked with the amount of tokens to be operated on:
+  
+      ```solidity
+      // Pre-execution validation: Check if sufficient tokens are available
+      (uint256 totalAllocation, uint256 claimedAmount) = PatronVestingStorage._vestingInfo(operation.fromAddress, BATCH_TIER_ID);
+      uint256 availableTokens = totalAllocation - claimedAmount;
+  
+      if (availableTokens < operation.amount) {
+          revert InsufficientTokensForBatchOperation(_batchId, operation.fromAddress, operation.amount, availableTokens);
+      }
+      ```
+      Reference: [PatronVesting.sol#L433-439](https://github.com/infinex-xyz/infinex-contracts/blob/76def92dab4b9d6c66b0c517b594da2d208ce123/src/patron/PatronVesting.sol#L433-L439)
+  
+      However, this is checked later in both operation branches, [_returnTokensToDeadAddress()](https://github.com/infinex-xyz/infinex-contracts/blob/76def92dab4b9d6c66b0c517b594da2d208ce123/src/patron/PatronVesting.sol#L607-L630) and [_transferTokensBetweenAddresses()](https://github.com/infinex-xyz/infinex-contracts/blob/76def92dab4b9d6c66b0c517b594da2d208ce123/src/patron/PatronVesting.sol#L607-L630).
+  
+      **Remediations to Consider**
+  
+      Consider removing the checks in the internal function operations or removing in `executeBatchOperation()` to save a bit of gas on each call.
+    </field>
+  </item>
+  

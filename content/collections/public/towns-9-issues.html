@@ -1,0 +1,75 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/towns-protocol/towns/pull/2586/commits/69ebb8b4fe01213a7903d2e8b10d856e13a7644c</field>
+    <field name="content">
+      ## [L-1] Reference _msgSender() in crosschain events
+  
+      In the `Towns.sol` contract, the `msg.sender` value is used in events emitted within the `crosschainMint()` and `crosschainBurn()` functions. However, in the `onlyL2SuperChainBridge()` modifier, where access control is implemented, `_msgSender()` is used instead for comparison. With meta transactions, these two values may differ.
+  
+      **Remediations to Consider**
+  
+      - Update `crosschainMint()` and `crosschainBurn()` to emit events with `_msgSender()` to reduce inconsistency issues.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/towns-protocol/towns/pull/2586/commits/2b8da90ae72cc706a5801d9245c27123bc01af5a</field>
+    <field name="content">
+      ## [L-2] lockCooldown() may return misleading value
+  
+      In the `LockBase.sol`, in the `_disableLock()` function, the `cooldownByAddress` variable is set to indicate when the cooldown expires. 
+  
+      ```solidity
+        function _disableLock(address caller) internal {
+          LockStorage.Layout storage ds = LockStorage.layout();
+  
+          uint256 cooldown = block.timestamp + ds.defaultCooldown;
+          ds.enabledByAddress[caller] = false;
+          ds.cooldownByAddress[caller] = cooldown;
+  
+          emit LockUpdated(caller, false, cooldown);
+        }
+      ```
+  
+      However, in `_enableLock()`, there is no corresponding functionality for resetting this value. As a result, `Towns.lockCooldown()` may, in some situations, return misleading values, which may indicate that the cooldown is in place and the lock may expire or have expired while it is just set.
+  
+      **Remediations to Consider**
+  
+      - Update `_enableLock()` implementation to reset `ds.cooldownByAddress[caller]`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+      ## [Q-1] Missing validation when setting a cooldown period
+  
+      In the `LockBase.sol`, `_setDefaultCooldown()`, although it contains the crucial functionality of managing token transfer capability, does not feature range validation for valid values.
+  
+      Consider adding MIN and MAX values to prevent extreme values for the cooldown period due to accidental management updates.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">https://github.com/towns-protocol/towns/pull/2586/commits/69ebb8b4fe01213a7903d2e8b10d856e13a7644c</field>
+    <field name="content">
+      ## [Q-2] CustomRevert not used consistently
+  
+      In the `Towns.sol` contract, `CustomRevert.revertWith()` is not used consistently across the contract. In the `onlyL2StandardBridge()` modifier revertWith() utility functions is not used to with `Unauthorized()` error.
+  
+      Consider updating the modifier’s implementation to report errors consistently.
+    </field>
+  </item>
+  

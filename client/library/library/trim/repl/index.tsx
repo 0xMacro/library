@@ -1,18 +1,26 @@
-import '../../evm/_lib/shims'
+import "../../evm/_lib/shims";
 
-import m from 'mithril'
-import { cc } from 'mithril-cc'
-import { ethers } from 'ethers'
-import { RunTxResult } from '@ethereumjs/vm/dist/runTx'
-import { Address } from 'ethereumjs-util';
+import m from "mithril";
+import { cc } from "mithril-cc";
+import {
+  createPublicClient,
+  http,
+  parseAbiItem,
+  decodeAbiParameters,
+  encodeAbiParameters,
+  toFunctionSelector,
+  stringToHex,
+  hexToString,
+} from "viem";
+import type { RunTxResult } from "@ethereumjs/vm/dist/runTx"
+import type { Address } from "ethereumjs-util"
 
-import { compileBasm, compileTrim, getOpcodesForTrim } from '@0xmacro/trim'
-import { BetterVM } from '../../evm/_lib/evm'
-import { Opcode } from '@ethereumjs/vm/dist/evm/opcodes'
+import { trim, compileBasm, getOpcodesForTrim } from "trim-evm"
+import { BetterVM } from "../../evm/_lib/evm"
+import type { Opcode } from "@ethereumjs/vm/dist/evm/opcodes"
+import { formatAbiItem } from "abitype"
 
 const ONE_WEI = 1_000_000_000
-
-window.ethers = ethers
 
 let vm = new BetterVM()
 const opcodes = getOpcodesForTrim(vm.opcodes)
@@ -77,7 +85,7 @@ async function runTransactions() {
 
     if (tx.type === 'create') {
       tx.bytecode = languageSelect.value === 'trim'
-        ? compileTrim(input.value, { opcodes })
+        ? trim.compile(input.value, { opcodes })
         : compileBasm(input.value, { opcodes })
       console.log("BYTECODE", tx.bytecode)
 
@@ -97,10 +105,9 @@ async function runTransactions() {
       if (!mainContract) {
         mainContract = createdAddress
       }
-    }
-    else {
-
-      const iface = new ethers.utils.Interface([`function ${tx.abi}`])
+    } else {
+      const abiItem = parseAbiItem(`function ${tx.abi}`)
+      const args = JSON.parse(tx.args)
 
       const { results } = await vm.runTx(0, {
         nonce: '0x' + pad(nonce.toString(16), 2),
@@ -108,11 +115,10 @@ async function runTransactions() {
         gasLimit: '0x' + pad((30_000_000).toString(16), 8),
         value: '0x00', // TODO
         to: mainContract!.toString(),
-        data: iface.encodeFunctionData(tx.abi.split('(')[0], JSON.parse(tx.args))
-        // data: calldataInput.value
-        //   ? '0x' + calldataInput.value.split(',').map(v => pad(v, 64)).join('')
-        //   : ''
-      })
+        data:
+          toFunctionSelector(formatAbiItem(abiItem)) +
+          encodeAbiParameters(('inputs' in abiItem ? abiItem.inputs : null) || [], args).slice(2),
+      });
       tx.output = report(results)
     }
 
@@ -200,9 +206,6 @@ function report(results: RunTxResult) {
       }
     }
   }
-  else {
-    output += `<<none>>`
-  }
   return output
 }
 
@@ -279,7 +282,12 @@ const fnsInput = document.getElementById('fnsInput') as HTMLTextAreaElement
 const fnsOutput = document.getElementById('fnsOutput')!
 
 function updateFns() {
-  fnsOutput.innerText = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(fnsInput.value)).slice(0,10)
+  try {
+    const abiItem = parseAbiItem(fnsInput.value);
+    fnsOutput.innerText = toFunctionSelector(formatAbiItem(abiItem));
+  } catch (err) {
+    fnsOutput.innerText = "Invalid function signature";
+  }
 }
 
 //
@@ -314,6 +322,6 @@ export function pad(str: string, len: number, char='0') {
   return str
 }
 function reportError(err: any) {
-  console.error('Runtime error', err)
-  errorOutput.innerText = err.message
+  console.error("Runtime error", err);
+  errorOutput.innerText = err.message;
 }

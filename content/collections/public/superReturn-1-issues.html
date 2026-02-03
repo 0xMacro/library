@@ -1,0 +1,175 @@
+<item>
+    <field name="topic">Compliance</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">879553778a95485563fe50d85f537703d14ad1f6</field>
+    <field name="content">
+        ## [M-1] `BoringVaultSCVersion` is not compliant with **ERC-7802**
+
+        The purpose of `BoringVaultSCVersion` is to make the boring vault compatible with the [SuperchainERC20](https://docs.optimism.io/interop/superchain-erc20) standard. To achieve this, it must implement the [ERC-7802 standard](https://eips.ethereum.org/EIPS/eip-7802), which states:
+        
+        > Implementors MUST ensure that the `supportsInterface` method of ERC-165 returns true for this interface ID to indicate support for `IERC7802`.
+        > 
+        
+        Currently, `BoringVaultSCVersion` lacks an explicit `supportsInterface` function implementation.
+        
+        **Remediation to Consider**
+        
+        Implement a `supportsInterface` function that returns `true` for the following interface ids:
+        
+        - `type(IERC7802).interfaceId`
+        - `type(IERC20).interfaceId`
+        - `type(IERC165).interfaceId`
+        - `type(IERC1155Receiver).interfaceId`
+        - `type(IERC721Receiver).interfaceId`
+    </field>
+</item>
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">b31d801926515c8442a4b2fa4f45ccf3fcfdab04</field>
+    <field name="content">
+        ## [M-2] Morpho decoder doesn’t sanitize `adapterId`
+
+        In MorphoDecoderAndSanitizer, the `deposit` and `withdraw` functions accept `adapterId` as their first parameter. The Morpho Router uses this ID to retrieve the adapter's address from its `adapters` array. Because each adapter controls its own deposit token and the `adapterId` lacks proper sanitization in the decoder, the boring vault cannot effectively restrict which tokens are permitted for deposits.
+        
+        **Remediation to Consider**
+        
+        Retrieve the adapter's address directly from the Router's public `adapters` array. Use this address to obtain the `depositToken` and implement proper address sanitization in the decoder.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Event</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">90e10c202cabd9d94d71810ee766e0a077c4c2e4</field>
+    <field name="content">
+        ## [L-1] Incorrect values are passed to `WithdrawAssetUpdated` event
+
+        In BoringOnChainQueue.sol, the event `WithdrawAssetUpdated` is defined with this parameter order:
+        
+        ```solidity
+        event WithdrawAssetUpdated(
+            address indexed assetOut,
+            uint24 minimumSecondsToDeadline,
+            uint24 secondsToMaturity,
+            uint16 minDiscount,
+            uint16 maxDiscount,
+            uint96 minimumShares
+        );
+        ```
+        
+        **Source**: [BoringOnChainQueue.sol#L167-L174](http://github.com/aiblackrock/USDAI/blob/31dc1be8b6f936ee706db86648a642041605adaa/src/base/Roles/BoringQueue/BoringOnChainQueue.sol#L167-L174)
+        
+        However, when emitting this event, the `updateWithdrawAsset` function swaps the order of parameters:
+        
+        ```solidity
+        emit WithdrawAssetUpdated(  
+            assetOut, secondsToMaturity, minimumSecondsToDeadline, minDiscount, maxDiscount, minimumShares
+        );
+        ```
+        
+        **Source**: [BoringOnChainQueue.sol#L300-L302](https://github.com/aiblackrock/USDAI/blob/31dc1be8b6f936ee706db86648a642041605adaa/src/base/Roles/BoringQueue/BoringOnChainQueue.sol#L300-L302)
+        
+        The second and third arguments (`secondsToMaturity` and `minimumSecondsToDeadline`) are in the wrong order.
+        
+        **Remediation to Consider**
+        
+        Correct the parameter order in the `updateWithdrawAsset` function to match the event definition.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+        ## [L-2] Across decoder doesn’t sanitize `destinationChainId`
+
+        The AcrossDecoderAndSanitizer implements the `depositV3` function, which accepts `destinationChainId` as its 7th parameter. While the function properly sanitizes all address parameters, it does not validate `destinationChainId`. Adding this validation would allow the boring vault to control the destination chain where assets can be bridged to.
+        
+        **Remediation to Consider**
+        
+        Add sanitization for the parameter `destinationChainId`.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Compile Error</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">c2a172b10a5385cb61813c3f69b34e748324a97f</field>
+    <field name="content">
+        ## [Q-1] Compile Error
+
+        In its [current state](https://github.com/aiblackrock/USDAI/commits/31dc1be8b6f936ee706db86648a642041605adaa/), the project fails to compile. Running `forge compile —skip test` produces this error:
+        
+        ```solidity
+        Error: Encountered invalid solc version in lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol: 
+        No solc version exists that matches the version requirement: ^0.8.22
+        ```
+        
+        This error stems from a Solidity version mismatch. The project uses the latest version (v5.3.0) of `openzeppelin-contracts-upgradeable`, which requires `pragma solidity ^0.8.22;`, while the boring vault contracts specify `pragma solidity 0.8.21;`.
+        
+        **Remediation to Consider**
+        
+        To resolve this, either downgrade `openzeppelin-contracts-upgradeable` to v5.1 (which uses Solidity 0.8.21) or upgrade the boring vault contracts to Solidity 0.8.22.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="content">
+        ## [I-1] Boring vaults are using different types of storage pattern
+
+        Both, the `BoringVault` and `BoringVaultSCVersion` use different types of storage patterns. They inherit from `Auth`, which uses regular (sequential) storage, while also inheriting from `ERC20Upgradable`, which uses unstructured storage. This mixed pattern could cause storage collisions during contract upgrades, so extra caution is needed when upgrading these contracts.
+    </field>
+</item>
+
+<item>
+    <field name="topic">Trust</field>
+    <field name="content">
+        ## [I-2] Protocol’s privileged users should use multisig
+
+        The integrated protocols used by the boring vault for yield generation—OpenEden, Across, Sake, and Morpho—must be trustworthy. A critical security measure is ensuring that the protocol’s owner or other privileged users implement proper multisig setups to eliminate single points of failure. 
+        
+        Analysis of deployed contracts shows that among these protocols, only Across has implemented a proper 3/5 multisig setup. OpenEden on mainnet and Sake on Soneium both use single EOA accounts as owners, which requires extra caution when using these protocols. Furthermore, the Morpho mainnet address uses a different contract than the testnet (Sepolia) version, making the current MorphoDecoderAndSanitizer incompatible with the provided mainnet address.
+        
+        A detailed breakdown of the supported protocols, their production addresses and their roles is shown below:
+        
+        **OpenEden**
+
+Addresses: mainnet → `0x80e49d1bdce8f80c38e88dd5c4c004ddb9b4e887`
+
+Roles: owner → EOA
+
+Capability: upgrade, pause minting/redeeming, change configuration settings
+
+**Across**
+
+Addresses: mainnet → `0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5`, soneium → `0x3baD7AD0728f9917d1Bf08af5782dCbD516cDd96`
+
+Roles: owner → 3/5 multisig
+
+Capability: upgrade, pause deposits, change configuration settings
+
+**Sake**
+
+Addresses: soneium → `0x3C3987A310ee13F7B8cBBe21D97D4436ba5E4B5f`
+
+Roles: owner → EOA
+
+Capability: upgrade
+
+**Morpho**
+
+Addresses: mainnet → `0x6566194141eefa99Af43Bb5Aa71460Ca2Dc90245`
+    </field>
+</item>

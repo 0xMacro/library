@@ -1,0 +1,88 @@
+<page
+  clientName="Maple Finance"
+  reportDate="September 18, 2025"
+  auditTitle="Maple Finance A-6"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/maple-labs/globals-v2"
+  repoCommitHash="c19ed92f23af4903a0d2781f523394ea57936c13"
+  repoCommitHashFinal="42136fbec446d397ce553dd72c48e8e06f88930f"
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from September 15, 2025 to September 18, 2025.
+</content-for>
+
+<content-for name="spec">
+
+  <ul>
+    <li>Discussions on Telegram with the {{page.clientName}} team.</li>
+  </ul>
+  
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    The `GovernorTimelock` contract is a role-based governance system that enforces delays on action execution, protected by separating responsibilities among multiple actors who each fulfill different key functions in the governance process. 
+    
+    - Minimum delay (`MIN_DELAY`*)* is set to 1 day, after which proposals becomes executable.
+    - Minimum execution window (`MIN_EXECUTION_WINDOW`) is set to 1 day, after which
+    proposals becomes invalid.
+    - Default delay and execution window can be configured (`setDefaultTimelockParameters()`), but must respect the enforced minimum values.
+    - Custom target/selector delays can be set (`setFunctionTimelockParameters()`), but must respect the enforced minimum values.
+    - When custom function timelock parameters are proposed(`setFunctionTimelockParameters()`), the previously set values are used as delays.
+    - Both default and custom delay and execution window settings must go through the full proposal cycle (scheduling by a proposer, waiting for the required delay period, and execution by an Executor).
+    
+    ## Actors
+    
+    ### **Proposer (`PROPOSER_ROLE`)**
+    
+    The Proposer, intended to be the Governor Multisig, is a trusted role responsible for scheduling governance proposals. This actor is trusted to submit legitimate proposals, but the contract is designed to limit its power.
+    
+    - Can schedule new governance proposals, which are subject to a mandatory time delay.
+    - Cannot execute, cancel, or directly schedule proposals that modify roles.
+    - If compromised, the primary mitigation is the Canceller role, which can unschedule malicious proposals, and the Role Admin, which can revoke the Proposer's role.
+    
+    ### **Executor (`EXECUTOR_ROLE`)**
+    
+    The Executor, intended to be an Executor Admin and the Operational Admin, is trusted to enact valid proposals. This role is the final step in the governance process, executing decisions after their time delay has passed and before the execution window.
+    
+    - Can execute proposals that have passed their time delay and have not been cancelled.
+    - Cannot schedule or cancel proposals. The contract verifies proposal data at execution time to prevent tampering.
+    - A compromised Executor cannot create malicious proposals. Their ability to do harm is limited to executing malicious proposals scheduled by a compromised Proposer in the worst case. The primary mitigation is the Role Admin, which can revoke the Executor’s role.
+    
+    ### **Canceller (`CANCELLER_ROLE`)**
+    
+    The Canceller, intended to be a Security Admin, is a highly trusted safety role. It serves as a critical check on the Proposer, responsible for preventing malicious proposals from being executed.
+    
+    - Can unschedule active proposals to prevent their execution.
+    - By design, cannot cancel role update proposals. This is a key recovery mechanism, preventing a rogue Canceller from blocking the removal of a compromised actor.
+    - If compromised, the canceller can disrupt governance by cancelling legitimate proposals, halting progress until their role is revoked by the Role Admin.
+    
+    ### **Role Admin (`ROLE_ADMIN`)**
+    
+    The Role Admin, intended for the Governor Multisig and a dedicated Role Admin, holds administrative control over the role management. This is a highly trusted role responsible for managing the security and composition of the other roles, but limited to proposing and using the regular proposal cycle.
+    
+    - Can propose to grant or revoke any role, including its own.
+    - Cannot execute its own proposals. Role updates are subject to the standard time delay and must be executed by an Executor as any othe proposal.
+    - If compromised, Executors serve as the final line of defense, as they are trusted not to execute malicious role change proposals. Another Role Admin can then revoke the compromised admin's access, relying on the integrity of non-malicious Executors to approve only legitimate role changes.
+    
+    ### **Token Withdrawer**
+    
+    The Token Withdrawer is a trusted role with the singular ability to withdraw any ERC20 tokens held by the `GovernorTimelock` contract. This role is intended for treasury management or recovering tokens sent to the contract.
+    
+    - Can withdraw any ERC20 token to its own address at any time.
+    - The role is not managed by the `ROLE_ADMIN`. It can only be changed via a two-step process: the current withdrawer proposes a new one, and the new address must call a function to accept the role.
+  </template>
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contracts within this repository:</p>
+
+  <template type="file-hashes">
+    618801abdc091928b8705df4c3371ff7ef49087822931f53cf5185381d853322  contracts/GovernorTimelock.sol
+    54583995a6c2967a7afa492926c81095e80662634fc988f4eedfe2bed43000b6  contracts/interfaces/IGovernorTimelock.sol
+  </template>
+</content-for>
+
+</page>
