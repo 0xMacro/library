@@ -1,0 +1,218 @@
+<item>
+    <field name="topic">Incentive Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">51ae2da000262e4f895d4745499d16cf026c99fb</field>
+    <field name="content">
+      ## [M-1] Any member can submit another member's swap to get points
+
+      In `SwapFacet`, users are incentivized to execute swaps through the Space by accruing airdrop points depending on their swap volume and the protocol fees.  
+  
+    ```solidity
+    if (
+        params.tokenIn == CurrencyTransfer.NATIVE_TOKEN
+          params.tokenOut == CurrencyTransfer.NATIVE_TOKEN
+      ) {
+          address airdropDiamond = _getAirdropDiamond();
+          uint256 points = _getPoints(
+              airdropDiamond,
+              ITownsPointsBase.Action.Swap,
+              abi.encode(protocolFee)
+          );
+          _mintPoints(airdropDiamond, msg.sender, points);
+      }
+      ```
+  
+      **Reference:** [SwapFacet.sol#L193-204](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/spaces/facets/swap/SwapFacet.sol#L193-L204)
+  
+      However, the current implementation mints the point to the `msg.sender`. For `executeSwapWithPermit()`, any other member can submit the swap intent with the proper data and signature for another user and get their points, indirectly creating an incentive to relay others’ swaps and farm points.
+  
+      **Remediations to Consider**
+  
+      1. Using the `permit.owner` as the target address for points or,
+      2. Allowing users to explicitly authorize any external member to execute their swap on the exchange for their points.
+  
+      ---
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Fee</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commitTree">7d2c318dbd8300798755349db8224478f900d0e8</field>
+    <field name="response">The L-1 finding has a more severe attack vector. An attacker can create a "bait-and-switch" scheme where they own two spaces: Space X with attractive 0.5% poster fees and Space Y with 2% poster fees (Y has forwardPosterFee = true). Users are attracted to Space X's low fees and sign permits with poster = attacker. However, the attacker executes these permits through Space Y instead, collecting 4x higher fees while users pay far more than expected.
+
+        This attack is profitable, scalable, and exploitable because the permit signature binds to the poster address but not the fee rate. Since fees are calculated based on msg.sender (the calling space), the same permit can execute through any space accepting that poster configuration.</field>
+    <field name="content">
+      ## [L-1] Permit swap’s poster fee is caller-dependent
+  
+      In `SwapRouter`, the poster fees are calculated based on the `msg.sender`. If a user permit swap is executed through a different space than the user intended, with the same input payload, the fee will be calculated based on the caller. 
+  
+      ```solidity
+      function _collectFees(
+            address token,
+            uint256 amount,
+            address poster
+        ) internal returns (uint256 amountAfterFees, uint256 protocolFee, uint256 posterFee) {
+            address spaceFactory = _getSpaceFactory();
+            (uint16 protocolBps, uint16 posterBps) = _getSwapFees(spaceFactory, msg.sender);
+            ...
+      ```
+  
+      **Reference:** [SwapRouter.sol#L349-355](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/router/SwapRouter.sol#L349-L355)
+  
+      Consider the following scenario:
+  
+      - Given a Space A with a 1% poster fee and a Space B with a 2% poster fee.
+      - User A signs a permit order for a swap using Space A and is aware of the 1% poster fee for this space.
+      - The space owner submits the swap with a permit call but uses Space B instead. Since fees are calculated based on the caller, the user will be charged a 2% fee instead.
+  
+      This scenario results in inconsistent charging of poster fees, contrary to the user's intent. 
+  
+      **Remediations to Consider**
+  
+      1. Using the poster address in `_getSwapFees()`. If it’s a space, it will use the proper space’s BPS, abstracting it from the caller context.
+      2. Including the `posterBps` in the parameter inputs and witness data as the expected fee to get charged.
+  
+      ---
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Edge Case</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1502a742850116e760c0d280ff8333665bc11128</field>
+    <field name="content">
+      ## [L-2] Space poster fee can be incorrectly refunded
+  
+  
+      In `SwapFacet` the space owner can configure the `forwardPosterFee` to allow members of the space to execute swaps and forward poster fees to an arbitrary address. By default, this value is set to false and resolves to the Space’s address, meaning the Space gets the poster fee.
+  
+      ```solidity
+      function _resolveSwapPoster(address poster) internal view returns (address) {
+        // default behavior: fees go to space, return the space address
+        if (!SwapFacetStorage.layout().forwardPosterFee) {
+            return address(this);
+        }
+        // if fees should be forwarded to poster, return the poster as-is
+        // (including address(0) which will skip poster fee)
+        return poster;
+      }
+      ```
+  
+      **Reference:** [SwapFacet.sol#L260-268](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/spaces/facets/swap/SwapFacet.sol#L260-L268)
+  
+      Specifically for native tokens as `tokenIn`, the logic checks the `forwardPosterFee` and subtracts the poster fee from the unused tokens for refunds.
+  
+      ```solidity
+      // for ETH, subtract poster fee if it was collected to space
+      if (
+          tokenIn == CurrencyTransfer.NATIVE_TOKEN && !SwapFacetStorage.layout().forwardPosterFee
+      ) {
+          // get the poster fee that was collected to space
+          (, uint16 posterBps, ) = getSwapFees();
+          uint256 posterFee = BasisPoints.calculate(msg.value, posterBps);
+  
+          // subtract poster fee from refund since it should stay in space
+          refundAmount = FixedPointMathLib.zeroFloorSub(refundAmount, posterFee);
+      }
+      ```
+  
+      **Reference:** [SwapFacet.sol#L225-235](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/spaces/facets/swap/SwapFacet.sol#L225-L235)
+  
+      However, if the poster is the Space's address and the `forwardPosterFee` is set to true, the logic will skip the subtraction and refund the entire fee to the caller with the unused tokens, effectively bypassing the poster fee altogether.
+  
+      **Remediations to Consider:**
+  
+      Consider checking if the poster address is the Space in the refund logic, in case the `forwardPosterFee` Space configuration is set to true.
+  
+      ---
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Redundancy</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a87af5f03b9e883e174ffa16e8035979458f4931</field>
+    <field name="content">
+      ## [Q-1] Redundant refund logic for permit swaps through facet
+  
+      In `SwapFacet`, the `executeSwapWithPermit()` handles refunds for swaps that didn’t use the entirety of the `amountTokenIn`, this sends the remaining tokens to the caller instead of the permit owner. However, since the SwapRouter already calculates and sends the remaining tokens to the `permit.owner`, the facet’s logic becomes a no-op as the refunded amount to the Space will always be zero. Consider removing the `_handleRefund()` internal function or updating it to refund the `permit.owner` and keeping it as a redundant sanity logic.
+  
+      ---
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Logic</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">76126c5595270976a77f395dd660f149ff4df6c9</field>
+    <field name="content">
+      ## [Q-2] User intent is not necessarily relayed to the router
+  
+      In the `SwapFacet` contract, the `executeSwapWithPermit()` function takes the `poster` address as an input parameter. This parameter is used in the `SwapRouter` to verify and charge poster fees and is bound with the permit2 signature witness data through the user's signature. Since the `poster` address is directly signed and passed by the user, the `SwapFacet` logic to resolve this address will trigger an `InvalidSigner()` error if it mismatches the `SwapFacet` configuration. This breaks the user's expectation of a transparent and controllable fee mechanism. To improve error accuracy and user intent transparency, consider enforcing a check in the `SwapFacet` for the `poster` address input instead of resolving it, and relay the revert to the `SwapRouter`:
+  
+      ```solidity
+      if (!SwapFacetStorage.layout().forwardPosterFee) {
+        require(poster == address(this), InvalidPosterInput());
+      }
+      ```
+  
+      ---
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Redundancy</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6b8f006ce3e6397c973dd1f5272ee9385d2f5788</field>
+    <field name="content">
+      ## [Q-3] Duplicated code
+
+      - In `SwapRouter` and `SwapFacet`: Consider using the `_getBalance()` function consistently for all token balance fetch operations.
+          - [SwapRouter.sol#L95](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/router/SwapRouter.sol#L95)
+          - [SwapRouter.sol#L132](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/router/SwapRouter.sol#L132)
+          - [SwapRouter.sol#L283-284](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/router/SwapRouter.sol#L283-L284)
+          - [SwapFacet.sol#L81](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/spaces/facets/swap/SwapFacet.sol#L81)
+          - [SwapFacet.sol#84](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/spaces/facets/swap/SwapFacet.sol#L84)
+          - [SwapFacet.sol#90](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/spaces/facets/swap/SwapFacet.sol#L90)
+          - [SwapFacet.sol#126](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/spaces/facets/swap/SwapFacet.sol#L126)
+      - Swap functions in the router calculate the `params.tokenIn **==** CurrencyTransfer.NATIVE_TOKEN` **condition, which is computed again in the `_executeSwap` function. Consider caching and passing this bool to the `_executeSwap` function.
+      - In `SwapRouter` the value check is performed twice for the same logic flow.
+          - [SwapRouter#L98-99](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/router/SwapRouter.sol#L98-L99) and [#L289-290](https://github.com/towns-protocol/towns/blob/f4a3a79c5fce133462db742f1a50b5dcc82299c4/packages/contracts/src/router/SwapRouter.sol#L289-L290)
+  
+      ---
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">External Integration</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">77912b4a8a5bcd76bf4bdfa0224f561f2201e77e</field>
+    <field name="content">
+      ## [Q-4] Enforce Input/Output token uniqueness
+
+  
+      Although known external routers will revert by using the same `tokenIn` as `tokenOut`, and the `SwapRouter` correctly handles fee accounting even if both inputs are equal, consider enforcing a sanity check to disallow `tokenIn == tokenOut` to narrow the assumptions on the external whitelisted routers.  
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      ## [I-1] Fee-on-transfer tokens received by the user can be less than `minAmountOut`
+  
+      The `SwapRouter` implementation includes logic to account for fee-on-transfer tokens. While the slippage check occurs after the swap to verify that the user's `minAmountOut` requirement was met, any subsequent transfer could result in the user receiving fewer tokens than this minimum amount. This could occur since the fee-on-transfer mechanism applies after the verification check has already been completed.
+
+    </field>
+  </item>
