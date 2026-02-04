@@ -1,0 +1,101 @@
+<item>
+    <field name="topic">Locked assets</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">2714ffdd14fb1904c6c258a5d420511fb886e950</field>
+    <field name="content">
+      ## [H-1] No mechanism to withdraw deposited market collateral
+  
+      In [ProfitShareModule](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/markets/yield-market/contracts/modules/ProfitShareModule.sol), markets can deposit collateral, allowing to borrow assets secured by their collateral via [depositStrategyCollateral()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/markets/yield-market/contracts/modules/ProfitShareModule.sol#L178-L207) but there is no corresponding function that withdraws the deposited collateral. This results in any deposited collateral unable to be withdrawn, leading to assets stuck in the protocol.
+  
+      **Remediations to Consider**
+  
+      Add a `withdrawMarketCollateral()` function similar to the [depositStrategyCollateral()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/markets/yield-market/contracts/modules/ProfitShareModule.sol#L178-L207) function.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Accounting</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">d26f28a26b62bf2c34c5a50b686db61d96b21dd3</field>
+    <field name="content">
+      ## [H-2] Interest not included in reportedDebt causing stale debt values in pool distributions
+  
+      In `YieldMarketFactoryModule` the [reportedDebt()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/markets/yield-market/contracts/modules/YieldMarketFactoryModule.sol#L80-L82) function currently returns 0 for markets using unsecured credit. Interest is only reflected in the system when [accrue()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/protocol/synthetix/contracts/modules/core/UnsecuredCreditModule.sol#L84-L127) is manually called, which updates `netIssuanceD18` with accrued interest. However, `accrue()` may not be called frequently, leading to stale debt values when:
+  
+      - Pools rebalance and distribute debt
+      - LPs join or leave pools
+      - Credit capacity calculations are performed
+      - Value per share is calculated for LP positions
+  
+      This results in inaccurate debt accounting between `accrue()` calls, potentially causing unfair distributions to LPs and incorrect risk assessments.
+  
+      **Remediations to Consider**
+  
+      Change [reportedDebt()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/markets/yield-market/contracts/modules/YieldMarketFactoryModule.sol#L80-L82) to return real-time interest plus bad debt, rather than updated it via  [accrue()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/protocol/synthetix/contracts/modules/core/UnsecuredCreditModule.sol#L84-L127).
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Missing Feature</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">dbc6e2ffe2a75c04a35dd418a1c44c42b855e0d3</field>
+    <field name="content">
+      ## [M-2] No mechanism to permanently donate profits to backing pools
+  
+      When yield markets generate profits and want to distribute them to backing pools, the [realizeProfit()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/markets/yield-market/contracts/modules/ProfitShareModule.sol#L127-L165) function attempts to use either [repayUnsecured()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/protocol/synthetix/contracts/modules/core/UnsecuredCreditModule.sol#L182-L255) or [depositMarketUsd()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/protocol/synthetix/contracts/modules/core/MarketManagerModule.sol#L217-L261).
+  
+      In the case of the unsecured path, [repayUnsecured()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/protocol/synthetix/contracts/modules/core/UnsecuredCreditModule.sol#L204-L207) caps repayment at total debt. Once debt is fully repaid, excess profits cannot be distributed:
+  
+      ```solidity
+      uint256 totalDebt = state.accruedInterestD18 + state.principalD18 + state.badDebtD18;
+      if (amountD18 > totalDebt) {
+          amountD18 = totalDebt;  // Excess is ignored
+      }
+      ```
+      Reference: [UnsecuredCreditModule.sol#L204-207](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/protocol/synthetix/contracts/modules/core/UnsecuredCreditModule.sol#L204-L207)
+      
+      When realizing profits, if in the unsecured state, then additional profits outside what was borrowed and the interest owed cannot be distributed this way, while when called the dev receives a portion of these profits, and the excess remains in the market, allowing for realizeProfit to be called repeatedly with any large amount allowing the dev to receive all assets in the market.
+      In the case of the secured credit path, assets are distributed, however it results in a negative netIssuance, which increases the credit capacity of the market, and allows for 
+  
+      **Remediations to Consider**
+      The intent is to distribute profits once unsecured credit has been paid off, and the market has switched to secured credit, however considering the resulting increase in credit capacity once distributed,  a function should be added that distributes profits to backing pools without increasing credit capacity, without required the market to swap to its secured mode.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [I-1] Unsecured borrowing adds additional systemic risk to liquidity providers
+  
+      The [UnsecuredCreditModule](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/protocol/synthetix/contracts/modules/core/UnsecuredCreditModule.sol#L18) allows markets to borrow without correlation to pool backing. Available credit is determined by [global and per-market caps](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/protocol/synthetix/contracts/modules/core/UnsecuredCreditModule.sol#L153-L156), not pool collateral, but potential yield generated from these unsecured loans get distributed only to pools that back the market as it gets distributed via [distributeDebtToPools()](https://github.com/Polynomial-Protocol/fx-contracts/blob/435b19a3fddcb6cc7725644c4acbbd5ba4a2f664/protocol/synthetix/contracts/storage/Market.sol#L453-L478). This allows for unsecured markets to potentially borrow more than assets provided by backing pools, resulting in systemic risk for the entire protocol, not just backing pools if these assets are not paid off.
+      Currently there is only one pool in the polynomial core protocol, which means all liquidity providers will be backing these unsecured markets, and take on the risk of default. If in the future more pools are added, allowing for the choice to back these unsecured markets, currently the systemic risk would still be present for these pools, yet they would not receive the proceeds.
+  
+      If more pools are added in the future, consider capping the credit limit of unsecured loans based on the assets pools, or implement bad debt to only effect backing pools to limit the risks to only the pools backing these markets.
+    </field>
+    <field name="response">
+        Unsecured credit is an opt‑in feature gated by owner controls and explicit caps (global + per‑market). Today there is a single pool, so all LPs implicitly back the system. As we expand to multi‑pool setups, we plan to scope unsecured exposure to backing pools only or cap unsecured credit based on pool‑provided collateral, so that non‑backing pools do not inherit the risk. This is a known design trade‑off and will be addressed alongside multi‑pool support.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Missing Feature</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [I-2] Bad debt handling is not implemented
+  
+      Currently there is no method to handle cases where unsecured debt cannot be paid off, and how this bad debt gets updated and handled. Polynomial will add bad debt handling in the near future, but currently the protocol makes the assumption that the borrowed assets will be paid back.
+    </field>
+    <field name="response">
+        Current design assumes full repayment of unsecured credit; explicit bad‑debt resolution is not yet implemented. We plan to add a bad‑debt framework (e.g., write‑offs and controlled socialization to backing pools) in a future upgrade. Until then, unsecured credit limits are kept conservative and admin‑controlled.
+    </field>
+  </item>
+  

@@ -1,0 +1,44 @@
+<page
+  clientName="Polynomial"
+  reportDate="Feburary 4, 2025"
+  auditTitle="Polynomial A-9"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Polynomial-Protocol/fx-contracts"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="435b19a3fddcb6cc7725644c4acbbd5ba4a2f664"
+  finalRepoCommitHash="dbc6e2ffe2a75c04a35dd418a1c44c42b855e0d3"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on Janurary 1-5th 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+      c6d4458d48ec548d1f4e214d1b2dbb803a78e41be6e2208b09c387973c242e01  contracts/interfaces/IProfitShareModule.sol
+      7ef99e0a07e5fc04672b49d83de98d2e1e6e2cce69427017ebbbd1ca1f128bcb  contracts/interfaces/IYieldMarketFactoryModule.sol
+      acb8022da5715479e82f9be26721178526bd51c8b831036e21451f00b98889ce  contracts/interfaces/external/ISynthetixSystem.sol
+      7cb31cae3603efceaba544f1f0f0d6dd8e59d60243479110c622415b58b7b6e7  contracts/modules/CoreModule.sol
+      bdc187ed23cc9e47c93ad6f0a9e8a5a83db63f4c78bf8b02acfa2cad0a245dc2  contracts/modules/ProfitShareModule.sol
+      6496ec3f976767a56b2852c528e3b084974511af5f90841aee97fd46581000fc  contracts/modules/YieldMarketFactoryModule.sol
+      b55d74067defb1c4c347876c86bf47e04f09aef300b9ca81f2c5cd6983cddcd6  contracts/storage/ProfitShare.sol
+      47d6762c01e20b5f75f9056faad9aa702127effdbf5f1d1b29ee1f37f820da47  contracts/storage/YieldMarketFactory.sol
+      2f2f150d67a377f67be03dcf7cf0719f78f5cb9646019240d83ff8e1dcdc85d6  contracts/utils/MathUtil.sol
+      66f3d0cabda019d8ad1fa9cb2898a4043f4f64eb87143fb0a4755b85c6a4a08d  contracts/modules/core/UnsecuredCreditModule.sol
+      0f27e432997306945718a925499a95dead916edc369e230ec9014fb221db14f5  contracts/interfaces/IUnsecuredCreditModule.sol
+      ca01a8acc155efb82a684ac7ec61cf75e7d0fbaceffab5bcaa312fefa5548ae2  contracts/storage/UnsecuredCredit.sol
+    </template>
+  </content-for>
+</page>
