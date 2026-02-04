@@ -82,9 +82,7 @@
       If more pools are added in the future, consider capping the credit limit of unsecured loans based on the assets pools, or implement bad debt to only effect backing pools to limit the risks to only the pools backing these markets.
     </field>
     <field name="response">
-        Unsecured borrowing adds additional systemic risk to liquidity providers
-Acknowledged. Unsecured credit is an opt‑in feature gated by owner controls and explicit caps (global + per‑market). Today there is a single pool, so all LPs implicitly back the system. As we expand to multi‑pool setups, we plan to scope unsecured exposure to backing pools only or cap unsecured credit based on pool‑provided collateral, so that non‑backing pools do not inherit the risk. This is a known design trade‑off and will be addressed alongside multi‑pool support.
-
+        Unsecured credit is an opt‑in feature gated by owner controls and explicit caps (global + per‑market). Today there is a single pool, so all LPs implicitly back the system. As we expand to multi‑pool setups, we plan to scope unsecured exposure to backing pools only or cap unsecured credit based on pool‑provided collateral, so that non‑backing pools do not inherit the risk. This is a known design trade‑off and will be addressed alongside multi‑pool support.
     </field>
   </item>
   
@@ -97,8 +95,7 @@ Acknowledged. Unsecured credit is an opt‑in feature gated by owner controls an
       Currently there is no method to handle cases where unsecured debt cannot be paid off, and how this bad debt gets updated and handled. Polynomial will add bad debt handling in the near future, but currently the protocol makes the assumption that the borrowed assets will be paid back.
     </field>
     <field name="response">
-        Bad debt handling is not implemented
-Acknowledged. Current design assumes full repayment of unsecured credit; explicit bad‑debt resolution is not yet implemented. We plan to add a bad‑debt framework (e.g., write‑offs and controlled socialization to backing pools) in a future upgrade. Until then, unsecured credit limits are kept conservative and admin‑controlled.
+        Current design assumes full repayment of unsecured credit; explicit bad‑debt resolution is not yet implemented. We plan to add a bad‑debt framework (e.g., write‑offs and controlled socialization to backing pools) in a future upgrade. Until then, unsecured credit limits are kept conservative and admin‑controlled.
     </field>
   </item>
   
