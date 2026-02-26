@@ -33,7 +33,7 @@
     - Users interacting with `burn()` (bilateral exit) are responsible for agreeing to a fair payout split off-chain. The contract only enforces the conservation constraint (`predictorPayout + counterpartyPayout == totalTokensBurned`) and that both parties signed the same parameters.
     - Vault users (LPs) deposit assets and receive shares through a manager request flow. They are responsible for submitting requests within the expiration window and accept that the manager determines when conditions are favorable for processing.
     
-    ---
+
     
     ### **Protocol Owner**
     
@@ -68,7 +68,7 @@
     - `toggleEmergencyMode()` — Enables or disables emergency withdrawals, bypassing the normal manager-mediated flow.
     - `pause()` / `unpause()` — Halts or resumes all user-facing operations.
     
-    ---
+
     
     ### **Vault Manager**
     
@@ -80,7 +80,7 @@
     - `cleanInactiveProtocols()` — Removes protocols with zero deposits and zero allowance from the active set.
     - Signs EIP-1271 messages on behalf of the vault. Any message hash signed by the manager is considered a valid vault signature, granting broad signing authority. A compromised manager key can authorize arbitrary EIP-1271 validations against the vault.
     
-    ---
+
     
     ### **Condition Resolvers**
     
@@ -92,7 +92,7 @@
     - **PythConditionResolver** — Trusts the Pyth Lazer oracle to provide accurate historical price data. The resolver is permissionless; anyone can call `settleCondition()` with a valid Pyth payload. Price feed manipulation or use of stale data would affect settlement outcomes.
     - **ConditionalTokensConditionResolver** — Trusts Polygon `ConditionalTokensReader` to accurately read and relay payout data from the Gnosis ConditionalTokens contract via LayerZero.
     
-    ---
+
     ### **OnboardingSponsor / Budget Manager**
 
     The budget manager is a semi-trusted operational role, within the `OnboardingSponsor` contract. The budget manager and the owner are trusted to:
@@ -102,7 +102,7 @@
 
     Constraints enforced on-chain by `OnboardingSponsor` at call time: required counterparty (prevents self-dealing), max entry price cap (prevents risk-free farming on near-certain outcomes), per-user budget limit, and per-mint match limit. A misconfigured or compromised budget manager can exhaust the sponsor's collateral balance by over-allocating budgets.
 
-    ---
+
     
     ### **LayerZero Protocol**
     
@@ -111,7 +111,7 @@
     - **Bridge messaging** (`CMD_BRIDGE` / `CMD_ACK`) between Ethereal and Arbitrum for position token bridging. A failed message leaves a bridge in `PENDING` state until retried. A maliciously delivered message from an unconfigured peer would need to pass the LZ endpoint's source verification, the protocol trusts that LZ enforces this correctly.
     - **Resolution relay** from Polygon (`ConditionalTokensReader` → `ConditionalTokensConditionResolver`) carrying condition outcomes to Ethereal resolvers. A failed or reordered message blocks settlement for any prediction depending on that condition indefinitely, as the resolver has no fallback.
     
-    ---
+
     
     ## General Risk Observations
     
@@ -184,6 +184,6 @@
 
   <template type="file-hashes">
     10e5913f37256a516a0e05efb36701e1a6c829d323e141bb22d23dd81d9f18d4  ./src/v2/PredictionMarketEscrow.sol
-    13ca9b1889918f3365c8725f86eaa68cadc173f22bf67d67d6963a5a6a22fce6  ./src/v2/sponsors/OnboardingSponsor.solß
+    13ca9b1889918f3365c8725f86eaa68cadc173f22bf67d67d6963a5a6a22fce6  ./src/v2/sponsors/OnboardingSponsor.sol
   </template>
 </content-for>
