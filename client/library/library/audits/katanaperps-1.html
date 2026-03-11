@@ -1,0 +1,110 @@
+<page
+  clientName="KatanaPerps"
+  reportDate="March 11th, 2026"
+  auditTitle="KatanaPerps A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/katanaperps/katana-perps-contracts-niseko"
+  repoCommitHashFinal="5995ab6b61af12f7f60cfb38c6fb0463be3a8b3a"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+  passwordEncrypt="env:PAGE_PASS_KATANAPERPS_1"
+>
+  <content-for name="schedule">
+    The security audit was performed in two parts by the Macro security team. Part 1 was conducted from January 19th to January 26th, 2026. The second part was conducted from February 11th to February 16th, 2026.  
+  </content-for>
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Documentation files contained in the repo.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash of Part 1 (Diff Audit + Index Price Adapter):
+        <code>2ac8f8ed5806a23a2486ac64166836b9c5601623</code>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash of Part 2 (Layer Zero Integration):
+        <code>5995ab6b61af12f7f60cfb38c6fb0463be3a8b3a</code>
+      </li>
+
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>For part 1, we audited the diff between commits <code>4b15268</code> and <code>2ac8f8e</code> for the following contracts, as well as a full review of the index price adapters.</p>
+
+    <template type="file-hashes">
+        b9002eb21864ecf6f911a568ec445961caeefe225864a764a8a897f7a98992be  contracts/Custodian.sol
+        8ab84ac517a135f52c38c8ece5c7e3908669251a54b37586ecbd9c9855aca6e0  contracts/EarningsEscrow.sol
+        6f7f596145232284df7db1dbcf485c5a4c99f6e613b5a4330315d35a159090f8  contracts/Exchange_v1.sol
+        0ff6506329c713a5174ab0aea998e8983376ec6d1e3df006efa8041622f4b09b  contracts/Governance.sol
+        c9c73bbd0f7959c87285772bf9e46c1e5d7aecba905446644f3d10c7d998124a  contracts/Owned.sol
+        0ad653925c4ce99a7ab0800a85f41beac99d5eb946fe85fb195ea800bccc604d  contracts/index-price-adapters/ChainlinkDataStreamsIndexPriceAdapter.sol
+        38c5cc734465cb2470874dfe3fcc1920f6e8229d268b57e0a4af5bda47f7280f  contracts/index-price-adapters/KatanaPerpsIndexAndOraclePriceAdapter.sol
+        36bfb4faa3965498d8fd9a56e7d9ab027b1f4423d2757e3bdded28420442a67a  contracts/index-price-adapters/RedStoneIndexPriceAdapter.sol
+        f64dc1cd808c0091ce995772f486ff8af8d2ef38935baedcea652d3248629145  contracts/libraries/Address.sol
+        344a1cc1939eab99cabbbe73343b3756b662ec3e212920f6926a9c347bc69bf7  contracts/libraries/AssetUnitConversions.sol
+        57c10af02af1eebf84da0e16c1208e30d6ac5dd1fe756248ddbba982654b9025  contracts/libraries/BalanceLoading.sol
+        a3bb7dd936e9a17f054d859996acc96e87a2b08b929fe73cdd75e893fd18cf08  contracts/libraries/BalanceTracking.sol
+        40ecd08fe99fcda8f9f6d1e3377d02b082efb86474a6d6848f46c456f2b578b2  contracts/libraries/ClosureDeleveraging.sol
+        f7b557f11f7cf5fad174e92a038b6438bfb8ee15c057d066a6da3ebd4e85df8c  contracts/libraries/Constants.sol
+        f1462fbb2874ad3f0b52545ee58f1aa1b2cfb40feb5891c3f89959b17f390938  contracts/libraries/Depositing.sol
+        ebeb139bf937871f951449a3c1c96b9a43f009c122bc49d9721ccfee19be8cf1  contracts/libraries/Enums.sol
+        ec26be9a89199328f52be7bc60342e48a07832b4581e0d114fa6184eb52f1b49  contracts/libraries/ExchangeErrors.sol
+        ceda48b8661bf993752fd05813e7f48af87a25d218afe732efa455ad83d89f7b  contracts/libraries/ExchangeEvents.sol
+        09beccdba9bf3824cf147092cb8c25e11e6edd9531f7fe558ab9a99321cd90c2  contracts/libraries/ExitFund.sol
+        ee9bc35d7f371bd536c29e777f79192acd55fd4a8251d4fc155c93a71a5f3383  contracts/libraries/Funding.sol
+        62a2c57f810ef8c21c0af703d6f4ee6bce21eff57de8d3ba66207968d7e8a3de  contracts/libraries/FundingMultiplierQuartetHelper.sol
+        6bbb02f9396b3cf719dbfd95642d2cf87fe1327831eec901ff92d4ba2ce9806e  contracts/libraries/Hashing.sol
+        757ebcbe59121636dbb843859ef3d4eb121960f98ae3760ab25b3bd6fbd87b16  contracts/libraries/IndexPriceMargin.sol
+        913205a9c2e12395322b710f4b2ada60d73c6aa0b5b4ee9b2ab74f9458a4b5fc  contracts/libraries/Interfaces.sol
+        ba8a4734d3250dc46c90ad0592a2e4d47a1979a15878ef95351b3bafbcae7b10  contracts/libraries/LiquidationValidations.sol
+        ed8a7667e782b97234ed2fa3d8492122a629f8908f6c41e5aa82dea7f4d410b5  contracts/libraries/ManagedAccounts.sol
+        b1da3a0c07ac89eb4b17d1a4d39ebd3a0ac65604424b7e2416aa8c118ec4a70f  contracts/libraries/MarketAdmin.sol
+        ad85cf26d38f962608209352d088df2084573c973e6be776b0717b53445053d7  contracts/libraries/MarketHelper.sol
+        cf33dcdc314b0e6525e467ddc09bbaf2a51dcbbe56132650aa108c08ddad96fa  contracts/libraries/Math.sol
+        0c6262cae45da84a8a9a45d130f203d297947eeda952e42b11f4020f94978ab9  contracts/libraries/NonceInvalidations.sol
+        fc8c72d456117dd2f5b92c137174f9996ce7c166c778b004db84bb89753a33ef  contracts/libraries/OraclePriceMargin.sol
+        4165387015f78870090c7a162b49dd1031ae7b68735e32bb575540f4a554f36f  contracts/libraries/PositionBelowMinimumLiquidation.sol
+        753efb7333f1b80e75000d19b85908ec7e7673380baed873198ad487c0767457  contracts/libraries/PositionInDeactivatedMarketLiquidation.sol
+        cc218a524be0b4fbbdf4e168ae3e0e19fd5d249c3638cb87d9b4e4daae5686a0  contracts/libraries/SortedStringSet.sol
+        8b78b454836a3d132835c8a6cbe3162a75689ba7a64a62dc354bf506b52e189a  contracts/libraries/String.sol
+        fe61103b8c6a6a6f813c21e1c6efd69696cd68fab614c8ee1d1517d23b11af1d  contracts/libraries/Structs.sol
+        ee798309e50c7171a14f7ca849a5f3246c1f76f7c7cbdc39a34413f696dc6325  contracts/libraries/Time.sol
+        ca59df6d85bf52104115345b970d70334bbf38e47d35884c0b173ca8fbea4bae  contracts/libraries/TradeValidations.sol
+        1ed2a7ea20aafc32f8d168694fba188768b68b572e39a4a125bdf29cd6b0e02e  contracts/libraries/Trading.sol
+        5f7e66fc078ebf51f162b822e8a4d6a53036b5176a603307e85ae0bf4a4c6ba9  contracts/libraries/Transferring.sol
+        284d26454225a43dc5c69a6d77c520c88fbdc0dd9758354fcb24da317b848c7c  contracts/libraries/UUID.sol
+        95d4b0b9e907b42f967e7ec9f39c0f9354d47943f4ab6e7aeae261ede64b03c5  contracts/libraries/Validations.sol
+        09180d1b790e32dfc3b736949d6dc149f86ff0553412959941afa0d02318c232  contracts/libraries/WalletExitAcquisitionDeleveraging.sol
+        959f149ddc23cef322ea145968f951a68c6ef1697875f68b6177d4ff8436925b  contracts/libraries/WalletExitLiquidation.sol
+        952948ac5cbf2d1bd859822d1e335ce3363d823b170214e1bb680b9f3db197ac  contracts/libraries/WalletExits.sol
+        71c9a9e8e1bfda7b054fe81cad9ddf9e2600e16c0936a536b94c1a8370cfd940  contracts/libraries/WalletInMaintenanceAcquisitionDeleveraging.sol
+        02c9bd6e02fb2432af370b628161db51c7286d58070164cd9fbc49b130046dc7  contracts/libraries/WalletInMaintenanceLiquidation.sol
+        21c8c764695cef9cc84bf8c17bde262bca524bdacf3c7882979307a984d7b7b9  contracts/libraries/Withdrawing.sol
+        7ab7e14f8fecb56c2f301c4b5d0ec47e0f43a022ad4a829cd26bde78b2497069  contracts/oracle-price-adapters/ChainlinkOraclePriceAdapter.sol
+    </template>
+</br>
+    <p>For part 2, we audited the following contracts:</p>
+  
+    <template type="file-hashes">
+        659b0e519dd7af05f9863b49378d4974e8e77182c12da57a30367afc02e53f38  contracts/bridge-adapters/ExchangeLayerZeroAdapter_v1.sol
+        bf4c37cc5a774cb22c51e4566edce352af4202faee398ba7637c058d27ce9fcd  contracts/bridge-adapters/KatanaPerpsStargateForwarder_v1.sol
+        8c3d5c3c63ca154afa00dcc4a888781783bfc01bdb8737cc2d105181ca4e6ac9  contracts/bridge-adapters/LayerZeroFeeEstimation.sol
+        1fb1cc1c6fd40e7fc1ae6790e9bd2acc28b50e565f2000e62dde083b9ebafdf8  contracts/bridge-adapters/libraries/BridgeAdapterEvents.sol
+        93070867ba01aadfa4efe91181063365316664b9c888f772e9c1f9c9f873be1a  contracts/bridge-adapters/libraries/ExchangeAdapterComposing_v1.sol
+        f476c8732cd9f66acf8db0fd183c45f5ec81a23b607488d9f7df41ab9b4692e7  contracts/bridge-adapters/libraries/KatanaPerpsStargateForwarderComposing_v1.sol
+    </template>
+  </content-for>
+</page>
