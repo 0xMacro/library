@@ -1,0 +1,158 @@
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">medium</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">0e2b3363ddbae68926e702c9917c97ce370ede75</field>
+  <field name="content">
+        ## [H-1] Yield updates and recording losses blocked during vesting period
+
+        In AccountantWithYieldStreaming, both `vestYield` and `postLoss` contain the same problematic time-gating check:
+
+        ```jsx
+        if (block.timestamp < accountantState.lastUpdateTimestamp + accountantState.minimumUpdateDelayInSeconds)
+        ```
+
+        The issue stems from `accountantState.lastUpdateTimestamp` being updated in multiple contexts:
+
+        1. In `_collectFees()`, called during `updateExchangeRate()`, which is triggered during user deposits and withdrawals.
+        2. In `vestYield()` and `postLoss()` themselves
+
+        This creates a problem: if withdrawals and deposits occur frequently, strategists cannot post timely yield updates or loss adjustments. This leads to inaccurate share prices and prevents strategists from promptly recording losses, which masks declining share values from users.
+
+        Consider using a separate variable to track when losses or yields were last provided, allowing strategists to perform updates during active investing periods.
+ </field>
+</item>
+
+<item>
+  <field name="topic">Incentive Design</field>
+  <field name="impact">high</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">0e2b3363ddbae68926e702c9917c97ce370ede75</field>
+  <field name="content">
+    ## [H-2] `bulkWithdraw` fails to update exchange rate and cumulative supply
+
+    The `bulkWithdraw` function in TellerWithYieldStreaming isn't overridden, so it uses the standard implementation from TellerWithMultiAssetSupport. This implementation fails to call `updateExchangeRate` before withdrawals and `updateCumulative` after withdrawals.
+
+    Updating the exchange rate before deposits/withdrawals is crucial for maintaining accurate `getRate()` and `totalAssets()` values. Similarly, updating `cumulativeSupply` after deposits/withdrawals ensures correct TWAP calculations.
+
+    Consider overriding the `bulkWithdraw` function to include `updateExchangeRate` before and `updateCumulative` after `_withdraw`.
+ </field>
+</item>
+
+
+<item>
+  <field name="topic">Incentive Design</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">0e2b3363ddbae68926e702c9917c97ce370ede75</field>
+  <field name="content">
+    ## [M-1] Yield deviation ignores vesting duration
+
+    In `vestYield`, the calculation of `yieldBps` considers `yieldAmount` as an absolute value without accounting for the distribution `duration`. This approach fails to recognize that distributing the same `yieldAmount` over e.g. 1 day versus 7 days creates significantly different impacts.
+
+    Consider modifying the calculation to normalize `yieldAmount` to a daily rate, then using this normalized value to determine deviation.
+ </field>
+</item>
+
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">low</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">0e2b3363ddbae68926e702c9917c97ce370ede75</field>
+  <field name="content">
+    ## [L-1] **`previewUpdateExchangeRate` function uses incorrect implementation from parent contract**
+
+    The `AccountantWithYieldStreaming` contract fails to override the `previewUpdateExchangeRate` function from its parent `AccountantWithRateProviders` contract. This causes the function to use the parent's exchange rate update logic instead of the yield streaming logic.
+
+    Consider disabling the function (if not needed) or implement a proper logic.
+ </field>
+</item>
+
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">0e2b3363ddbae68926e702c9917c97ce370ede75</field>
+  <field name="content">
+## [L-2] Price updates are still possible while contract is paused
+
+In `AccountantWithYieldStreaming`, the `paused` state does not prevent price update functions from executing. Specifically, `isPaused` is not checked in `vestYield`, `postLoss`, and `updateExchangeRate`.
+
+This behavior differs from `AccountantWithRateProviders`, where `updateExchangeRate` includes an `isPaused` check. As a result, even when the contract is paused, share price updates can still occur, which may be inconsistent with expected pause semantics.
+ </field>
+</item>
+
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">ack</field>
+  <field name="content">
+## [L-3] Incorrect value provided for `YieldRecorded` event
+
+At the end of the `vestYield` function, the following event is emitted:
+
+```jsx
+emit YieldRecorded(yieldAmount, vestingState.endVestingTime);
+```
+
+with the following event declaration:
+
+```jsx
+event YieldRecorded(uint256 amountAdded, uint256 newtotalAssetsInBase);
+```
+
+The 2nd parameter should be `newtotalAssetsInBase`, but `vestingState.endVestingTime` is provided instead. Either update the event definition or provide the correct parameter when emitting the event.
+ </field>
+</item>
+
+
+<item>
+  <field name="topic">Events</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">ack</field>
+  <field name="content">
+## [L-4] Updating cumulative supply fails to emit an event
+
+The `updateCumulative()` function modifies important state variables like `cumulativeSupply` and `lastUpdateTimestamp` without emitting an event. Best practices recommend emitting events for all functions that change state to improve transparency and facilitate off-chain monitoring.
+ </field>
+</item>
+
+
+
+<item>
+  <field name="topic">Unnecessary Code</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">d6afe6a4cabd946dc449086ef6ff2ff2542d73ee</field>  
+  <field name="content">
+## [Q-1] Unnecessary state variable update in `_collectFees`
+
+In the `_collectFees` function, `state.totalSharesLastUpdate` is set to the current `totalSupply()` on each call. This is redundant because the same value is already set at the end of the `_updateExchangeRate()` function. Consider removing the redundant update to `totalSharesLastUpdate` in the `_collectFees` function.
+</field>
+</item>
+
+
+
+<item>
+  <field name="topic">Best Practices</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">1169636dee2b3efb2d83872b6eb896220cdfe763</field>
+<field name="content">
+## [Q-2] Nitpicks
+
+- Unused import of BoringVault [here](https://github.com/Veda-Labs/boring-vault/blob/98b572caf553b34891203c1aaf5dbe69d004276c/src/base/Roles/AccountantWithYieldStreaming.sol#L10).
+- Unused import of IPausable [here](https://github.com/Veda-Labs/boring-vault/blob/98b572caf553b34891203c1aaf5dbe69d004276c/src/base/Roles/AccountantWithYieldStreaming.sol#L13).
+- Unused error definition `AccountantWithYieldStreaming__MaxDeviationLossExceeded` [here](https://github.com/Veda-Labs/boring-vault/blob/98b572caf553b34891203c1aaf5dbe69d004276c/src/base/Roles/AccountantWithYieldStreaming.sol#L86).
+</field>
+</item>

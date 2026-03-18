@@ -1,0 +1,507 @@
+<item>
+  <field name="topic">Fund Handling</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">a10100cc4789c18dc1bd630b77d302c72911464f</field>
+  <field name="content">
+    ## [C-1] Stakers do not receive payment from sales of their NFTs
+
+    When a staked NFT is sold on the marketplace, the `onNFTSold()` function is invoked on the `SiliconEpochPool` contract. The pool contract acts as the `listingCreator` from the marketplace's perspective since it is the technical owner of the staked NFT. As a result, the marketplace transfers the sales proceeds to the `SiliconEpochPool` contract.
+
+    The `onNFTSold()` function correctly handles the internal transfer of the staked NFT's ownership from the seller to the buyer. However, it completely omits forwarding the payment received from the marketplace, `totalPrice`, to the `originalStaker`.
+
+    The root cause of this issue is the absence of any logic to transfer the sales funds to the original seller. This creates a critical vulnerability where a staker's NFT is sold, but they receive no payment, leading to a direct loss of assets. The funds from the sale become permanently locked within the `SiliconEpochPool` contract.
+
+    **Remediations to Consider**
+    Implement logic within the `onNFTSold()` function to forward the `totalPrice` to the `originalStaker`.
+
+  </field>
+</item>
+<item>
+  <field name="topic">Accounting</field>
+  <field name="impact">high</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">1d6c0d7b255a95d5bdd7f19b7bc66a64db7f6b87</field>
+  <field name="content">
+    ## [C-2] Stakers can inflate rewards by manipulating stake counts in the current epoch
+
+
+    The `depositForTokens()` function allows for the premature inclusion of newly staked, non-warm NFTs in a staker's reward calculation for the current and subsequent epochs. This enables a malicious staker to artificially inflate their share of rewards.
+
+    Normally, a newly staked NFT must wait for the next epoch to become "warm" and eligible for rewards. The `userStaked` mapping is intended to be a historical snapshot of a user's warm stake count for past, finalized epochs. However, `depositForTokens()` incorrectly updates this snapshot for the `currEpoch` (the current, unfinished epoch).
+
+    The root cause is that when a user calls `depositForTokens()` for an already warm NFT, the function proceeds to set `userStaked[currEpoch][staker]` to the staker's *total* current stake count (`_stakerNftCount[staker]`), which includes any non-warm NFTs staked within the same epoch.
+
+    This leads to the following exploit scenario:
+
+    1. A malicious user has 3 warm NFTs staked in epoch `X`. Their `userStaked[X][staker]` should be 3.
+    2. The user stakes a 4th NFT during epoch `X`. This NFT should only become warm in epoch `X+1`. Their `_stakerNftCount[staker]` is now 4, and `userStakeDelta[X][staker]` is 1.
+    3. The user calls `depositForTokens()` for one of their 3 warm NFTs with a minimal amount. The [`_isWarm()` check](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L465) passes.
+    4. The function then incorrectly sets `userStaked[X][staker]` to `_stakerNftCount[staker]`, which is 4.
+    5. This incorrect `userStaked[X][staker]` value is not overwritten with the correct one during finalization in `_backfillStakerSnapshots()`, as the logic [prevents re-setting the value if it's not zero](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L926).
+    6. When epoch `X+1` is finalized, the user's stake is [calculated as `userStaked[X][staker] + userStakeDelta[X][staker]`](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L927), which becomes `4 + 1 = 5`.
+    7. The user now earns rewards for 5 NFTs in epoch `X+1` while only legitimately owning 4. This can be repeated by withdrawing staked NFTs out and exploiting again to indefinitely inflate rewards.
+
+    A secondary impact involves the `epochs[currEpoch].totalStaked` variable. This state is intended to be a finalized snapshot of the total number of warm NFTs for a given epoch. By modifying it for the `currEpoch`, the `depositForTokens()` function causes this public-facing value to become temporarily inflated and inaccurate. While the contract's own finalization process in `_finalizeEpochsCore()` will eventually [overwrite this with the correct value](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L797), any external contracts or off-chain services that read the `epochs` mapping during the epoch will receive incorrect data. This could lead to flawed analytics, incorrect displays on front-ends, or faulty logic in contract that integrate the `SiliconEpoch` contract.
+
+    **Remediations to Consider**
+    Remove the logic that updates `userStaked` and `epochs.totalStaked` for the current epoch from the `depositForTokens()` function. These state variables should only be updated for finished epochs through the `_backfillStakerSnapshots()` and `_finalizeEpochsCore()` mechanisms.
+
+    ```diff
+      function depositForTokens(
+          address[] calldata collections,
+          uint256[] calldata tokenIds,
+          uint256[] calldata amounts
+      ) external nonReentrant {
+          ...
+              if (_isWarm(key, currEpoch)) {
+                  uint256 pre = rewardToken.balanceOf(address(this));
+                  rewardToken.safeTransferFrom(msg.sender, address(this), amt);
+                  uint256 post = rewardToken.balanceOf(address(this));
+                  if (post != pre + amt) revert DeflationaryToken();
+                  epochPending[currEpoch] += amt;
+                  accountedRewardBalance += amt; // pre-account so earlier epochs don't consume it
+                  // Ensure snapshot for current epoch is populated
+    -             if (userStaked[currEpoch][staker] == 0) {
+    -                 uint256 count = _stakerNftCount[staker];
+    -                 if (count != 0) {
+    -                     userStaked[currEpoch][staker] = count;
+    -                     epochs[currEpoch].totalStaked += count;
+    -                 }
+    -             }
+                  emit EpochDeposit(msg.sender, currEpoch, col, id, amt);
+              } else {
+                  rewardToken.safeTransferFrom(msg.sender, staker, amt);
+                  emit DirectDeposit(msg.sender, staker, col, id, amt);
+              }
+          }
+          _finalizeEpochsCore(maxEpochsPerFinalizePass());
+      }
+    ```
+
+    **Reference:** [src/SiliconEpochPool.sol#L446-L487](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L446-L487)
+  </field>
+</item>
+
+
+
+<item>
+  <field name="topic">Accounting</field>
+  <field name="impact">high</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">96936c6960dd0e194835124fc271983718910845</field>
+  <field name="content">
+    ## [M-1] Booted NFTs pending withdrawal are doubly penalized, leading to reward loss
+
+    The `boot()` function allows anyone to forcibly remove an inactive NFT from the staking pool. The withdrawal process is typically a two-step action: `withdraw()` is called first to mark an NFT for withdrawal, and `claim()` is called later to retrieve the NFT after a waiting period. The `withdraw()` function [decrements `epochStakeDelta` and `userStakeDelta`](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L335-L336) to reflect that the NFT will not be earning rewards in the next epoch.
+
+    The `_forceBoot()` function, which is called by `boot()`, also [decrements `epochStakeDelta` and `userStakeDelta`](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L744-L745). The root cause of the issue is that `_forceBoot()` does not check if the NFT being booted is already pending withdrawal. If an NFT has already had `withdraw()` called on it, its deltas have already been decremented. If it is then booted, the deltas are decremented a second time for the same NFT's removal.
+
+    This double deduction causes the staker's calculated number of staked NFTs to be lower than their actual stake. As a result, the staker will earn fewer rewards than expected.
+
+    **Remediations to Consider**
+    The contract should only adjust the stake deltas in `_forceBoot()` if the NFT is not already pending withdrawal. This prevents the double-counting issue.
+
+    ```diff
+    -           epochStakeDelta[currEpoch] += bootDelta;
+    -           userStakeDelta[currEpoch][staker] += bootDelta;
+    +           if (_nftWithdrawEpoch[key] == NO_WITHDRAW) {
+    +               epochStakeDelta[currEpoch] += bootDelta;
+    +               userStakeDelta[currEpoch][staker] += bootDelta;
+    +           }
+    ```
+
+    **Reference:** [src/SiliconEpochPool.sol#L744-L745](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L744-L745)
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Integration</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">549bcfb32eac469e453d28819a5b71fd768d3ae8</field>
+  <field name="content">
+    ## [M-2] Stakers cannot update listings with an ID of 0
+
+      |  |
+     **Likelihood** | Low |
+
+    The `createListing()` function allows a staker to list their NFT on an external marketplace. The marketplace contract generates and returns a `listingId`, which is then stored in the `nftListingId` mapping. Some marketplace implementations can return `0` as a valid `listingId` for the first listing created.
+
+    The root cause of this issue is in the `updateListing()` function. It contains a [check](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L1224), `require(listingId != 0, "No listing found")`, which incorrectly assumes that a `listingId` of `0` is invalid. This will prevent a staker who receives a `listingId` of `0` from being able to call `updateListing()` to modify the price or other details of their listing.
+
+    **Remediations to Consider**
+    To differentiate between an unlisted NFT (where the default `nftListingId` is `0`) and a listed NFT with a legitimate `listingId` of `0`, consider using a 1-based indexing system for storage. When a `listingId` is received from the marketplace, store it as `listingId + 1`. When the ID is needed for a marketplace interaction, retrieve the stored value and subtract 1.
+
+    This ensures that a stored value of `0` in `nftListingId` always signifies an unlisted token, while a stored value of `1` corresponds to a marketplace `listingId` of `0`.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Integration</field>
+  <field name="impact">medium</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">b3e59ac951840759178d2de769d91f2a212a57fb</field>
+  <field name="content">
+    ## [M-3] Stale marketplace listings can be exploited
+
+    A scenario exists where a stale listing for an NFT can persist on the marketplace contract, leading to unexpected sales. This occurs because the `claim()` and `boot()` functions in `SiliconEpochPool` contract use a `try-catch` block when canceling a listing. If the external call to `cancelListing` on the marketplace fails (e.g., the marketplace is paused), the local state (`nftMarketplace`, `nftListingId`) is still cleared.
+
+    This leaves an active listing on the marketplace that the `SiliconEpochPool` contract is no longer aware of. If the owner re-stakes and re-lists the same NFT, a new, second listing is created. The `onNFTSold()` function does not validate the `listingId`, meaning a buyer could purchase the NFT through the old, stale listing, potentially at an incorrect price, and the transaction would still be processed.
+
+    **Remediations to Consider**
+    Enforce a check within the `onNFTSold()` function to ensure the `listingId` from the sale matches the currently active listing ID stored in the contract.
+
+    ```diff
+        function onNFTSold(
+    		    address assetContract, 
+    		    uint256 tokenId, 
+    		    address seller, 
+    		    address buyer, 
+    		    uint256 /*quantity*/, 
+    		    uint256 totalPrice, 
+    		    address /*currency*/, 
+    -		    uint256 /*listingId*/
+    +		    uint256 listingId
+    		) external override nonReentrant {
+            bytes32 key = _tokenKey(assetContract, tokenId);
+    +       require(listingId == nftListingId[key], "Wrong listingId");
+            require(msg.sender == nftMarketplace[key], "Wrong marketplace");
+            require(seller == address(this), "Seller must be the pool for pool-managed listings");
+            require(nftOwner[key] != address(0), "NFT not staked in pool");
+            require(_nftWithdrawEpoch[key] == NO_WITHDRAW, "Pending withdraw");
+        
+            ...
+        }
+    ```
+
+    **Reference:** [src/SiliconEpochPool.sol#L1257-L1302](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L1257-L1302)
+  </field>
+</item>
+
+<item>
+  <field name="topic">Marketplace Integration</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">1ff9055aa2e0ee62475391d08396e9567cd06109</field>
+  <field name="content">
+    ## [L-1] Marketplace callbacks consistently fail
+
+    The marketplace callback functions `onListingCreated()`, `onListingUpdated()`, and `onListingCancelled()` in `SiliconEpochPool.sol` are designed to be called by the marketplace contract. However, these callbacks will always revert due to two main reasons.
+
+    First, the functions that trigger these callbacks (`claim()`, `boot()`, `createListing()`, `updateListing()`, `cancelListing()`) are marked as `nonReentrant`. The external call to the marketplace and its subsequent call back to the `SiliconEpochPool` contract is a re-entrant pattern, which is blocked by the modifier.
+
+    Second, the validation `require(nftOwner[key] == seller)` within the callbacks is flawed. The marketplace identifies the `SiliconEpochPool` contract as the seller and passes its address in the `seller` parameter. However, `nftOwner[key]` stores the address of the original staker, causing the check to fail.
+
+    The severity is low because the marketplace uses a `try-catch` block for these calls, preventing the transaction from failing.
+
+    **Remediations to Consider**
+    The logic inside `onListingCreated`, `onListingUpdated`, and `onListingCancelled` should be removed to prevent confusion and unnecessary gas usage on reverts, since the intended state changes are already handled by fallback mechanisms or are non-critical.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Overconstraint</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">a7539afe733a585ecd610ea1dd399b21606f3e65</field>
+  <field name="content">
+    ## [L-2] Redundant check restricts staking via approval
+
+    In the `stake()` function, there's an explicit check to ensure `msg.sender` is the owner of the NFT: 
+
+    ```solidity
+    if (IERC721(col).ownerOf(id) != msg.sender) revert NotOwner();
+    ```
+
+    **Reference:** [src/SiliconEpochPool.sol#L268](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L268)
+
+    This check is overly restrictive as it prevents a common ERC721 pattern where a third party, approved via `approve()` or `setApprovalForAll()`, stakes an NFT on behalf of the owner. The subsequent call to `IERC721(col).transferFrom(msg.sender, address(this), id)` already provides sufficient validation, as it will correctly revert if `msg.sender` is neither the owner nor an approved operator. The current implementation unnecessarily limits valid staking pathways.
+
+    **Remediations to Consider**
+    Remove the redundant ownership check to allow staking by approved addresses, relying on the `transferFrom` call for validation.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Unnecessary logic</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">9938c75deda77b63b615f07c08bdf5ba5ea152dd</field>
+  <field name="content">
+    ## [L-3] Unnecessary logic for sweeping zero-reward epochs increases complexity and gas costs
+
+    The `claim(uint256[] calldata epochStarts)` function allows users to specify which epochs they want to claim rewards from, providing precise control. However, the contract also includes complex helper functions, `_sweepZeroRuns()` and `_updateEarliestUnclaimed()`, which automatically mark zero-reward epochs as claimed and track the earliest unclaimed epoch.
+
+    This automation is redundant given the selective nature of the `claim()` function. These features add significant code complexity and gas overhead for functionality that could be better handled off-chain. A user interface could easily query epoch data and present users with a list of claimable epochs, achieving the same goal without on-chain costs.
+
+    **Remediations to Consider**
+    To simplify the contract and save gas for users, it is recommended to remove the `_sweepZeroRuns()` and `_updateEarliestUnclaimed()` functions entirely. The calls to these functions within `claim()` and `performStakerMaintenance()` should also be removed.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Wrong condition</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">72f0576f34bc933e2835c3fb8aef1e068b9eb734</field>
+  <field name="content">
+    ## [L-4] Incorrect logic for checking matured NFTs
+
+    The `_userHasMaturedNFTsForEpoch()` function incorrectly determines if an NFT is ready for withdrawal. The condition [`_nftWithdrawEpoch[key] <= epochStart`](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L1064) mistakenly identifies an NFT as matured within the same epoch its withdrawal was initiated. An NFT should only be considered "matured" for withdrawal in the epoch *after* the withdrawal request is made.
+
+    If a user calls `withdraw()` within `epochStart`, this function will incorrectly return `true` for that same epoch. This can cause the `_updateEarliestUnclaimed` function to halt its process, believing there is a matured NFT to be claimed when it is not yet ready, potentially forcing a user to make an unnecessary transaction.
+
+    **Remediations to Consider**
+    The logical operator should be changed from `<=` to `<` to ensure an NFT is only considered matured in an epoch after its withdrawal epoch.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="customCommits">https://github.com/berkeleycompute/pooling/commit/80b44e8e39487b17a8d5480e8091656a5c13e5d4,https://github.com/berkeleycompute/pooling/commit/fcac91eda2df268983d3213e43f3967aa7edc254</field>
+  <field name="content">
+    ## [L-5] Redundant function misinterprets gas limit parameter
+
+    The `_finalizeUserEpochs()` function is largely redundant, duplicating the logic already present in `_backfillStakerSnapshots()`. More critically, it misinterprets its `gasLimit` parameter.
+
+    The `performStakerMaintenance()` function passes [a gas value](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L1087-L1088) (derived from `gasleft()`) to `_finalizeUserEpochs()`. However, `_finalizeUserEpochs()` treats this `gasLimit` not as a cap on gas consumption, but as [a cap on the *number of epochs* to process](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L560). This unit mismatch can cause the function to run for an unexpectedly large number of iterations, consuming far more gas than intended by the caller.
+
+    **Remediations to Consider**
+    The `_finalizeUserEpochs()` function can be replaced with a direct call to `_backfillStakerSnapshots`, ensuring the gas limit parameter is correctly interpreted.
+
+    ```diff
+        function performStakerMaintenance(address staker) external nonReentrant returns (bool fullyDone) {
+            ...
+        
+            // 2. User epoch finalization (enables rewards) - use all remaining gas
+            uint256 gasForUser = gasleft() > safety ? gasleft() - safety : 0;
+    -       bool userDone = _finalizeUserEpochs(staker, gasForUser);
+    +       bool userDone = _backfillStakerSnapshots(staker, gasForUser);
+        
+            ...
+        }
+    ```
+
+    **Reference:** [src/SiliconEpochPool.sol#L1078-L1101](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L1078-L1101)
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">State Management</field>
+  <field name="impact">low</field>
+  <field name="chance">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">38875ca14045374aece5cfc015f6a17d55a2d689</field>
+  <field name="content">
+    ## [L-6] Conflicting NFT states allowed between withdrawal and marketplace listing
+
+    The contract allows an NFT to be in conflicting states simultaneously: pending withdrawal and listed on the marketplace. The `createListing()` function does not check if an NFT is already pending withdrawal, and conversely, the `withdraw()` function does not verify if an NFT is actively listed.
+
+    This can lead to transaction failures and poor user experience. For instance, a user can list an NFT and then immediately initiate its withdrawal. If a buyer tries to purchase this NFT, the transaction will fail when the `onNFTSold()` callback reverts due to the pending withdrawal status, creating confusion.
+
+    **Remediations to Consider**
+    Add checks in both functions to prevent these conflicting state transitions.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">8c4981f2fdc4a4a8f0f9c524676488fbfba014d7</field>
+  <field name="content">
+    ## [G-1] State variables are updated in a loop
+
+    In `SiliconEpochPool.sol`, several functions perform state updates and token transfers within loops where the values could be aggregated and updated/transferred once outside the loop. This pattern unnecessarily increases gas costs, especially when iterating over large arrays.
+
+    - In `stake()`, [`_stakerNftCount[msg.sender]` and `totalNftsStaked`](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L276-L277) are incremented in a loop.
+    - In `withdraw()`, [`pendingGlobalWithdraw`](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L326) is incremented inside a loop.
+    - In `depositForTokens()`, [`rewardToken.safeTransferFrom` is called, and `epochPending[currEpoch]` and `accountedRewardBalance` are updated](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L466-L471) within a loop.
+
+    These repeated state writes and external calls are expensive and can be optimize.
+
+    **Remediations to Consider**
+
+    Aggregate the total amounts in a local variable within the loop and perform a single state update or token transfer after the loop finishes.
+
+    For `stake()`:
+
+    ```diff
+    -           _stakerNftCount[msg.sender] += 1;
+    -           totalNftsStaked += 1;
+            }
+    +       _stakerNftCount[msg.sender] += len;
+    +       totalNftsStaked += len;
+    ```
+
+    For `withdraw()`:
+
+    ```diff
+    -           pendingGlobalWithdraw += 1;
+            }
+    +       pendingGlobalWithdraw += len;
+    ```
+
+    For `depositForTokens()`:
+
+    ```diff
+    -               uint256 pre = rewardToken.balanceOf(address(this));
+    -               rewardToken.safeTransferFrom(msg.sender, address(this), amt);
+    -               uint256 post = rewardToken.balanceOf(address(this));
+    -               if (post != pre + amt) revert DeflationaryToken();
+    -               epochPending[currEpoch] += amt;
+    -               accountedRewardBalance += amt; // pre-account so earlier epochs don't consume it
+
+    +               totalRewards += amt;
+                }
+    +           uint256 pre = rewardToken.balanceOf(address(this));
+    +           rewardToken.safeTransferFrom(msg.sender, address(this), totalRewards);
+    +           uint256 post = rewardToken.balanceOf(address(this));
+    +           if (post != pre + amt) revert DeflationaryToken();
+    +           epochPending[currEpoch] += totalRewards;
+    +           accountedRewardBalance += totalRewards;
+    ```
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">9001ff6a243d5b30a58da8e0f95292cae14f50d5</field>
+  <field name="content">
+    ## [G-2] Unused variable assignment from an external call
+
+    In the `_finalizeEpochsCore()` function, the local variable [`poolBal`](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L869) is assigned the result of the external call `rewardToken.balanceOf(address(this))`. However, this variable is never read or used afterward in the function.
+
+    **Remediations to Consider**
+
+    Remove the line entirely as it has no effect on the logic.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">73f81a7f12bff88d816f70016082330338935905</field>
+  <field name="content">
+    ## [G-3] Redundant logic after `_backfillStakerSnapshots` call
+
+    In `claim()` function, the function `_backfillStakerSnapshots()` is called, which [returns a boolean indicating if all pending user epochs were processed](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L936). However, this return value is [ignored](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L360). Following this call, an [`if` block](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L364) manually re-checks if maintenance is complete and reverts otherwise. This duplicates logic, increasing gas costs and code complexity
+
+    **Remediations to Consider**
+
+    Capture the boolean returned by `_backfillStakerSnapshots()` and use it in a `require` statement.
+
+    ```diff
+    -        _backfillStakerSnapshots(msg.sender, MAX_GAS_PER_MAINTENANCE);
+    -        if (MAX_GAS_PER_MAINTENANCE != 0) { // gas-bounded maintenance
+    -            uint256 nextEp = _lastSnapshotEpoch[msg.sender];
+    -            uint256 currE = _epochStartForTimestamp(block.timestamp);
+    -            if (nextEp != 0 && nextEp < currE) {
+    -                uint256 epochsBehind = (currE - nextEp) / epochDuration;
+    -                if (epochsBehind > 0) revert MaintenanceRequired();
+    -            }
+    -        }
+    +        bool maintenanceDone = _backfillStakerSnapshots(msg.sender, MAX_GAS_PER_MAINTENANCE);
+    +        if (MAX_GAS_PER_MAINTENANCE != 0) {
+    +            if (!maintenanceDone) revert MaintenanceRequired();
+    +        }
+    +
+    +        _finalizeEpochsCore(maxEpochsPerFinalizePass());
+
+    ```
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Gas Optimization</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">c3df70239185e93ca01c14bd89633c5744ca32a7</field>
+  <field name="content">
+    ## [G-4] High gas consumption in `_withdrawMaturedNFTs` due to nested loops
+
+    The [`_withdrawMaturedNFTs()` function](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L668) uses three nested loops to find and process NFTs that are ready for withdrawal. It iterates through the all staker's NFT, then all staking collections, and finally all staked tokens within each collection. This leads to high computational complexity and big gas consumption.
+
+    **Remediations to Consider**
+    To optimize, introduce a dedicated data structure to track NFTs pending withdrawal for each user.
+
+    ```solidity
+    struct NFTInfo {
+        address collection;
+        uint256 tokenId;
+    }
+    mapping(address => NFTInfo[]) private pendingWithdrawals;
+    ```
+
+    In `withdraw()`, add the token details to this `pendingWithdrawals` mapping. Then, `_withdrawMaturedNFTs` can iterate over this much smaller, targeted list instead of all staked tokens, reducing the complexity to O(n).
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">79aea381be2fb244a0d43145c158bbce38dc87bb</field>
+  <field name="content">
+    ## [Q-1] Inconsistent error handling patterns used throughout the contract
+
+    Throughout the `SiliconEpochPool.sol` contract, error handling is implemented using two different patterns: `require()` statements with string messages and `if (...) revert CustomError()` statements. This inconsistency is found in multiple functions, which reduces code readability and maintainability. Adopting a single, uniform approach to error handling would improve the clarity and quality of the codebase.
+
+    **Remediations to Consider**
+    Refactor all validation checks throughout the contract to use a consistent pattern.
+
+    
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">e52e54df942e660f0d0c7e7eacb574f36abe9753</field>
+  <field name="content">
+    ## [Q-2] Mismatched units for processing limit in maintenance function
+
+    In `performStakerMaintenance()` function, the [`gasForGlobal` variable](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L1082) is calculated based on `gasleft()`, meaning its unit is gas. This value is then passed as the `limit` parameter to [`_finalizeEpochsCore()`](https://github.com/berkeleycompute/pooling/blob/4e299b623b01f70dea5d305367c27f83183af104/src/SiliconEpochPool.sol#L842), which interprets the limit as a maximum number of epochs to process, not a gas budget. This mismatch in units causes the function to potentially process far more epochs than intended. A similar issue exists for the `gasForUser` variable passed to `_finalizeUserEpochs`.
+
+    **Remediations to Consider**
+
+    Refactor the logic to ensure consistent units are used for processing limits. 
+
+    
+  </field>
+</item>

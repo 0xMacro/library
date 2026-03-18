@@ -1,0 +1,219 @@
+<item>
+    <field name="topic">Data Consistency</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">d2e04cbaa9525c3b2bf458eec98e39af17cc46af</field>
+    <field name="content">
+      ## [M-1] Incomplete eligibility reset for conditions
+  
+      The `DropFacet` contract allows the owner to set an array of conditions by calling `setClaimConditions()`. By setting the `resetElegibility` boolean, the previously `suppliedClaimedByWallet` will not prevent an account from claiming the set conditions, as a new, unused ID will be used.
+  
+      However, combining mixed eligibility configurations can cause the contract to improperly clear the previous condition IDs, leading to unintended preservation of claim history and inconsistent behavior when resetting eligibility. Consider the following potential order of configurations being set and their final state:
+  
+      1. Initial configuration with three conditions is set:
+
+        ```
+        conditionById[0] = Condition A
+        conditionById[1] = Condition B
+        conditionById[2] = Condition C
+        conditionCount = 3
+        conditionStartId = 0
+        ```
+      
+      2. A second configuration with two conditions is set with `resetElegibility` false:
+    
+        ```
+        conditionById[0] = New Condition X
+        conditionById[1] = New Condition Y
+        conditionById[2] = (deleted)
+        conditionCount = 2
+        conditionStartId = 0
+        ```
+      
+      3. A third configuration is set with three new conditions with `resetElegibility` true:
+    
+        ```
+        conditionById[0] = (deleted)
+        conditionById[1] = (deleted)
+        conditionById[2] = New Condition 1 (With previous condition C claim history)
+        conditionById[3] = New Condition 2
+        conditionById[4] = New Condition 3
+        conditionCount = 3
+        conditionStartId = 2
+        ```
+      
+  
+      This renders a scenario where the `conditionById[2]` is re-used even if `resetElegibility` was true for the latest configuration, disallowing users to claim this condition. 
+  
+      **Remediations to Consider:**
+  
+      Consider keeping track of the highest condition ID used and starting from this index when resetting eligibility.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="impactNote">
+        There are no incentives for space owners to undelegate as there is no positive effect. The operator's slashing or removal is not currently supported and is on plans for future updates.
+    </field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">aa81e3e61a5711fb06ef1743c5a33aee0479249e</field>
+    <field name="content">
+      ## [M-2] Inconsistent reward accrual
+  
+      The `RewardsDistribution` contract accrues rewards to users who stake and delegate their voting power to spaces or valid operators. If users delegate to a space, the delegation points to the space’s delegation. However, if a space stops delegating or an operator becomes inactive, users who initially staked and delegated to these will continue accruing rewards. This occurs because the earning power is updated at the stake or delegation execution, through functions `stake()`, `permitAndStake()`, `increaseStake()`, `changeBeneficiary()`, and `redelegate()`. Ultimately, calling into the `StakingRewards` library’s internal functions that update the earning power.
+  
+      Additionally, the `_sweepSpaceRewardsIfNecessary()` function transfers accrued rewards from spaces treasure to their delegated operators. However, when a space redelegates to a new operator, the sweep function uses the current operator mapping. This means all accumulated rewards (including those earned by the previous operator) will be sent to the new operator, resulting in incorrect reward attribution.
+  
+      This issue could lead to unintended reward distribution and potential economic imbalances within the protocol. It may also indirectly incentivize users to maintain outdated delegations.
+  
+      **Remediations to Consider:**
+  
+      1. Implementing a sweep internal mechanism for spaces when redelegating to update the previous operator rewards.
+      2. Incentivize users to maintain updated their delegations. 
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Slippage</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ff7062b291930d9877307ec60280b8f74f54ebc9</field>
+    <field name="content">
+      ## [L-1] Users claiming penalty is not predictable
+  
+      In the `DropFacet` contract, users can execute a `claimWithPenalty()` call to receive their allocated tokens according to the parameters of their leaf in the `claim` data and the configured conditions. After the logic verifies the claim arguments, the function deducts the `penaltyBps` configured for that specific condition ID:
+  
+      ```solidity
+      function claimWithPenalty(
+          Claim calldata claim
+        ) external returns (uint256 amount) {
+          DropStorage.Layout storage ds = DropStorage.layout();
+  
+          _verifyClaim(ds, claim);
+  
+          ClaimCondition storage condition = ds.getClaimConditionById(
+            claim.conditionId
+          );
+  
+          **amount = claim.quantity;
+          uint256 penaltyBps = condition.penaltyBps;
+          if (penaltyBps > 0) {
+            unchecked {
+              uint256 penaltyAmount = BasisPoints.calculate(
+                claim.quantity,
+                penaltyBps
+              );
+              amount = claim.quantity - penaltyAmount;
+            }
+          }**
+  
+          ...
+        }
+      ```
+  
+      **Reference:** DropFacet.sol#L34-74
+  
+      However, users can not ensure the current `penaltyBps` will be used as there is no expected output or slippage to ensure this. Although highly unlikely, users might end up with a different quantity of tokens than initially expected if the condition they’re attempting to claim modifies this penalty fee before their transactions are included in a validated block.
+  
+      **Remediations to Consider:**
+  
+      Consider adding an expected `penaltyBps` to the input arguments and comparing the used value to match the user value.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Data Retrieval</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">adaf6d322f167e6c3ee83fc2e05d576350fcd9f3</field>
+    <field name="content">
+      ## [Q-1] Lack of public view function to retrieve all claimable conditions
+  
+      The `DropFacet` contract lacks an external view function to fetch all existing configured conditions. Consider adding a new view function to complement the existing `getActiveCondition()`, enabling retrieval of all present conditions.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Admin Configuration</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">d2e04cbaa9525c3b2bf458eec98e39af17cc46af</field>
+    <field name="content">
+      ## [Q-2] Lack of granular claim condition management
+  
+      The `DropFacet` contract’s current implementation only allows setting or resetting all claim conditions at once through the `setClaimConditions()` function. While this approach works, it may be less efficient and more prone to errors when only a single condition needs to be updated or a new one added. A more granular approach to managing claim conditions could improve the contract's flexibility and reduce potential mistakes when modifying conditions.
+  
+      Consider implementing additional explicit functions that allow for more targeted modifications of claim conditions, such as:
+  
+      - A function to update a single existing condition by its ID.
+      - A function to add a new condition without affecting existing ones.
+      - A function to remove a specific condition by its ID
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Sanity Checks</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        This concerns the permitAndStake function which follows UniStaker. The intention is to delegate signature verification to the EIP-2612 compatible ERC-20 token and attempt to stake even if the permit call fails.
+    </field>
+    <field name="content">
+      ## [Q-3] Permit deadline is not checked internally
+  
+      In `RewardsDistribution`, the current implementation of `stakeOnBehalf()` wraps the permit call to the token with a `try-catch` statement and empty error handling to prevent any denial of service issues by a potential third-party actor using the passed signature. It continues the function call if the allowance is present. However, there is no internal verification on the `deadline` that can filter non-valid permit signatures to prevent this call. Consider checking the `deadline` internally to prevent expired signatures from being used.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="status">wontdo</field>
+    <field name="response">
+        This is intentional for poking state updates.
+    </field>
+    <field name="content">
+      ## [Q-4] `increaseStake` operations lack zero amount check
+  
+      In `RewardsDistribution`, `increaseStake()` doesn't validate the input amount. A user could call this with zero amount, causing unnecessary state updates, like reward calculations, and emitting an event without any actual stake increase.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Use Cases</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-5] Lack of direct reward compounding functionality
+  
+      Currently, if users desire to compound their rewards, they’d need to execute a reward claim and then `increase stake` or `stake` separately. To reduce friction in this potential user case, consider having a `claimAndStake()` function that allows users to claim and stake atomically.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Events</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ffb59b299cba6abee5def399eabcc4959b03e875</field>
+    <field name="content">
+      ## [Q-6] `initiateWithdrawal` lacks distinct event for mainnet delegation withdrawals
+  
+      In `RewardsDistribution`, staking delegations use a two-step process for deposit withdrawals. In contrast, mainnet delegations use a single step to remove the delegated amount directly. However, the current event structure does not provide any arguments to differentiate between local delegation withdrawals and mainnet delegation withdrawals. To enhance transparency and improve data tracking, consider adding a separate event for mainnet delegation withdrawals or including an identifier parameter in the existing event.
+    </field>
+  </item>
+  

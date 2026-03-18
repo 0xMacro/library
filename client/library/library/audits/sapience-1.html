@@ -1,0 +1,191 @@
+<page
+  clientName="Sapience"
+  reportDate="February 26, 2026"
+  auditTitle="Sapience A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/sapiencexyz/sapience"
+  repoCommitHash="f2b6bd9231ae9915f9ba88f6bef02e7a914e6288"
+  finalCommitHash="48092fda945e2d6d1958f6e6289ead99253cf9e6"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from February 4 to February 26, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+    <li>Technical documentation available in the repository.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    ### **End Users (Predictor / Counterparty / LP)**
+
+    Considered untrusted and potentially malicious. The system is designed to be defensive against users attempting to claim collateral they are not entitled to.
+    
+    - Users must provide valid EIP-712 signatures (ECDSA, EIP-1271, or session key) to participate in mint and burn operations. The contract verifies signatures against the claimed signer address and a per-account nonce to prevent replay attacks.
+    - Users are responsible for providing correct picks, wagers, nonces, and deadlines. The contract validates these inputs on-chain.
+    - A malicious user's actions are confined to their own positions. They cannot affect the collateral or settlement outcome of other user's predictions.
+    - Position tokens are freely transferable ERC20s. The protocol is agnostic to secondary market activity, any holder of a position token can redeem it proportionally after settlement, regardless of how they acquired it.
+    - Users interacting with `burn()` (bilateral exit) are responsible for agreeing to a fair payout split off-chain. The contract only enforces the conservation constraint (`predictorPayout + counterpartyPayout == totalTokensBurned`) and that both parties signed the same parameters.
+    - Vault users (LPs) deposit assets and receive shares through a manager request flow. They are responsible for submitting requests within the expiration window and accept that the manager determines when conditions are favorable for processing.
+    
+
+    
+    ### **Protocol Owner**
+    
+    Highly trusted during the setup phase, can renounce ownership after configuration. The owner has administrative control across multiple contracts and is trusted to:
+    
+    **PredictionMarketEscrow**
+    
+    - `setAccountFactory(address)` — Sets the `ZeroDevKernelAccountFactory` wrapper used to verify smart account ownership in session key flows. The wrapper is a protocol-deployed contract pointing at the ZeroDev Kernel factory and ECDSA validator. The owner is trusted to deploy the wrapper with correct external addresses and to register it here accurately. An incorrect factory or wrapper configuration would allow session keys associated with arbitrary accounts to sign on behalf of users, or silently disable smart account verification entirely.
+    - `sweepDust(bytes32, address)` — Sweeps rounding-error collateral from fully redeemed pick configurations.
+    
+    **PredictionMarketBridge / PredictionMarketBridgeRemote**
+    
+    - `setBridgeConfig(BridgeConfig)` — Sets the remote endpoint ID and remote bridge address for LayerZero messaging. Misconfiguration would allow messages from unauthorized senders to release escrowed tokens.
+    - `withdrawETH(address, uint256)` — Withdraws the ETH balance used to fund ACK fees.
+    - `renounceOwnershipSafe()` — Renounces ownership once all bridge configuration is complete.
+    
+    **PredictionMarketTokenFactory**
+    
+    - `setDeployer(address)` — Sets the authorized deployer (typically the bridge) that can deploy new position token contracts via `CREATE3`. Pointing this at an untrusted address would allow arbitrary token deployments at deterministic addresses.
+    - `renounceOwnershipSafe()` — Renounces ownership once the deployer is set. After this, no new deployer can be authorized.
+    
+    **ConditionalTokensConditionResolver / LZConditionResolver**
+    
+    - `setBridgeConfig(LZTypes.BridgeConfig)` — Sets the LayerZero remote endpoint ID and trusted bridge address for receiving resolution messages. Misconfiguration would allow this address to inject resolution outcomes into the resolver.
+    
+    **PredictionMarketVault**
+    
+    - `setManager(address)` — Designates the manager EOA. The manager has broad authority over user funds and deposit/withdrawal processing.
+    - `setMaxUtilizationRate(uint256)` — Sets the maximum fraction of vault assets that can be deployed to external protocols.
+    - `setDepositInteractionDelay(uint256)` / `setWithdrawalInteractionDelay(uint256)` — Sets the cooldown period between user requests. Setting this to zero or a very large value can break normal user flows.
+    - `setExpirationTime(uint256)` — Sets how long a request remains valid before it can be cancelled. Setting this to zero makes all requests immediately expired.
+    - `toggleEmergencyMode()` — Enables or disables emergency withdrawals, bypassing the normal manager-mediated flow.
+    - `pause()` / `unpause()` — Halts or resumes all user-facing operations.
+    
+
+    
+    ### **Vault Manager**
+    
+    Highly trusted operational role. The vault manager controls fund deployment and request processing on behalf of the `PredictionMarketVault`. This entity is trusted to:
+    
+    - `processDeposit(address)` / `batchProcessDeposit(address[])` — Process pending deposit requests by minting shares to users. There is no on-chain enforcement of the share price at processing time; the manager is trusted to process only at fair rates.
+    - `processWithdrawal(address)` / `batchProcessWithdrawal(address[])` — Process pending withdrawal requests by burning shares and returning assets. The manager controls the ordering and timing of withdrawals.
+    - `approveFundsUsage(address, uint256)` — Approves vault assets to an external protocol (PredictionMarketEscrow). A malicious or negligent manager can deploy funds to an unfavorable or incorrect protocol, resulting in permanent loss of LP assets.
+    - `cleanInactiveProtocols()` — Removes protocols with zero deposits and zero allowance from the active set.
+    - Signs EIP-1271 messages on behalf of the vault. Any message hash signed by the manager is considered a valid vault signature, granting broad signing authority. A compromised manager key can authorize arbitrary EIP-1271 validations against the vault.
+    
+
+    
+    ### **Condition Resolvers**
+    
+    Trusted external contracts. The protocol delegates condition resolution entirely to resolver contracts registered per pick. These are trusted to:
+    
+    - Return correct and final outcome vectors `[yesWeight, noWeight]` for each `conditionId`. An incorrect outcome directly determines who wins the collateral pool, there is no appeal mechanism once a pick configuration is resolved.
+    - Behave correctly under the `RESOLVER_GAS_LIMIT` cap. A resolver that reverts, runs out of gas, or returns arrays shorter than expected will cause settlement to fail or revert permanently for affected predictions.
+    - Non-decisive outcomes (vectors where neither weight is zero, e.g. `[1,1]`) are currently treated as `COUNTERPARTY_WINS` by the escrow's parlay logic. A resolver returning such a vector is therefore equivalent to a counterparty win.
+    - **PythConditionResolver** — Trusts the Pyth Lazer oracle to provide accurate historical price data. The resolver is permissionless; anyone can call `settleCondition()` with a valid Pyth payload. Price feed manipulation or use of stale data would affect settlement outcomes.
+    - **ConditionalTokensConditionResolver** — Trusts Polygon `ConditionalTokensReader` to accurately read and relay payout data from the Gnosis ConditionalTokens contract via LayerZero.
+    
+
+    ### **OnboardingSponsor / Budget Manager**
+
+    The budget manager is a semi-trusted operational role, within the `OnboardingSponsor` contract. The budget manager and the owner are trusted to:
+
+    - `setBudget(address, uint256)` / `setBudgets(address[], uint256[])` — Set per-user collateral budgets unlocked by invite codes. Setting an excessive budget for a user allows them to place sponsored bets beyond the intended onboarding allocation.
+    - The owner additionally controls: `setMatchLimit(uint256)` — caps collateral per sponsored mint; `setBudgetManager(address)` — rotates the API signer; `sweepToken(IERC20, address, uint256)` / `sweepNative(address, uint256)` — recovers all funds held by the sponsor.
+
+    Constraints enforced on-chain by `OnboardingSponsor` at call time: required counterparty (prevents self-dealing), max entry price cap (prevents risk-free farming on near-certain outcomes), per-user budget limit, and per-mint match limit. A misconfigured or compromised budget manager can exhaust the sponsor's collateral balance by over-allocating budgets.
+
+
+    
+    ### **LayerZero Protocol**
+    
+    Trusted cross-chain infrastructure. LZ peer configuration is set by the owner at deployment and is assumed to be correct before ownership is renounced. Post-renouncement, peer addresses are permanent and any misconfiguration cannot be corrected. The protocol relies on LayerZero V2 for two distinct message flows:
+    
+    - **Bridge messaging** (`CMD_BRIDGE` / `CMD_ACK`) between Ethereal and Arbitrum for position token bridging. A failed message leaves a bridge in `PENDING` state until retried. A maliciously delivered message from an unconfigured peer would need to pass the LZ endpoint's source verification, the protocol trusts that LZ enforces this correctly.
+    - **Resolution relay** from Polygon (`ConditionalTokensReader` → `ConditionalTokensConditionResolver`) carrying condition outcomes to Ethereal resolvers. A failed or reordered message blocks settlement for any prediction depending on that condition indefinitely, as the resolver has no fallback.
+    
+
+    
+    ## General Risk Observations
+    
+    - Changing any bridge or resolver configuration while predictions are active (mid-flight) can permanently break resolution for unresolved conditions, locking user collateral in escrow with no recovery path. The owner is trusted not to modify live configurations until all dependent predictions are settled.
+    - Changing the `deployer` on `PredictionMarketTokenFactory` after tokens are already deployed breaks the trust assumption that only the legitimate bridge can mint and burn bridged position tokens. Any address set as the new deployer gains the ability to deploy contracts at deterministic `CREATE3` addresses, potentially shadowing existing tokens or minting unbacked supply. The owner is trusted not to rotate the deployer once the bridge is operational.
+    
+  </template>
+</content-for>
+
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(initial)</b>:
+        <code>f2b6bd9231ae9915f9ba88f6bef02e7a914e6288</code>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(final)</b>:
+        <code>94919e2e9420a07234ad92910318465549049084</code>
+      </li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="source-code">
+
+    <p>We audited the following contracts with <b>f2b6bd9231ae9915f9ba88f6bef02e7a914e6288</b> commit hash:</p>
+    <template type="file-hashes">
+      fe0c18ba03c347cbf3f3f60a33a2a382b921200568f8d2af07fe8b78d417931c  ./src/v2/PredictionMarketEscrow.sol
+      198d76d66fef56d563d22394155c5c66e38f97d1b77eecf3cb88fcc8e2eba5b4  ./src/v2/PredictionMarketToken.sol
+      d8a8c43b626b0cd4bbe00a5baea2153013623ed5aeba16e06ecd5beefdb63052  ./src/v2/PredictionMarketTokenFactory.sol
+      4c112d0fb3ef8fb465d00abbe295eb08ba66f87ba8b7dcc3b00d4b0deb8bd74b  ./src/v2/SecondaryMarketEscrow.sol
+      3fd3cc0564333d8464ff6b0de6deb28a57094a8afe99ff8e9e6905b1d975f48a  ./src/v2/bridge/PredictionMarketBridge.sol
+      3abd34604fd6fa360594393ac0af06e718866b645ea890b130ae17beaf6779a1  ./src/v2/bridge/PredictionMarketBridgeBase.sol
+      9f7d6a512db41277d6ac9b61b11da50d8c8c35b69b63fd4710f28368ddd7059f  ./src/v2/bridge/PredictionMarketBridgeRemote.sol
+      1c6d2a20c0f1bbb907c995051894d392c57a4eaf4bdf0997bc574c7e92a1bb1f  ./src/v2/bridge/interfaces/IPredictionMarketBridge.sol
+      9ae9e9bb85beb7e6b67a78e71e1513c6224982dba69b4b51180bc40535b49967  ./src/v2/bridge/interfaces/IPredictionMarketBridgeBase.sol
+      e062eb5a4f9457e680d2cdd6a7dbf2de1c4206ebdf59fee73ff56cd0f8b2ec4a  ./src/v2/bridge/interfaces/IPredictionMarketBridgeRemote.sol
+      6a0020bd755f209c7d165758272cea4a359ed222524ba2f30844b638f86879b9  ./src/v2/interfaces/IConditionResolver.sol
+      d99f15d7a35e817d490b9b5763956688c13e4280efa7fef493018c2344a3f057  ./src/v2/interfaces/IMintSponsor.sol
+      a49a4947cef12233a2eb78b6c0208c9c39b9e4ca095f8b91579806910d7d61ba  ./src/v2/interfaces/IPredictionMarketEscrow.sol
+      9e8d3d501caca427db8269f3fe022b3e81b682a579e100b49071289d99eb5d28  ./src/v2/interfaces/IPredictionMarketToken.sol
+      64d257ca69f5cea70da1f5783b887ae1bae626c11840c65ad2b0cfd0ee7a73bb  ./src/v2/interfaces/IPredictionMarketTokenFactory.sol
+      25b8666dc38cba5f9c6f5077e31c07aa07f76a12ae11fa8291f421238f56ff25  ./src/v2/interfaces/ISecondaryMarketEscrow.sol
+      1163665b56ea161095652ce67b0568634be368ef50172a210c3f9aa2fe9087d8  ./src/v2/interfaces/IV2Events.sol
+      28c7bde3a8b4970168cb399ff00fb81adce53ba49939174d0961be434ca4a05f  ./src/v2/interfaces/IV2Types.sol
+      5aee5a565adeb485a2b81f89b4e3648bfa14faff65701ffadd37d70effd9ad15  ./src/v2/resolvers/conditionalTokens/ConditionalTokensConditionResolver.sol
+      038e5d7b44bf2a4b7aa457d0ad6319bf8faeb24b63e4c9f510f64a942c914d24  ./src/v2/resolvers/conditionalTokens/ConditionalTokensReader.sol
+      a999559e2717d9c1c6884026fe819a535e6bd343eb33e40de48ca8e6a894c3a2  ./src/v2/resolvers/conditionalTokens/interfaces/IConditionalTokensConditionResolver.sol
+      eaaa006b981a47c647a394882f1056d17549b0dc076d66301c99de395be37132  ./src/v2/resolvers/conditionalTokens/interfaces/IConditionalTokensReader.sol
+      313c7082bccc33087199f4d9a9ffe3870cdced03ad48d6f4bac76540535c4e7d  ./src/v2/resolvers/lz-uma/LZConditionResolver.sol
+      8e124572a8aa57da90cdbb722400679607d56a2db95740c005dbd7a6ea936645  ./src/v2/resolvers/lz-uma/LZConditionResolverUmaSide.sol
+      e5b7ff1ab151592a1567cea87a3c8b3b72e2cb63142f03a43dd1f909973b6c03  ./src/v2/resolvers/lz-uma/LZETHManagement.sol
+      46b925318e4be22731178af469c940a88592bf823782c39612c5b1503a62fe54  ./src/v2/resolvers/lz-uma/interfaces/ILZConditionResolver.sol
+      30bbe87be86b4136e5c025f5c61ab674e027ff5857b293f9c0b734e89054e19b  ./src/v2/resolvers/lz-uma/interfaces/ILZConditionResolverUmaSide.sol
+      3da2c3ada52f8a60dcf603bea373b8273a18f5c84ccb949c09540e8142e08ced  ./src/v2/resolvers/mocks/ManualConditionResolver.sol
+      dfd5989421cfa4f29a659274fea9ee0ed26f864203f445d29bfcf0dc9fc4d946  ./src/v2/resolvers/pyth/PythConditionResolver.sol
+      b134c9fbc1d42e0c0ccd6f2bc6ff5d3f5fa490f16674e90e6ff3b8ef618ebc42  ./src/v2/resolvers/pyth/PythLazerLibs/IPythLazer.sol
+      49a4945b29758112f5a7408aba31b8527cdc21e394f1db7334d1f78a816f4ce1  ./src/v2/resolvers/pyth/PythLazerLibs/PythLazerLib.sol
+      27ca50a8422e23f50c22a836908934f64cf9959951a5d6704425f5b32df690e6  ./src/v2/resolvers/pyth/PythLazerLibs/PythLazerLibBytes.sol
+      ddaa9035f7794d7eb56616bc68ea7b8ccd896c863bb35908bc424517e55f8115  ./src/v2/resolvers/pyth/PythLazerLibs/PythLazerStructs.sol
+      82d96ecdf30cb074cd68d1d8860ba70c5072ee21a08387914b290a5c735f351d  ./src/v2/resolvers/shared/LZTypes.sol
+      13ca9b1889918f3365c8725f86eaa68cadc173f22bf67d67d6963a5a6a22fce6  ./src/v2/sponsors/OnboardingSponsor.sol
+      50bd14f9be77309ac0e54e419ae111e78ba535f85d14e5a9f993eddeef4b9b80  ./src/v2/utils/IAccountFactory.sol
+      10f1c9c9ffa1894182e851924633528e7480f7a5e9d4d82875da269669470c29  ./src/v2/utils/SignatureProcessor.sol
+      ebec7ada1ab5cd5e96a9ec21d0ecc6866908a192e790c476a4005d99a54e36b9  ./src/v2/utils/SignatureValidator.sol
+      52986141b26e01651a982e8ba003a37126b2ca7015e4ff025ac971c3fdbfc8a1  ./src/v2/utils/ZeroDevKernelAccountFactory.sol
+      050445136d86787b131c7195933e7ac6092337a6babd3254b8f880fd2448db89  ./src/v2/vault/PredictionMarketVault.sol
+      59536d72e5c8bec2f8c09da5e76ab30e46e094be7d058c8facc17056d2e13fb8  ./src/v2/vault/interfaces/IPredictionMarketVault.sol
+    </template>
+  </content-for>

@@ -1,0 +1,146 @@
+<item>
+    <field name="topic">Loss of funds</field>
+    <field name="impact">critical</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a54c35ff85ace781c96369d566fc1a5c2c0125b8</field>
+    <field name="content">
+      ## [C-1] Funds can be locked in the bonding curve
+  
+      The [BondingCurve](https://github.com/fleek-platform/fleek-contracts/blob/f6ede261b4f069e4238f4f2e3f01805478f4a662/src/creator-tokens/curve/BondingCurve.sol) sells creator tokens for Fleek tokens whose price adjusts along a linear bonding curve. After a set amount of tokens have been sold, [_graduate()](https://github.com/fleek-platform/fleek-contracts/blob/f6ede261b4f069e4238f4f2e3f01805478f4a662/src/creator-tokens/curve/BondingCurve.sol#L469-L546) is called, which initializes a UniswapV4 pool with Fleek received, and a set amount of creator tokens:
+  
+      ```solidity
+      PoolKey memory poolKey = PoolKey({
+          currency0: Currency.wrap(token0),
+          currency1: Currency.wrap(token1),
+          fee: POOL_FEE,
+          tickSpacing: TICK_SPACING,
+          hooks: IHooks(metadata.universalHook)
+      });
+  
+      POOL_MANAGER.initialize(poolKey, startingPrice);
+  
+      uint256 tokenId =
+          _mintAndBurnLiquidityPosition(poolKey, token0, token1, amount0, amount1, startingPrice);
+      ```
+      Reference: [BondingCurve.sol#L531-542](https://github.com/fleek-platform/fleek-contracts/blob/f6ede261b4f069e4238f4f2e3f01805478f4a662/src/creator-tokens/curve/BondingCurve.sol#L531-L542)
+  
+      However, the input parameters to initialize the pool are known before _graduate() may be called, and could be initialized beforehand. If that were to occur, when graduate() eventually does get called, it would revert when calling initialize(), would [revert](https://github.com/Uniswap/v4-core/blob/main/src/libraries/Pool.sol#L101), locking the fleek and creator tokens in the contract.
+  
+      **Remediations to Consider**
+  
+      Setup a `beforeInitialize()` callback to the [UniversalAntiFlipFeeHook](https://github.com/fleek-platform/fleek-contracts/blob/f6ede261b4f069e4238f4f2e3f01805478f4a662/src/creator-tokens/hooks/UniversalAntiFlipFeeHook.sol) that reverts if the bondingCurve has not graduated, to prevent it from being initialized until it is ready.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">5983785ccde48d0c7aa07e78dad37bee30b4c016</field>
+    <field name="content">
+      ## [H-1] Users can circumvent fees
+  
+      There are additional fees set for selling either in the [BondingCurve](https://github.com/fleek-platform/fleek-contracts/blob/f6ede261b4f069e4238f4f2e3f01805478f4a662/src/creator-tokens/curve/BondingCurve.sol) or in the uniswap pool via the [UniversalAntiFlipFeeHook](https://github.com/fleek-platform/fleek-contracts/blob/f6ede261b4f069e4238f4f2e3f01805478f4a662/src/creator-tokens/hooks/UniversalAntiFlipFeeHook.sol), which is determined in the [AntiFlipFeeLib](https://github.com/fleek-platform/fleek-contracts/blob/f6ede261b4f069e4238f4f2e3f01805478f4a662/src/creator-tokens/libraries/AntiFlipFeeLib.sol)’s [getTotalFee()](https://github.com/fleek-platform/fleek-contracts/blob/f6ede261b4f069e4238f4f2e3f01805478f4a662/src/creator-tokens/libraries/AntiFlipFeeLib.sol#L60-L93):
+  
+      ```solidity
+      if (!isBuy) {
+          uint256 lastBuyTime = userLastBuy[user];
+  
+          if (lastBuyTime > 0) {
+              uint256 windowDuration =
+                  calculateWindow(user, creatorToken, lastBuyTime, entropyTimestamp);
+              uint256 elapsed = block.timestamp - lastBuyTime;
+  
+              if (elapsed < windowDuration) {
+                  totalFee += SNIPE_PENALTY_BPS;
+              }
+          }
+      }
+      ```
+      Reference: [AntiFlipFeeLib.sol#L90-78](https://github.com/fleek-platform/fleek-contracts/blob/f6ede261b4f069e4238f4f2e3f01805478f4a662/src/creator-tokens/libraries/AntiFlipFeeLib.sol#L78-L90)
+  
+      The `lastButTime` is marked for a user on purchase, however, there is nothing preventing a user from transferring their tokens to another address that does not a set `lastBuyTime`, circumventing these extra fees intended to disincentivize sniping and selling without waiting, and results in less fees collected.
+  
+      **Remediations to Consider**
+  
+      Allow for tokens to be locked on purchase via the bondingCurve or hook for the duration of the window, with the exception of transferring to the bondingCurve or pool to allow for selling.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a54c35ff85ace781c96369d566fc1a5c2c0125b8</field>
+    <field name="content">
+      ## [M-1] Sophisticated users can guarantee a minimal anti sniper window
+  
+      Additional fees are applied if selling within a variable window from the time of purchase. This variance of window is intended to be random and a fun way to help prevent disincentivize users from flipping the tokens, especially on launch of the token or creation of the pool. There is a clear advantage to having a smaller window for users that may want to flip the token without incurring fees. This window is determined by the time of last purchase, the users address, time the token was created, and the creator token address:
+  
+      ```solidity
+      function calculateWindow(
+          address user,
+          address creatorToken,
+          uint256 buyTimestamp,
+          uint256 entropyTimestamp
+      ) internal pure returns (uint256) {
+          uint256 seed = uint256(
+              keccak256(abi.encodePacked(user, creatorToken, buyTimestamp, entropyTimestamp))
+          );
+  
+          return MIN_WINDOW + (seed % WINDOW_RANGE);
+      }
+      ```
+      Reference: [AntiFlipFeeLib.sol#47-58](https://github.com/fleek-platform/fleek-contracts/blob/f6ede261b4f069e4238f4f2e3f01805478f4a662/src/creator-tokens/libraries/AntiFlipFeeLib.sol#L39-L58)
+  
+      Since the user is a input in determining the window, this can leveraged by a contract that could try a bunch seeds for addresses until i finds one that would generate a minimum window for their desired purchase.
+  
+      **Remediations to Consider**
+  
+      Use `msg.origin` for the user, to prevent attempting with multiple addresses in a singular transaction, additionally use `block.prevrandao` for added uncertainty as opposed to buy timestamp. Additionally instead of storing last purchase time, store the window calculated, and update it only if the new window is greater than the currently stored.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Precision</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">c38f3ee34700b78e21ee23cc1af4724344d29d5a</field>
+    <field name="content">
+      ## [L-1] Potential loss of precision when checking zero value
+  
+      In [LinearCurveMath](https://github.com/fleek-platform/fleek-contracts/blob/a54c35ff85ace781c96369d566fc1a5c2c0125b8/src/creator-tokens/libraries/LinearCurveMath.sol), when calculating the amount of tokens purchased via [calculateBuyAmount()](https://github.com/fleek-platform/fleek-contracts/blob/a54c35ff85ace781c96369d566fc1a5c2c0125b8/src/creator-tokens/libraries/LinearCurveMath.sol#L85-L127), there is a check at the end to ensure a non-zero amount of tokens are purchased before returning the result:
+  
+      ```bash
+      if (UD60x18.unwrap(outputFP) == 0) revert OutputTooSmall();
+  
+      return _fromUD60x18(outputFP, buyTokenDecimals);
+      ```
+      Reference: [LinearCurveMath.sol#L24-26](https://github.com/fleek-platform/fleek-contracts/blob/a54c35ff85ace781c96369d566fc1a5c2c0125b8/src/creator-tokens/libraries/LinearCurveMath.sol#L124-L126)
+  
+      However, the check assumes the buy token is in 18 decimals, while the return value converts it using the proper decimals. In the case where the buy token has a small amount of decimals ie 6, this function could result in a small value for `outputFP` say 0.0000000000000005, which would evaluate to 500 via `unwrap()` and pass the check, but would result in zero tokens when converting to the proper decimals.
+  
+      This is not necessarily a issue for the protocol currently as both the creator token and the sell token (Fleek) have 18 decimals. However, this may change, or this contract may be used in other protocols where this could come up.
+  
+      **Remediations to Consider**
+  
+      Check if the properly converted value is zero.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">informational</field>
+    <field name="content">
+      ## [I-1] Rounding results in small gain of creator tokens if no fees are set
+  
+      When buying creator tokens and immediately selling them back, it can result in gaining a small amount of creator tokens for free, provided there are no fees set. Currently the protocol expects to always use 4% fees which offsets the small amount of tokens gained, leading to this not being a worry. It is important, however, that this is considered if this protocol or other protocols use the code and do not charge fees.
+    </field>
+  </item>
+  

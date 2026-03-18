@@ -1,0 +1,463 @@
+<item>
+    <field name="topic">Stolen Rewards</field>
+    <field name="impact">critical</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">0ae9ebf3a</field>
+    <field name="content">
+      ## [C-1] User payout can be stolen with minimal risk
+  
+      Users are allowed to make bets on picks that already have bets on them, and as long as there is a willing counter party, the bet can be of any amount on either side. There is nothing preventing a user from being both party and counter party to a bet, be it using the same address or another they control. Since the way rewards are calculated is based on a percent proportion of the winning bet collaterals, and tokens are minted based on the wager amount for a given side, an outsized bet made at any point would lead to them taking an outside proportion of the winnings from the losing side:
+  
+      ```solidity
+      // Mint tokens proportional to wager (1:1 ratio)
+      IPredictionMarketToken(predictorToken)
+          .mint(request.predictor, request.predictorWager);
+      IPredictionMarketToken(counterpartyToken)
+          .mint(request.counterparty, request.counterpartyWager);
+      ```
+  
+      **Reference**: [PredictionMarketEscrow.sol#L283-287](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/PredictionMarketEscrow.sol#L541-L556)
+  
+      ```solidity
+      // Use ORIGINAL total tokens (= collateral in 1:1 ratio), not current totalSupply
+      // This ensures consistent payouts even after partial redemptions
+      uint256 originalTotalTokens = isPredictor
+        ? config.totalPredictorCollateral
+        : config.totalCounterpartyCollateral;
+    
+      // Calculate claimable pool based on result
+      uint256 claimablePool = _calculateClaimablePool(
+          config.result,
+          config.totalPredictorCollateral,
+          config.totalCounterpartyCollateral,
+          isPredictor
+      );
+  
+      // Proportional payout: (amount / originalTotalTokens) * claimablePool
+      payout = (amount * claimablePool) / originalTotalTokens;
+      ```
+  
+      **Reference:** [PredictionMarketEscrow.sol#L541-556](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/PredictionMarketEscrow.sol#L541-L556)
+  
+      In cases where there are active bets for a given pick, and the likelihood of one side has shifted to being very likely or a certainty to win, someone could make a disproportionately large bet for the likely outcome and place one wei as the counterparty. This results in them taking winnings owed to honest betters, with little to no risk depending on how certain the pick is.
+      There should be an invariant where if a bet is made, the winner should be rewarded the sum both parties collateral, irrelevant of the actions others make on the same pick.
+  
+      ### Remediations to Consider
+  
+      When minting tokens each party should receive token amounts proportional to the sum of collateral placed for the given bet, rather than equal to each sides wager. This means that a token will always represents a dollar (or collateral token equivalent) if side wins, and zero if not. Then once settled, rather than rewarding based on a percent share of collateral, each token can be redeemed for one collateral token, simplifying the contract, removing the possibility of dust accumulating, and prevents users from stealing rewards.
+  
+     
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Exploit</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">0ae9ebf3a</field>
+    <field name="content">
+      ## [C-2] Users can mint predictions after settlement
+  
+      In `PredictionMarketEscrow`, the `PredictionMarketEscrow.mint()` function does not validate whether the `pickConfigId` has already been resolved. This allows an attacker to mint new position tokens after the outcome is known, diluting existing winning token holders and extracting value from the pool as mentioned in C-1. 
+  
+      The `mint()` function checks if a token pair exists for a `pickConfigId` but never validates the resolution state:
+  
+      ```solidity
+      function mint(IV2Types.MintRequest calldata request)
+          external
+          nonReentrant
+          returns (
+              bytes32 predictionId,
+              address predictorToken,
+              address counterpartyToken
+          )
+      {
+          // ... validation ...
+      
+          bytes32 pickConfigId = _computePickConfigId(request.picks);
+      
+          // Create or reuse token pair for this pick configuration
+          IV2Types.TokenPair storage tokenPair = _tokenPairs[pickConfigId];
+          if (tokenPair.predictorToken == address(0)) {
+              // First bet with these picks creates both tokens
+              (predictorToken, counterpartyToken) = _createTokenPair(pickConfigId);
+              // ...
+          } else {
+              // Reuse existing tokens but no checks for config.resolved!
+              predictorToken = tokenPair.predictorToken;
+              counterpartyToken = tokenPair.counterpartyToken;
+          }
+      
+          _executeMint(...);
+      }
+      ```
+  
+      **Reference**: [PredictionMarketEscrow.sol#L150-265](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/PredictionMarketEscrow.sol#L150-L265)
+  
+      An external attacker could monitor resolution events and mint predictions after they are resolved, diluting the payouts of legitimate winners and extracting value from them. The exploit can be executed atomically, is effectively riskless, since the outcome is known and the losing side can be minimized to only 1 wei, and can be scaled with flash loans since settlement is already public and set in the `pickConfigId` state.
+      
+  
+      ### Remediations to Consider
+  
+      Consider adding a resolution state check in the `mint()` function.
+  
+      ```solidity
+      IV2Types.PickConfiguration storage config = _pickConfigurations[pickConfigId];
+      if (config.resolved) {
+          revert PickConfigAlreadyResolved();
+      }
+      ```
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Locked assets</field>
+    <field name="impact">critical</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">d367401f5</field>
+    <field name="content">
+      ## [C-3] All assets in the PredictionMarketVault can be locked
+  
+      In [PredictionsMarketVault’s](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/vault/PredictionMarketVault.sol) [requestWithdrawal](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/vault/PredictionMarketVault.sol#L230-L275) the user can request `shares` and `expectedAssets`, where shares is constrained to the users balance, but expected assets is not and can be any value. `expectedShares` is used to increment `pendingWithdrawalAssets` which is a simple bookkeeping variable that tracks assets pending to be removed and is not acted on directly in the contract. When making a withdrawRequest, a user can maliciously set this value to be the max uint value which would prevent any further withdrawal requests as expectedAssets has to be non-zero so would result in a overflow and revert. Effectively all assets in the vault could be locked, with a simple griefing attack, and a minimum of 1 wei of shares.
+  
+      ### Remediations to Consider
+  
+      Remove `pendingWithdrawalAssets`, since it is not directly used by the contract, or constrain the value of expected assets to be something reasonable based on shares trying to be withdrawn.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Exploit</field>
+    <field name="impact">critical</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">a7e7387ab</field>
+    <field name="content">
+      ## [C-4] Fake **tokens can be bridged to mint unbacked bridged tokens and permanently corrupt mappings**
+
+      When bridging a position token from Ethereal to Arbitrum, the `PredictionMarketBridge.bridge()` function validates position tokens by calling `pickConfigId()` and `isPredictorToken()` on the provided token address ensuring the target address implements these methods:
+  
+      ```solidity
+      // Validate token has required interface (must be a PositionToken)
+      try IPredictionMarketToken(token).pickConfigId() returns (bytes32) { }
+      catch {
+          revert InvalidToken(token);
+      }
+  
+      try IPredictionMarketToken(token).isPredictorToken() returns (bool) { }
+      catch {
+          revert InvalidToken(token);
+      }
+      ```
+  
+      **Reference:** [PredictionMarketBridge.sol#L52-60](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/bridge/PredictionMarketBridge.sol#L52-L60)
+  
+      However, there is no check that the token was actually deployed by `PredictionMarketEscrow`. Any contract that implements these two view functions with matching return values passes validation. An attacker can deploy a fake ERC20 with arbitrary supply, returning the same `pickConfigId` and `isPredictorToken` as a legitimate token, and bridge it successfully.
+  
+      This is exploitable because of two additional design choices on the Arbitrum side. First, the `CREATE3` salt used by `PredictionMarketTokenFactory` does not include the source token address:
+  
+      ```solidity
+      function predictAddress(bytes32 pickConfigId, bool isPredictorToken)
+          public
+          view
+          returns (address)
+      {
+          bytes32 salt = computeSalt(pickConfigId, isPredictorToken);
+          return CREATE3.predictDeterministicAddress(salt, address(this));
+      }
+      ```
+  
+      **Reference:** [PredictionMarketTokenFactory.sol#L68-75](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/bridge/PredictionMarketTokenFactory.sol#L68-L75)
+  
+      This means a fake token with matching `pickConfigId` and `isPredictorToken` maps to the exact same bridged token address as the legitimate one. 
+  
+      And, second the `sourceToRemote` and `remoteToSource` mappings in `PredictionMarketBridgeRemote` will be overwritten on every bridge call if the `sourceToken` address is different, which will be when using fake tokens:
+  
+      ```solidity
+      // Always update mappings (in case of re-bridging after full release)
+      if (sourceToRemote[sourceToken] == address(0)) {
+          sourceToRemote[sourceToken] = remoteToken;
+          remoteToSource[remoteToken] = sourceToken;
+      }
+      ```
+  
+      **Reference:** [PredictionMarketBridgeRemote.sol#L260-264](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/bridge/PredictionMarketBridgeRemote.sol#L260-L264)
+  
+      Together, these allow an attacker to:
+  
+      1. Mint unbacked bridged tokens: Bridge a fake token before any legitimate user. The attacker receives legitimate bridged tokens and can trade them on Arbitrum.
+      2. Drain escrowed tokens: Corrupt `remoteToSource` to point the bridged token at the real source token, then bridge back. This can be done if a legitimate user bridges canonical tokens after the attacker. The ACK on Ethereal releases from `_escrowedBalances[realToken]`, draining user funds.
+      3. Permanently lock legitimate funds: Overwrite `remoteToSource` to the fake token address. If the attacker bridges fake tokens after a legitimate bridge, and corrupt the mapping pointers with a fake address. Causing all future bridge-backs release worthless fake tokens, permanently locking real escrowed tokens.
+  
+      ### Remediations to Consider
+  
+      - Validate source token origin on Ethereal. `PredictionMarketBridge.bridge()` should verify the token was deployed by the protocol's `PredictionMarketEscrow`.
+      - Additionally, include source token address in the CREATE3 salt, changing the factory salt to `keccak256(abi.encode(pickConfigId, isPredictorToken, sourceTokenAddress))`. This isolates each source token into its own bridged token address, so a fake token cannot claim or share the bridged token of a legitimate one.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Design Flaw</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">50ab39a7c</field>
+    <field name="content">
+      ## [M-1] Losing-side position tokens can never be burned permanently blocking dust sweeping
+
+      In `PredictionMarketEscrow` contract, when a pick configuration resolves decisively (`PREDICTOR_WINS` or `COUNTERPARTY_WINS`), the losing side's position tokens have a payout of zero. If they call the `redeem()` function it will silently skip both the token burn and the collateral transfer when `payout == 0`.
+  
+      ```solidity
+      function redeem(address positionToken, uint256 amount, bytes32 refCode)
+          external
+          nonReentrant
+          returns (uint256 payout)
+      {
+          // ... validation and payout calculation ...
+      
+          // Payout math
+          payout = (amount * claimablePool) / originalTotalTokens;
+      
+          if (payout > 0) {
+              // Burn the position tokens
+              IPredictionMarketToken(positionToken).burn(msg.sender, amount);
+              collateralToken.safeTransfer(msg.sender, payout);
+              // ...
+          }
+          // @audit When payout == 0, entire logic is skipped and nothing happens
+      }
+      ```
+      
+      **Reference**: [PredictionMarketEscrow.sol#L517-](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/PredictionMarketEscrow.sol#L517-L577)[577](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/PredictionMarketEscrow.sol#L541-L556)
+      
+      The losing-side tokens remain permanently in circulation. There is no alternative mechanism to burn them since `burn()` reverts after resolution due to the `!config.resolved` check.
+      
+      This permanently blocks the `sweepDust()` function, which requires **both** token supplies to reach zero:
+      
+      ```solidity
+      function sweepDust(bytes32 pickConfigId, address recipient) external onlyOwner nonReentrant {
+          // ...
+          uint256 predictorSupply =
+              IPredictionMarketToken(tokenPair.predictorToken).totalSupply();
+          uint256 counterpartySupply =
+              IPredictionMarketToken(tokenPair.counterpartyToken).totalSupply();
+      
+          if (predictorSupply > 0
+            || counterpartySupply > 0) {
+              revert TokensStillOutstanding(predictorSupply, counterpartySupply);
+          }
+          // ...
+      }
+      ```
+  
+      **Reference**: [PredictionMarketEscrow.sol#L96-L145](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/PredictionMarketEscrow.sol#L96-145)
+  
+      Because `sweepDust` is the only mechanism to recover rounding dust left from payout divisions, any collateral dust from decisive outcomes is permanently locked in the contract. 
+  
+      <aside>
+      ℹ️
+  
+      Additionally, there is no incentive for any losing-side holder to call `redeem()`. They would pay gas to receive nothing. Even if `redeem()` burns tokens on zero-payout, it would still rely on losing-side holders voluntarily spending gas for no benefit.
+  
+      </aside>
+  
+      ### Remediations to Consider
+  
+      - Modify `sweepDust()` to only require winning-side tokens to be burned. Also considering the non-decisive case were both sides should burn their positions.
+      - Also consider burning the losing-side tokens in `redeem()` even when `payout == 0`.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Session Management</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">df8b3ba</field>
+    <field name="content">
+      ## [M-2] Session keys lack on-chain revocation and permission verification
+  
+      The current session key implementation for the `PredictionMarketEscrow` has two related limitations that stem from its purely off-chain, stateless design.
+  
+      ### No revocation before expiry
+  
+      Once an owner signs a `SessionKeyApproval`, it remains valid until `validUntil` timestamp, there is no on-chain way to cancel it early. There is no mapping of revoked sessions, no nonce on the approval itself, and no registry of active sessions:
+  
+      ```solidity
+      // Check session key is still valid
+      if (block.timestamp > sessionApproval.validUntil) {
+          return false;
+      }
+      ```
+  
+      **Reference:** [SignatureValidator.sol#L480-L483](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/utils/SignatureValidator.sol#L480-L483)
+  
+      If a session key is compromised, the attacker can continue signing valid mint and burn approvals until the session expires.
+  
+      ### `permissionsHash` is signed but never enforced
+  
+      The `SessionKeyApproval` struct commits to a `permissionsHash` in the owner's signed message:
+  
+      ```solidity
+      bytes32 public constant SESSION_KEY_APPROVAL_TYPEHASH = keccak256(
+          "SessionKeyApproval(address sessionKey,address smartAccount,uint256 validUntil,bytes32 permissionsHash,uint256 chainId)"
+      );
+      ```
+  
+      **Reference:** [SignatureValidator.sol#L35-L37](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/utils/SignatureValidator.sol#L35-L37)
+  
+      However, after verifying the owner's signature, `permissionsHash` is never checked against the actual operation. A session key approved with any value or argument here can equally sign burns or unlimited wagers. 
+  
+      ### Remediations to Consider
+  
+      1. Consider adding on-chain session revocation. Store a mapping of revoked session keys and check revocation status during `_isSessionKeyApprovalValid` before returning true.
+      2. Additionally, consider enforcing `permissionsHash` or remove it. Either define a concrete `Permissions` struct (e.g. allowed operations, max wager, allowed `pickConfigIds`, mint or burn), hash it to derive `permissionsHash`, and validate the actual operation against decoded permissions on-chain; or remove the field from the typehash entirely to avoid misleading users into thinking it has any effect.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Nonces</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">df8b3ba</field>
+    <field name="content">
+      ## [M-3] Sequential nonces may prevent users from making multiple bets
+  
+      In `PredictionMarketEscrow` while minting a bet for a prediction, the signature of both parties is verified and the signatures nonce is checked to ensure it is the same as the currently set sequential nonce for each user:
+  
+      ```solidity
+      // Validate counterparty signature (EOA or session key)
+      if (!_validatePartySignature(
+              predictionHash,
+              request.counterparty,
+              request.counterpartyWager,
+              request.counterpartyNonce,
+              request.counterpartyDeadline,
+              request.counterpartySignature,
+              request.counterpartySessionKeyData
+          )) {
+          revert InvalidSignature();
+      }
+      if (request.counterpartyNonce != _nonces[request.counterparty]) {
+          revert InvalidNonce();
+      }
+  
+      // Increment nonces
+      _nonces[request.predictor]++;
+      _nonces[request.counterparty]++;
+      ```
+  
+      **Reference:** [PredictionMarketEscrow.sol#L210-228](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/PredictionMarketEscrow.sol#L210-L228)
+  
+      However, if a user makes multiple bets around the same time, processing these wagers may result in collisions if they use the same nonce, or if they are ordered incorrectly and result in failure. This would limit the throughput of bets and cause friction, especially for users intending to take on lots of counterparty bets, like the `PredictionMarketVault` intends to. Since each party has to sign with their nonce, once the wager is known, which can take variable time for both parties, there is no way to know which of your wagers will be ready sooner and should use the current nonce. Additionally, if either user takes part in a wager using that nonce, as another may have been signed by both parties quicker, it would invalidate the wager and require a new signature as their nonce has increased.
+  
+      ### Remediations to Consider
+  
+      Instead of using sequential nonces, generate a random nonce for each wager, and use a mapping to ensure it has not been used before. This will allow users to take on any number of wagers at the same time with no issues as they would each have a unique nonce.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="response">Acknowledged — by design, documented in TMAAR. User responsibility to verify resolver trust.</field>
+    <field name="content">
+      ## [I-1] Arbitrary contract address can be used as condition resolver
+  
+      By design, the `PredictionMarketEscrow` does not enforce a whitelist or registry of approved condition resolvers. Any contract address can be passed as `conditionResolver` in a pick, and the escrow accepts it if it implements `IConditionResolver` and returns valid results. During mint, the escrow only calls `isValidCondition(conditionId)` during settlement, it calls `getResolution()` or `getResolutions()` and uses the returned outcome vectors to decide the winner. A malicious resolver could always return outcomes in favor of one side, enabling theft of the other side’s collateral. It is the user’s responsibility to sign only with resolvers they trust. Both predictor and counterparty must verify the resolver address before signing the `MintRequest`. Users who sign picks without checking the resolver accept the associated trust and risk.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Authentication</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">cdc251380</field>
+    <field name="content">
+      ## [Q-1] `getClaimableAmount` does not check token address
+  
+      In `PredictionMarketEscrow` contract, the [`getClaimableAmount()`](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/PredictionMarketEscrow.sol#L658) view function does not check if the `positionToken` address is a valid position token, it only checks if it’s a `predictorToken` and defaults to a counterparty. Consider adding a check to ensure the passed argument is in fact a valid position token.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="response">Acknowledged — settle() triggers resolution and emits events consumed by indexer/frontend. Redundant prediction.settled flag is cosmetic, not a security risk. </field>
+    <field name="content">
+      ## [Q-2] `settle()` has no functional flow
+  
+      In `PredictionMarketEscrow`, [`settle()`](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/PredictionMarketEscrow.sol#L466) function marks individual `prediction.settled = true` and emits events with calculated claimable amounts. But `redeem()` operates entirely on position tokens and the PickConfiguration, it never checks whether any prediction is settled. It only requires `config.resolved == true`.
+  
+      The resolution of a `PickConfiguration` is done as a side effect of the first `settle()` call on any prediction within that config. After that, any token holder can call `redeem()` directly.
+  
+      This means:
+  
+      - The `_calculateClaimableForPrediction` output in `settle()` is purely informational (emitted in events but never stored or used).
+      - A user can `redeem()` without ever having their specific prediction settled.
+      - The `settled` flag on individual predictions serves no functional purpose.
+  
+      While not a direct vulnerability, it creates misleading invariants, off-chain systems relying on `PredictionSettled` events for accounting could diverge from actual on-chain redemptions.
+  
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Bridging</field>
+    <field name="impact">medium</field>
+    <field name="status">ack</field>
+    <field name="response">Acknowledged — valid optimization, but refactoring bridge state machine pre-launch carries more risk than the gas savings justify. Tracked for future improvement.</field>
+    <field name="content">
+      ## [G-1] Bridge acknowledgment pattern is unnecessary and costly
+  
+      Currently bridging via either [PredictionMarketBridge](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/bridge/PredictionMarketBridge.sol) or [PredictionMarketBridgeRemote](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/bridge/PredictionMarketBridgeRemote.sol) uses a bridge acknowledgement pattern, where once the bridge message is received from the other chains pair contract and is processed, the contract sends an acknowledgement bridge message back which makes the request from pending to completed. In the case of [PredictionMarketBridgeRemote](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/bridge/PredictionMarketBridgeRemote.sol) the acknowledgement function also burns the tokens and adjusts escrow accounting:
+  
+      ```solidity
+      /// @dev Handle ACK from Ethereal (burn escrowed tokens)
+      function _handleAck(bytes memory data) internal override {
+          bytes32 bridgeId = abi.decode(data, (bytes32));
+          PendingBridge storage pending = _pendingBridges[bridgeId];
+  
+          if (pending.status == BridgeStatus.PENDING) {
+              pending.status = BridgeStatus.COMPLETED;
+  
+              // Now burn the escrowed tokens
+              _escrowedBalances[pending.token] -= pending.amount;
+              IPredictionMarketTokenBridged(pending.token)
+                  .burn(address(this), pending.amount);
+  
+              emit BridgeCompleted(bridgeId);
+          }
+      }
+      ```
+  
+      Reference: [PredictionMarketBridgeRemote.sol#L283-297](https://github.com/sapiencexyz/sapience/blob/f2b6bd9231ae9915f9ba88f6bef02e7a914e6288/packages/protocol/src/v2/bridge/PredictionMarketBridgeRemote.sol#L283-L297)
+  
+      However, bridging can function without requiring an acknowledgement back to the sending chain since it currently will already prevent processed bridge messages from being executed again. Additionally for the remote bridge, since bridge requests cannot be canceled, burning the tokens on acknowledgement could instead be done on the bridge request. All in all the pattern adds unnecessary complexity and additional cost for users for the extra bridge message.
+  
+      ### Remediations to Consider
+  
+      Remove the acknowledge pattern to reduce complexity and reduce the cost of bridging.
+
+    </field>
+  </item>
+  
