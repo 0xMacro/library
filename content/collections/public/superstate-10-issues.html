@@ -1,0 +1,272 @@
+<item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-1] Market config updates can be performed for Active market
+  
+      In the `Dip.sol` contract, important state changes through config update performed by the admin, may change or break core invariants of the corresponding market in Active state. For example, by changing unexpectedly discount rate buyers may receive less than the anticipated assets in return. Also by changing `totalPaymentTarget` to be less than the `totalPaymentReceived` no additional purchases will be possible through the `buyTheDip()` function, but market will remain in `Active` state.
+  
+      **Remediations to consider**
+  
+      - Consider restricing configuration updates only to Paused markets, or
+      - Consider adding timelock for important configuration state changes.
+    </field>
+    <field name="response">
+        Expected behavior, acknowledged. Changes will be announced ahead of time, and validation/scheduling will be decided and set off-chain
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-2] Oracle latency tolerance potentially too restrictive
+  
+      In the `Dip.sol`, oracle latency tolerance is configured through the uint8 config variable `oracleLatencyToleranceInSeconds`, which defines latency tolerance in seconds resulting in a valid range of 1-255 seconds (max ~4 minutes).
+  
+      This range is potentially too restrictive operationally for some of the price feeds and this may cause unnecessary reverts. Consider using uint32 or uint64 instead.
+    </field>
+
+    <field name="response">
+        Non-issue, validation and proper config will be decided and set off-chain.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Spec</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">85b56e1e961ed82c60b0d15801f524ce8dc267bb</field>
+    <field name="content">
+      ## [L-3] Mismatch in payment tokens decimals allows zero payment mints
+  
+      In the `Dip.sol` contract, in specific situation when payment token decimals value is smaller than the value of the constant `PAYMENT_TOKEN_DECIMALS` set during contract deployment, contract functionality may malfunction. This will cause instrument tokens to be minted in exchange for 0 payment amount due to the loss of precision error in calculations.
+  
+      In the `Dip.sol` contract, `_calculateOutput()` is responsible for performing the most important calculations related to the issuance of instrument assets under discounted rates.
+  
+      ```solidity
+      uint8 instrumentDecimals = uint8(IERC20Metadata(address(market.instrument)).decimals());
+      instrumentAmount = _calculateInstrumentAmount(
+          normPaymentAmount, PAYMENT_TOKEN_DECIMALS, discountedPrice, priceDecimals, instrumentDecimals
+      );
+      actualPaymentAmount = changeDecimals(normPaymentAmount, PAYMENT_TOKEN_DECIMALS, paymentDecimals);
+      ```
+  
+      In the case, when payment token decimals is smaller than the `PAYMENT_TOKEN_DECIMALS` `normalizedPaymentAmount` will get truncated during conversion from `PAYMENT_TOKEN_DECIMALS` to the actual payment token decimals. This will cause `actualPaymentAmount` to have smaller value than expected and in specific cases to be 0.
+  
+      Since in the `Dippable.sol`, return value of `actualPaymentAmount` is used to determine how much to charge buyer for the issued amount of instrument, it will result in underpayment in this scenario.
+  
+      ```solidity
+      function buyTheDip(bytes32 marketId, uint256 paymentAmount, uint256 minOutAmount, IERC20 paymentToken)
+          external
+          virtual
+      {
+              ...
+          
+          // Call DIP contract with buyer address and payment token
+          // DIP validates market state, pricing, and returns actual amounts
+          (uint256 actualPaymentAmount, uint256 instrumentAmount, address paymentRecipient) =
+              IDip(dip).buyTheDip(marketId, msg.sender, paymentAmount, paymentToken);
+  
+          // Validate slippage protection
+          if (instrumentAmount < minOutAmount) revert InsufficientOutput(instrumentAmount, minOutAmount);
+  
+          // Transfer payment from buyer to recipient
+          paymentToken.safeTransferFrom(msg.sender, paymentRecipient, actualPaymentAmount);
+  
+          // Mint instrument tokens to buyer
+          _mint(msg.sender, instrumentAmount);
+  
+          // Note: DIP contract emits the Purchase event for tracking
+      }
+      ```
+  
+      **Remediations to consider**
+  
+      - Add validation that payment token cannot have decimals smaller than the `PAYMENT_TOKEN_DECIMALS` value, or
+      - Implement rounding up in the case when `normalizedPaymentAmount` is not divisible by the scaling factor.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">f582b07d0971a243d4efdf8e7ff950d55548699d</field>
+    <field name="content">
+      ## [Q-1] Multiple versions of OpenZeppelin libraries present
+  
+      Within the project scope multiple versions of OpenZeppelin are used. In the case of `Dip.sol` contract 2 versions of OpenZeppelin are used within the same contract. (both v5.0.2 and v5.1.0).
+  
+      In `EquityToken.sol` contract, OZ’s v4 SafeERC20 library is used, while in in `Dippable.sol` OZ’s v5 is used.
+  
+      Consider updating implementation across the project in scope to use a single OZ library version.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">85b56e1e961ed82c60b0d15801f524ce8dc267bb</field>
+    <field name="content">
+      ## [Q-2] Missing public/external methods in IDip.sol interface
+  
+      In the `Dip.sol` following public methods are present which are not feature in the `IDip.sol` interface.
+  
+      ```solidity
+      // setters
+      setPriceOracle(address)
+      initialize(address)
+      // Public getters (auto-generated)
+      priceOracle()
+      markets(bytes32)
+      // public constants
+      BASIS_POINTS()
+      PRICE_CLAMP_DECIMALS()
+      PAYMENT_TOKEN_DECIMALS()
+  
+      ```
+  
+      Consider adding them to the `IDip.sol`.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">85b56e1e961ed82c60b0d15801f524ce8dc267bb</field>
+    <field name="content">
+      ## [Q-3] Unnecessary code can be removed
+  
+      In the `EquityToken.sol`
+  
+      - The following import seems unused and can be removed
+      
+          ```solidity
+          import {IERC20 as IERC20V5} from "openzeppelin-contracts-v5.0.2/contracts/token/ERC20/IERC20.sol";
+          ```
+      
+  
+      In the `Dip.sol`
+  
+      - DiscountedPriceZero error is unreachable. Given price > 0 and discountRate < 10000, both factors `price` and `BASIS_POINTS - discountRate` are non zero, as a result `mulDivUp()` won’t yield zero.
+      
+          ```solidity
+          uint256 price = uint256(int256(pythPrice.price)); // Safe: already validated price > 0
+          ...
+          discountedPrice = FixedPointMathLib.mulDivUp(price, BASIS_POINTS - market.discountRate, BASIS_POINTS);
+          if (discountedPrice == 0) revert DiscountedPriceZero();
+          ```
+      
+           Consider removing this unnecessary code.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Best practices</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">85b56e1e961ed82c60b0d15801f524ce8dc267bb</field>
+    <field name="content">
+      ## [Q-4] Improve inline project documentation
+  
+      In the `Dip.sol`
+  
+      - `createMarket()` docs claim oracle address validation, but implementation doesn’t ensure a non-zero priceOracle
+          - Docs say it validates “paymentToken, instrument, oracle all non-zero”, in practice only `oraclePriceFeedId` is checked and `priceOracle` is global (could be zero unless set via setPriceOracle).
+          - Either check `priceOracle != address(0)` in createMarket or update NatSpec to clarify requirement to set it beforehand.
+      - Integration doc in header omits the buyer parameter Dip.sol Lines 33-41
+      
+          ```solidity
+          // Call buyTheDip(marketId, paymentAmount, paymentToken) - only callable by active market's instrument
+          function buyTheDip(bytes32 marketId, address buyer, uint256 paymentAmount, IERC20 paymentToken)
+          ```
+      
+          Update docs to include buyer.
+      
+      - Comment about clearing `currentMarketForInstrument`, lists only Paused/Cancelled, but code also clears on Closed
+      
+          ```solidity
+          *      Leaving Active State:
+          *      - Clears currentMarketForInstrument[instrument] = bytes32(0)
+          *      - Allows other markets for same instrument to become active
+          *      - Applies to: Active → Paused, Active → Cancelled       <=== here
+          *
+          *      Entering Active State:
+          *      - Validates no other market is currently active (AlreadyCurrentMarket)
+          *      - Sets currentMarketForInstrument[instrument] = marketId
+          *      - Applies to: Initialized → Active, Paused → Active
+          ```
+      
+          Docs should include Active → Closed.
+      
+      - calculateOutput() natspec refers to non existing `_calculateOutputNormalized()` function.
+      - natspec for `markets` variable incorrectly refers to 12 fields of Market struct, while it actually has 14 fields
+      
+          ```solidity
+          /// @dev Auto-generates getter that returns all 12 fields as tuple
+          ```
+      
+  
+      In the `Dippable.sol`
+  
+      - In the natspec for `buyTheDip()` function, consider clarifying that payment transfer is performed by the instrument, not DIP.
+      
+          ```
+          /**
+               * @notice Purchases tokens through a DIP market with oracle-based discounted pricing
+               * @dev Validates inputs, processes payment through DIP contract, and mints tokens to buyer
+               * @param marketId The DIP market identifier
+               * @param paymentAmount The amount of payment token to spend
+               * @param minOutAmount The minimum amount of tokens to receive (slippage protection)
+               * @param paymentToken The token to use for payment (must match market's payment token)
+               */
+          ```
+      
+      - The must expression in the following statement is misleading
+      
+          ```solidity
+          3. _requireNotAccountingPaused() must be implemented by the inheriting contract
+          ```
+      
+          Since, this function has a default empty body, inheritors are not forced to override it. In EquityToken it is overridden correctly, but other inheritors could omit it and bypass the pause check. Consider updating must to should, or remove empty function body to require inheritors to implement it.
+      
+  
+      In the `EquityToken.sol`
+  
+      - There is a reference to undefined function bridgeToBookEntry() in the natspec docs for `adminBurn()`.
+      - Consider clarifying that payment transfer is performed by the instrument, not DIP.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Trust model</field>
+    <field name="content">
+      ## [I-1] Contract owner has extensive privileges
+
+      - Admin can mint() / bulkMint() / burn() tokens
+      
+          Contract owner may mint() / bulkMint() / burn() any tokens and circumvent buyTheDip() execution flow.
+      
+      - Admin can hot-swap DIP contract
+      
+          `Dippable.setDipContract()` is owner-only but has no delay/guard. This is an admin risk; consider using a timelock.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">ERC20 compability</field>
+    <field name="content">
+      ## [I-2] Only regular ERC20 tokens supported
+
+      The contracts in the project’s scope do not support fee-on-transfer payment tokens.
+    </field>
+  </item>
+  
