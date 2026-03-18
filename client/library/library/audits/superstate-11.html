@@ -1,0 +1,31 @@
+<page
+  clientName="Superstate"
+  reportDate="Feburary 25th, 2025"
+  auditTitle="Superstate A-11"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+
+  repoUrl="https://github.com/superstateinc/evm-dip-audit"
+  repoCommitHash="bb4ad379bd6411a9fca9be035a02a45fd93a5183"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from January 23rd, 2026.
+  </content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+
+    <p>Specifically, we audited the following contracts:</p>
+
+    <template type="file-hashes">
+      427c0b1cc3e992dcb9919b30c73e95ff5f473624e6a3d908cecd31d4a083ee61  evm/protocol/dip/src/Dip.sol
+      379a52c5f8baed5dfb73029c198bfc46c92fa3daf1baae2743238f9043c1bd93  evm/protocol/token/src/components/Dippable.sol
+      b0db815f9879269a6020f669cd9df787eca4c551c6a3666bd1e6aefe6a1a6d7c  evm/protocol/token/src/EquityToken.sol
+    </template>
+  </content-for>
+</page>
