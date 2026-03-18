@@ -1,0 +1,176 @@
+<item>
+    <field name="topic">DoS</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/berkeleycompute/pre-deposit/commit/27d02d0047a7e64808b78263d26fa31e99bc37a3,https://github.com/berkeleycompute/pooling/commit/a62990bdd247421287a6cb4959f19efcbbe95df0</field>
+    <field name="content">
+      ## [M-1] FIFO queue selling is disabled once the vault has more than 200 active schedule classes
+  
+      In `FifoEscrow`, the `depositNft()` function first calls [`INftVault(VAULT).depositFixed()`](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L253) to deposit an NFT into the vault and mint SPT, then calls [`_walkAndRecordFill()`](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L266-L267) which reads the pool NAV via [`INftVault(VAULT).getPoolNAV()`](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L291) to price the FIFO queue allocations.
+  
+      Inside [`NftVaultV1.depositFixed()`](https://github.com/berkeleycompute/pooling/blob/64dbde689745176f8eba5862cc4eb47f123e3d8f/src/NftVaultV1.sol#L568), after processing the deposit, `_processEachDeposit()` calls [`_invalidateNAVCache()`](https://github.com/berkeleycompute/pooling/blob/64dbde689745176f8eba5862cc4eb47f123e3d8f/src/NftVaultV1.sol#L682) which zeros out the cached NAV state (`cachedNAV = 0`, `navCacheStartTime = 0`, `navCacheComplete = false`).
+  
+      When `_walkAndRecordFill()` subsequently calls [`getPoolNAV()`](https://github.com/berkeleycompute/pooling/blob/64dbde689745176f8eba5862cc4eb47f123e3d8f/src/NftVaultV1.sol#L1134-L1146), the vault checks whether the number of active schedule equivalence classes exceeds `NAV_CHUNK_SIZE` (200). If it does, `getPoolNAV()` requires a fresh completed cache via `_isNavFresh()`. Since the cache was just invalidated by `depositFixed()`, this check fails and the call reverts with `FreshNAVRequired`.
+  
+      Each `depositFixed()` call at a different `block.timestamp` creates a new schedule equivalence class because `_computeScheduleHash()` includes `block.timestamp` in the hash. This means the number of active schedule classes grows approximately linearly with the number of deposit transactions (net of redemptions). Once 201 unique schedules are active, any `depositNft()` call that attempts to sell SPT to the FIFO queue reverts, disabling the escrow's core swap functionality. Users can still deposit NFTs by setting `retentionBps = 10_000` to retain 100% of their SPT, but this bypasses the FIFO queue entirely and defeats the purpose of the escrow contract.
+  
+      **Remediations to Consider**
+  
+      Read both `INftVault(VAULT).getPoolNAV()` and `SPT.totalSupply()` **before** calling `depositFixed()`, and pass those values into `_walkAndRecordFill()`. The price ratio `totalSupply / NAV` is preserved across a `depositFixed()` call (the vault mints proportional tokens), so pre-deposit values yield the same SPT pricing as post-deposit values. This avoids the stale-cache revert entirely with no extra gas cost.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">DoS</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">3cb2253fe96b91980db9ab8fd46ea5065f00217b</field>
+    <field name="content">
+      ## [M-2] Mismatched dust thresholds cause `depositNft()` to randomly revert
+  
+      In [`_walkAndRecordFill()`](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L286), during a partial fill, `pUsdc` is calculated as `remaining * nav / totalSupply`. If [`pUsdc == 0`](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L336), the loop breaks early without allocating the remaining SPT. After the loop, if [`anyAllocated && remaining > 1_000`](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L347-L350), the transaction reverts.
+  
+      These two thresholds are significantly mismatched. The `pUsdc == 0` condition is satisfied when `remaining < totalSupply / nav`. For example, if SPT is worth $1 with USDC having 6 decimals and SPT having 18 decimals, 1 wei USDC would equal approximately 1e12 SPT wei. This means `pUsdc == 0` is reached when `remaining < ~1e12`, but the revert occurs when `remaining > 1_000`.
+  
+      Any `remaining` value in the range (1_000, ~1e12) triggers both conditions: the `pUsdc == 0` break AND the `remaining > 1_000` revert. This is a wide window spanning roughly 1 billion possible values. The leftover `remaining` after full fills is an arithmetic residue that depends on the exact queue composition and current NAV — effectively arbitrary. NFT depositors cannot predict or control this value and have no workaround when their transaction lands in this range.
+  
+      **Remediations to Consider**
+  
+      Forward dust SPT to the last allocated recipient when `pUsdc == 0`, matching the existing dust-forwarding logic that is currently unreachable:
+  
+      ```diff
+       if (pUsdc == 0) {
+      +    if (lastAllocated != type(uint256).max) {
+      +        sptOwed[lastAllocated] += remaining;
+      +        remaining = 0;
+      +    }
+           break;
+       }
+      ```
+  
+      **Reference:** [src/FifoEscrow.sol#L336](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L336)
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">0a55b3528664e9fccb179f4dc8fe1647e33a94eb</field>
+    <field name="content">
+      ## [Q-1] `SENTINEL` constant uses `uint128` type requiring unnecessary casting
+  
+  
+      The `SENTINEL` constant is defined as `uint128` but is consistently cast to `uint256` throughout the codebase whenever it is used (e.g., `uint256(SENTINEL)` in comparisons with `listHead`, `listTail`, `_nexts`, and `_prevs`). Since all linked list indices and related state variables are `uint256`, the `uint128` type adds unnecessary casting operations and reduces code clarity without providing any benefit. Consider defining `SENTINEL` directly as `uint256`:
+  
+      ```diff
+      - uint128 internal constant SENTINEL = type(uint128).max;
+      + uint256 internal constant SENTINEL = type(uint128).max;
+      ```
+  
+      **Reference:** [src/FifoEscrow.sol#L62](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L62)
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5add57798bb61cb517c927140a74118ec9abb5b2</field>
+    <field name="content">
+      ## [Q-2] Redundant check for `_sptRetained > 0` when `sptForSale` is zero
+  
+      In `depositNft()`, when `sptForSale == 0`, there is a check `if (_sptRetained > 0)` before transferring SPT. This condition is always true and therefore redundant. The function already reverts if `sptMinted == 0`, and since `sptMinted = sptForSale + _sptRetained`, when `sptForSale == 0`, it follows that `_sptRetained == sptMinted > 0` is guaranteed.
+  
+      Consider removing the redundant condition:
+  
+      ```diff
+        if (sptForSale == 0) {
+      -     if (_sptRetained > 0) { 
+      -         SPT.safeTransfer(msg.sender, _sptRetained);
+      -     }
+      +     SPT.safeTransfer(msg.sender, _sptRetained);
+            return (0, _sptRetained);
+        }
+      ```
+  
+      **Reference:** [src/FifoEscrow.sol#L260-L264](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L260-L264)
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">0a3f0c9525aa36ba43f93fad319d476a569adf9a</field>
+    <field name="content">
+      ## [Q-3] Unreachable condition `pUsdc > amt` in partial fill logic
+  
+  
+      In [`_walkAndRecordFill()`](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L286), the partial fill branch includes a check `if (pUsdc > amt)` that caps `pUsdc` to `amt`. This condition can never be true. The partial fill branch is only entered when `remaining < sptNeeded`, where `sptNeeded = ⌊amt × totalSupply / nav⌋`. Since `pUsdc = ⌊remaining × nav / totalSupply⌋`, mathematical derivation shows `pUsdc < amt` is always guaranteed. Both floor operations compound in the same direction, making `pUsdc` strictly less than `amt`. The guard is dead code.
+  
+      Consider removing the unreachable condition:
+  
+      ```diff
+        pUsdc = Math.mulDiv(remaining, nav, totalSupply);
+      - if (pUsdc > amt) {
+      -     pUsdc = amt;
+      - }
+      ```
+  
+      **Reference:** [contracts/src/FifoEscrow.sol#L333](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L333)
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b4dec17a952ae5877e48488c83b7d33fee0d18d8</field>
+    <field name="content">
+      ## [Q-4] Partial fill `amounts` update is unnecessarily deferred outside the loop
+  
+      In `_walkAndRecordFill()`, when a partial fill occurs, the loop sets `pIdx`, `pUsdc`, `sptOwed[cursor] += remaining`, and `remaining = 0` which exits the loop. However, the corresponding `amounts[pIdx] -= pUsdc` update is performed in a [separate block after the loop](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L352-L363). Since the partial fill branch sets [`remaining = 0`](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L343), the loop always terminates immediately after. Consolidating the `amounts` update into the partial fill branch would improve code readability and make the partial fill logic self-contained, matching how full fills handle all their state updates inline.
+  
+      Consider moving [`amounts[cursor] -= pUsdc` block](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L352-L363) into the partial fill branch, alongside the other state updates for that code path.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2be4e209ca1ab8c91336fc69b0369d769b4b7f66</field>
+    <field name="content">
+      ## [Q-5] Unreachable `amounts[pIdx] == 0` branch after partial fill subtraction
+  
+      In [`_walkAndRecordFill()`](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L286), after a partial fill, `amounts[pIdx] -= pUsdc` is executed, followed by a check `if (amounts[pIdx] == 0)`. This condition can never be true. The partial fill branch is only entered when `remaining < sptNeeded`, where `sptNeeded = ⌊amt * totalSupply / nav⌋`. Since `pUsdc = ⌊remaining * nav / totalSupply⌋`, mathematical derivation shows `pUsdc < amt` strictly. Therefore `amounts[pIdx] - pUsdc >= 1` always, making the entire `amounts[pIdx] == 0` block dead code.
+  
+      Consider removing the unreachable branch:
+  
+      ```diff
+        amounts[pIdx] -= pUsdc;
+      - if (amounts[pIdx] == 0) {
+      -     filledCount++;
+      -     _splice(pIdx);
+      -     _nexts[pIdx] = 0;
+      -     _prevs[pIdx] = 0;
+      -     pIdx = type(uint256).max;
+      -     pUsdc = 0;
+      -     pSpt = 0;
+      - }
+      ```
+  
+      **Reference:** [contracts/src/FifoEscrow.sol#L352-L363](https://github.com/berkeleycompute/pre-deposit/blob/d5136045246e6738799b29ff5b779ff8d840fa93/contracts/src/FifoEscrow.sol#L352-L363)
+  
+    </field>
+  </item>
+  
