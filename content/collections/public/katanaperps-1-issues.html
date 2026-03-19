@@ -1,0 +1,203 @@
+  <item>
+    <field name="topic">Conversion</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3b23f3981d3bf5751a281453878c282f553ffd38</field>
+    <field name="content">
+        ## [L-1] Missing seconds-to-milliseconds conversion in Chainlink adapter
+
+        In `ChainlinkDataStreamsIndexPriceAdapter`, the `validFromTimestamp` from Chainlink's ReportV3 is in seconds, but it is assigned directly to `timestampInMs` without conversion:
+
+        ```jsx
+        return
+        IndexPrice({
+            baseAssetSymbol: market.baseAssetSymbol,
+            timestampInMs: SafeCast.toUint64(report.validFromTimestamp),
+            price: priceInPips
+        });
+        ```
+
+        **Reference**: [ChainlinkDataStreamsIndexPriceAdapter.sol#L195-L200](https://github.com/katanaperps/katana-perps-contracts-niseko/blob/2ac8f8ed5806a23a2486ac64166836b9c5601623/contracts/index-price-adapters/ChainlinkDataStreamsIndexPriceAdapter.sol#L195-L200)
+
+        As a result, `timestampInMs` will contain an incorrect value, leading to unexpected behavior in any logic that relies on it. 
+
+        **Remediation to Consider**
+
+        Multiply by 1000: `timestampInMs = validFromTimestamp * 1000`
+    </field>
+  </item>
+
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-2] Missing price validation for Chainlink and Redstone price adapters
+
+        The ChainlinkDataStreamsIndexPriceAdapter’s `validateIndexPricePayload` doesn’t validate key fields from the ReportV3 struct, such as:
+
+        - `report.expiresAt > block.timestamp`
+        - `report.price > 0`
+
+        Similar validation checks are missing in the **RedStoneIndexPriceAdapter**. 
+
+        As a result, expired or invalid price reports could be accepted, leading to incorrect index prices being used in the protocol
+
+        **Remediation to Consider**
+
+        Add meaningful validation checks for both adapters.
+    </field>
+    <field name="response">
+        We ended up with just the validations wrapped into [MarketAdmin’s publishIndexPrices_delegatecall](https://github.com/katanaperps/katana-perps-contracts-niseko/blob/main/contracts/libraries/MarketAdmin.sol#L103-L107). There are a few operational limits on this front. There can be delays in dispatching transactions from the off-chain components to the contracts, in which case validating older price updates is actually a requirement. Pricing > 0 could work, but any such price update would run afoul of the upstream off-chain logic, and practically we would delist markets well before encountering anything close to 0. 
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Conversion</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-3] Chainlink price adapter doesn’t handle fees
+
+        The `ChainlinkDataStreamsIndexPriceAdapter` does not handle verification fees, as noted in the comments that Katana does not currently have a `feeManager` set: 
+
+        ```jsx
+        // Katana does not have a FeeManager and no funding is needed to verify
+        // reports. Validate no FeeManager is set as a sanity check
+        require(verifier.s_feeManager() == address(0), "FeeManager not supported");
+        ```
+
+        **Reference**: [ChainlinkDataStreamsIndexPriceAdapter.sol#L183-L185](https://github.com/katanaperps/katana-perps-contracts-niseko/blob/2ac8f8ed5806a23a2486ac64166836b9c5601623/contracts/index-price-adapters/ChainlinkDataStreamsIndexPriceAdapter.sol#L183-L185)
+
+        If Chainlink enables fees in the future, the adapter will fail to verify reports.
+
+        **Remediation to Consider**
+
+        Two options:
+
+        1. Redeploy when needed: Keep current implementation and deploy a new adapter with fee support if Chainlink enables fees. Acceptable if potential downtime and governance delay are tolerable.
+        2. Implement fee handling now: Adapt the implementation to handle fees as shown in https://docs.chain.link/data-streams/reference/interfaces/ifeemanger. This requires:
+            - A mechanism to fund the contract
+            - A withdraw function to recover tokens
+            - Optionally, support for both native and ERC20 fee payment options
+    </field>
+    <field name="response">
+        The Chainlink team has assured us that they will not be deploying a feeManager to Katana.    
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Conversion</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">wontdo</field>
+    <field name="content">
+        ## [L-4] RedStone price adapter assumes 8 decimals for all feeds
+
+        The `RedStoneIndexPriceAdapter` assumes all RedStone price feeds use 8 decimals, but this is not guaranteed for all feeds. As a result, if a feed with non-standard decimals is added, the price will be incorrectly scaled, leading to wrong index prices.
+
+        **Remediation to Consider**
+
+        Either:
+
+        - Make `decimals` configurable per market in the `RedStoneMarket` struct (as done in `ChainlinkDataStreamsIndexPriceAdapter`), or
+        - Document and enforce that only standard 8-decimal feeds are supported
+    </field>
+    <field name="response">
+        Given the predominance of 8-decimal feeds, we opted to make that decimal count an operational requirement for adding new market pricing.    
+    </field>
+  </item>
+
+ <item>
+    <field name="topic">Loss of Custody</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3678e7c4a54e584465eedc4d1ca655281a7b8825</field>
+    <field name="content">
+        ## [L-5] Forwarder `lzCompose` catch block sends funds to `owner()` without attempting wallet identification
+
+        When `compose()` reverts entirely, the user's tokens go to `owner()`. There are scenarios where the `destinationWallet` could be successfully decoded. Consider the case where `vbUSDC.deposit` inside `_forwardDeposit` reverts due to a paused vault. In this case all user funds from bridging attempts would go to the owner, causing temporary loss of custody and increasing operational burden since affected users need to be identified and refunded. 
+
+        **Remediation to Consider**
+
+        Trying to decode `destinationWallet` to reduce operational burden and avoid temporary loss of custody.
+    </field>
+    <field name="response">
+        After discussion and consideration, we landed on a slightly adjacent change. The forwarder did not explicitly validate against a 0x0 destinationWallet.
+        Our rationale is:
+        1. A 0x0 destinationWallet is definitely an error condition, and the Forwarder’s catch block handles this correctly. This is “expected” in that it is user input prone to errors.
+        2. None of the other granular failures in _forwardDeposit are expected conditions. Rather than reason about which tokens to return or whether the destination wallet is valid, we believe it’s cleaner and safer to allow the catch to handle it universally.
+    </field>
+  </item>
+
+   <item>
+    <field name="topic">Validation</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b632be749168413ae1968845c6d67bf6a00f73e7</field>
+    <field name="content">
+        ## [L-6] `setComposeParameters` bypasses bounds validation for `minimumWithdrawQuantityMultiplier`
+
+        `The ExchangeLayerZeroAdapter_v1.setMinimumWithdrawQuantityMultiplier` enforces bounds of [90%, 100%]. But `setComposeParameters` sets the same variable without any bounds check. This also applies during deployment, since the constructor routes through `setComposeParameters`. An accidental value of `0` disables slippage protection entirely; a value above 100% makes all withdrawals fail.
+
+        **Remediation to Consider**
+
+        Add the boundary checks `<= MAX_MINIMUM_WITHDRAW_QUANTITY_MULTIPLIER` and `>= MIN_MINIMUM_WITHDRAW_QUANTITY_MULTIPLIER` to the `setComposeParameters` function.
+    </field>
+
+  </item>
+
+    <item>
+    <field name="topic">Economics</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b632be749168413ae1968845c6d67bf6a00f73e7</field>
+    <field name="content">
+        ## [L-7] ERC-4626 `previewRedeem`/`redeem` return value discrepancy
+
+        In `_forwardWithdrawal`, `previewRedeem` is called to compute `usdcAmount`, which is then used for the Stargate send and the Ethereum direct transfer. However, the actual `redeem` call may return a slightly different (higher) amount. Per EIP-4626, `previewRedeem` "MUST return as close to and no more than the exact amount of assets that would be withdrawn in a redeem call in the same transaction." This means redeem can
+        return `≥ previewRedeem`. Aa a result, any dust difference between `redeem's` actual return and `previewRedeem's` estimate accumulates in the forwarder contract. 
+
+        **Remediation to Consider**
+
+        Use the amount returned by the actual `redeem` call instead of `previewRedeem` for subsequent transfers.
+    </field>
+
+  </item>
+
+    <item>
+    <field name="topic">Transfer</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b632be749168413ae1968845c6d67bf6a00f73e7</field>
+    <field name="content">
+        ## [L-8] **`withdrawNativeAsset` uses `.transfer()` with 2300 gas stipend**
+
+        The `ExchangeLayerZeroAdapter_v1.withdrawNativeAsset` correctly uses `.call{value: quantity}("")`, but the StargateForwarder uses `.transfer()` which forwards only 2300 gas. This will fail if the destination is a contract with a non-trivial `receive()` (e.g., a multisig). Since this is admin-only, impact is limited to operational inconvenience.
+
+        **Remediation to Consider**
+
+        Use `.call` instead of `transfer`.
+    </field>
+
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+        ## [I-1]  Migration only works from old to new exchange
+        In `BalanceTracking`, the balance migration logic in `loadBalanceStructAndMigrateIfNeeded` copies balance data from a source Exchange but omits the `managedAccountProvider` field. This is intentional and works for migration from an old exchange (without managedAccountProvider support) to a new exchange. However, if a future Exchange upgrade migrates from a version that already supports `managedAccountProvider`, all managed account associations would be lost. 
+
+        Document this limitation for future upgrade planning. When migrating from an Exchange that supports managed accounts, the migration logic must be updated accordingly.
+    </field>
+    <field name="response">
+        This is an intentional design decision for the current upgrade path. We don’t yet know what target structure we will need to support in any future upgrade. As a result, we plan to update the balance migration logic as part of any upgrade.
+    </field>
+  </item>
