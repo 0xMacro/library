@@ -1,0 +1,16 @@
+<item>
+    <field name="topic">User Experience</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">f05bdea530101fcb904b83ddd2f8cef1dc843a0e</field>
+    <field name="content">
+      ## [Q-1] Preview withdraw should return amount of withdrawable assets
+  
+      When calling [previewWithdrawal()](https://github.com/Veda-Labs/boring-vault/blob/99b03fdad8538060a0d3aaf4728cd4ea4444a902/src/helper/ArcticArchitectureLens.sol#L214-L245) or [previewInstantWithdrawal()](https://github.com/Veda-Labs/boring-vault/blob/99b03fdad8538060a0d3aaf4728cd4ea4444a902/src/helper/ArcticArchitectureLens.sol#L275-L321), a bool `notEnoughWithdrawableAssets` is returned if the assets requested are available to withdraw. However, this doesn’t give information to users on how much could be withdrawn, just that their request exceeds what is available.
+  
+      **Remediations to Consider**
+  
+      Rather than return a bool, return the assets that can be withdrawn to allow requests to be adjusted more easily to withdraw what is available.
+    </field>
+</item>
+  
