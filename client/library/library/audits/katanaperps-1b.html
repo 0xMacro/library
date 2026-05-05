@@ -1,0 +1,49 @@
+<page
+  clientName="KatanaPerps"
+  reportDate="April 29th, 2026"
+  auditTitle="KatanaPerps B-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/katanaperps/katana-perps-contracts-niseko-ma"
+  repoCommitHash="902b18ca14cfa378df99dc915d05e2aae795992d"
+  repoCommitHashFinal="af2ef636c2b2ed5a786d7d5156a88096e7e0726e"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_KATANAPERPS_1"
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from March 3rd to March 23rd, 2026.
+  </content-for>
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Documentation files contained in the repo.</li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="source-code">
+    <p>Specifically, we audited the following contract within this repository:</p>
+
+    <template type="file-hashes">
+        e774299cc66a8a08bf6b00a43a4eaddf3edf6655f669826a866b21524f30e0b2  contracts/managed-accounts/FixedIncomeVaultProviderStateAggregator_v1.sol
+        3ae6545275c294c73abf97eb2eaa155b665b764ff393013d876161d0357e8c59  contracts/managed-accounts/FixedIncomeVaultProvider_v1.sol
+        2793daafc1ee6cd81085a63def6d89f53b55a9af247a1cd22a403674b1d464be  contracts/managed-accounts/VaultProviderBase.sol
+        325d3bdb5f04f1a7dcc4d4b7d5c4ef59c4f4fc45648bbd745bf97784dd182c30  contracts/managed-accounts/libraries/FixedIncomeVaultInterestCalculation_v1.sol
+        7b80e8f41a0a7c4c9325d40883a6efb137ba838972747430196b62c49ce90f59  contracts/managed-accounts/libraries/FixedIncomeVaultWithdrawing_v1.sol
+        30aaf024422c36481da82c7da32490f148b67031024e87f1e185cba555281364  contracts/managed-accounts/libraries/VaultDepositQueue.sol
+        da4325cb3c9290a5506296e06fcef5eacf70e859d3720aaf03e8fe96f9da5a78  contracts/managed-accounts/libraries/VaultProviderBaseWithdrawing.sol
+        ed10f5af173e21862e1773e4c63f0a19eff5eb6f7358f1e8ce3e6130916fbe60  contracts/managed-accounts/libraries/VaultWithdrawalQueue.sol
+        ed8a7667e782b97234ed2fa3d8492122a629f8908f6c41e5aa82dea7f4d410b5  contracts/libraries/ManagedAccounts.sol
+        14a81afb0a9150e5bb2160ad76c3acc01484e17667c2a4b4cf12e3f1b04d1049  contracts/bridge-adapters/ExchangeLocalDepositAdapter_v1.sol
+        55236931d8102afe9819ec4509e9b8429ff6f0824487d04360ecc76a9e37b3c0  contracts/bridge-adapters/ExchangeLoopbackAdapter_v1.sol
+        93070867ba01aadfa4efe91181063365316664b9c888f772e9c1f9c9f873be1a  contracts/bridge-adapters/libraries/ExchangeAdapterComposing_v1.sol
+        6f7f596145232284df7db1dbcf485c5a4c99f6e613b5a4330315d35a159090f8  contracts/Exchange_v1.sol
+        0ff6506329c713a5174ab0aea998e8983376ec6d1e3df006efa8041622f4b09b  contracts/Governance.sol
+        a3bb7dd936e9a17f054d859996acc96e87a2b08b929fe73cdd75e893fd18cf08  contracts/libraries/BalanceTracking.sol
+        71c9a9e8e1bfda7b054fe81cad9ddf9e2600e16c0936a536b94c1a8370cfd940  contracts/libraries/WalletInMaintenanceAcquisitionDeleveraging.sol
+        02c9bd6e02fb2432af370b628161db51c7286d58070164cd9fbc49b130046dc7  contracts/libraries/WalletInMaintenanceLiquidation.sol
+        21c8c764695cef9cc84bf8c17bde262bca524bdacf3c7882979307a984d7b7b9  contracts/libraries/Withdrawing.sol
+        6bbb02f9396b3cf719dbfd95642d2cf87fe1327831eec901ff92d4ba2ce9806e  contracts/libraries/Hashing.sol
+    </template>
+
+  </content-for>
+</page>
