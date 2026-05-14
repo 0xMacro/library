@@ -1,0 +1,31 @@
+<page
+  clientName="Veda Labs"
+  reportDate="May 14th, 2026"
+  auditTitle="Veda A-84"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  repoCommitHash="784abe7a8b44b468bb1443cfce83f5c8c4e609cd"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team May 13th, 2026.
+</content-for>
+  
+<content-for name="spec">
+<ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository.</li>
+</ul>
+</content-for>
+  
+<content-for name="source-code">
+  
+    <p>Specifically, we audited the following contracts:</p>
+  
+    <template type="file-hashes">
+        92524387e2fcfef94a908c5ae302afe0021013bb198ded64b9f0c99668bdb11a  src/base/Roles/MorphoMarketBufferHelper.sol
+        a70ddc60446ed8a074ede7faaf002ad4301fa403d28dee41255cc43e90666dcf  src/base/Roles/ERC4626BufferHelper.sol
+       
+    </template>
+</content-for>
