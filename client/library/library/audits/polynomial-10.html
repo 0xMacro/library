@@ -1,0 +1,35 @@
+<page
+  clientName="Polynomial"
+  reportDate="May 17, 2026"
+  auditTitle="Polynomial A-10"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Polynomial-Protocol/openstock-contracts"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="ec385eae90e17a8dcd5fdc884a8fcb188b8997b6"
+  finalRepoCommitHash="4f3b3d4ad5b935919360016df36d680f692d5372"
+  passwordEncrypt="env:PAGE_PASS_POLYNOMIAL_10"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on May 4-7th 2026.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+  </content-for>
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository.
+    </p>
+
+    <template type="file-hashes">
+        30e97ce6846cea63889d756270c868f8e3d9309e57179cebffdb98b34d31bade  evm/src/OpenStockVault.sol
+        2dafb52a9f268447f55c8ae552f256b656a593c5ff197f543548598fb8605551  solana/programs/openstock-vault/src/lib.rs
+    </template>
+  </content-for>
+</page>
