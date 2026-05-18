@@ -1,0 +1,326 @@
+<item>
+    <field name="topic">Loss of Funds</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">761baab68e642aa1b6c0451b5f1aa91750ba7526</field>
+    <field name="content">
+## [H-1] Excess USDC remains stuck after `openRedemption()`
+
+In the EVM implementation, `openRedemption()` accepts a `redeemableUsdcAmount` chosen by the admin and only verifies that the vault balance is at least that amount. Redemptions then distribute only the snapshotted `redeemableUsdc` amount pro rata to share holders.
+
+However, if `usdc.balanceOf(address(this))` is greater than `redeemableUsdcAmount`, the excess USDC is not part of the redemption pool. Once the vault is in `RedemptionOpen`, normal asset movement paths are no longer available, and the surplus can remain permanently stuck in the contract.
+
+Note: This issue also applies to the SVM implementation.
+
+**Remediation to Consider**
+
+Consider either making the full available balance redeemable, or adding a narrowly scoped admin recovery function for excess USDC that is not reserved for depositor redemptions or tracked yield.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Loss of Funds</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3aee58f2ef8e52aab6c1c4c03bb52328cae45915</field>
+    <field name="content">
+## [M-1] `sweepYield()` after `openRedemption()` can leave late redeemers unable to redeem
+
+In the EVM implementation, `openRedemption()` checks that the vault holds at least `redeemableUsdcAmount` and then snapshots that amount as the redemption pool. Separately, `sweepYield()` lets an admin or operator transfer up to `yieldAvailable` to the yield treasury.
+
+However, `sweepYield()` is still callable after the vault enters `RedemptionOpen`. If the redemption pool includes USDC that is also counted as yield, sweeping after redemption opens can reduce the vault balance below the remaining redemption obligations. Early redeemers can exit, while later redeemers revert when the vault no longer has enough USDC.
+
+Note: This issue also applies to the SVM implementation.
+
+**Remediation to Consider**
+
+Consider disallowing `sweepYield()` during `RedemptionOpen`, or enforcing that `openRedemption()` reserves both the redemption amount and any unswept `yieldAvailable` before opening redemptions.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">11a771fc79e99ed55155f5694d642a7996de918b</field>
+    <field name="content">
+## [M-2] `moveAssets` can drain USDC reserved for realized yield
+
+In the EVM implementation, if there is `yieldAvailable` accumulated, `moveAssets` can be called while the vault is in `FundingClosed` or `AssetsDeployed` and transfers the requested amount without reserving the `yieldAvailable`. 
+
+The operator can therefore realize yield from Aave, then move out the USDC that backs that yield before it is swept. `sweepYield` still passes its accounting check:
+
+```solidity
+if (amount > yieldAvailable) revert InsufficientYield();
+yieldAvailable -= amount;
+usdc.safeTransfer(treasury, amount);
+```
+
+but the final USDC transfer can revert because the vault balance no longer covers the recorded yield. 
+
+The same accounting gap exists in the Solana implementation: `move_assets` does not reserve `vault.yield_available` before transferring out `vault_usdc`.
+
+**Remediation to Consider**
+
+In `moveAssets`, cap the movable amount by the unreserved USDC balance:
+
+```solidity
+if (amount > usdc.balanceOf(address(this)) - yieldAvailable) revert ExceedsMovable();
+```
+
+Mirror the same reservation check in Solana against `vault_usdc.amount - vault.yield_available`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Loss of Funds</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">adc3f659ea6cac429797089077daa0c5ae8be84a</field>
+    <field name="content">
+## [M-3] Donated aUSDC can block EVM settlement
+
+In the EVM implementation, `recordSettlement()` requires `hasActiveYieldPosition()` to be false before moving the vault to `Settled`. `hasActiveYieldPosition()` checks both internal `aavePrincipal` and the live `aUsdc.balanceOf(address(this))`.
+
+However, aUSDC is externally transferable. After the legitimate Aave position is closed, any account can donate a dust amount of aUSDC to the vault. This makes `hasActiveYieldPosition()` return true and causes `recordSettlement()` to revert, blocking settlement and redemption even though the vault's internally tracked Aave principal is zero.
+
+Note: This issue also applies to `record_settlement` (`vault_f_token_account.amount == 0,`) in the SVM implementation.
+
+**Remediation to Consider**
+
+Consider relying on internal Aave/Jupiter principal accounting for the active-position check, or track protocol-owned aUSDC/f-token balance internally on supply and withdraw.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Data Consistency</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">ede072463cbce0e80d7d6a8b6eece950bbccefeb</field>
+    <field name="content">
+## [M-4] `receiver` is not bound to `receiver_share.owner` in SVM deposits
+
+In the SVM implementation, `deposit()` uses `receiver` for the buyer-state PDA and deposit event, while `receiver_share` receives the minted shares. The account constraints only require `receiver_share.mint == vault.share_mint`.
+
+However, `receiver_share.owner` is not required to equal `receiver`. A depositor can name one wallet as `receiver` while minting shares to another wallet's token account. This makes buyer counts inaccurate and emits incorrect event data.
+
+**Remediation to Consider**
+
+Consider adding a constraint requiring `receiver_share.owner == receiver.key()` so the receiver recorded in state and events is the owner of the share account that receives minted shares.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Slippage</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">3953539bd40b790ce96e6fcd185d92b041e81a8d</field>
+    <field name="content">
+## [M-5] Jupiter Earn supply/withdraw use unprotected variants with no slippage bound
+
+In the SVM implementation, `supply_to_jupiter_earn` and `withdraw_from_jupiter_earn` build CPIs against Jupiter Lend's plain `deposit` and `withdraw` instructions. These variants accept only an `amount` argument and silently use whatever exchange rate Jupiter's pool produces at execution time. The operator gets no on-chain guarantee about how many f-tokens are minted on supply, or how much USDC is returned on withdraw. 
+
+If the Jupiter pool's exchange rate moves adversely between the operator submitting the transaction and execution, the vault accepts the worse rate. 
+
+The Jupiter Lend protocol exposes slippage-protected variants for exactly this purpose:
+
+- `deposit_with_min_amount_out` (reverts if minted f-tokens < min_amount_out)
+- `withdraw_with_max_shares_burn` (reverts if burned f-tokens > max_shares_burn)
+
+**Remediation to Consider**
+
+Switch to the slippage-protected variants and require the operator to pass a bound, or alternatively, enforce the bound at the program level.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">579332c7e275814f66e0016733c7562c062c75f7</field>
+    <field name="content">
+## [L-1] EVM shares report 18 decimals while minted 1:1 with 6-decimal USDC
+
+In the EVM implementation, vault shares inherit OpenZeppelin ERC20's default `decimals()` value of 18. Deposits mint shares 1:1 against raw USDC amounts, which are expected to use 6 decimals.
+
+However, external integrators that rely on `decimals()` can display or price the share token off by `1e12`. This can affect wallets, dashboards, DEX integrations, and secondary-market pricing assumptions.
+
+Note: A similar issue applies to the SVM implementation. `initialize_vault` accepts `share_decimals: u8` as a free parameter and uses it to initialize the share mint. Whenever `share_decimals ≠ USDC` decimals, the issue applies. 
+
+**Remediation to Consider**
+
+Consider setting share decimals to match the underlying USDC precision, or account for decimal conversions in deposit and redeem.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Loss of Funds</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Polynomial-Protocol/openstock-contracts/commit/579332c7e275814f66e0016733c7562c062c75f7,https://github.com/Polynomial-Protocol/openstock-contracts/commit/4b7faa0b31296b8828eaf4579737ab1c2396d81f</field>
+    <field name="content">
+## [L-2] `initialize_vault`  can be front-run to seize admin/operator/freezer roles
+
+If `vault_id` is predictable before deployment, an attacker can call `initialize_vault` with the same `vault_id`, and sets themselves as all three roles. The legitimate deployer's tx then reverts.
+
+If the deployer's pipeline doesn't assert the post-init role keys before publishing the address, the published PDA is still the "correct" vault address — and it's attacker-controlled. User deposits can then be drained by the attacker.
+
+**Remediation to Consider**
+
+Include the intended admin in the PDA seeds:
+
+```rust
+seeds = [VAULT_SEED, admin.key().as_ref(), vault_id.as_ref()]
+```
+
+This makes the PDA address a function of the admin pubkey, so an attacker calling `initialize_vault` with the same `vault_id` but signing as themselves derives a different PDA and cannot occupy the address the deployer will publish. Front-running becomes impossible without the admin's private key.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Loss of Funds</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a47384e727ea559080553734a30620b3edc0bc31</field>
+    <field name="content">
+## [L-3] Reconfiguration of Jupiter Lend allowed while a position is open
+
+`configure_jupiter_earn` only checks `require_admin` and unconditionally overwrites `vault.vault_f_token_account`, `vault.jupiter_f_token_mint`, and the lending/liquidity program IDs. There is no check that the current Jupiter position is closed (`jupiter_principal == 0` and the stored f-token account balance is zero).
+
+If the admin calls it while a position is open, vault state is repointed to a fresh, empty f-token account. The original f-token account still holds the deployed principal but the program no longer references and the principle becomes unreachable. 
+
+Remediation to Consider
+
+Consider:
+
+- Reject `configure_jupiter_earn` when `vault.jupiter_principal != 0` or when the stored `vault_f_token_account` still has a non-zero balance.
+- or disallow reconfiguration at all
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="customCommits">https://github.com/Polynomial-Protocol/openstock-contracts/commit/0cce12153fb57162e35d4f9caaae82dd11448aa6,https://github.com/Polynomial-Protocol/openstock-contracts/commit/4b7faa0b31296b8828eaf4579737ab1c2396d81f,https://github.com/Polynomial-Protocol/openstock-contracts/commit/4f3b3d4ad5b935919360016df36d680f692d5372</field>
+    <field name="content">
+## [Q-1] Jupiter Lend integration should use pinned IDLs and typed Anchor CPI helper
+
+The current Jupiter Earn integration builds raw CPI instructions manually:
+
+- instruction discriminators are pasted as byte arrays
+- account metas are ordered manually
+- Jupiter program accounts are represented as `UncheckedAccount`
+
+This works only as long as the local byte arrays, account ordering, and account assumptions stay exactly aligned with Jupiter's deployed program interface. It is brittle and makes upgrades hard to review. A small IDL change, account reorder, or wrong program address can silently turn into a failed CPI or, worse, an unsafe CPI surface.
+
+**Remediation to Consider**
+
+For integrating with Jupiter Lend, the safer best practice is to add Jupiter's official Anchor IDLs into the repo, generate CPI types from them, and pin the real mainnet program IDs in code.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Best Practice</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">1f4a391d0d32a35614cfe9591428bb08a4cc9d67</field>
+    <field name="content">
+## [Q-2] Simple role authorization should live in Anchor account constraints
+
+Several SVM handlers authorize roles inside the instruction body via `require_admin`, `require_operator`, `require_freezer`, and `require_admin_or_operator`.
+
+The checks are correct, but moving the simple identity ones into `#[account(address = vault.admin)]` (etc.) on the corresponding `Signer` field makes the required role visible at the account-validation layer and removes the chance that a future handler forgets to call the helper. Compound rules such as `require_admin_or_operator` can stay as helpers.
+
+**Remediation to Consider**
+
+Consider:
+
+- moving `require_admin` / `require_operator` / `require_freezer` checks into `#[account(address = vault.admin)]` / `vault.operator` / `vault.freezer` constraints on the relevant `Signer` accounts; and
+- keeping `require_admin_or_operator` and `require_phase` as a body-level helper.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Data Model</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">4e2859edfae890083f7b144b84894e919bb25ba7</field>
+    <field name="content">
+## [Q-3] Vault custody token accounts should be deterministic ATAs
+
+The SVM vault holds custody token accounts for USDC (`vault_usdc`) and the Jupiter f-token (`vault_f_token_account`). These are constrained by mint and authority, but the addresses are not required to be the vault PDA's associated token accounts (ATAs); the deployer can pass arbitrary vault-owned accounts.
+
+This is valid SPL Token usage, but it leaves account selection up to clients and tests, and it means the canonical custody addresses cannot be derived purely from the vault key. 
+
+**Remediation to Consider**
+
+Consider using ATAs for `vault_usdc` and `vault_f_token_account` to simplify off-chain derivation for frontends, indexers, etc.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Interoperability</field>
+    <field name="impact">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">e8a18159d7c99daea88476c3c2483e7d6824fcb3</field>
+    <field name="content">
+## [Q-4] SVM share token name and symbol are not exposed in a standard way
+
+In the SVM implementation, `token_name` and `token_symbol` are stored in the `Vault` account but are not exposes via standard ways such as Metaplex or Token 2022. 
+
+The on-chain values held in the `Vault` struct are correct, but they are invisible to anything that does not already speak the OpenStock vault IDL. This prevents wallets, block explorers and other integrators from reading the values correctly.
+
+**Remediation to Consider**
+
+Consider integrating Metaplex Token Metadata as the de-facto standard for fungible token name/symbol/URI/decimals discovery.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Broken Tests</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">404fb5508b834f438d47fa9706b4ef3460815546</field>
+    <field name="content">
+## [Q-5] Missing writable `share_mint` in SVM Deposit and Redeem accounts breaks tests
+
+In the SVM implementation, `deposit()` mints shares and `redeem()` burns shares, both of which mutate `share_mint.supply`. The mutation goes through the SPL token program, which requires `share_mint` to be a writable account.
+
+However, neither `Deposit` nor `Redeem` declares `share_mint` with `#[account(mut)]`. The Anchor IDL therefore advertises `share_mint` as readonly. Standard IDL-generated clients submit the account with `isWritable = false`, the inner `MintTo` / `Burn` CPI fails, and deposits and redemptions revert in normal usage and tests.
+
+**Remediation to Consider**
+
+Consider adding `#[account(mut)]` to `share_mint` in both `Deposit` and `Redeem`.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Discrepancies</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">9efb42135d7f241fff3b84e16472654655c79add</field>
+    <field name="content">
+      ## [Q-6] EVM and SVM implementations have behavioral discrepancies
+
+The EVM and SVM implementations are not exact behavioral equivalents. Notable differences:
+
+- **Vault model.** EVM is one vault per contract instance; SVM is multiple vaults per program (PDAs keyed by `vault_id`).
+- **Share decimals.** EVM hard-codes 18 decimals; SVM accepts `share_decimals` at initialization.
+- **Role rotation.** EVM uses OpenZeppelin `AccessControl`, so admin can grant and revoke roles; SVM stores `admin`, `operator`, and `freezer` keys at initialization with no on-chain rotation path. A lost or compromised SVM operator/freezer key has no in-program recovery.
+- **Freezer model.** EVM tracks frozen wallets in an `isFrozen` mapping; SVM freezes individual SPL token accounts. Holders with multiple share token accounts on SVM must each be frozen separately, and a freeze does not follow a transfer.
+- **Yield integration.** EVM uses Aave v3 with configuration set at deployment. SVM uses Jupiter Earn with configuration set at runtime, and allows reconfiguration.
+
+Some or all of these differences might be intentional design choices.
+    </field>
+
+  </item>
