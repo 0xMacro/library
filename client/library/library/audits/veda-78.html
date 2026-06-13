@@ -1,0 +1,34 @@
+<page
+  clientName="Veda"
+  reportDate="March 24th, 2026"
+  auditTitle="Veda A-78"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  issueSummaryFormat="table"
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on March 23rd, 2026.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li class="break-words break-all">
+        <b>A gated deposit to function added to the multiasset teller (from <a href="https://github.com/Veda-Labs/boring-vault/pull/626">PR 626</a>)</b> </br>
+        Commit Hash: <code>cdd7b4cfb1173bd150632ea9587f91c57177238e</code>
+        <template type="file-hashes">
+          4f1de09f903646d6bf80e24f6191f8556458d03964409e8c630109a895727b77  src/base/Roles/TellerWithMultiAssetSupport.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
