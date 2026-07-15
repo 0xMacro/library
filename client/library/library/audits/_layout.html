@@ -400,10 +400,7 @@
               </h2>
             </div>
 
-            <if cond="page.issueSummaryFormat === 'table'">
-              <include src="./library/audits/_issue-summary-table.html" locals="{ issue }"/>
-            </if>
-            <else>
+            <if cond="page.issueSummaryFormat === 'legacy'">
               <include src="./library/audits/_issue-summary-bar.html" locals="{ issue }"/>
 
               <if cond="issue.status !== 'informational' && issue.statusNote">
@@ -411,6 +408,9 @@
                   {{issue.statusNote}}
                 </div>
               </if>
+            </if>
+            <else>
+              <include src="./library/audits/_issue-summary-table.html" locals="{ issue }"/>
             </else>
 
             <div class="mt-8 Copy">{{AuditMarkdown.renderIssueContent(issue.content)}}</div>

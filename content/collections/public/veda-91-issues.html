@@ -1,0 +1,41 @@
+<item>
+  <field name="topic">Stale Comments</field>
+  <field name="impact">low</field>
+  <field name="impactNote">Documentation only; no effect on sanitization behavior.</field>
+  <field name="status">fixed</field>
+  <field name="commit">597abb550d23f579ac1d0b67390f052e542d62d0</field>
+  <field name="content">
+    ## [Q-1] Stale natspec after the main/supplemental split
+
+    Several protocol decoders were moved out of `LombardBtcDecoderAndSanitizer` into `LombardBtcSupplementalDecoderAndSanitizer`. However, several override `natspec` comments in the main composite were not updated to match the narrowed `override(...)` lists.
+
+    For example, the `redeem(uint256,address,address,uint256)` override is now `override(FluidFTokenDecoderAndSanitizer)` only, but is still documented as:
+
+    ```solidity
+    /**
+     * @notice Resolv, and FluidFToken all specify a `redeem(uint256,address,address,uint256)`,
+     *         all cases are handled the same way.
+     */
+    ```
+
+    `Resolv` now lives in the supplemental, so the comment no longer reflects the inheritance. Consider updating these comments so the documentation matches the post-split composition.
+  </field>
+</item>
+<item>
+  <field name="topic">Expanded Behavior</field>
+  <field name="content">
+    ## [I-1] `requestRedeem` settles in the base asset (BTC.b) and is fulfilled asynchronously
+
+    The `LombardBTCocDecoderAndSanitizer` sanitizes two functions of the BTCoc "Bitcoin Onchain Credit Strategy" vault: `deposit(address depositAsset, uint256 assets, address receiver)` and `requestRedeem(uint256 shares, address owner)`. Both fund-flow addresses are extracted, and the accompanying Merkle leaves pin `receiver` and `owner` to the BoringVault, so no funds can be misdirected.
+
+    Two behaviors of the underlying strategy are worth documenting for integrators and downstream accounting:
+
+    - **Deposits are multi-asset, redemptions are single-asset.** The strategy whitelists both LBTC and BTC.b as deposit assets (`getAssets()`), and leaves are generated for both. Redemptions, however, are always denominated and paid in the strategy's single base asset, BTC.b (`asset()` = `0xB0F70C0bD6FD87dbEb7C10dC692a2a6106817072`), regardless of which asset was deposited. A round-trip therefore leaves the vault holding BTC.b rather than the asset it entered with.
+
+    - **Redemptions are asynchronous.** `requestRedeem` only burns the shares and records a claim; the underlying payout is pushed later by a BTCoc operator holding `PAY_REDEMPTIONS_ROLE` via `fulfillRedeemRequests`, subject to a one-block minimum delay between request and fulfillment. Until fulfillment, the vault holds a pending claim rather than the asset.
+
+    Both are the intended design of the strategy. This note is informational so that the vault's accountant is configured to price BTCoc shares and BTC.b, and so that a BTC.b exit route remains available to the strategist after redemption.
+
+    No vulnerabilities are introduced.
+  </field>
+</item>

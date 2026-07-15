@@ -1,0 +1,36 @@
+<page
+  clientName="Veda Labs"
+  reportDate="July 8th, 2026"
+  auditTitle="Veda A-91"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-fixes"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on July 8th, 2026.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Lombard BTCoc Decoder and BTC decoder main/supplemental split (from <a href="https://github.com/Veda-Labs/boring-vault-fixes/pull/23">PR 23</a>)</b> </br>
+        Commit Hash: <code>9ab12106d45f6e3ed0a3924fc49694e2acfad47b</code>
+        <template type="file-hashes">
+            887099529c9691bcc66b086a92bda42c3abcc173d20b379c75ac68c69d74890e  src/base/DecodersAndSanitizers/LombardBTCocDecoderAndSanitizer.sol
+            8faec49325f1e6d327ef4fea20066f53013a1fb3dcb44b6250d94b481e92b43a  src/base/DecodersAndSanitizers/LombardBtcDecoderAndSanitizer.sol
+            cc042b401091f136a8d968a78449b84a4fa90926bcc238979e601f59991f478b  src/base/DecodersAndSanitizers/LombardBtcSupplementalDecoderAndSanitizer.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
