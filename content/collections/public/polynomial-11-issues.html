@@ -1,0 +1,486 @@
+<item>
+    <field name="topic">DOS</field>
+    <field name="impact">medium</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">aaa15ba692ccee43d5077f19b34c680d5cd11868</field>
+    <field name="content">
+      ## [H-1] Frozen owner or receiver at the queue head will permanently block the withdrawal flow (EVM only)
+  
+
+  
+      The `OpenStockVault` contract processes withdrawal requests sequentially in `OpenStockVault.processWithdrawals()`. When processing a request, `OpenStockVault._processWithdrawalRequest()` checks if the `owner` or `receiver` is frozen. If either is frozen, the function reverts.
+  
+      The problem is that because the queue is strictly FIFO, a revert at the queue head will prevent the `withdrawalQueueHead` from advancing. This effectively blocks the entire withdrawal flow for all subsequent requests. While users can still use the instant `OpenStockVault.withdraw()` function, their queued funds will be stuck.
+  
+      A user whose receiver is frozen could technically unblock the queue by calling `OpenStockVault.cancelWithdrawRequest()`, which returns their shares. However, if the malicious requester deliberately refuses to cancel, or if the `owner` itself is frozen (which prevents them from calling `OpenStockVault.cancelWithdrawRequest()`), the queue will remain permanently stuck.
+  
+      **Remediations to Consider**
+  
+      Consider redesigning the queue processing model to allow processing an array of arbitrary indexes instead of strict sequential processing. This will prevent a single invalid request from DoSing the entire withdrawal process.
+  
+      Alternatively, a simpler fix is to catch requests with frozen owners or receivers during processing, mark them as canceled or processed so they cannot be retried, and skip to the next request. Note that if the request is skipped and marked as canceled, the protocol must safely handle the escrowed shares and queue accounting (`queuedWithdrawalAssets` and `queuedWithdrawalShares`) without attempting to return shares to a frozen owner.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Privilege</field>
+    <field name="impact">high</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">a37ec7e3141e5e1ef95082f371a063c62aa56c26</field>
+    <field name="content">
+      ## [H-2] Frozen users can bypass restrictions by using another share token account (Solana only)
+
+  
+      The `OpenStockVault` contract on Solidity enforces freezing at the wallet level through `isFrozen`. A frozen address is blocked from deposits, pending deposit claims, withdrawal requests, withdrawal cancellations, withdrawal processing, and share transfers through checks in `OpenStockVault.deposit()`, `OpenStockVault.claimPendingDeposit()`, `OpenStockVault.requestWithdraw()`, `OpenStockVault.cancelWithdrawRequest()`, `OpenStockVault.processWithdrawals()`, and `OpenStockVault._update()`.
+  
+      The problem is that the Solana `OpenStockVault` contract only freezes individual SPL share token accounts through `OpenStockVault.freeze_token_account()`. It does not store or check wallet-level frozen state. A user can own multiple share token accounts for the same mint, so freezing one token account does not freeze the user.
+  
+      For example, user A can request a withdrawal from share token account `X`, then have `X` frozen. The withdrawal can still be processed if no shares are returned, because `OpenStockVault.process_withdrawal()` only burns escrowed shares and transfers USDC. If shares must be returned, or if user A cancels, they can use another owned share token account `Y` as `owner_share`, bypassing the freeze on `X`.
+  
+      This will lead to frozen users bypassing the intended restriction by routing through a different share token account. The worst realistic outcome is that a sanctioned, blocked, or otherwise restricted user can still complete withdrawals or recover shares, while the Solidity implementation would block the same user at the wallet level.
+  
+      **Remediations to Consider**
+  
+      Add wallet-level freeze state to the Solana `OpenStockVault` contract and enforce it consistently anywhere a wallet sends, receives, claims, cancels, processes, or transfers shares. `OpenStockVault.freeze_token_account()` can remain as a control for direct share token transfer.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">DOS/Griefing</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">a4b4153f338984ef3664ebc19ec7831d1d60f6a7</field>
+    <field name="content">
+      ## [H-3] Users can force the admin to pay rent or halt the withdrawal queue (Solana only)
+
+  
+      `OpenStockVault.process_withdrawal()` processes withdrawal requests sequentially and requires the user-provided token accounts to exist when the request reaches the head of the queue. A malicious user can call `OpenStockVault.request_withdraw()` with a minimal amount, close the token accounts needed for settlement, and leave the request pending.
+  
+      This puts the admin in two bad positions: 
+  
+      - If the admin does not recreate the missing token accounts, the request at `vault.withdrawal_queue_head` cannot be processed and the whole withdrawal queue is stuck.
+      - If the admin recreates the token accounts to unblock the queue, the user can later close them again and reclaim the rent.
+  
+      The attack can affect both the USDC receiver token account and the share token account. `OpenStockVault.process_withdrawal()` always needs to transfer USDC to `receiver_usdc`, and when extra shares need to be returned, it also transfers shares to `owner_share`. Since a Solana `TokenAccount` is 165 bytes while the `WithdrawalRequest` account is only 99 bytes, the attacker can potentially externalize rent for one or two token accounts while only creating a small withdrawal request account. Attacker can repeatedly extract rent from the admin or leave the withdrawal queue blocked for all later users.
+  
+      **Remediations to Consider**
+  
+      Consider using a pull-based withdrawal flow. `OpenStockVault.process_withdrawal()` should finalize the withdrawal, burn the escrowed shares, advance the queue, and record claimable USDC and any returned shares. The user should then call a separate claim instruction and provide or create their own token accounts at their own cost.
+  
+      Simpler fixes are adding an upfront withdrawal fee or having a minimum withdrawal amount to make repeated rent griefing uneconomical.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">DOS</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">eb3d6f9d10089018c2303303e40ffd141c4e0b88</field>
+    <field name="content">
+      ## [M-1] Small withdrawal requests can block the withdrawal queue when redeemable assets round to zero (both EVM and Solana)
+  
+  
+      The `OpenStockVault` contract processes withdrawal requests sequentially from `withdrawalQueueHead`. The problem is that `OpenStockVault._processWithdrawalRequest()` calculates `maxAssetsForShares` with `previewRedeem(request.shares)`, then sets `paidAssets` to `Math.min(request.assets, maxAssetsForShares)`. If `paidAssets` becomes `0`, the function returns early without finalizing the request.
+  
+      This can happen for a very small request when the share price moves down after the request is created. For example:
+  
+      - A user can call `OpenStockVault.requestWithdraw()` for `1` wei of USDC when the `sUSDC/USDC` ratio is `1`, producing `request.shares = 1` and `request.assets = 1`.
+      - If the ratio later decreases to `0.99`, then `previewRedeem(request.shares)` can round `0.99` down to `0`, making `maxAssetsForShares = 0` and `paidAssets = 0`.
+  
+      When this request reaches the head of the queue, `OpenStockVault._processWithdrawalRequest()` returns `0`, and `OpenStockVault.processWithdrawals()` breaks instead of advancing to the next request ID. Since `withdrawalQueueHead` remains stuck on the same request, later withdrawal requests cannot be processed unless the ratio increases enough for `previewRedeem(request.shares)` to return a nonzero value, or the requester voluntarily cancels the request. In the worst case, a malicious requester leaves the dust request in place and DoSes the queued withdrawal flow.
+  
+      **Remediations to Consider**
+  
+      Ensure that the zero asset request can be handle properly without blocking the request chain.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Donation attack</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">f0211c22b441ea647a6d66cf306c413d66153fc4</field>
+    <field name="content">
+      ## [M-2] First depositor can inflate the share price and extract value from later deposits (both EVM and Solana)
+  
+      The `OpenStockVault` contract mints shares in `previewDeposit()` as `assets` when `totalSupply()` is zero, then mints later deposits with `Math.mulDiv(assets, supply, totalAssets())`, rounded down. The problem is that `OpenStockVault.totalAssets()` includes the raw `usdc.balanceOf(address(this))`, so a direct USDC transfer to the vault increases `totalAssets()` without minting any new shares.
+  
+      An attacker can do the sandwich attack to the victim depositor by making the first deposit so that `totalSupply()` becomes `1` share unit, then donate `1_000e6` USDC directly to the vault. When a victim later deposits `2_000e6` USDC, `OpenStockVault.previewDeposit()` computes `floor(2_000e6 * 1 / (1_000e6 + 1)) = 1`, so the victim receives only `1` share unit instead of the expected proportional amount. The victim overpays for that share, and the attacker benefits when redeeming their own share against the inflated asset pool.
+  
+      In the worst realistic case, the first depositor can capture a meaningful portion of the next depositor's funds by choosing a donation size that forces the victim's minted shares to round down heavily.
+  
+      **Remediations to Consider**
+  
+      Prevent first-deposit price manipulation by adding virtual assets and virtual shares to the conversion formulas, similar to OpenZeppelin’s ERC4626 approach.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Liquid insolvency</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5785eb88d2e8e3bc50f28c38058c955e4f1ec361</field>
+    <field name="content">
+      ## [M-3] Withdrawal requests can exceed liquid assets while withdrawals are blocked (both EVM and Solana)
+  
+      The `OpenStockVault` contract reserves liquid assets before moving funds into IPO or Aave by limiting deployments to `liquidAssets() - queuedWithdrawalAssets`. This is meant to keep pending withdrawal requests backed by liquid USDC.
+
+      The problem is that `OpenStockVault.requestWithdraw()` does not enforce the same invariant. After funds are supplied to Aave, users can still create withdrawal requests priced against `totalAssets()`, which includes `aavePrincipal`, even though those assets are not liquid. For example: 
+  
+      - If `liquidAssets()` is `5_000 USDC` and `queuedWithdrawalAssets` is `2_000 USDC`, `OpenStockVault.supplyToAave()` can only supply `3_000 USDC`.
+      - But after `aavePrincipal` becomes `3_000 USDC`, another user can still call `OpenStockVault.requestWithdraw()` for up to the full value backed by `liquidAssets() + aavePrincipal`.
+      - This can lead to `queuedWithdrawalAssets` exceeding the liquid USDC held by the vault. If the Aave position then suffers a loss and the admin records it through `OpenStockVault.recordAavePrincipalLoss()`, the vault can end up with `aavePrincipal = 0`, only `2_000 USDC` liquid, and a `5_000 USDC` queued withdrawal request.
+  
+      The request is not fully liquid-backed, and `OpenStockVault.processWithdrawals()` and `OpenStockVault.withdraw()` are also blocked while `aavePrincipal` is active. In the worst realistic case, queued withdrawals are delayed until the operator unwinds Aave or records losses, and users cannot rely on the reservation invariant that the protocol otherwise enforces before deploying assets.
+  
+      **Remediations to Consider**
+  
+      Apply the same deployable-liquidity invariant when creating withdrawal requests, so new queued withdrawals cannot exceed liquid assets reserved for withdrawals.
+  
+      ```diff
+          if (assets == 0) revert ZeroAmount();
+          if (receiver == address(0) || owner == address(0)) revert ZeroAddress();
+      +   if (assets > _deployableLiquidAssets()) revert InsufficientLiquidity();
+  
+          if (isFrozen[msg.sender]) revert FrozenAccount(msg.sender);
+      ```
+  
+      **Reference:** evm/src/OpenStockVault.sol#L266-L290
+  
+      Further improvement should be allowing `OpenStockVault.processWithdrawals()`  and  `OpenStockVault.withdraw()` while `aavePrincipal` is active, since the funds will be fully backed regardless.
+    </field>
+  </item>
+  
+    </field>
+  </item>
+  
+
+
+  <item>
+    <field name="topic">Accounting</field>
+    <field name="impact">low</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">b5662211634d94c9252b45cca7fe0da4b54b4d0a</field>
+    <field name="content">
+      ## [M-4] Temporary double counting of assets during IPO settlement inflates share price (both EVM and Solana)
+  
+      The `OpenStockVault` contract tracks deployed IPO funds using `activeIpoPrincipal`. The problem is that when the administrator transfers the returned USDC back to the contract before calling `OpenStockVault.recordSettlement()`, the `OpenStockVault.liquidAssets()` value immediately increases because it relies on the raw USDC balance. Since `OpenStockVault.totalAssets()` adds both `OpenStockVault.liquidAssets()` and `activeIpoPrincipal`, the returned funds are double counted until the settlement is recorded.
+  
+      For example: 
+  
+      - Assuming the pool has `50000 USDC` that deploys to IPO `40000 USDC`, `liquidAssets()` becomes `10000` and `activeIpoPrincipal` becomes `40000`.
+      - If the investment returns `45000 USDC` and is sent to the contract, `liquidAssets()` jumps to `55000` while `activeIpoPrincipal` remains `40000`. This will lead to `OpenStockVault.totalAssets()` temporarily reporting `95000 USDC`.
+  
+      This temporarily inflates the results of `OpenStockVault.totalAssets()`, `OpenStockVault.previewDeposit()`, `OpenStockVault.previewWithdraw()`, `OpenStockVault.previewRedeem()`, and `OpenStockVault.sharePrice()`. In the worst outcome, offchain systems or third-party contracts consume incorrect pricing data, and users observing the inflated price might call `OpenStockVault.requestWithdraw()` expecting a high payout, only to receive significantly less when the withdrawal is processed after settlement corrects the accounting.
+  
+      **Remediations to Consider**
+  
+      Embed the USDC transfer logic directly within the `OpenStockVault.recordSettlement()` function. By pulling the funds from the caller during the settlement transaction, the balance increase and the accounting updates happen atomically, eliminating the stale state window.
+  
+      ```diff
+           function recordSettlement(
+               uint256 cashReturned,
+               uint256 backendFee_,
+               bytes32 referenceId
+           )
+               external onlyRole(DEFAULT_ADMIN_ROLE)
+           {
+               _requirePhase(Phase.IpoDeployed);
+               if (backendFee_ > cashReturned) revert BackendFeeExceedsCashReturned();
+      +        usdc.safeTransferFrom(msg.sender, address(this), cashReturned);
+  
+      ```
+  
+      **Reference:** evm/src/OpenStockVault.sol#L348-L370
+    </field>
+  </item>
+  
+
+
+  <item>
+    <field name="topic">DOS</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3ee3ed3a9389260393f63b9bd54e4282a996e2f8</field>
+    <field name="content">
+      ## [L-1] Cancelled withdrawal requests cause denial of service in `writeOffZeroNavWithdrawal()` (both EVM and Solana)
+  
+      The `OpenStockVault.writeOffZeroNavWithdrawal()` function manually deletes pending withdrawal requests. The problem is that if a withdrawal request in the queue has already been cancelled by a user, attempting to process it will revert. Because requests are processed sequentially, a cancelled request in the middle of the queue will block all subsequent pending requests from being written off.
+  
+      **Remediations to Consider**
+      Update the logic to gracefully handle processed or cancelled requests by advancing the queue head and returning early.
+  
+      ```diff
+      + if (request.processed || request.canceled) {
+      +     withdrawalQueueHead = requestId + 1;
+      +     return;
+      + }
+      ```
+  
+      **Reference:** evm/src/OpenStockVault.sol#L452-L468
+    </field>
+  </item>
+  
+  
+  <item>
+    <field name="topic">Integrations</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a009758bea4a773c427354ebe687dad2a53c2766</field>
+    <field name="content">
+      ## [L-2] No way to pull Aave rewards resulting in locked incentives (EVM only)
+  
+      The `OpenStockVault` contract interacts with Aave but lacks a function to claim Aave incentives. The problem is that any rewards distributed by the Aave protocol will accumulate in the contract without a way to retrieve them. This will lead to these reward tokens being permanently locked, resulting in a loss of potential yield.
+  
+      **Remediations to Consider**
+      Implement a function that allows an authorized role to interact with the Aave incentives controller to claim accumulated rewards and transfer them to a designated treasury.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Features</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6a77176a1904fd4bf3adb9f146cebaf63fa6d3ff</field>
+    <field name="content">
+      ## [L-3] Unnecessary queuing of deposits and withdrawals leads to extra transactions (both EVM and Solana)
+  
+      The `OpenStockVault.requestDeposit()` and `OpenStockVault.requestWithdraw()` functions in the `OpenStockVault` contract allow users to add requests to the queue even when the vault state allows for instant processing. If a user accidentally adds a deposit or withdrawal to the queue during these states, they can instantly claim it, but this will lead to an unnecessary extra transaction.
+  
+      **Remediations to Consider**
+      Add state checks to the `OpenStockVault.requestDeposit()` and `OpenStockVault.requestWithdraw()` functions to prevent users from accidentally queuing requests when instant processing is available.
+  
+      ```diff
+        function requestDeposit(uint256 assets, address receiver) external whenNotPaused {
+      +     if (phase == Phase.Open) revert InvalidPhase(Phase.IpoDeployed, phase);
+            _recordPendingDeposit(msg.sender, receiver, assets);
+        }
+  
+        function requestWithdraw(
+            uint256 assets,
+            address receiver,
+            address owner
+        )
+            external whenNotPaused returns (uint256 requestId)
+        {
+      +     if (phase == Phase.Open && !hasActiveYieldPosition()) revert InvalidPhase(Phase.IpoDeployed, phase);
+            if (assets == 0) revert ZeroAmount();
+      ```
+  
+      **Reference:** evm/src/OpenStockVault.sol#L229-L231
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Features</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">fb8416d3f061fcb8e9f8df95c9de46c91a9f90ca</field>
+    <field name="content">
+      ## [L-4] Withdraw function lacks automatic fallback to the request queue unlike the deposit flow (both EVM and Solana)
+  
+  
+      In the deposit flow, the `OpenStockVault.deposit()` function automatically routes to the queue by calling `_recordPendingDeposit()` when the vault is in `Phase.IpoDeployed`, giving users a single entry point. In contrast, `OpenStockVault.withdraw()` calls `_requireImmediateWithdrawalAvailable()` and simply reverts when the phase is not `Phase.Open` or when there is an active yield position, with no case to route the request to `OpenStockVault.requestWithdraw()`. This will lead to an inconsistent interface where users must manually determine which function to call, degrading the user experience.
+  
+      **Remediations to Consider**
+      Mirror the deposit flow by routing to the withdrawal queue inside `OpenStockVault.withdraw()` when immediate withdrawal is not available.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Restriction</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6e3cd711138d630dd1b132d1353c0f1e1a7a2c74</field>
+    <field name="content">
+      ## [L-5] Write-off functions do not require paused state allowing concurrent deposits and withdrawals (both EVM and Solana)
+  
+      The `OpenStockVault.writeOffZeroNavShares()` and `OpenStockVault.writeOffZeroNavWithdrawal()` functions in the `OpenStockVault` contract can be executed while the contract is not paused. Because these write-off functions operate on the vault state over multiple transactions, allowing users to deposit and withdraw in the middle of the write-off process creates a race condition. This will lead to inconsistent accounting where user actions interleave with the write-off, potentially letting users transact against stale or partially written-off state.
+  
+      **Remediations to Consider**
+      Require the contract to be paused before executing the write-off functions so that no deposits or withdrawals can occur during the process.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Accounting</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">15ea0ba2eeb888b8bbdee79a82f3730a8ea25ccb</field>
+    <field name="content">
+      ## [L-6] Partial Jupiter withdrawals leave residual yield untracked in vault accounting (Solana only)
+  
+      The `OpenStockVault.withdraw_from_jupiter_earn()` function sets `vault.jupiter_principal` to 0 once a withdrawal returns at least the tracked principal. If the Jupiter position still contains accrued yield after that partial withdrawal, the remaining yield is recorded in neither `vault.jupiter_principal` nor `vault.yield_available`, so it is excluded from `total_assets()` and NAV. This can make the vault treat the Jupiter position as closed while residual funds remain there, leading to missed or delayed yield realization.
+  
+      Per the Jupiter docs, an amount of `u64::MAX` withdraws the entire balance.
+  
+      **Remediations to Consider**
+      Support a "withdraw all" path that passes `u64::MAX` to Jupiter when fully exiting the position, mirroring the Solidity Aave `type(uint256).max` behavior.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">DOS</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">4b58f188b1253ebdc8816efdbe5508241f87cf4c</field>
+    <field name="content">
+      ## [L-7] Vault USDC token account creation can be front-run to block initialization (Solana only)
+  
+      The vault initialization instruction in the Solana program creates the `vault_usdc` associated token account with the `init` constraint. Because the associated token account address is deterministically derived from the vault authority and the `usdc_mint`, anyone can compute it in advance and create that account before the admin calls the initialization instruction. When the account already exists, the `init` constraint fails, so a malicious user can front-run the transaction and cause a denial of service on initialization. This will lead to the admin being unable to complete vault setup until using new wallet as admin.
+  
+      **Remediations to Consider**
+      Use `init_if_needed` for the `vault_usdc` account so that initialization succeeds whether or not the associated token account already exists.
+  
+      ```diff
+        #[account(
+      -     init,
+      +     init_if_needed,
+            payer = admin,
+            associated_token::mint = usdc_mint,
+            associated_token::authority = vault
+        )]
+      ```
+  
+      **Reference:** solana/programs/openstock-vault/src/lib.rs#L963-L969
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">DOS</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">cec6b17bb19a056d05763561141995f2efe320bb</field>
+    <field name="content">
+      ## [L-8] Vault cannot add to an existing Jupiter position preventing incremental staking (Solana only)
+  
+      The `deployable_assets()` helper in the Solana program returns 0 whenever `vault.jupiter_principal != 0`. Since the amount available to supply to Jupiter is derived from `deployable_assets()`, this means once any principal has been staked into Jupiter, no further deposits can be deployed until the position is fully withdrawn and `jupiter_principal` returns to 0. This will lead to the vault being unable to stake multiple times or top up an existing Jupiter position.
+  
+      **Remediations to Consider**
+      Remove the `jupiter_principal != 0` guard so that additional liquid assets can be deployed on top of an existing Jupiter position, allowing incremental staking.
+  
+      ```diff
+      - if vault.phase != Phase::Open || vault.jupiter_principal != 0 {
+      -     return 0;
+      - }
+      ```
+  
+      **Reference:** solana/programs/openstock-vault/src/lib.rs#L2618-L2623
+    </field>
+  </item>
+  
+  
+
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">ae3456385c6e9a2c9b6ab97bf4907acfea96b850</field>
+    <field name="content">
+      ## [Q-1] Preview helpers revert instead of returning zero causing an API inconsistency (Solana only)
+  
+      The preview helpers behave differently across the two implementations. In the Solidity version, `previewDeposit()`, `previewWithdraw()` and `previewRedeem()` return 0 when `totalAssets == 0` or supply is unavailable, and the caller later reverts if the computed shares are 0. In the Solana program, `preview_deposit()`, `preview_withdraw()` and `preview_redeem()` revert directly in those cases. This will not lead to an exploit, but the divergent behavior could confuse integrators reading across both codebases.
+  
+      **Remediations to Consider**
+      Optionally align the Solana helpers to return 0 like the Solidity versions and let callers handle the zero case, for consistency.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">b8e5b31d9ca8a2d4b96bd330b8ee604d7a459162</field>
+    <field name="content">
+      ## [Q-2] Solana deposit lacks the IPO phase fallback present in the Solidity version (Solana only)
+  
+      In the Solidity contract, `OpenStockVault.deposit()` automatically routes to the pending deposit flow when the phase is `IpoDeployed`, giving users a single entry point. In contrast, the Solana `deposit()` calls `require_phase(Phase::Open)` and simply reverts in any non-Open phase, with no route to the pending deposit flow. This will lead to an inconsistent cross-chain interface where Solana users must manually call the request flow while Solidity users do not, degrading user experience.
+  
+      **Remediations to Consider**
+      Mirror the Solidity behavior by routing to the pending deposit flow inside `deposit()` when the vault is in the `IpoDeployed` phase.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">14f24f90bf3d35f0a9a9fa0ddbfdf92895dd3d14</field>
+    <field name="content">
+      ## [Q-3] Yield and fee sweeps are restricted to the Open phase unlike the EVM version (Solana only)
+  
+      The Solana program's `sweep_yield()` and `sweep_backend_fees()` functions require `vault.phase == Phase::Open`, a restriction that does not exist in the Solidity `OpenStockVault` contract. This will lead to a behavioral divergence where admins and operators can sweep accrued yield and backend fees at any time on the Solidity side, but are blocked from doing so on Solana whenever the vault is not in the Open phase.
+  
+      **Remediations to Consider**
+      Remove the `Phase::Open` requirement from `sweep_yield()` and `sweep_backend_fees()` to align with the Solidity version, unless the restriction is intentional.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3b0bfb14aa917ac7e5ddcb95b25d3cfecd4e8660</field>
+    <field name="content">
+      ## [Q-4] Admin or operator check relies on implicit role revert instead of an explicit error (EVM only)
+  
+      The `OpenStockVault._requireAdminOrOperator()` function does not throw directly when the caller holds neither `DEFAULT_ADMIN_ROLE` nor `OPERATOR_ROLE`. Instead, it falls through to `_checkRole(DEFAULT_ADMIN_ROLE)` and relies on that call to revert, which is a less clear failure mode.
+  
+      **Remediations to Consider**
+      Throw an explicit error inside the `if` branch rather than delegating to `_checkRole()`.
+  
+      ```diff
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(OPERATOR_ROLE, msg.sender)) {
+      -     _checkRole(DEFAULT_ADMIN_ROLE);
+      +     revert Unauthorized();
+        }
+      ```
+  
+      **Reference:** evm/src/OpenStockVault.sol#L645-L649
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">DOS</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">7d175fdc6ac16b6d7151523c0d842212db143b23</field>
+    <field name="content">
+      ## [Q-5] A tiny USDC donation can temporarily block the zero NAV write-off functions (both EVM and Solana)
+  
+      The `OpenStockVault._requireZeroNavWriteOffAvailable()` function in the `OpenStockVault` contract requires `totalAssets() == 0` (with `totalSupply() != 0`) for the zero NAV write-off functions to execute. Since `totalAssets()` includes the USDC balance beyond reserved amounts, anyone can donate as little as 1 wei of USDC to make `totalAssets()` non-zero, causing these functions to revert with `ZeroNavUnavailable`. This will lead to a temporary denial of service on the write-off path. There is a workaround to pull the crumb via `OpenStockVault.startDeployment()` and `OpenStockVault.recordSettlement()`, so the impact is minor, but the griefing vector is worth flagging.
+  
+      **Remediations to Consider**
+      Consider tolerating a negligible dust threshold in the zero NAV check, or document the `startDeployment()` and `recordSettlement()` workaround for clearing donated crumbs.
+    </field>
+  </item>
+  
