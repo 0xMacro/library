@@ -1,0 +1,28 @@
+<page
+  clientName="EtherFi"
+  reportDate="July 17, 2026"
+  auditTitle="EtherFi A-3"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-fixes"
+  repoCommitHash="ebd542737e1141dbaaff06ac7b0b2dd6be7f10d8"
+  layout="/library/audits/_layout.html"
+  issueSummaryFormat="legacy"
+  passwordEncrypt="env:PAGE_PASS_ETHERFI_3"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team July 16th, 2026.
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contract within this repository:</p>
+
+  <template type="file-hashes">
+    e78868a692530f9ca99cc0cab78b60978dee28126cd17c386837c76e2e7bc78d  src/base/DecodersAndSanitizers/HyperliquidDecoderAndSanitizer.sol
+    8ce33af75b2e37b2a870fef3e6c3a227f261dd0f57147a8c9bcfd12b85a249b9  src/base/DecodersAndSanitizers/Protocols/HyperCoreDecoderAndSanitizer.sol
+  </template>
+</content-for>
+
+</page>
