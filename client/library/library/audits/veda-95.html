@@ -1,0 +1,36 @@
+<page
+  clientName="Veda Labs"
+  reportDate="July 27th, 2026"
+  auditTitle="Veda A-95"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-private"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on July 24th, 2026.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Aave v4 decoder (from <a href="https://github.com/Veda-Labs/boring-vault-private/pull/47">PR 47</a>)</b> </br>
+        Commit Hash: <code>0d7d0ab02bded814a910fc8ccc51b8c2e38af8e5</code>
+        <template type="file-hashes">
+            3b09d638d0969307096e203ac143546e4d8906235b9fc1de1131161b2aa6329b  src/base/DecodersAndSanitizers/Protocols/AaveV4DecoderAndSanitizer.sol
+            de6250250135d77c08bec73809efb23d16acf292f268a63f125b1ddcd722549a  src/base/DecodersAndSanitizers/AaveV4FullDecoderAndSanitizer.sol
+            b714415bcc07de3f4a0f60dc548288f59dd8d7a2f262f4d9856c64a720d9b1ac  test/resources/MerkleTreeHelper/MerkleTreeHelper.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
