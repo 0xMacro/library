@@ -1,0 +1,97 @@
+<item>
+    <field name="topic">Capacity and solvency</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">46414faf4f6e75a3c8adab511c5ab0d3a9a0ab9a</field>
+    <field name="content">
+      ## [M-1] Unbounded `effectiveLeverage` lets real backing approach zero and nullifies the `minCAR` floor
+  
+      `CoverOrderAllocator` sizes period capacity as `collateral × effectiveLeverage / minCAR`, widened by the divergence tolerance. `_setCapacityConfig` validates `minCAR ≥ BPS_DENOMINATOR` (a CAR floor of 1.0) and `effectiveLeverage != 0`, but places no upper bound on `effectiveLeverage`.
+  
+      ```solidity
+      if (config.minCAR < BPS_DENOMINATOR) revert InvalidMinCAR();
+      if (address(config.firstLossBufferToken) == address(0)) revert InvalidZeroAddress();
+      if (config.firstLossBuffer == address(0)) revert InvalidZeroAddress();
+      // TODO: Add max cap on leverage?
+      if (config.effectiveLeverage == 0) revert InvalidLeverage();
+      ```
+      **Reference:** CoverOrderAllocator.sol#L604-608
+  
+      ```solidity
+      uint256 strictCapacity = availableCollateralCanonical.mulDiv(config.effectiveLeverage, config.minCAR);
+      // Fold in the divergence tolerance as the period's effective capacity.
+      totalAvailableCapacity = strictCapacity.mulDiv(BPS_DENOMINATOR + config.divergenceToleranceBps, BPS_DENOMINATOR);
+      ```
+      **Reference:** CoverOrderAllocator.sol#L661-663
+  
+      Because capacity depends on the ratio `effectiveLeverage / minCAR`, the real (un leveraged) collateralization behind sold cover is `minCAR / (effectiveLeverage × (1 + tol))`. The `minCAR` floor of 1.0 bounds only the leveraged CAR, which counts leverage as if it were capital. It does not bound real backing. With `effectiveLeverage` unbounded, an operator can drive real backing arbitrarily low while the leveraged CAR still reads at or above the floor. For example, at `minCAR = 1.0` and leverage of 100x, real backing is roughly 1 percent, yet the on-chain CAR check is satisfied.
+  
+      The important consequence is that the `minCAR` floor is not an independent solvency protection today. Since leverage sits on top of it with no ceiling, a change to `effectiveLeverage` directly moves the very quantity `minCAR` is meant to guarantee. In effect, unbounded leverage nullifies the `minCAR` protection: the floor becomes real only once leverage is capped. The client has confirmed a maximum will be added (spec: 5.0x absolute ceiling).
+  
+      **Remediations to Consider**
+  
+      - Add a maximum for `effectiveLeverage`. An absolute cap is sufficient to floor real backing only while `minCAR ≥ BPS_DENOMINATOR` remains enforced, so keep that floor as a load bearing invariant.
+      - A bound expressed relative to `minCAR` (`effectiveLeverage ≤ k × minCAR`) is more robust, since it fixes real backing to `1 / (k × (1 + tol))` independent of the `minCAR` value. Document the guaranteed minimum real backing implied by the chosen bound.
+  </field>
+</item>
+  
+<item>
+    <field name="topic">Liveness</field>
+    <field name="impact">medium</field>
+    <field name="chance">medium</field>
+    <field name="status">addressed</field>
+    <field name="content">
+      ## [M-2] Atomic `batchSettle` with initial pinned values can DoS runner settlement
+  
+      In the allocator runner's `Engine.ts`, `processOrders()` reads the orders and buyer funding at the period start pin block for determinism, reproducing the same tree on every run within the period. Settlement then runs through `EngineRunner.ts` (`settleAll`), which calls `batchSettle()` in the `CoverOrderAllocator`, an atomic loop: one reverting order reverts the whole batch.
+  
+      A buyer funded at period start who later revokes approval or moves funds makes their `transferFrom` call revert, reverting the entire batch. Because funding is pinned to period start, re-running the matcher yields the same tree and the same revert, so the runner cannot recover; it only warns. A malicious buyer can therefore grief the whole period's batch by approving before the pin and revoking after it. Recovery is manual: recommit a new root excluding the order (allowed while `totalSettledCover == 0`), or settle the fundable orders individually with `settleCoverOrder`. 
+  
+      **Remediations to Consider**
+  
+      Consider verifying allowances and balances before settlement and excluding orders without sufficient allowances from the `batchSettle()` parameters, and flagging these orders to be individually settled if clients allow. 
+  
+    </field>
+    <field name="response">
+        Addressed in Engine Runner, no contract updates.
+    </field>
+</item>
+  
+<item>
+    <field name="topic">Vault accounting</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">6806f358aa05bba8ee51fef3457a6b3487398597</field>
+    <field name="content">
+      ## [L-1] `deposit` can mint zero shares while still transferring assets
+  
+      In `FirelightVault.sol`, `deposit()` guards `assets == 0` but not the computed share amount. A small deposit can floor to zero shares while the underlying is still pulled from the depositor; an honest user could lose their deposited assets to rounding.
+  
+      ```solidity
+      if (assets == 0) revert InvalidAmount();
+  
+      if (_hasActiveIncident()) revert CurrentPeriodHasActiveIncident();
+  
+      (uint256 shares, uint256 _totalSupply, uint256 _totalAssets) = _previewTotals(
+          assets,
+          true,
+          Math.Rounding.Floor
+      );
+  
+      _depositFunds(_msgSender(), receiver, assets, shares, _totalSupply, _totalAssets);
+      ```
+      **Reference:** FirelightVault.sol#L613-623
+  
+      `mint()` function is unaffected since it guards against `shares == 0`. Although the likelihood of small amounts like these being deposited is low, a robustness check could narrow this surface and avoid any dust losses.
+  
+      **Remediations to Consider**
+  
+      - Add `if (shares == 0) revert InvalidAmount();` in `deposit` before `_depositFunds`.
+  
+    </field>
+  </item>
+
+  
+  
