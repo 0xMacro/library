@@ -61,6 +61,7 @@
         
         For the live V1 vault, this authority is verified on-chain (see On-Chain Verification): the ProxyAdmin owner and the vault `DEFAULT_ADMIN_ROLE` are the same 2 of 2 Safe, whose two members are themselves a 6 of 11 and a 3 of 4 Safe. This is a strong dual control structure. 
         
+        
         ## Protocol Roles
         
         The roles below are operational trust assumptions. Holders are assumed to act within established policies. If a holder is compromised or acts maliciously, the impact is as described.
@@ -98,7 +99,6 @@
         
         Receives the pooled payout at the single payout receiver and distributes each beneficiary's pro rata share manually, off-chain for this MVP version. Cover buyers trust this party to forward their share correctly. This is a custodial step at the edge of the system.
         
-        ---
         
         ## On-Chain Verification
         
