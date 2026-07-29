@@ -134,7 +134,7 @@
     <field name="status">fixed</field>
     <field name="commit">037c4794c80be31574613acf763074e212fe60cb</field>
     <field name="content">
-        ## [L-3] `setSettlementGracePeriod` has no upper bound
+        ## [L-3] `setSettlementGracePeriod` has no upper bound
         
         In `CoverOrderAllocator.sol` contract, the concentration caps configuration takes effect at `currentPeriod() + 1`, which is the same period in which orders created now will settle. Lowering a `(chain, protocol)` group cap therefore applies to orders already on the book for that period. At settlement, `_settleCoverOrder()` reads the new lower cap and can revert with `ProtocolConcentrationOverflow`.
   
@@ -232,5 +232,20 @@
     </field>
   </item>
   
+  <item>
+    <field name="topic">Informational</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+     
+      ## [I-1] Cover NFTs are freely transferable but carry no on-chain rights
+  
+      Cover NFTs are standard transferable `ERC721` tokens, while claim attribution routes through the order's `payoutRecipient`, captured at creation and never consulted against the current NFT holder. The specification confirms this is intended (the NFT is a receipt and payouts are routed off-chain to the recorded recipient). The consequence is that transferring or selling a Cover NFT does not transfer coverage: a secondary market buyer of a Cover NFT receives no claim rights.
+    </field>
+    <field name="response">
+        This is intended behaviour.
+    </field>
+  </item>
   
   
