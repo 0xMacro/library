@@ -92,6 +92,145 @@
   
     </field>
   </item>
+  <item>
+    <field name="topic">Cover settlement</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-2] Lowering a concentration cap mid period can strand already created orders
+      In `CoverOrderAllocator.sol` contract, the settlement grace period is set with no validation.
+  
+      ```solidity
+      function setSettlementGracePeriod(uint48 newGracePeriod) external onlyRole(CONFIG_ADMIN_ROLE) {
+          CoverOrderAllocatorStorage storage $ = _getStorage();
+          uint48 oldGracePeriod = $.settlementGracePeriod;
+          $.settlementGracePeriod = newGracePeriod;
+          emit SettlementGracePeriodUpdated(oldGracePeriod, newGracePeriod);
+      }
+      ```
+      **Reference:** CoverOrderAllocator.sol#L553-558
+  
+      Settlement is blocked until `committedAt + settlementGracePeriod`, and it must also be called while the target period is the current period (`SettleWindowExpired` otherwise). If the grace pushes `graceExpiresAt` to or past the period boundary, there is no instant at which the grace has elapsed and the target period is still current, so no order in that period can settle. All orders stay `PENDING`, then expire, recoverable via the permissionless expired order sweep. No funds are lost, since the premium is pulled during settlement, but cover issuance halts, and buyers who expected coverage for that period receive none.
+  
+      **Remediations to Consider**
+  
+      - Set a minimum floor for the `settlementGracePeriod()`, ensuring it is shorter than the period duration.
+      - Consider disallowing `commits` or `recommits` if the remaining period duration is less than the grace period.
+  
+    </field>
+    <field name="response">
+        - Timing confirmed: orders are created during period P with `targetPeriod = P+1`, and concentration updates checkpoint at`currentPeriod() + 1`, so a decrease during P applies exactly to the period where the existing book settles.
+    - **Key property the report understates: the cap is frozen once the settle period starts.**Any update made during P+1 lands at P+2, and the matcher builds and commits the tree *during* P+1. If the engine reads `getProtocolConcentrationAt(hash, P+1)`at any point after P+1 begins, it sees the final cap and `ProtocolConcentrationOverflow`is unreachable — affected orders are simply allocated less (PARTIAL) or left unallocated and expire. The settle revert only occurs if the engine matches against a snapshot taken before **the period start, the same stale-pin pattern as M-2.
+    - **The proposed remediation (defer decreases to** `currentPeriod() + 2`**) is rejected:**It worsens the risk posture: concentration caps are the de-risking lever, and deferring a decrease by a full period extends exposure to a`(chain, protocol)`group precisely when the curator wants to cut it. The current failure mode is the conservative one, less cover is sold on the risky group.
+      </field>
+  </item>
+  
+  <item>
+    
+    <field name="topic">Cover matching</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">037c4794c80be31574613acf763074e212fe60cb</field>
+    <field name="content">
+        ## [L-3] `setSettlementGracePeriod` has no upper bound
+        
+        In `CoverOrderAllocator.sol` contract, the concentration caps configuration takes effect at `currentPeriod() + 1`, which is the same period in which orders created now will settle. Lowering a `(chain, protocol)` group cap therefore applies to orders already on the book for that period. At settlement, `_settleCoverOrder()` reads the new lower cap and can revert with `ProtocolConcentrationOverflow`.
+  
+  The affected orders remain PENDING and are later cancelled, so no premium is charged and no funds are lost. The impact is liveness for those specific orders, and it requires coordination between the curator and the off-chain matching engine to avoid it. The behavior is documented in the contract.
+  
+  **Remediations to Consider**
+  
+  - Defer concentration decreases to `currentPeriod() + 2`, preserving the original cap for orders already created for the next period.
 
+  </field>
+  
+
+  </item>
+  
+  
+  <item>
+    <field name="topic">Spec Breaking</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">caa80cbacac7128e372f7c0745205d62f80f7999</field>
+    <field name="content">
+      ## [L-4] Code enforces a CAR floor of 1.0 while the specification requires 1.2
+  
+      The engineering specification enforces a Capital Adequacy Ratio floor of 1.2 at matching time. The contract only rejects `minCAR` values below `BPS_DENOMINATOR`, which is a floor of 1.0.
+  
+      ```solidity
+      if (config.minCAR < BPS_DENOMINATOR) revert InvalidMinCAR();
+      ```
+      **Reference:** CoverOrderAllocator.sol#L604
+  
+      An operator (or a configuration error) can therefore set `minCAR` between 1.0 and 1.2 and pass validation, sizing capacity above the solvency envelope the specification intends. This is a mismatch between the documented invariant and the enforced one. Combined with M-1, the effective solvency posture is governed entirely by configuration rather than by code.
+  
+      **Remediations to Consider**
+  
+      - If 1.2 is a hard requirement, enforce it in `_setCapacityConfig` (`minCAR ≥ 1.2e4`).
+      - If 1.2 is only a target and 1.0 is the true hard floor, document that explicitly so the discrepancy between spec and code is intentional.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">abffeabad13ea7330ee9a9b890a4e9b9f5ac75e2</field>
+    <field name="content">
+      ## [G-1] `payout` scans `periodConfigurations` twice for data derivable in one pass
+  
+      In `FirelightVault`, `payout()` function fetches the `capturePeriod` from the `captureTimestamp` and then the `capturePeriodStart` from the `capturePeriod` number:
+  
+      ```solidity
+      uint256 capturePeriod = periodAtTimestamp(captureTimestamp);
+      ...
+      uint48 capturePeriodStart = _periodStart(capturePeriod);
+      ```
+      **Reference:** FirelightVault.sol#L852-L863
+  
+      ```solidity
+      function periodConfigurationAtTimestamp(uint48 timestamp) public view returns (PeriodConfiguration memory) {
+          uint256 length = periodConfigurations.length;
+          if (length == 0) revert InvalidPeriod();
+  
+          PeriodConfiguration memory periodConfiguration;
+          for (uint256 i = 0; i < length; i++) {
+              if (timestamp < periodConfigurations[i].epoch)
+                  break;
+              periodConfiguration = periodConfigurations[i];
+          }
+          if (periodConfiguration.epoch == 0) revert InvalidPeriod();
+          return periodConfiguration;
+      }
+      ```
+      **Reference:** FirelightVault.sol#L244-L256
+  
+      However, each scan is O(n) over the period configuration history, which only grows over the vault's life, and the `periodConfigurationAtTimestamp()` used inside  `periodAtTimestamp()` already fetches all configuration for the specific timestamp. 
+  
+      ```solidity
+      /**
+       * @notice Configuration of a vault period.
+       * @param epoch Starting timestamp of this configuration.
+       * @param duration Period length in seconds. Must be a multiple of {SMALLEST_PERIOD_DURATION}.
+       * @param startingPeriod Period number assigned to `epoch`.
+       */
+      struct PeriodConfiguration {
+          uint48 epoch;
+          uint48 duration;
+          uint256 startingPeriod;
+      }
+      ```
+      **Reference:** IFirelightVault.sol#L27-L37
+  
+      Consider resolving the timestamp to its `PeriodConfiguration` once and deriving both the period number and its start timestamp from that single lookup, returning both values in a single loop.
+  
+    </field>
+  </item>
+  
   
   
