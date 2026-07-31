@@ -245,5 +245,129 @@
         This is intended behaviour.
     </field>
   </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      <field name="status">fixed</field>
+      <field name="commit">ba51b6774afe9cac3132da3fad9c4bda303ebe03</field>
+      <field name="content">
+        ## [I-2] Add events to Firelight functions
+
+        
+      </field>
+      <field name="response">
+        Added events AddedToBlocklist , RemovedFromBlocklist , AddedToPayoutAllowlist , RemovedFromPayoutAllowlist from FirelightVault contracts.
+      </field>
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      <field name="status">fixed</field>
+      <field name="commit">add7b3b261ad87e68423a55e0dfe36f5155f1804</field>
+      <field name="content">
+        ## [I-3] Add checkpoint on reward distributor
+      </field>
+    <field name="response">
+        At VaultRewardDistributor contract, added call to FirelightVault checkpointTotalAssets to update the totalAssets from checkpointed values.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      <field name="status">fixed</field>
+      <field name="commit">7f9260284f2e4c6d3fae0e6ed84e5023ea8c9b03</field>
+      <field name="content">
+        ## [I-4] Added function to cancel an allocation commitment
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      <field name="status">fixed</field>
+      <field name="commit">a3fecf27fedffb8d50ba3dff5850071f382bae2d</field>
+      <field name="content">
+        ## [I-5] Emit deposit limit event during FirelightVault initialize
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      <field name="status">fixed</field>
+      <field name="commit">c7a137f7da42c2672cdfcb5f6207fcee0d70373e</field>
+      <field name="content">
+        ## [I-6] Emit PayoutReceiverUpdated at IncidentManager initialize
+
+    </field>
+  </item>
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      <field name="status">fixed</field>
+      <field name="commit">605872d4afca7c68d047c1df6194cd873d277355</field>
+      <field name="content">
+        ## [I-7] Enforce minCAR upper bound
+
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      <field name="status">fixed</field>
+      <field name="commit">1ac85df0f820c5e958f80e1cb1bb029c0cd7430b</field>
+      <field name="content">
+        ## [I-8] Bytecode optimizations at CoverOrderAllocator
+
+    </field>
+    <field name="response">
+        Covered in [I-10] remediation via premium calculation.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      <field name="status">fixed</field>
+      <field name="commit">1ac85df0f820c5e958f80e1cb1bb029c0cd7430b</field>
+      <field name="content">
+        ## [I-9] Added matchingCapacity at commitAllocation 
+
+        
+    </field>
+    <field name="response">
+        Used by the Engine at settling time to generate coverOrder proofs from initial matching commitment.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      <field name="status">fixed</field>
+      <field name="commit">1ac85df0f820c5e958f80e1cb1bb029c0cd7430b</field>
+      <field name="content">
+        ## [I-10] Cover Settlement - Premium Validation Gap
+    </field>
+    <field name="response">
+        - Full match binds premium exactly, partial accepts any premium <= total from the leaf with no proportionality check (Contract stores per market rate + cover, the exact premium is computable onchain. The current code instead accepts allocatedPremium from the leaf (only bounding it <= totalPremiumAmount), making allocatedPremium a trusted leaf field that could be removed entirely).
+        - Removed premium from merkle tree leaf.
+    </field>
+  </item> 
+
+  <item>
+    <field name="topic">Informational</field>
+    <field name="content">
+      <field name="status">fixed</field>
+      <field name="commit">4b9da8ba7838eeec92a6eee8fc676661d0f0a73d</field>
+      <field name="content">
+        ## [I-11] Updated wrong comments
+    </field>
+  </item> 
   
   
