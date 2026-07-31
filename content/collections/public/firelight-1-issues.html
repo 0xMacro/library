@@ -253,9 +253,6 @@
       <field name="content">
         ## [I-2] Add events to Firelight functions
 
-        
-      </field>
-      <field name="response">
         Added events AddedToBlocklist , RemovedFromBlocklist , AddedToPayoutAllowlist , RemovedFromPayoutAllowlist from FirelightVault contracts.
       </field>
   </item>
@@ -266,10 +263,9 @@
       <field name="commit">add7b3b261ad87e68423a55e0dfe36f5155f1804</field>
       <field name="content">
         ## [I-3] Add checkpoint on reward distributor
-      </field>
-    <field name="response">
+
         At VaultRewardDistributor contract, added call to FirelightVault checkpointTotalAssets to update the totalAssets from checkpointed values.
-    </field>
+      </field>
   </item>
 
   <item>
@@ -279,6 +275,7 @@
       <field name="content">
         ## [I-4] Added function to cancel an allocation commitment
 
+        Function was added to cancel an allocation commitment.
     </field>
   </item>
 
@@ -289,6 +286,7 @@
       <field name="content">
         ## [I-5] Emit deposit limit event during FirelightVault initialize
 
+        Event was added to emit the deposit limit event during FirelightVault initialize.
     </field>
   </item>
 
@@ -299,6 +297,7 @@
       <field name="content">
         ## [I-6] Emit PayoutReceiverUpdated at IncidentManager initialize
 
+        Event was added to emit the PayoutReceiverUpdated event at IncidentManager initialize.
     </field>
   </item>
   <item>
@@ -308,6 +307,7 @@
       <field name="content">
         ## [I-7] Enforce minCAR upper bound
 
+        The minCAR upper bound was enforced alongside the lower bound.
     </field>
   </item>
 
@@ -318,6 +318,7 @@
       <field name="content">
         ## [I-8] Bytecode optimizations at CoverOrderAllocator
 
+        Bytecode optimizations were added to the CoverOrderAllocator contract.
     </field>
     <field name="response">
         Covered in [I-10] remediation via premium calculation.
@@ -330,8 +331,7 @@
       <field name="commit">1ac85df0f820c5e958f80e1cb1bb029c0cd7430b</field>
       <field name="content">
         ## [I-9] Added matchingCapacity at commitAllocation 
-    </field>
-    <field name="response">
+
         Used by the Engine at settling time to generate coverOrder proofs from initial matching commitment.
     </field>
   </item>
@@ -342,8 +342,7 @@
       <field name="commit">1ac85df0f820c5e958f80e1cb1bb029c0cd7430b</field>
       <field name="content">
         ## [I-10] Cover Settlement - Premium Validation Gap
-    </field>
-    <field name="response">
+
         - Full match binds premium exactly, partial accepts any premium <= total from the leaf with no proportionality check (Contract stores per market rate + cover, the exact premium is computable onchain. The current code instead accepts allocatedPremium from the leaf (only bounding it <= totalPremiumAmount), making allocatedPremium a trusted leaf field that could be removed entirely).
         - Removed premium from merkle tree leaf.
     </field>
@@ -355,6 +354,8 @@
       <field name="commit">4b9da8ba7838eeec92a6eee8fc676661d0f0a73d</field>
       <field name="content">
         ## [I-11] Updated wrong comments
+
+        Comments were updated.
     </field>
   </item> 
   
