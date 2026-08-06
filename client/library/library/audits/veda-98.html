@@ -1,0 +1,33 @@
+<page
+  clientName="Veda Labs"
+  reportDate="August 6th, 2026"  
+  auditTitle="Veda A-98"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html"
+  repoCommitHash="53276da816741d2bb193f842ab4811974ac76f5a"
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on August 6th, 2026.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <ul>
+        <b>Solver Registry and M0Adapter changes specifically from <a href="https://github.com/Veda-Labs/boring-vault/pull/772">PR 772</a></b>
+
+      <template type="file-hashes">
+        2b09f53b4c9f1a011110cd5f429aeda38005b850edfb6191636c0c08bfabc123  src/base/Periphery/SolverRegistry.sol
+        7dc43d6d9dd9364b04b9e3c13e7856a6b8363cd03eb5b93a568889caff6753dc  src/base/Periphery/BoringSwapper.sol
+        47112fd6f2f57456c45789a6f58584b9a1bc868afddcc5affe369a635149ab0a  src/base/Periphery/adapters/M0Adapter.sol
+      </template>
+    </ul>
+  </content-for>
+</page>
