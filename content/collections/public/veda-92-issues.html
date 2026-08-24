@@ -1,0 +1,12 @@
+<item>
+  <field name="topic">Scoped Impact</field>
+  <field name="content">
+    ## [I-1] Constructor bound checks apply only to newly deployed accountants
+
+    [PR 748](https://github.com/Veda-Labs/boring-vault/pull/748) adds five input-validation guards to the `AccountantWithRateProviders` constructor so that an accountant can no longer be *deployed* with parameters its own setters would reject.
+
+    Previously, the five setters (`updateUpper`, `updatePlatformFee`, etc.) enforced these bounds, but the constructor, as written, would write those same values straight into `accountantState` unchecked. In theory, an accountant could have been deployed in a state that normal operation would never reach.
+
+    This change closes that gap by creating consistent checks across both the setters *and* the constructor. No onchain behavior is affected with this change.
+  </field>
+</item>
