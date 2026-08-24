@@ -1,0 +1,333 @@
+<page
+  clientName="Firelight"
+  reportDate="July 29, 2026"
+  auditTitle="Firelight A-1"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/firelight-protocol/firelight-core"
+  layout="/library/audits/_layout.html" 
+  issueSummaryFormat="legacy"
+  repoCommitHash="d0d373376bdefd97efe5c7a8dd251ac27e12c9b4"
+  finalRepoCommitHash="bd1849d0d57e81d19ca864b5d2741ba94f019314"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on June 26th to July 13th 2026.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+        ### Trust Model, Assumptions, and Accepted Risks (TMAAR)
+
+        Firelight is an on-chain cover protocol on Flare. For the MVP it is, by design, an operator run underwriting desk with on-chain settlement rails: off-chain actors sell cover, assess incidents, and execute payouts, while the contracts enforce per action bounds and hold funds. This document outlines what each participant must trust and what happens if a trusted party is compromised or errs. The privileged powers listed here are conditions for correct operation, not vulnerabilities in themselves.
+        
+        The v2 contracts in scope are not yet deployed, so their role holders below are the intended holders described by the team. The legacy V1 predeposit vault, however, is live on Flare mainnet and holds real capital; its control structure was verified on-chain and is described in the On-Chain Verification section, and the audited v2 code is intended to upgrade it.
+        
+        Two participant classes carry very different exposure:
+        
+        - **Collateral providers (XRP stakers)** are protected by code. Slashing is bounded and pro rata, and their downside can never exceed their stake. Their residual exposure is governance and the solvency parameters.
+        - **Cover buyers** are protected mainly by permissioned users executing based off legal or business agreements, not by code. Their orders are authored by the operator, their claims are assessed by the operator and approved by a consortium, and their payouts are distributed manually. On-chain they only grant a premium approval and hold a receipt NFT.
+        
+       
+        ## External Infrastructure
+        
+        ### Flare FTSO v2 (via the Flare Contract Registry)
+        
+        Trusted for the integrity of the vault asset price (FXRP in USD), which drives both cover capacity and the vault of payouts. The `FtsoChainlinkAdapter` reads the feed live through a static call and validates positivity and freshness before use, so a bad or zero read fails closed rather than mispricing.
+        
+        - The adapter works only while the FTSO feed is callable without a fee, which is the current default. If Flare enables fees on the wrapped feed, every price read reverts and both cover commitment and vault payouts halt until the operators migrate to a fee adapter. This is a live external dependency for the whole pricing surface.
+        - FTSO integrity is a Flare infrastructure assumption outside this protocol's control. A manipulated or degraded feed mis sizes capacity and payouts. Flare is an L1, so there is no sequencer liveness concern.
+        
+        ### First Loss Buffer custody wallet
+        
+        A stablecoin reserve that both contributes to cover capacity and pays first in the claim payout waterfall. It is an external Firelight operated wallet configured per period, not an escrow held by the protocol.
+        
+        - Capacity reads the wallet balance live, and the waterfall pulls from it via a set approval. The protocol trusts this wallet to remain funded and approved. If it is funded at commitment and then drawn down, sold cover becomes underbacked. If it holds a balance but has not approved the `IncidentManager`, incident approval reverts.
+        - The buffer is assumed to be a stablecoin pegged to USD. Its USD value is not oracle checked on-chain (see Accepted Risks).
+        
+        ### Premium Collection Address and daily conversion service
+        
+        Receives all premiums and runs a daily strategy that converts them into the vault asset and streams the result into the vault as staker yield. Trusted to collect premium honestly and return it as yield. A misconfigured or compromised collector could divert or steal staker yield. Operationally isolated from payout flows.
+        
+        ## Protocol Governance
+        
+        ### ProxyAdmin owner and `DEFAULT_ADMIN_ROLE` (Firelight)
+        
+        Highest trust level. All contracts sit behind Transparent proxies, the ProxyAdmin owner can replace the logic of every contract, which overrides every restriction and invariant of the protocol. `DEFAULT_ADMIN_ROLE` on each contract grants and revokes all other roles and can assign itself any operational power below.
+        
+        For the live V1 vault, this authority is verified on-chain (see On-Chain Verification): the ProxyAdmin owner and the vault `DEFAULT_ADMIN_ROLE` are the same 2 of 2 Safe, whose two members are themselves a 6 of 11 and a 3 of 4 Safe. This is a strong dual control structure. 
+        
+        
+        ## Protocol Roles
+        
+        The roles below are operational trust assumptions. Holders are assumed to act within established policies. If a holder is compromised or acts maliciously, the impact is as described.
+        
+        ### Curator (Sentora): `CURATOR_ROLE` and `ALLOCATOR_ROLE` on the `CoverOrderAllocator`, `CURATOR_ROLE` on the `IncidentManager`
+        
+        The operational heart of the MVP. The curator creates cover orders on behalf of clients and sets every order parameter, commits the off-chain matching result and settles it (charging premium and minting cover NFTs), and creates incidents, chooses their capture timestamp, and publishes the proposed loss schedule.
+        
+        Trusted to author orders on agreed terms, match honestly, and report incidents and losses truthfully. If compromised, it can charge buyers for unwanted or mispriced cover or propose fabricated incidents. Premium flows to the collector rather than the curator, so premium extraction is theft only if the same party controls the collector or holds the allocator `ADMIN_ROLE`. 
+        
+        ### Risk Consortium Safe: `ASSESSMENT_APPROVER_ROLE`, `ASSESSMENT_REJECTER_ROLE`, and `INCIDENT_INVALIDATOR_ROLE` on the `IncidentManager`
+        
+        Intended as a multisign with a 5 member consortium and a 3-out-of-5 quorum threshold. The payout authority and the primary on-chain check on the operational proposals of incidents and payouts. 
+        
+        Trusted to validate the curator's loss schedule (both coverage validity and payout accuracy) before approving. If it colludes with the curator or approves without genuine review, it can unfairly slash the buffer and vault assets. Its independence from the curator is the single most important assumption in the claim flow. Note that all three claim-side powers live in this one Safe.
+        
+        ### `PAYOUT_ROLE` and `INCIDENT_ROLE` on the `FirelightVault`
+        
+        Operational roles in `FirelightVault` intended to be held by the `IncidentManager` contract, not by any EOA. `PAYOUT_ROLE` is the only path by which vault assets leave to the cover side, and `INCIDENT_ROLE` freezes deposits during an open incident. The vault trusts the caller entirely for legitimacy and enforces only per-call bounds. Because these roles are contract held, misuse requires the curator and consortium path above rather than a single key. It is a deployment invariant that these roles are held only by the `IncidentManager`.
+        
+        ### `MINTER_ROLE` on the `CoverNFT`
+        
+        Held by the allocator contract, which mints one cover NFT per settled order to the buyer. It is a deployment invariant that this role is held only by the allocator; otherwise arbitrary token ids or recipients could be minted.
+        
+        ## Configuration and value setting roles (Firelight)
+        
+        - **Allocator `CONFIG_ADMIN_ROLE`** sets the solvency parameters (leverage, `minCAR`, first loss buffer token and wallet, divergence tolerance), the settlement grace period, markets, and concentration caps. Misuse can over-leverage the protocol (see M-1, L-4) or strand orders. Highest impact configuration role.
+        - **Allocator `ADMIN_ROLE`** sets the premium collector and the capacity oracle. Redirecting the collector diverts all premiums.
+        - **IncidentManager `PAYOUT_ADMIN_ROLE`** sets the single payout receiver that receives all buffer and vault payouts. Redirecting it captures payouts before the manual distribution step.
+        - **IncidentManager and adapter oracle roles** (`PRICE_FEED_ADMIN_ROLE`, `FEED_ADMIN_ROLE`) change the payout oracle and rotate the wrapped FTSO feed. Feed rotation has no timelock. The allocator and IncidentManager price feeds are configured independently in code; both are expected to reference the single FTSO FXRP/USD adapter, which is a deployment configuration assumption verified in the checklist below rather than an enforced invariant.
+        - **Vault `BLOCKLIST_ROLE` with `RESCUER_ROLE`** can blocklist any account and move its shares and pending withdrawals to an address of choice. This is the standard compliance rescue pattern and is a targeted confiscation power over a staker's principal.
+        - **Vault `PAUSE_ROLE`, `DEPOSIT_LIMIT_UPDATE_ROLE`, `PERIOD_CONFIGURATION_UPDATE_ROLE`, `PAYOUT_ALLOWLIST_ROLE`; CoverNFT `PAUSER_ROLE` and `URI_MANAGER_ROLE`; rewarder `DISTRIBUTOR_ROLE` and `SWEEPER_ROLE`** are lower impact operational levers (pause, deposit throttling, period cadence, payout allowlist, NFT metadata base URI, yield injection, stray token recovery). Pausing the CoverNFT also halts settlement. `URI_MANAGER_ROLE` is cosmetic only: it sets the CoverNFT metadata base URI and touches no funds or liveness.
+        
+        ### Firelight Foundation Multisig (off-chain distributor)
+        
+        Receives the pooled payout at the single payout receiver and distributes each beneficiary's pro rata share manually, off-chain for this MVP version. Cover buyers trust this party to forward their share correctly. This is a custodial step at the edge of the system.
+        
+        
+        ## On-Chain Verification
+        
+        The values below were read from live calls against the Flare mainnet via a public node RPC on audit dates (July 10, 2026), with the `ERC1967` implementation and admin slots read directly. Only the legacy V1 `predeposit` vault is deployed today. The v2 contracts in scope are not yet deployed, so their role holders remain intended as described above. This section characterizes the live control surface that custodies predeposit capital now, and that will execute the upgrade to v2.
+        
+        ### Governance structure
+        
+        The V1 vault is a Transparent proxy. Its upgrade authority (the ProxyAdmin owner) and its `DEFAULT_ADMIN_ROLE` are the same Gnosis Safe, a 2 of 2. The two members of that Safe are not individual keys; each is itself a Gnosis Safe:
+        
+        - Member A is a 6 of 11 Safe.
+        - Member B is a 3 of 4 Safe.
+        
+        Changing the vault logic or granting any vault role therefore requires both member Safes to approve, which in turn requires a 6 of 11 quorum in one organization and a 3 of 4 quorum in the other. This is a dual control structure between two multisig parties, each with internal redundancy, rather than a thin two key setup.
+    </template>
+
+    <h3>Address Legend</h3>
+    <table class="mt-8 table-fixed w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
+      <thead>
+        <tr>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Label</th>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Address</th>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Type</th>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Description</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words">Root Safe</td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0xf811e83b45d8de67858efa3ac1202a8b46b8d0b3</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 2 of 2</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Owns the ProxyAdmin and holds <code>DEFAULT_ADMIN_ROLE</code> on the vault</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words">Member Safe A</td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0x78547dda5c18db47bb8ecd1d3c368955b513f355</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 6 of 11</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">One of the two required members of the root Safe</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words">Member Safe B</td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0xb75e26b07253172348c34a70802b09f9ed735438</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 3 of 4</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">One of the two required members of the root Safe</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words">ProxyAdmin</td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0x15f89292cef63405a53ab806966681ecb430df85</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">ProxyAdmin</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Transparent proxy admin, owned by the root Safe</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words">Vault asset</td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0xad552a648c74d49e10027ab8a618a3ad4901c5be</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">ERC20, FXRP, 6 decimals</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Underlying collateral</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words">Operations Safe</td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0x189993f3B53284c7e5C02b058EFC6618F78D0cEA</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 1 of 1</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Holds <code>PAUSE</code>, <code>BLOCKLIST</code>, and <code>PERIOD_CONFIGURATION_UPDATE</code></td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words">Deposit limit Safe</td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0x877EC24ad923De4D22bA24eB1A6A3564AbC94564</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 1 of 1</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Holds <code>DEPOSIT_LIMIT_UPDATE</code></td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words">Rescuer Safe</td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0xC115757266b902d4b1284eA24DBbE557C15E963E</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 1 of 1</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Holds <code>RESCUER</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Contract Registry</h3>
+    <table class="mt-8 table-fixed w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
+      <thead>
+        <tr>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Contract</th>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Proxy</th>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Implementation</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words">V1 predeposit vault</td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0x4C18Ff3C89632c3Dd62E796c0aFA5c07c4c1B2b3</code></td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0x70ccf1bee0c1217069fe74083ca71af7bcd7fb76</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Observed State</h3>
+    <table class="mt-8 table-fixed w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
+      <thead>
+        <tr>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Item</th>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Value</th>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Note</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words"><code>contractVersion()</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">1</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Confirms the pre v2 predeposit vault</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words"><code>asset()</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">FXRP, 6 decimals</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Underlying collateral</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words"><code>totalAssets()</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">approximately 60.16 million FXRP</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Real predeposit capital held today</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words"><code>DEFAULT_ADMIN_ROLE</code> holder</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Root Safe (2 of 2)</td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">The two member Safes do not hold the role individually</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Role Matrix</h3>
+    <table class="mt-8 table-fixed w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
+      <thead>
+        <tr>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Role</th>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Holder</th>
+          <th scope="col" class="py-3.5 px-4 text-center font-medium text-gray-900 dark:text-gray-300">Type</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words"><code>DEFAULT_ADMIN_ROLE</code></td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all">Root Safe <code>0xf811e83b45d8de67858efa3ac1202a8b46b8d0b3</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">2 of 2 (members are a 6 of 11 and a 3 of 4 Safe)</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words"><code>PAUSE_ROLE</code></td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0x189993f3B53284c7e5C02b058EFC6618F78D0cEA</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 1 of 1</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words"><code>BLOCKLIST_ROLE</code></td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0x189993f3B53284c7e5C02b058EFC6618F78D0cEA</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 1 of 1</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words"><code>PERIOD_CONFIGURATION_UPDATE_ROLE</code></td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0x189993f3B53284c7e5C02b058EFC6618F78D0cEA</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 1 of 1</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words"><code>DEPOSIT_LIMIT_UPDATE_ROLE</code></td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0x877EC24ad923De4D22bA24eB1A6A3564AbC94564</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 1 of 1</td>
+        </tr>
+        <tr>
+          <td class="p-4 font-medium text-gray-900 dark:text-gray-300 text-left break-words"><code>RESCUER_ROLE</code></td>
+          <td class="Copy p-4 dark:text-gray-100 font-ui text-left break-words break-all"><code>0xC115757266b902d4b1284eA24DBbE557C15E963E</code></td>
+          <td class="p-4 text-gray-900 dark:text-gray-300 text-left break-words">Gnosis Safe, 1 of 1</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <template type="audit-markdown">
+        The original deployer `0x3e6F51038D42E3Dd34b234813ec32bd6074E4Ee7` held `DEFAULT_ADMIN_ROLE` at genesis and was revoked once the root Safe was granted it, so no deployer key retains admin privileges.
+
+        ## Accepted and Known Risks
+        
+        These are conditions the team has reviewed and accepted for the MVP, or documented as known issues. They are ordered by blast radius. Several rest on the same off chain operator and should be revisited before a mainnet deployment that holds real staker capital.
+        
+        ### Aggregate claims are not capped on-chain against cover sold (known issue, observed on testnet)
+        
+        The contracts do not track how much of a given cover has already been claimed within a period. Each assessed loss is checked only against a cover market's fixed allocation, and the duplicate check is scoped to a single incident and round, so two incidents in the same period can each claim the full allocation for the same cover. The team flags this to auditors in the specification, and their own testnet paid out more than 100 percent of notional across incidents in a single period. It requires a curator and the consortium to approve duplicate or excessive claims, or an operational oversight.
+        
+        The sole control today is off-chain review by the consortium. Impact if it recurs is staker loss beyond underwritten exposure. The team's planned fix is on-chain per coverage tracking (a `remainingCoverage` decrement on approval). This is accepted for the MVP.
+        
+        ### First loss buffer is counted and paid from an unescrowed external wallet (trust assumption for MVP)
+        
+        Capacity counts, and the waterfall draws from, the live balance of an external address. It can be funded to inflate capacity at commitment and then withdrawn, and its funding and approval state is a liveness dependency for claim approval. Accepted for the MVP under the assumption that the buffer wallet is honestly managed by the operator. 
+        
+        ### Cover orders are authored entirely by the operator, gated only by the buyer's approval (accepted for MVP)
+        
+        For the MVP, the curator places orders on behalf of clients under an existing off-chain business relationship, and the buyer does not interact directly with the protocol. The only on-chain consent gate is the buyer's premium approval, which bounds premium value at risk but not the order parameters. Because coverage can be renewed per period with a fresh premium pull each time, recurring buyers overapproving their recurring premium for more to avoid constantly managing their allowances are more exposed to the protocol discretion. Accepted as an explicit trust assumption for the MVP, with buyers creating their own orders post MVP. Recommendations: bound the per-order premium on-chain (a maximum rate), keep the curator and the collector setting role separate, and adopt signed order consent (EIP712 with a per-buyer nonce) for the post-MVP self-serve path. 
+        
+        ### First loss buffer is treated as exactly USD pegged (accepted, documented)
+        
+        The buffer's USD value is derived solely via decimal conversion, with no oracle. A depeg of the buffer stablecoin overcounts capacity and, on the payout side, credits the buffer at par, so the depeg loss is routed to the beneficiary while the vault is shielded. Accepted given a standard, high-trust stablecoin is intended to be used and clear documentation. The assumption is only as strong as the configured buffer token, so a change of that token via the capacity configuration should be reviewed.
+        
+        ### New deposits can capture a pending reward distribution (accepted)
+        
+        Because rewards are injected by raising the vault redemption value, a deposit placed just before a distribution shares in yield it did not earn, diluting existing stakers for that cycle. It is mitigated by the withdrawal delay and by incident risk, since the new capital cannot exit immediately and remains exposed for the period. 
+        
+        ### Incident approval is FIFO by capture time and depends on operators resolving earlier incidents
+        
+        In `IncidentManager`, `approveCurrentAssessment` must target the earliest non-terminal incident in the payout window, so a later incident cannot be approved while an earlier one is still `OPEN`, `CONFIRMED`, or under evaluation without a submitted round. This capture time priority is intentional, giving earlier incidents first claim on capacity, but it means a stalled earlier incident delays every later payout in the window until the curator advances or cancels it. The stall is always clearable by the operators while the incident is live, since the cancel paths and the selection share the same current and previous period window, and it self clears once the incident's period ages out of that window.
+    </template>
+  </content-for>
+
+ 
+
+  <content-for name="source-code">
+    <p>
+      Specifically, we audited the following contracts within this repository. Additionally, Firelight made changes after the audit, marked as issues I-2 to I-11, which were reviewed.
+    </p>
+
+    <template type="file-hashes">
+        da52074815a7eec5b418a053d7155992392d3179041b8358137ba819d0084c73  contracts/core/CoverNFT.sol
+        ea06ed8b715f60efaea7fe3fd59747e971d09710a1a631f8ff1b24c786f238f6  contracts/core/CoverOrderAllocator.sol
+        4a6d517ae45f7944ce4fb47c82300371f918d5cd34be5bdaf2baacf6de4420d6  contracts/core/FirelightVault.sol
+        95e0038b04608c829ef2f22ef8c219ade2aeba65fd7180abfa01639531c5f0f6  contracts/core/FirelightVaultStorage.sol
+        dc7298ee691143abe7644aef234c5f71e5d67af41c3e1bc4c96afb2cc092abcb  contracts/core/IncidentManager.sol
+        af91d2b0401b8704593f09a290c11a344510544ce6936e953ed343aa6a805371  contracts/core/VaultRewardDistributor.sol
+        b3473f120e8a5aa8792807b1c4955ec063398402f8c7cb34daf0f57e629fded2  contracts/core/interfaces/IAggregatorV3.sol
+        6b7022a6cfd0fc25e90bc4ac26330d64449c43c82fa94ade53e141b1dd9de8ff  contracts/core/interfaces/ICoverOrderAllocator.sol
+        ec5b25f6bf5516559f8b72c4f5b22fede37af6de8e77a7071a7a133007b0bc2e  contracts/core/interfaces/IFirelightVault.sol
+        5c9eaaff03a284c0c9265f8520e7af82b95ac5f1dc52d8159f30781ef83cb594  contracts/core/interfaces/IIncidentManager.sol
+        a77a6f3fc67f0b16d402c2ac6a50324f39a1164904995db59f10b36dd03df900  contracts/core/lib/Checkpoints.sol
+        01f898306283631b28cee3edca987e151d98d24de125413db58c9a909c063e53  contracts/core/lib/Decimals.sol
+        d0a980eebb9f8c0703845d06dc7cf717b62201366ed058d4d88426734c2d4122  contracts/core/lib/PriceFeed.sol
+        56d797e28be1d802a04424d2636412dc9446faec1fe0f86e136a935cee6906d8  contracts/oracle/FtsoChainlinkAdapter.sol
+    </template>
+
+  </content-for>
+</page>
