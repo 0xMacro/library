@@ -1,0 +1,20 @@
+<item>
+    <field name="topic">Grieifing</field>
+    <field name="impact">high</field>
+    <field name="impactNote">Potential loss of all assets bridged.</field>
+    <field name="chance">low</field>
+    <field name="chanceNote">In practice, it would be unlikely circle would accept such a high fee.</field>
+    <field name="status">fixed</field>
+    <field name="commit">8c4f05367803a098c8a216e6f8330aca91f78273</field>
+    <field name="content">
+      ## [L-1] Max fee for bridging is not constrained
+  
+      In [`depositForBurn()`](https://github.com/Veda-Labs/boring-vault-private/blob/c4779a0fc0f2d59b9a140dce5a6d193335a22779/src/base/DecodersAndSanitizers/Protocols/CCTPDecoderAndSanitizer.sol#L17-L55) the parameter `maxFee` is intended to set a limit on the max fee Circle charges to bridge assets. Since the sanitizer does not constrain the max fee, it allows a strategist to set this fee to be equal to effectively be the amount being bridged. If Circle ends up charging the max fee set, all assets transferred would be lost.
+  
+      **Remediations to Consider**
+  
+      Constrain the `maxFee` to a small percentage of the assets being bridged.
+  
+    </field>
+  </item>
+  
