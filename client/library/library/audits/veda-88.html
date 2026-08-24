@@ -1,0 +1,43 @@
+<page
+  clientName="Veda Labs"
+  reportDate="June 11th, 2026"
+  auditTitle="Veda A-88"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  repoCommitHash="f5801171e3a1fa793f72d13b72cfe2cff3301406"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team from June 3rd to June 5th, 2026.
+</content-for>
+  
+<content-for name="spec">
+<ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository.</li>
+</ul>
+</content-for>
+  
+<content-for name="source-code">
+  
+    <p>Specifically, we audited the following contract changes:</p>
+  
+    <template type="file-hashes">
+        1e5514e62ec26fc4a20e22d9544dbcf84b384d58acd22f05375da5da0f222952  src/base/DecodersAndSanitizers/Protocols/BoringSwapperDecoderAndSanitizer.sol
+        f7cd67d8ce3661454cf040cc685504a1b9a88d184fbbf21dfffeaa7b0f2a2e47  src/base/Periphery/AdapterRegistry.sol
+        8d5a6055dadb31c1875c1dd8162157a3aac8a6a28f042446c173f04c9ac6edee  src/base/Periphery/BoringSwapper.sol
+        00790c1feb0d16b351299bcf6572da6e488833677110e6fe89581a4c30b12c6e  src/base/Periphery/FeeRegistry.sol
+        4155f0ab8032b93417439b18ba3fc1c2b70a6a2b060c00c832152d85c8022bae  src/base/Periphery/adapters/BaseAdapter.sol
+        3384228eff8996bd8419727e8fd6cbda2d45782359669c5529365ded9edeb3e5  src/base/Periphery/adapters/CowswapAdapter.sol
+        12e60e3386aa920f6354aa1873669e8b48dfdab7337a4ce3e9e19a7bdf5ad2e3  src/base/Periphery/adapters/LifiAdapter.sol
+        b4902cdc4617ee82a00ba09b37b42b1cf5eab0badb1e29e36acb07937ffb3d74  src/base/Periphery/adapters/M0Adapter.sol
+        0fc21abb53aa4a29ac55ae0f08085d7fcf8bb8276f60c93693505e94adf897e8  src/base/Periphery/adapters/OneInchAdapter.sol
+        b9e3d45178887bc3020cc2f2a06f84ec8709eb04c14c9f719624f6cad8d1690e  src/base/Periphery/adapters/OpenOceanAdapter.sol
+        cdac70485a29bebb8694dcb4c779de25b163fca3eae8eb720e8adbf816264284  src/base/Periphery/adapters/UniswapV3Adapter.sol
+        984b64a92536739f149bcd0e889e983f96f956e20703d63f9e3ee5efa4a53822  src/base/Periphery/adapters/price/PriceValidator.sol
+        68e517d2730f98550fe57b50f06a32a4edc4dced621f7d9205ed14d5b3901410  src/helper/GenericRateProviderWithStalenessCheck.sol
+        8205c596ae0143c3d76edba42542b162d405b77317ba0819ff4a5a1092acc603  src/interfaces/DecoderCustomTypes.sol
+
+    </template>
+</content-for>

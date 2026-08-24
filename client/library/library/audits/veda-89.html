@@ -1,0 +1,35 @@
+<page
+  clientName="Veda Labs"
+  reportDate="June 11th, 2026"
+  auditTitle="Veda A-89"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-fixes"
+  repoCommitHash="f80c54fdb67d893c1cca0af4f79ca3e4a0408092"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team May 8th to 11th, 2026.
+</content-for>
+  
+<content-for name="spec">
+<ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository.</li>
+</ul>
+</content-for>
+  
+<content-for name="source-code">
+  
+    <p>Specifically, we audited the following contract changes:</p>
+  
+    <template type="file-hashes">
+        caadea60f8f8630d6d44b26a2518e04547a1708e946bb1d7cf73e244772fd277  src/base/DecodersAndSanitizers/Protocols/BTCbDecoderAndSanitizer.sol
+        b4a99bbe0d6addc8ef048c9cac0a34b22708cf1027560b0581e9e5dbdd6e7540  src/base/DecodersAndSanitizers/Protocols/BTCKDecoderAndSanitizer.sol
+        6386ac356a4877a4722b726a6839701db5546e4e12e25cc4051ae1a441a100ed  src/base/DecodersAndSanitizers/Protocols/FluidDexDecoderAndSanitizer.sol
+        b7967036499b8b27dad99d0e873077dc6f0d22d191de21e0bc46f13ba6ad2d54  src/base/DecodersAndSanitizers/Protocols/EigenLayerLSTStakingDecoderAndSanitizer.sol
+        fe7416350b1d37748067a4b07398c903caa1730d44fa973eb95dbc53b9c7f899  src/base/DecodersAndSanitizers/Protocols/OFTDecoderAndSanitizer.sol
+        7e6c7819ffe0ce0675da3dbdb64b60bdc7494c3d7c35e3ac9c4a99cd130fed95  src/base/DecodersAndSanitizers/Protocols/TellerDecoderAndSanitizer.sol
+        6e22753927cb2d39827d65bc9bade6fd350ce1d9152ba1fe9dad113b5a3c0597  src/base/DecodersAndSanitizers/Protocols/UniswapV4DecoderAndSanitizer.sol
+    </template>
+</content-for>
