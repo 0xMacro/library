@@ -1,0 +1,58 @@
+<page
+  clientName="Veda Labs"
+  reportDate="May 29th, 2026"
+  auditTitle="Veda A-86"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  repoCommitHash="71368995faf419c75fffa3c687ab27fd58dc2cdb"
+  finalCommitHash="aac9c31bb0eb35f9274b30ad302cfdbfd6a0443c"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team on April 20th to April 27th 2024.
+  </content-for>
+  
+    <content-for name="spec">
+      <ul>
+        <li>Discussions with the {{page.clientName}} team.</li>
+        <li>Available documentation in the repository.</li>
+      </ul>
+  
+        <template type="audit-markdown">
+          ### Trust Model, Assumptions, and Accepted Risks (TMAAR)
+
+          #### Roles
+
+            - Strategist: Can swap, as well as submit, cancel and replace orders. Is trusted to use the swapper to facilitate the vaults strategy and operate in the best interest of vault shareholders
+            - Vault Admin: Has pause control of the swapper and adaptors, can set pricing value like oracles and slippage, approve verified adaptors for the swapper to use and allow token swap routes, and sweep tokens as necessary. Is trusted to set these value appropriately and in the interest of vault shareholders .
+            - Veda Admin: Has pause control, can set the fee registry on swappers, add or remove verified adaptors on the adaptor registry, and control the fee registry. Is trusted to can in the best interest of their clients and vault shareholders in general.
+            
+        </template>
+    </content-for>
+  
+   
+  
+    <content-for name="source-code">
+      <p>
+        Specifically, we audited the following contracts within this repository.
+      </p>
+  
+      <template type="file-hashes">
+        8dd82ac0cd9c40ca05b35dfbb30a5c20dffd7a3428d7d36e9a6cc10a1c7560d5  src/base/Periphery/AdapterRegistry.sol
+        2cce617492aec2d97dd388566656122ef2dff1046df61bd218dee9ebe13e0798  src/base/Periphery/BoringSwapper.sol
+        619239d77fdb476beb3f0b46b478be258b587dd78878c63fca54c974f13a0084  src/base/Periphery/FeeRegistry.sol
+        6cb0957c6d1a520f82ade07b0c67f05143d6a63a19c6d0a4cf9e6703ae400c51  src/base/Periphery/adapters/price/PriceValidator.sol
+        82162e30acc5c8f968a328ed758d312292b05ee8047757a7d9a05d12179bd965  src/base/DecodersAndSanitizers/Protocols/BoringSwapperDecoderAndSanitizer.sol
+        90af95577ec17523304e39df87971e6e399dc5ba528322786406274a4b9e28b0  src/base/Periphery/adapters/BaseAdapter.sol
+        eb67794e8da8738c2220a27b1cc5e48001fa841f7e851cc3be8cf969432324c4  src/base/Periphery/adapters/CowswapAdapter.sol
+        094a1f8c77a18b937d37f405e279cb8c6d16927b2cb522d59537db69013ec3e7  src/base/Periphery/adapters/LifiAdapter.sol
+        407588a51c3a8dddec0548e86bbb050cb033fe67e760678bf1cae3f388d610e8  src/base/Periphery/adapters/OneInchAdapter.sol
+        0b3646af698956cc862c1a788afb0bff8fcc432a1244cccd7d608755c44b497f  src/base/Periphery/adapters/OpenOceanAdapter.sol
+        58cb42b9a2e2f1d8d5038cde01439b816315919966104fc338c34c0491ae01bb  src/base/Periphery/adapters/UniswapV3Adapter.sol
+        
+      </template>
+  
+    </content-for>
+  </page>
+</content-for>
