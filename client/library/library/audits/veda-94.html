@@ -1,0 +1,42 @@
+<page
+  clientName="Veda Labs"
+  reportDate="July 23th, 2026"
+  auditTitle="Veda A-94"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-fixes"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on July 22nd, 2026.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        <b>Upshift TokenizedVault decoder support for SentoraUSD (from <a href="https://github.com/Veda-Labs/boring-vault-fixes/pull/33">PR 33</a>)</b> </br>
+        Commit Hash: <code>28e0a14c0e3ddae781de0f8b2e4c5bf9a807f689</code>
+        <template type="file-hashes">
+            6170603e9e33d61d44f8735f7acb5a1ab23d8443090651dcc62cd5a6579bcc03  src/base/DecodersAndSanitizers/Protocols/UpshiftTokenizedVaultDecoderAndSanitizer.sol
+            2c31d3553ed0a2641102736fe000e324bac31dfd0372f2bb12aee89229af8b60  src/base/DecodersAndSanitizers/FullUpshiftTokenizedVaultDecoderAndSanitizer.sol
+            b6bb31115d8fe286c397db6db5bf3c5e55ba2cd67a78f6e9f68e638f9627c285  test/resources/MerkleTreeHelper/MerkleTreeHelper.sol
+        </template>
+        <b>Nest Decoder (from <a href="https://github.com/Veda-Labs/boring-vault-fixes/pull/34">PR 34</a>)</b> </br>
+        Commit Hash: <code>28e0a14c0e3ddae781de0f8b2e4c5bf9a807f689</code>
+        <template type="file-hashes">
+            56e1b8cf19d99a25ef5c7514ffba584e37a399f8f3c53ce3adb296d311cdd8f8  src/base/DecodersAndSanitizers/Protocols/NestDecoderAndSanitizer.sol
+            6780e4af9bd0ff7e9e7a10773b4514cb1f9cfbab6613d7431ca7a2b4b5435bd5  test/resources/MerkleTreeHelper/MerkleTreeHelper.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
