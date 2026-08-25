@@ -1,0 +1,231 @@
+<item>
+    <field name="topic">Validation</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">3fb1d9c8b38448af410f4d4a6d897a8ad323f20a</field>
+    <field name="content">
+      ## [L-1] Ineffective `_lockDuration` validity check
+  
+      In `Staking.sol`’s [`_stake()`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L138-L182) function, the _lockDuration is checked to ensure it is valid. It does so by checking against each valid duration:
+  
+      ```solidity
+        if (
+            !(_lockDuration == MINUTE ||
+                _lockDuration == FIVE_MINUTES ||
+                _lockDuration == HOUR ||
+                _lockDuration == MONTH ||
+                _lockDuration == SIX_MONTHS ||
+                _lockDuration == EIGHTEEN_MONTHS)
+        ) revert InvalidLockDuration();
+      ```
+      Reference: [Staking.sol#L162-169](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L162-L169)
+  
+      Some of these values along with their associated multipliers are present only for testing purposes:
+  
+      ```solidity
+      // ## for testing purposes only (will be removed on mainnet) ##
+  
+      uint256 public constant MINUTE = 60;
+      uint256 public constant FIVE_MINUTES = 300;
+      uint256 public constant HOUR = 3600;
+      ```
+      Reference: [Staking.sol#L35-38](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L35-L38)
+  
+      ```solidity
+      // ## for testing purposes only (will be removed on mainnet) ##
+  
+      rewardMultipliers[MINUTE] = 1000;
+      rewardMultipliers[FIVE_MINUTES] = 2000;
+      rewardMultipliers[HOUR] = 5000;
+      ```
+      Reference: [Staking.sol#L69-72](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L69-L72)
+  
+      Rather than use these lock duration constants and checking each, checking if the `rewardMultiplier` for that duration is non-zero is also equivalent and more flexible.
+  
+      **Remediations to Consider**
+  
+      Check if the `rewardMultiplier` for the `_lockDuration` is non-zero, rather than checking against each constant. Also consider in [`_initializeMultipliers()`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L64-L78) and [`updateRewardMultipliers()`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L80-L110) take an array of duration and multiplier and set using those. This would allow setting test values without directly adding to the contract, as well as adding additional durations post deployment if needed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Composability</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3fb1d9c8b38448af410f4d4a6d897a8ad323f20a</field>
+    <field name="content">
+      ## [L-2] `stakeForUser()` is limited to contracts that transfer tokens before calling
+  
+      Currently [stakeForUser()](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L200-L221) assumes tokens have been transferred in, and have set a non-zero value for `_stakePercentage`:
+  
+      ```solidity
+      if (_stakingPercentage == 0) {
+        //If _stakingPercentage>0 the transfer already hapenned in the airdrop contract
+        if (!token.transferFrom(_user, address(this), _amount))
+            revert TransferFailed();
+      }
+      ```
+      Reference: [Staking.sol#L171-175](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L171-L175)
+  
+      For `Airdrop.sol` this is the case, but other potential whitelisted addresses may not function like this, and prevents eoa’s from being whitelisted without requiring  trust. If approvals were used and transferFrom is always used rather than sending before it allows interaction and whitelist options to be more flexible.
+  
+      **Remediations to Consider**
+  
+      In Airdrop.sol’s constructor approve the Staking contract for uint.max tokens, and remove the prior transfer. Then always transfer using `transferFrom()`, ie when `_stakingPercentage` is non-zero.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="status">fixed</field>
+    <field name="commit">3fb1d9c8b38448af410f4d4a6d897a8ad323f20a</field>
+    <field name="content">
+      ## [I-1] Caution with adjusting merkle root after users have started to claim
+  
+      The merkle root used in `Airdrop.sol` is set in the [`constructor`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Airdrop.sol#L20-L31) as well as can be set with [`UpdateMerkleRoot()`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Airdrop.sol#L72-L78). If the initial root set in the constructor needs adjusting after users have claimed, these users can not make make use of the adjusted values, so they could have claimed more or less than is owed to them, which could cause in imbalance in the total tokens to distribute via the airdrop.
+  
+      **Remediations to Consider**
+  
+      Ensure that the initial merkle tree is correct, and/or pause the contract from claiming until it is properly set. If the merkle root does need to be adjusted/fixed after claiming, evaluate the effect for claimed/unclaimed users, potentially requiring sending additional tokens into the contract to ensure all users can complete their claim.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Informational</field>
+    <field name="status">fixed</field>
+    <field name="commit">3fb1d9c8b38448af410f4d4a6d897a8ad323f20a</field>
+    <field name="content">
+      ## [I-2] `stakeForUser()` can be used to grief claims if whitelist allows
+  
+      When staking on the `Staking.sol` contract, staking data gets added to an array of a users pending stakes:
+  
+      ```solidity
+       uint256 unlockTime = block.timestamp + _lockDuration;
+        uint256 multiplier = rewardMultipliers[_lockDuration];
+        userStakes[_user].push(StakedTokens(_amount, unlockTime, multiplier));
+      ```
+      Reference: [Staking.sol#L177-179](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L177-L179)
+  
+      These pending stakes can be claimed via `withdrawTokens()` and loops through all pending stakes for a user and then claims the sum total of unlocked tokens:
+  
+      ```solidity
+      //go through all stakes and withdraw from the user stakes that are unlockable
+      for (uint256 i = 0; i < stakes.length; ) {
+          if (stakes[i].unlockTime <= block.timestamp) {
+              uint256 amountToWithdraw = stakes[i].amount < remainingAmount
+                  ? stakes[i].amount
+                  : remainingAmount;
+              totalWithdrawable += stakes[i].amount;
+  
+              stakes[i].amount -= amountToWithdraw;
+              remainingAmount -= amountToWithdraw;
+  
+              //if the entire stake batch amount was spent on this withdrawal, remove the stake
+              if (stakes[i].amount == 0) {
+                  stakes[i] = stakes[stakes.length - 1];
+                  stakes.pop();
+                  continue;
+              }
+  
+              //if the entire remaining amount was withdrawn, break the loop
+              if (remainingAmount == 0) {
+                  break;
+              }
+          }
+          i++;
+      }
+  
+      if (totalWithdrawable < _amount)
+          revert InsufficientWithdrawableTokens();
+      if (!token.transfer(_msgSender(), _amount)) revert TransferFailed();
+      ```
+      Reference: [Staking.sol#L246-274](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L246-L274)
+  
+      However, if the stakes array gets sufficiently large, a user may not be able to execute this function because the cost may exceed the block gas limit or cost a substantial amount of gas to execute. It is safe to say a user would not normally stake enough to cause this issue, however if able to stake for another address someone could grief other users. 
+  
+      Currently the only way to stake for another address is via the function [`stakeForUser()`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Staking.sol#L200-L221) . However it is only callable by whitelisted addresses, an example is the `Airdrop` contract when claiming and staking via [`claimAndStake()`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Airdrop.sol#L130-L136), which should be limited to a single stake per address. If there is other addresses whitelisted, and allows for unrestricted staking for others then this could become a issue. It is important to note that a griefer would spend more in gas to achieve this. Smart use of `_amount` can help users mitigate, however in the case of smart contract claims attempting to claim their owed amount they could have its execution prevented. 
+  
+      **Remediations to Consider**
+  
+      When adding addresses to the whitelist ensure it does not allow unrestricted staking for other users.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">d62f923c2d7d4816a7782f8aa9c4aae1b77308e1</field>
+    <field name="content">
+      ## [G-1] Claimed airdrops can use bitmaps
+  
+      In `Airdrop.sol`, tokens are distributed to valid holders using a merkle tree. In order to prevent claiming multiple times, a `bool` is set in a mapping of the claiming address once claimed and checked to see if already set.
+  
+      ```solidity
+       // check if user has claimed before
+        if (usersClaimed[_msgSender()]) revert UserAlreadyClaimed();
+  
+        // save claimed user
+        usersClaimed[_msgSender()] = true;
+      ```
+      Reference: [Airdrop.sol#L113-117](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Airdrop.sol#L113-L117)
+  
+      Since this requires a storage write for each claim while only a single bit of information is required to determine if a user has claimed, a [bitmap](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/structs/BitMaps.sol) can be used instead.
+  
+      If a unique index is included in each recipients leaf when generating the merkle tree, then this index could be used as a bit index in a claimed bitmap. This means that only every 256th claimant needs to make a new storage write, while the others within that 256 bit word costs a much the cheaper storage update cost.
+  
+      **Remediations to Consider**
+  
+      Use a [bitmap](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/structs/BitMaps.sol) to read and write claimed airdrop info for users, using a unique index added to the leaves of the merkle tree.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3fb1d9c8b38448af410f4d4a6d897a8ad323f20a</field>
+    <field name="content">
+      ## [G-2] Use `immutable` for static initialization values
+
+      In `Airdrop.sol`, `tokenAddress` and `stakingContract` are set in the constructor but cannot be modified. If these are set to be immutable it will safe gas on construction and whenever these values are read.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3fb1d9c8b38448af410f4d4a6d897a8ad323f20a</field>
+    <field name="content">
+      ## [G-3] Unnecessary reentrancy guard
+  
+      In `Staking.sol` multiple functions use the `nonReentrant` reentrancy guard including `stake()` `stakeForUser()` and `withdrawTokens()`. However the only external mutative call in these is to transfer the set token via either `transferFrom()` or `transfer()`. Since the token is known and does not trigger callback functions that would allow for reentrancy, it is safe to remove these guards to save users some gas.
+  
+      **Remediations to Consider**
+  
+      Remove the reentrancy guards from `Staking.sol`
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3fb1d9c8b38448af410f4d4a6d897a8ad323f20a</field>
+    <field name="content">
+      ## [Q-1] Extra inheritance of ERC20
+  
+      [`PredictionCredits.sol`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/PredictionCredits.sol) inherits both [`ERC20`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol) and [`ERC20Permit`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC20Permit.sol) however `ERC20Permit` already inherits `ERC20`, so it is unnecessary.
+  
+      **Remediations to Consider**
+  
+      Remove the inheritance of ERC20 for `PredictionCredits.sol`.
+    </field>
+  </item>
+  
