@@ -1,0 +1,85 @@
+<page
+  clientName="EtherFi"
+  reportDate="August 26, 2026"
+  auditTitle="EtherFi A-6"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/nonce-cap/vault-solidity-tools"
+  repoCommitHash="ff862ab6e7dd09c8de1857ab4aa8726cb5fd341d"
+  layout="/library/audits/_layout.html"
+  issueSummaryFormat="legacy"
+>
+<content-for name="spec">
+
+  <ul>
+    Available repository documentation and boring vault infrastructure and documentation.
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+
+  `HyperliquidSafeTrader` contract holds the traded assets directly. Its access control recognizes only two callers, the `owner` and the `subvault`, and every privileged function is gated by one of the two. Every strategist action reaches the contract through the subvault, and the Veda merkle roots split that single caller into two actors with very different power. Three roles are intended to act on the contract, each carrying a different level of trust:
+
+  - The owner configures the rate limits and holds `emergencyCall`, an arbitrary call with a native value that can move any asset the contract holds. It is the ultimate authority over the contract.
+  - The operational strategist is limited to the four rate limited trading functions and is the actor the on chain guards exist to constrain; its reach is bounded by the buckets, slippage and cooldown. It is intended to be an automated key.
+  - The secure strategist holds every unrestricted action, including sends to an arbitrary destination and orders that bypass the guards, so it can move funds directly and is also the manual escape hatch for winding down a position. It is intended to be a multisig.
+
+  The contract itself enforces only `owner` versus `subvault`. The merkle roots, not the contract, should enforce the separation between operational and secure roles. 
+
+  ## External Infrastructure
+
+  ### HyperCore
+
+  The trader interacts with `HyperCore` in two directions. 
+
+  - Writes go through the `CoreWriter`, where all trading, transfer, staking, and lending actions are submitted. It is asynchronous and receiptless, so the contract does not confirm whether an action applied, and invalid or unfillable actions drop silently. It is trusted to apply actions faithfully, with the backend reconciling outcomes off-chain.
+  - Reads go through the `HyperCore` precompiles, which feed the slippage guard, the spot sell balance check and the cached decimals. A wrong value silently shifts a guard rather than reverting.
+
+  ### Veda merkle verification manager
+
+  The Veda merkle verification manager, which is out of scope, decides which strategist may call which function via the decoder and sanitizer pattern. The entire operational versus privileged split lives here, since every trader function is only `onlySubvault` within this contract's scope but reached through the merkle root verification.
+
+  ### BucketLimiter
+
+  The `BucketLimiter` library, also out of scope, handles the rate limit accounting and is unchanged since the audited `SafeSwapper`.
+
+  ## Actors
+
+  ### Owner
+
+  The owner holds `configureRateLimit`, `updateMaxSlippageBps` and `emergencyCall`. `emergencyCall` function is an arbitrary call with native value, so the owner can move any asset the contract holds in one transaction, an intentional fallback for a breaking Hyperliquid change. This is full custodial power over the contract.
+
+  ### Secure Strategist
+
+  The secure strategist holds every unrestricted action: `limitOrder`, which bypasses all guards, `spotSend` and `sendAsset`, which send to any destination, the vault and margin transfers, staking, lending, and all deposits and withdrawals. It can move funds out directly and bypass the guards, and it is the manual escape hatch that winds down a position without rate limits. It is bounded only by the secure merkle root verification layer.
+
+  ### Operational Strategist
+
+  The operational strategist holds only the four `rateLimited` trading functions. Its worst case is bounded, value bleed through slippage per order, capped by the bucket and `maxOrderNotional`, with a cooldown between same type orders. It cannot send funds anywhere, change configuration, or bypass the guards. 
+
+  ### Subvault
+
+  The subvault is the only recipient of `withdraw` and `withdrawNative`, which return assets to the hardcoded `subvault` address so the exit can’t be redirected. `receive()` is open, so anyone can send native HYPE in.
+    
+  </template>
+  
+</content-for>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team August 25th, 2026.
+</content-for>
+
+
+<content-for name="source-code">
+
+  <p>Specifically, we audited the following contract within this repository:</p>
+
+  <li class="break-words break-all">
+    <b>HyperliquidSafeTrader contract (from <a href="https://github.com/nonce-cap/vault-solidity-tools/pull/35">PR 35</a>)</b> </br>
+    Commit Hash: <code>a15a4dcb305b957f161fea198f9fa75a7cc45db0</code>
+    <template type="file-hashes">
+      b87d2973fffe6caa84904a6d600de589f2a202f1f054b0bd0fda41274c9400e0  src/HyperliquidSafeTrader.sol
+    </template>
+  </li>
+</content-for>
+
+</page>
