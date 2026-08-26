@@ -1,0 +1,60 @@
+<item>
+    <field name="topic">Configuration</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a15a4dcb305b957f161fea198f9fa75a7cc45db0</field>
+    <field name="content">
+        ## [L-1] Potential misconfiguration edge cases
+
+        In `HyperliquidSafeTrader.sol` contract, there are multiple potential misconfigurations that can silently pass and leave the contract in an undesired state. Three setting values pass validation, look correct on-chain, and silently disable a guard or brick an action, recoverable by the owner reconfiguring:
+
+        - `refillRate == 0` in `configureRateLimit()`, the bucket never refills and becomes a one time budget. This fails silently and late, behaving correctly until capacity is first exhausted.
+        - `maxOrderNotional < MIN_ORDER_NOTIONAL` in `configureRateLimit()`, every order of that type reverts with `OrderNotionalBelowMinimum` or `MaxOrderNotionalExceeded` depending on the order notional.
+        - `minimumOrderDelayBlocks == 0` in `constructor()`, this renders a non-cooldown scenario, so the same order type can be submitted repeatedly in one block against the same stale balance read.
+
+        None of these cases are externally exploitable, all require a trusted owner or deployer to enter a wrong value.
+
+        ### Remediations to Consider
+
+        Consider adding require statements for these configuration cases to avoid mistaken or wrong values being set.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Configuration</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="response">We are fine accepting the loss of dust in these cases.</field>
+    <field name="content">
+
+        ## [L-2] `depositTokenToHyperCore()` burns sub unit deposit dust
+
+        In `HyperliquidSafeTrader.sol` contract, when a linked token is deposited to HyperCore via `depositTokenToHyperCore()` function, the node credits only the round portion of the transferred amount and permanently burns the remainder. Per the Hyperliquid HyperCore to HyperEVM transfers documentation: 
+
+        > If the EVM contract has extra Wei decimals, then if the relevant log emitted has a value that is not round (does not end in `extraEvmWeiDecimals` zeros), the non-round amount is burned (guaranteed to be <1 Wei). This is true for both HYPE and any other spot tokens.
+        > 
+        
+        **Source:** Hyperliquid Docs
+        
+        The function reads `TokenInfo` and already holds `evmExtraWeiDecimals` in memory, but transfers `hyperevmAmount` unchecked, so any sub Core unit remainder is silently lost.
+        
+        ```solidity
+        TokenInfo memory tokenInfo = abi.decode(_readHyperCore(TOKEN_INFO_PRECOMPILE, abi.encode(tokenIndex)), (TokenInfo));
+        hyperevmAsset = tokenInfo.evmContract;
+        if (hyperevmAsset == address(0)) revert SpotAssetNotLinked();
+        SafeTransferLib.safeTransfer(hyperevmAsset, systemAddress, hyperevmAmount);
+        ```
+        
+        **Reference:** HyperliquidSafeTrader#L269-280
+        
+        The impact is almost negligible. The loss is guaranteed below one Core wei unit per call (at most `10 ** -weiDecimals` of a token), is zero for most basis assets (`BTC`, `HYPE`, `USDC` and `USDT0` all have `evmExtraWeiDecimals <= 0`), and applies only to tokens with `evmExtraWeiDecimals > 0` (meme and HIP tokens such as `PURR` at 13, `HFUN` at 10).
+        
+        ### Remediations to Consider
+        
+        - Round `hyperevmAmount` down to a multiple of `10 ** evmExtraWeiDecimals` before transfer (keeping the remainder in the contract) for tokens with positive `evmExtraWeiDecimals`.
+        - Alternatively, given the low impact, accept the behavior and simply document it as a known dust pitfall so operators are aware, optionally having the backend pre-round deposit amounts off-chain.
+    </field>
+  </item>
+  
