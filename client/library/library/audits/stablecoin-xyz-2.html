@@ -1,0 +1,101 @@
+<page
+  clientName="SBC"
+  reportDate="September 6, 2026"
+  auditTitle="Stablecoin.xyz A-2"
+  auditSubtitle="Cross-Chain Intent Settlements"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/stablecoinxyz/better-intents"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_STABLECOIN_XYZ"
+  customRepoInfo
+  customReviewInfo
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from August 4th to August 11th, 2026, followed by fixes review through August 29th, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository, including <code>AUDIT.md</code>, <code>SPEC-0</code>, and <code>SPEC-1</code>.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    ### **Trusted Parties**
+
+    - **Admin** — Can rotate the attestor set and threshold, manage the `SourceEscrow` input-token allowlist, and transfer admin (two-step). Intended to be a Safe + timelock contract on Base, and Squads on Solana.
+    - **Attestor quorum (M-of-N)** — Collectively authorize `claim` of locked input funds after cross-chain order delivery. Cannot unilaterally release funds below threshold, nor change the set without the admin.
+    - **Solver / filler** — Can deliver destination funds, submit claims with valid attestations, and call `RfqSwap` as the maker.
+
+    ### **Contracts**
+
+    **EVM**
+
+    - **`SourceEscrow`** — Custodies user input until claim-with-valid-proof of assets bridged, or a permissionless refund.
+    - **`AttestationVerifierMofN`** — Fund-release oracle for cross-chain bridging. Requires `threshold` distinct attestor EIP-712 signatures verifying successful cross-chain settlement.
+    - **`OutputSettler`** — Permissionless destination recorder for filled cross-chain orders.
+    - **`RfqSwap`** — Atomic same-chain RFQ. Holds no balances across calls. Uses user-signed EIP-712 orders.
+
+    **Solana**
+
+    - **`origin_settler`** — Claim requires M-of-N attestations; refund after expiry is permissionless. `Config.admin` may only set attestors or threshold.
+    - **`dest_settler`** — Token destination fill recorder. Handles only the solver's tokens, and does not custody user deposits.
+
+    ### **What Users Must Trust**
+
+    1. **Attestor quorum honesty** — Users trust that attestors sign only after real destination delivery. Collusion or key compromise at or above threshold can authorize claims without correct delivery.
+    2. **Admin key custody** — A compromised admin can change attestors and the threshold, and could set themselves as the only attestor.
+    3. **Solver liveness and inventory** — Users may wait until expiry and refund if unfilled. Same-chain RFQ still depends on the designated solver submitting a fair fill within signed bounds.
+    4. **Solana upgrade authority** — Holders of the program upgrade key can replace `origin_settler` / `dest_settler` bytecode. They are trusted to do so only as necessary.
+
+    ### **Accepted Risks**
+
+    The following residual risks are accepted under the stated M-of-N and admin-governance model. They are not treated as protocol bugs if the mitigations perform as designed.
+
+    1. **Off-chain attestation** — There is no light-client or native bridge verification of Solana ↔ EVM fills. Safety rests on quorum attestation honesty and timeliness.
+    2. **Admin power** — The admin can weaken the attestor set, potentially enabling theft of locked assets. Users accept the governance risk of a malicious or compromised admin.
+    3. **Solana program upgrade risk** — Unlike the immutable EVM routers and escrow used here, Solana programs remain upgradeable under the cluster's upgrade authority model. Users accept that authority's integrity to act in the protocol's best interest.
+    4. **Solver and inventory risk** — Prefunded settlement and RFQ depend on the solver's available capital. User principal in escrow is protected by refund after waiting out the expiry period, default 24 hours. Timely execution depends on solver liveness.
+  </template>
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li class="break-words break-all">
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank" class="text-blue-500 hover:underline">better-intents</a>
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash (initial):</b>
+      <code>e5178d26e98da5c5f10bdb51f683f6addb8345d0</code> (tag <code>audit-2026-07-22</code>)
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash (final):</b>
+      <code>ebbe515033f793a97c32d8fbcba04fe23d15fd87</code> (branch <code>audit/macro-fixes</code>)
+    </li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+  <p>Specifically, we audited the following contracts and programs within this repository:</p>
+
+  <template type="file-hashes">
+    8a170e19f3fd033108a95ac102a4dfa07089c9d211fde942c411fcaf88141058  contracts/src/SourceEscrow.sol
+    8d2f8799084e47d54a8f60b24365c187a8d0030ed74e03c494a25e61a9d7c004  contracts/src/RfqSwap.sol
+    c6b40da6c71b5f91de8c81955c1e85a1e154ed56040fd84d6c77010f17de81da  contracts/src/AttestationVerifierMofN.sol
+    35f3f8faf1e6771671feec45f760882d2dddafa5f3ef531852bd8621374225ce  contracts/src/OutputSettler.sol
+    b23b18153a41c821159131c81df4fc171c54666a582daf2d18191bbe0d8ec961  contracts/src/lib/SafeTransferLib.sol
+    269c79b2bf5868f4707a61558a344ae58bf9cc46d16fe8502cae221bd04b58f4  solana/programs/origin_settler/src/lib.rs
+    52dffb6318a8395c88eb2c973b2b57edd6d4ec0d0796f2ac75d8bb7503265072  solana/programs/dest_settler/src/lib.rs
+  </template>
+</content-for>
+
+<content-for name="review-info">
+  <p><b>Note:</b> This audit covers a cross-chain intent settlement system whose security properties are not contained within the on-chain code alone. In addition to the Solidity contracts and Anchor programs listed above, the review extended to the off-chain components that drive the money path — the solver engine and its chain adapters (<code>engine/</code>), the Cloudflare Worker solver and attestor signer fleet (<code>solver/worker.js</code>, <code>src/runtime/cf/</code>), the operator and UI settle endpoints (<code>ui/server.ts</code>), and the token registry that configures them (<code>registry/</code>). Several of the issues in this report exist only at the boundary between those layers.</p>
+
+  <p>The audit does not pertain to deployment scripts, infrastructure configuration, or any other programs or scripts in the repository beyond those described above. Note also that, as of the final commit hash, the fixes reviewed in this report were present on the <code>audit/macro-fixes</code> branch but had not yet been merged or deployed; the deployed Base contracts and Solana programs still carried pre-fix behavior.</p>
+</content-for>
+
+</page>
