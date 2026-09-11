@@ -16,50 +16,72 @@
 
   <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
   <template type="audit-markdown">
-
-  `HyperliquidSafeTrader` contract holds the traded assets directly. Its access control recognizes only two callers, the `owner` and the `subvault`, and every privileged function is gated by one of the two. Every strategist action reaches the contract through the subvault, and the Veda merkle roots split that single caller into two actors with very different power. Three roles are intended to act on the contract, each carrying a different level of trust:
-
-  - The owner configures the rate limits and holds `emergencyCall`, an arbitrary call with a native value that can move any asset the contract holds. It is the ultimate authority over the contract.
-  - The operational strategist is limited to the four rate limited trading functions and is the actor the on chain guards exist to constrain; its reach is bounded by the buckets, slippage and cooldown. It is intended to be an automated key.
-  - The secure strategist holds every unrestricted action, including sends to an arbitrary destination and orders that bypass the guards, so it can move funds directly and is also the manual escape hatch for winding down a position. It is intended to be a multisig.
-
-  The contract itself enforces only `owner` versus `subvault`. The merkle roots, not the contract, should enforce the separation between operational and secure roles. 
-
-  ## External Infrastructure
-
-  ### HyperCore
-
-  The trader interacts with `HyperCore` in two directions. 
-
-  - Writes go through the `CoreWriter`, where all trading, transfer, staking, and lending actions are submitted. It is asynchronous and receiptless, so the contract does not confirm whether an action applied, and invalid or unfillable actions drop silently. It is trusted to apply actions faithfully, with the backend reconciling outcomes off-chain.
-  - Reads go through the `HyperCore` precompiles, which feed the slippage guard, the spot sell balance check and the cached decimals. A wrong value silently shifts a guard rather than reverting.
-
-  ### Veda merkle verification manager
-
-  The Veda merkle verification manager, which is out of scope, decides which strategist may call which function via the decoder and sanitizer pattern. The entire operational versus privileged split lives here, since every trader function is only `onlySubvault` within this contract's scope but reached through the merkle root verification.
-
-  ### BucketLimiter
-
-  The `BucketLimiter` library, also out of scope, handles the rate limit accounting and is unchanged since the audited `SafeSwapper`.
-
-  ## Actors
-
-  ### Owner
-
-  The owner holds `configureRateLimit`, `updateMaxSlippageBps` and `emergencyCall`. `emergencyCall` function is an arbitrary call with native value, so the owner can move any asset the contract holds in one transaction, an intentional fallback for a breaking Hyperliquid change. This is full custodial power over the contract.
-
-  ### Secure Strategist
-
-  The secure strategist holds every unrestricted action: `limitOrder`, which bypasses all guards, `spotSend` and `sendAsset`, which send to any destination, the vault and margin transfers, staking, lending, and all deposits and withdrawals. It can move funds out directly and bypass the guards, and it is the manual escape hatch that winds down a position without rate limits. It is bounded only by the secure merkle root verification layer.
-
-  ### Operational Strategist
-
-  The operational strategist holds only the four `rateLimited` trading functions. Its worst case is bounded, value bleed through slippage per order, capped by the bucket and `maxOrderNotional`, with a cooldown between same type orders. It cannot send funds anywhere, change configuration, or bypass the guards. 
-
-  ### Subvault
-
-  The subvault is the only recipient of `withdraw` and `withdrawNative`, which return assets to the hardcoded `subvault` address so the exit can’t be redirected. `receive()` is open, so anyone can send native HYPE in.
+    `HyperliquidSafeTrader` contract holds the traded assets directly. Its access control recognizes only two callers, the `owner` and the `subvault`, and every privileged function is gated by one of the two. Every strategist action reaches the contract through the subvault, and the Veda merkle roots split that single caller into two actors with very different power. Three roles are intended to act on the contract, each carrying a different level of trust:
     
+    - The owner configures the rate limits, slippage bounds, hedge imbalance bands, cooldown and fee buffer, and holds `emergencyCall`, an arbitrary call with a native value that can move any asset the contract holds. It is the ultimate authority over the contract.
+    - The operational strategist is limited to the six rate limited trading functions, four single leg orders and two delta neutral pairs, and is the actor the on chain guards exist to constrain. Its reach is bounded by the buckets, slippage, the balance guards, the hedge imbalance bands and a single cooldown shared by every order. It is intended to be an automated key.
+    - The secure strategist holds every unrestricted action, including sends to an arbitrary destination, orders that bypass the guards and the account mode switch, so it can move funds directly and is also the manual escape hatch for winding down a position. It is intended to be a multisig.
+    
+    The contract itself enforces only `owner` versus `subvault`. The merkle roots, not the contract, should enforce the separation between operational and secure roles.
+    
+    ## External Infrastructure
+    
+    ### HyperCore
+    
+    The trader interacts with `HyperCore` in two directions.
+    
+    - Writes go through the `CoreWriter`, where all trading, transfer, staking, lending and mode actions are submitted. It is asynchronous and receiptless, so the contract does not confirm whether an action applied, and invalid or unfillable actions drop silently. A paired order submits two actions in one call and either leg can fill, partially fill or miss on its own. It is trusted to apply actions faithfully, with the backend reconciling outcomes off chain.
+    - Reads go through the `HyperCore` precompiles, which feed the slippage guards, the spot balance guards, the hedge imbalance guard, the hedge reservation and the cached decimals: spot balance, borrow lend user state, borrow lend reserve state, perp position and the mark and spot prices. A wrong value silently shifts a guard rather than reverting. Every guard reads the state settled at the start of the block, so an order that has not yet settled on `HyperCore` is invisible to the next call, and the cooldown is what keeps consecutive calls from reading the same stale state.
+    
+    ### Account mode
+    
+    The subvault’s `HyperCore` account runs in portfolio margin mode, which changes what the precompiles report and what `HyperCore` does with an order:
+    
+    - Idle balances are supplied to the lending pool automatically, so the spot balance precompile reads zero for them and the guards add the supplied balance read from the borrow lend precompile.
+    - When an order needs more USDC than the account holds, or when a rally pushes the perp short’s initial margin above the USDC balance, `HyperCore` borrows USDC against the HYPE collateral on the account’s behalf. Only quote stablecoins are borrowable. HYPE and BTC are collateral only, so a spot sell above the balance is rejected rather than borrowed. Borrowing is part of the product and occurs in normal operation. At the sizing observed during the review a rally of roughly five percent triggers it.
+    - While a borrow is outstanding `HyperCore` holds a portion of the HYPE as collateral and refuses to sell it. The sell guard subtracts that portion, derived from the outstanding borrow and the asset’s loan to value ratio and oracle price.
+    - The borrow is a negative USDC balance that any incoming USDC repays automatically: sale proceeds, deposits and realized perp profit.
+    
+    The contract bounds what the operational key initiates. It does not bound what `HyperCore` does to the account: rally borrows, their interest and the collateral lock cannot be prevented on chain, and the USDC the backend keeps against the short is the only control over how often they occur.
+    
+    The guards do not read the mode. The team runs the trader in two configurations only: portfolio margin for deployments with both legs on `HyperCore`, and unified account for perp only deployments where the spot asset lives on another chain, and its tooling tracks the account mode and blocks actions when the account is not in one of the two. The buy guard’s withdrawable fallback is exact under portfolio margin and is never reached in a perp only deployment, since the spot functions revert before it. Nothing on-chain exposes the mode, so a switch is confirmed through the API rather than by the contract.
+    
+    ### Veda merkle verification manager
+    
+    The Veda merkle verification manager, which is out of scope, decides which strategist may call which function via the decoder and sanitizer pattern. The entire operational versus privileged split lives here, since every trader function is only `onlySubvault` within this contract’s scope but reached through the merkle root verification. The sample roots reviewed grant the operational root only deposits into the trader and the rate limited functions, pin the order type of the secure strategist’s limit orders to IOC, and grant no `spotSend`, `sendAsset`, `vaultTransfer`, staking or `borrowLend` leaves. The final roots must be regenerated for the audited deployment.
+    
+    ### BucketLimiter
+    
+    The `BucketLimiter` library, also out of scope, handles the rate limit accounting and is unchanged since the audited `SafeSwapper`. It exposes an external function, so it must be deployed and linked at deployment.
+    
+    ## Actors
+    
+    ### Owner
+    
+    The owner holds `configureRateLimit`, `updateMaxSlippageBps`, `updateMaxHedgeImbalanceNotional`, `updateMinimumOrderDelayBlocks`, `updatePerpFeeBufferBps` and `emergencyCall`. `emergencyCall` function is an arbitrary call with native value, so the owner can move any asset the contract holds in one transaction, an intentional fallback for a breaking Hyperliquid change. This is full custodial power over the contract. The guards depend on the owner’s values: the cooldown must exceed the `HyperCore` settlement delay and doubles as a pause when raised, each hedge imbalance band must be at least the pair size the backend intends to send and a band below the minimum order notional rejects every order of that type from neutral, and the buckets, per order caps, slippage bounds and fee buffer size the remaining guards. These are trusted configuration values.
+    
+    ### Secure Strategist
+    
+    The secure strategist holds every unrestricted action: `limitOrder`, which bypasses all guards, `spotSend` and `sendAsset`, which send to any destination, the vault and margin transfers, staking, lending, `setAbstraction`, and all deposits and withdrawals. It can move funds out directly and bypass the guards, and it is the manual escape hatch that winds down a position without rate limits. It is bounded only by the secure merkle root verification layer. Leaving portfolio margin with balances still supplied leaves them counted by the guards but not released by `HyperCore` for orders, and requires a `borrowLend` withdraw to recover.
+    
+    ### Operational Strategist
+    
+    The operational strategist holds the four single leg `rateLimited` functions and the two delta neutral pairs. Its worst case per cooldown window is bounded: one call, single or paired, that can move the book one band’s worth away from delta neutral in one direction, value bleed through slippage per order capped by the bucket and `maxOrderNotional`, and, if it grows through single leg calls or a lopsided pair instead of a matched pair, a USDC borrow for the short’s margin, bounded by the grow band and repaid on the next sell. It cannot send funds anywhere, place resting orders, change configuration, or bypass the guards. Every move back toward delta neutral passes the hedge imbalance guard, so no state it can create is one it cannot leave.
+    
+    ### Subvault
+    
+    The subvault is the only recipient of `withdraw` and `withdrawNative`, which return assets to the hardcoded `subvault` address so the exit can’t be redirected. `receive()` is open, so anyone can send native HYPE in.
+    
+    ## Accepted Risks
+    
+    The guards bound what the operational key can do. The following remain with the backend and the trusted actors and are accepted by design:
+    
+    - Borrowing on the hedge leg outside the paired function. The paired grow reserves the margin of the short it bundles, so the pair never borrows. A buy sent through the single leg function, or a pair whose perp leg is much smaller than its spot leg, reserves nothing for the short that follows, and that short borrows its margin from `HyperCore`. The borrow is bounded by the grow band and is repaid by the next sale. The operational key is expected to grow through the paired function.
+    - Borrowing during a price rally. When a price rally pushes the short’s initial margin above the USDC balance, `HyperCore` borrows the difference on the account’s behalf, which is portfolio margin working as designed and cannot be prevented on-chain. How often it happens depends only on the USDC kept against the short.
+    - Part of the HYPE is locked while a borrow is outstanding. `HyperCore` holds a portion of the HYPE as collateral for the USDC it lent, and the sell guard mirrors that, so sells above the unlocked amount are refused and a shrink pair with a sell leg that large reverts. Reducing the short is unaffected, and every reduce shrinks the borrow and frees `HYPE`. Unwinding under a borrow is therefore done in steps, reduce the short first, then sell what became free.
+    - Slow drift from spot buy fees. Spot buy fees are charged in HYPE, so every grow leaves the short ahead of spot by the fee, and the difference accumulates against the `PERP_GROW` band over many cycles. The backend is expected to oversize buys by the fee or to true the book up periodically with a single leg buy.
+    - Size limit per trader instance. Above 20M USD of HYPE notional `HyperCore` halves the leverage tier and rejects further shorts at the current leverage setting, which the trader cannot change by itself. A single trader instance is expected to stay below that tier.
+
   </template>
   
 </content-for>
@@ -74,11 +96,20 @@
   <p>Specifically, we audited the following contract within this repository:</p>
 
   <li class="break-words break-all">
-    <b>HyperliquidSafeTrader contract (from <a href="https://github.com/nonce-cap/vault-solidity-tools/pull/35">PR 35</a>)</b> </br>
-    Commit Hash: <code>a15a4dcb305b957f161fea198f9fa75a7cc45db0</code>
+    <b>HyperliquidSafeTrader contract (from <a href="https://github.com/nonce-cap/vault-solidity-tools/pull/38">PR 38</a>)</b> </br>
+    Commit Hash: <code>a91006874a81f85229b301a725a3bdd6b07e6474</code>
     <template type="file-hashes">
-      b87d2973fffe6caa84904a6d600de589f2a202f1f054b0bd0fda41274c9400e0  src/HyperliquidSafeTrader.sol
+      65e43efe716e24ecf2159326e97b1de8dba6b6d1be72a335cf06a250d8bfe521  src/HyperliquidSafeTrader.sol
     </template>
+  </li>
+
+  <p>Additionally, we audited the following contract within this repository:</p>
+
+  <li class="break-words break-all">
+    <b>HyperliquidSafeTraderDecoderAndSanitizer contract (from <a href="https://github.com/Veda-Labs/boring-vault-private/pull/109">PR 109</a>)</b> </br>
+    Commit Hash: <code>afbdafce885614381f5d40daa3cd86d61223e9d4</code>
+    <template type="file-hashes">
+      e6b2b308dcf563ec0d1d3625a73f312d03c1b30eb39b22f401d0349a8581604d  src/base/DecodersAndSanitizers/HyperliquidSafeTraderDecoderAndSanitizer.sol    </template>
   </li>
 </content-for>
 
