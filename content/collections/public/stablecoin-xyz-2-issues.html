@@ -1,0 +1,541 @@
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">high</field>
+  <field name="impactNote">Loss of funds</field>
+  <field name="chance">high</field>
+  <field name="chanceNote">Permissionless</field>
+  <field name="status">fixed</field>
+  <field name="commit">79a189b570765c7f07d8a6deee696a22317341a4</field>
+  <field name="content">
+    ## [C-1] A solver fill can be purchased for dust
+
+    On the forward (Base → Solana) corridor, `SourceEscrow._validateOrder` restricts the input token and the solver's `makeCapGate` limits each output to `MAX_FILL_NOTIONAL_USD`. The UI constructs orders at the intended 1:1 rate, but users can bypass it and open orders directly through the permissionless escrow.
+
+    However, neither the escrow nor the solver checks that the input value covers the output value. An attacker can therefore lock 1 wei of an allowlisted input token, name the solver as the filler, and request a held output token up to the per-fill cap. The order passes both controls, causing the solver to deliver the full output while a valid attestation releases only the attacker's 1 wei of input to the solver. Repeating the attack with fresh orders can drain the solver's entire cross-chain inventory, because the cap bounds each loss but not cumulative losses.
+
+    **Remediations to Consider**
+
+    Require the solver to verify, using an authoritative token and pricing configuration, that the input notional covers the output notional before delivery. Alternatively, enforce the supported pairs and their permitted exchange rates in `SourceEscrow`.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">high</field>
+  <field name="impactNote">Loss of funds</field>
+  <field name="chance">high</field>
+  <field name="chanceNote">Permissionless</field>
+  <field name="status">fixed</field>
+  <field name="commit">9ffb30a6fa4e586f3b66d8cfc3906001156f073b</field>
+  <field name="content">
+    ## [C-2] Unconstrained input mint and output lets anyone drain the solver's Base inventory
+
+    Opening an order on Solana via `origin_settler::open` is permissionless. Every economic argument is caller-supplied, checked only for non-zero amounts and ordered deadlines.
+
+    However, nothing constrains which mint is locked, which token is demanded on Base, nor the rate of value between the two. Unlike the EVM origin input token gate (`allowedInputToken` in `SourceEscrow.sol`), the Solana origin has no equivalent.
+
+    This allows an attacker to provide, for example, one unit of USDC ($0.000001 at 6 decimals) and request $2 of output. The solver, with its current off-chain logic, blindly delivers the full $2 of inventory to the attacker and claims the near-worthless input amount. Repeated, this can drain the solver's entire Base balance of every ERC-20 it holds, for only the attacker's cost of Solana rent and fees.
+
+    The per-fill cap (e.g. `MAX_FILL_NOTIONAL_USD`) bounds each theft, not the total. There is no aggregate cap, no rate limit, and no settle-path alert.
+
+    **Remediations to Consider**
+
+    Enforce economic admission on the settle path, where it binds every order on-chain rather than only UI-built ones. Before delivering, require that the input is worth at least the output. Restricting input and output tokens will be necessary to avoid working with tokens for which there is no way to determine value.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Ranges</field>
+  <field name="impact">high</field>
+  <field name="impactNote">Permanent freezing of depositor funds</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">Requires a depositor-signed extreme expiry or UI misconfiguration, but mistakes do happen</field>
+  <field name="status">fixed</field>
+  <field name="commit">4187ede2a4f6cebee7b7c68c3b630ec5c43c9d23</field>
+  <field name="content">
+    ## [H-1] An unbounded `expires` can prevent refunds indefinitely
+
+    `origin_settler::open` requires `fill_deadline` to be in the future and `expires &gt;= fill_deadline`.
+
+    However, it does not cap either timestamp, while `refund` requires the current `i64` timestamp to be greater than `expires`. A caller — or a misconfigured UI — can therefore set `expires` up to `i64::MAX`. If the order is not filled, especially if the filler is defunct or does not exist, the depositor's funds could be permanently frozen with no rescue path. `SourceEscrow` has the same validation gap on the EVM corridor.
+
+    **Remediations to Consider**
+
+    Enforce `expires &lt;= now + MAX_ORDER_TTL` on-chain in both corridors, and validate `XCHAIN_REFUND_SECS` against a sane range when the Worker starts.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">high</field>
+  <field name="impactNote">Loss of solver inventory</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">Attacker-supplied orders reach an authenticated endpoint</field>
+  <field name="status">fixed</field>
+  <field name="commit">a6149e708f591a21b972a0c262730661a61247c4</field>
+  <field name="content">
+    ## [H-2] Operator settle endpoints bypass the input-covers-output admission gate
+
+    The remediation for C-1 introduced an admission gate requiring that an order's input notional cover its output notional before the solver delivers.
+
+    However, the two operator settle endpoints, `xchainSettle` and `xchainEvmSettle`, were not wired to that gate. Neither reads the order's input token or amount, so any order submitted through them always settles, leaving the original C-1 drain fully exposed on that path.
+
+    These endpoints require authentication and are therefore not permissionless, but the orders they settle are: an attacker opens a dust-funded order in the ordinary way, and the drain occurs whenever an operator settles it.
+
+    **Remediations to Consider**
+
+    Call the same `makeAdmissionGate` on both endpoints, so that every delivery path enforces the same economic admission rule rather than only the automated solver.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">high</field>
+  <field name="impactNote">Double-send of the solver's output</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">A retry, database loss, or operator/engine race is sufficient</field>
+  <field name="status">fixed</field>
+  <field name="commit">815641dc149fd5edac065f17021833718cad2eaf</field>
+  <field name="content">
+    ## [H-3] Delivery is not enforced as one idempotent on-chain operation
+
+    The system already deploys receipt contracts for exactly this purpose: `OutputSettler` on Base and `dest_settler` on Solana each record a unique on-chain fill receipt and reject duplicates.
+
+    However, both operator settle endpoints send the destination output by a plain transfer that touches neither settler, then create a single signature even though the source contracts require 2-of-3, causing the claim to fail after funds have already moved. Delivery is also tracked separately in D1 and in Durable Object storage, so a retry, a database loss, or an operator/engine race can send the same output again. If the user later refunds the still-open source order, the solver loses the output funds outright.
+
+    This and the surrounding issues expose a broader design concern: the system tracks a large amount of off-chain state in order to manage on-chain state. Smart contracts are designed to solve exactly this class of problem. Putting delivery state on-chain would make double-send impossible by construction, rather than something that is merely hoped not to happen through unforeseen events.
+
+    **Remediations to Consider**
+
+    Route every delivery through `OutputSettler` / `dest_settler`: transfer and record a unique on-chain receipt atomically, reject duplicates, and have signers attest only to that finalized receipt. Both the engine and the operator should derive delivery state from on-chain data, with off-chain databases reduced to queues and telemetry. The operator endpoint should also use the same on-chain settlement path as the automated solver, rather than implementing its own transfer and signing path.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Cross-Chain Finality</field>
+  <field name="impact">high</field>
+  <field name="impactNote">Cross-chain principal loss after a reorganization</field>
+  <field name="chance">low</field>
+  <field name="chanceNote">Requires a post-confirmation reorganization</field>
+  <field name="status">fixed</field>
+  <field name="commit">8fa67e54f0c2bbe1f041304096dc607ecc71f626</field>
+  <field name="content">
+    ## [M-1] Optimistic chain confirmations can leave either side of a cross-chain settlement reverted
+
+    On the reverse leg, each attestor signs as soon as `eth_getTransactionReceipt` returns one successful Base receipt with the expected log.
+
+    However, neither that check nor the associated `eth_call(..., "latest")` receipt lookup establishes that the Base block is safe or finalized. The solver's preceding `waitForTransactionReceipt` does not add a margin: viem defaults to one confirmation, and `EvmAdapter.confirmDelivery` supplies no `confirmations` parameter. All M-of-N signers can observe the same canonical head, so independent RPCs do not protect against a consensus reorganization.
+
+    Consequently, after those signatures release the Solana vault, a Base reorganization that removes the fill leaves the user without the promised output, and cannot revert the already-landed Solana claim.
+
+    The reverse failure also exists on the source side. `SvmAdapter._confirm` returns for either `confirmed` **or** `finalized`, despite its comments calling the operation "final". If that Solana claim is rolled back after optimistic confirmation, the order is Open on-chain while local state remains terminal; after expiry the depositor can refund the input even though the solver's Base output is irreversible.
+
+    **Remediations to Consider**
+
+    Define a finality policy per chain and enforce it before crossing the irreversible boundary:
+
+    - For Base delivery, require the receipt block to reach the selected `safe`/`finalized` head, or an explicitly justified confirmation depth, before any attestor signs.
+    - For Solana claims and refunds, wait specifically for `finalized`, and keep terminal orders under chain-truth reconciliation long enough to detect a rollback.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Proof Verification</field>
+  <field name="impact">medium</field>
+  <field name="impactNote">Blocked feature, user funds temporarily locked up</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">Requires compromised secrets, a risk increasingly becoming more common in today's AI-centered world</field>
+  <field name="status">fixed</field>
+  <field name="commit">ac4abcffe7cea7a43bac441f699bb9adb0d7ac47</field>
+  <field name="content">
+    ## [M-2] Flaw in signer logic can be used to create false quorum
+
+    `dest_settler::fill` is intended to bind a Solana delivery to an order by creating an Anchor `FillRecord` at a deterministic PDA `(orderId, recipient, mint, amount)`. Both the signer and the automatic refund path derive this address before deciding whether the order was filled:
+
+    ```js
+    // engine/svm-adapter.js:119-125
+    const pda = this._fillPda(order, mint, recipient, BigInt(order.outputAmount));
+    const acct = await this.conn.getAccountInfo(pda);
+    return { filled: acct !== null };
+
+    // src/runtime/cf/attestation.ts:292-295
+    const j = await res.json();
+    if (j.error) throw new Error(...);
+    return j.result?.value != null;
+    ```
+
+    However, both consumers treat **any PDA existence at all** as proof that `dest_settler::fill` executed.
+
+    An attacker with a compromised `SIGNER_AUTH_TOKEN` can exploit this in a few high-level steps:
+
+    1. Make one genuine payment, or identify an earlier transaction, whose metadata shows the expected `(recipient, mint, amount)` balance increase.
+    2. For each matching open order, transfer the zero-data rent-exempt minimum to that order's expected receipt PDA using only the System Program. No `origin_settler` or `dest_settler` instruction is involved.
+    3. Use the signer-fleet caller authorization to request an attestation for each order with the same genuine transaction as `deliveryRef`. The signer sees the same valid pre/post token-balance delta each time and a non-null account at each order's receipt PDA, so it returns a separate quorum for every order ID.
+    4. Submit each quorum to the permissionless `SourceEscrow.claim()`. Every call transfers that user's full Base input to the order's recorded `filler` address and marks the order `Claimed`, permanently disabling the user's refund ability, even though the output was not funded for their order.
+
+    Consequently, an attacker can cause users' escrowed Base inputs to be irreversibly released.
+
+    In combination with other issues, when a legitimate user attempts to open an order using `openFor` or `openWithPermit2`, and an existing `(recipient, mint, amount)` transaction exists, an attacker could front-run one of these matching transactions, setting themselves as the filler, and use this false quorum attack to mark it as filled, stealing the user's funds for themselves.
+
+    No filler private key is required to obtain the quorum or submit the claim: `SourceEscrow.claim()` is permissionless and automatically pays the recorded filler. Because the signers keep no record that a `deliveryRef` was already used, one payment can authorize any number of otherwise distinct orders sharing the output tuple.
+
+    **Remediations to Consider**
+
+    Accept a receipt only when the account is owned by the configured `dest_settler` program, has the `FillRecord` discriminator and exact serialized length, and deserializes to the expected full tuple and bump. The attestor should also bind `deliveryRef` to the transaction that created that exact receipt, rather than verifying a balance delta and receipt existence as two unrelated observations.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">high</field>
+  <field name="impactNote">Loss of solver inventory</field>
+  <field name="chance">low</field>
+  <field name="chanceNote">Requires a registry edit adding a token that is not dollar-pegged</field>
+  <field name="status">fixed</field>
+  <field name="commit">8f89a6cd36f85ff171535b09182222cec17e31cc</field>
+  <field name="content">
+    ## [M-3] Admission gates compare token quantity rather than value
+
+    The admission and cap gates introduced for C-1 are intended to ensure that an order's input covers its output.
+
+    However, both gates check how many units move, not what those units are worth. If an order set, for example, cfUSD as input at 9 decimals and WETH as output at 18 decimals, then 1 cfUSD admits 1 WETH, and the cap reads that as only $1 rather than the $2,000+ value of the WETH. This can be repeated to drain the inventory.
+
+    This is not reachable in the current configuration, because every token in the registry is pegged to the dollar and `par_cross_chain.outputs` is `[SBC, cfUSD]`. But nothing enforces the dollar peg, and adding a token to a flow's list is routine work with no CODEOWNERS on `registry/` and no deploy gate.
+
+    **Remediations to Consider**
+
+    Declare par per-token in the registry and have `parKeysFromRegistry` reject anything not declared par. Also consider extending `gate:allowlist` to cover outputs, as it currently covers only inputs.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Consistency</field>
+  <field name="impact">medium</field>
+  <field name="impactNote">Solver loses an output it has already delivered</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">Settlement routinely exceeds the 500ms alarm delay</field>
+  <field name="status">fixed</field>
+  <field name="commit">57748a5b8f1ff4ee8adbdaab2ed81ac902984d73</field>
+  <field name="content">
+    ## [M-4] Concurrent processing of one order can leave the delivery record pointing at a failed transaction
+
+    The remediation for H-3 correctly made destination payment idempotent on-chain. However, local recovery still assumes one `processOrder` call at a time. Two calls can both read an empty local state and an absent receipt before either submits, racing on the persisted state.
+
+    For example, for a Solana-destination order:
+
+    1. The operator calls `/settle`. The endpoint enrolls the order and schedules the alarm to run in 500ms.
+    2. Operator processing reads `st.delivery === undefined` and `fillReceiptOf(intent) === { filled: false }`.
+    3. While waiting for the Solana RPC response, the alarm fires. Its reconciliation pass reads the same empty state and absent receipt.
+    4. Both call `dest_settler.fill()` for the same receipt PDA.
+    5. Transaction `A` runs first, creates the receipt, and transfers the output to the user.
+    6. Transaction `B` runs second and fails, because the receipt PDA already exists.
+    7. Due to RPC timing, `A` stores its successful signature first, but `B` then overwrites it:
+
+    ```js
+    st.delivery = {
+      txRef: losingSignature,
+      confirmed: false
+    };
+    await store.putOrderState(orderId, st);
+    ```
+
+    8. On future alarm ticks, the engine sees `st.delivery` and therefore skips `fillReceiptOf()`:
+
+    ```js
+    if (!st.delivery) {
+      const receipt = await dst.fillReceiptOf(intent);
+      // ...
+    }
+    await dst.confirmDelivery(st.delivery.txRef);
+    ```
+
+    9. It repeatedly checks the failed transaction instead of discovering the successful on-chain receipt. The output has been paid once, but the source is never claimed automatically.
+
+    Consequently, an ordinary operator/alarm race can prevent the solver from claiming its locked input. If the user later refunds, the solver loses the output it delivered. Since settlement involves several network waits and can easily exceed 500ms, the two processing calls can readily overlap.
+
+    **Remediations to Consider**
+
+    Query for the exact on-chain receipt whenever delivery state is absent or unconfirmed, and let that receipt override any local transaction reference. At higher volume, consider batching these reads and applying concurrency limits and backoff.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Error Recovery</field>
+  <field name="impact">medium</field>
+  <field name="impactNote">Solver loses an output it has already delivered</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">Any failed processing attempt near the deadline is sufficient</field>
+  <field name="status">fixed</field>
+  <field name="commit">420f8df2373d54ed37bf4b396ea05407503cbd3b</field>
+  <field name="content">
+    ## [M-5] The engine abandons a delivered claim after `fillDeadline`, potentially losing its output
+
+    Both source contracts intentionally permit a claim with proof after `fillDeadline`; the claim remains valid until a refund changes the source order's terminal status.
+
+    However, the engine implements the opposite rule. After any failed processing attempt, it treats `fillDeadline` as a terminal claim cutoff and deletes the order from the pending set. This is unsafe when the order has already been filled: if the depositor refunds after `expires` before manual recovery, the solver loses the paid output.
+
+    **Remediations to Consider**
+
+    Delete an order at `fillDeadline` only when chain truth proves that no destination delivery occurred. Once the exact receipt exists, keep retrying the source claim until source-chain status is terminal; the deadline should raise attention, not remove the recovery obligation.
+
+    Consider never deleting a locked source order merely because `fillDeadline` passed and no destination receipt was observed. After `fillDeadline`, stop initiating new deliveries, but retain the order in a recovery state until it is claimed or refunded.
+
+    Also consider increasing the current `expires - fillDeadline` recovery buffer from 540 seconds (nine minutes). Because expiry refunds are an edge case, and the solver is already incentivized to complete its claims, a larger buffer such as four hours would be appropriate, increasing further — or scaling with value at risk — before supporting larger transfers.
+  </field>
+  <field name="response">
+Three parts of the recommendation were not implemented:
+
+1. Batching the receipt reads. One request has one fate, and an unreadable chain is our fail-closed "assume delivered", so one timeout would flag every order in the batch instead of one. The reads still fit in a tick.
+
+2. Never deleting a locked order. Some of those orders name a different filler, and keeping them fills our queue with work that is not ours. We took the half that protects our own money: an order we may have paid for is never dropped.
+
+3. A larger recovery buffer. It is 15% of the refund window, one config value, changeable with no code. The cost is depositor-facing — a longer buffer means a user whose order failed waits longer to self-refund — so at a $50 per-fill cap we are holding 540s and will raise it with the cap.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Consistency</field>
+  <field name="impact">low</field>
+  <field name="impactNote">1 hour lock of funds</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">Encouraged by UI</field>
+  <field name="status">fixed</field>
+  <field name="commit">93e337217b08b1100f83e3d947aef9f11183e02a</field>
+  <field name="content">
+    ## [L-1] User can lock their own funds for an order that will never fill
+
+    The UI caps an order at `FILL_CAP_USD`, while the solver's `makeCapGate` caps an output at `MAX_FILL_NOTIONAL_USD`. The UI also checks that sufficient solver inventory, or an enabled sourcing route, exists before building the order.
+
+    However, nothing keeps the two caps consistent: `wrangler.ui.toml` sets `FILL_CAP_USD` to $50, while `wrangler.solver.toml` sets `MAX_FILL_NOTIONAL_USD` to $2. Once the UI's funding check passes, an order between these two limits builds successfully, but the solver marks it `unfillable` and drops it. This causes the user to wait until after the one-hour `expires` deadline before recovering their funds.
+
+    **Remediations to Consider**
+
+    Derive both caps from one configuration source, and add a deployment check that rejects mismatches. Alternatively, have the UI read the solver's effective `per_fill_cap` heartbeat and enforce the lower limit before building an order.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Griefing</field>
+  <field name="impact">low</field>
+  <field name="impactNote">User funds locked for configured time window (currently 1 hour)</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">Permissionless frontrunning, no benefit to attacker</field>
+  <field name="status">fixed</field>
+  <field name="commit">566f4a0f7ce4374d7aefa7bc8ee89422c003beb3</field>
+  <field name="content">
+    ## [L-2] User's order open requests vulnerable to griefing attack
+
+    `SourceEscrow.openFor` and `openWithPermit2` allow a relayer to submit an order authorized by the swapper. The signatures bind the order fields through `_orderId`, and a successful claim always pays the escrowed input to the recorded filler.
+
+    However, the filler is supplied separately in unsigned `fillerData`; it is absent from `BraleOrderData` and therefore from `_orderId` and the Permit2 witness. A malicious or compromised relayer can name itself or an unreachable address as the filler, causing the project's solver to reject the order while the swapper's input remains locked until the one-hour refund deadline. A relayer that names itself also gains a free option to deliver only if the trade becomes profitable. The bundled UI's self-open flow is unaffected, but every integration using either gasless path relies on the relayer choosing the intended filler.
+
+    **Remediations to Consider**
+
+    Add a filler commitment to `BraleOrderData` so the swapper's signature binds it, while preserving an explicit sentinel if open filling is intended. Coordinate the resulting `orderId` change across the Solidity, TypeScript, and Solana implementations. Alternatively, restrict the relayed entry points to explicitly trusted relayers.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Data Consistency</field>
+  <field name="impact">low</field>
+  <field name="impactNote">Data loss, recoverable by reading the chain</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">Could be intentionally triggered by an attacker</field>
+  <field name="status">fixed</field>
+  <field name="commit">8192e64df536f77486fd9b98d397248177a67d2d</field>
+  <field name="content">
+    ## [L-3] Caller-chosen `order_id` lets one corridor overwrite the other's settlement telemetry
+
+    The solver runs both corridors from a single Durable Object, and the reverse engine is deliberately given its own DO key namespace so their per-order state cannot collide.
+
+    However, the two D1 tables the engine writes — `settlements` and `needs_attention` — are not namespaced. Both are keyed on `order_id` alone, and the one column that could discriminate the corridors, `settlements.chain`, is handed the same Base chain id by both engines (`engine/durable-store.js:13-14`; `solver/worker.js:196,217`).
+
+    A collision here is not merely a matter of probability. The Solana side's `order_id` is a caller-supplied argument that `origin_settler` never binds to the order's fields. An attacker could thus open an order with an `order_id` equal to any Base-origin `orderId` they have observed. This would:
+
+    1. Make `/api/xchain/status/&lt;id&gt;` report `claimed` for a still-open Solana order, along with the other order's `deliverRef`, `claimRef` and `recipient`;
+    2. Silently discard the first order's settlement row, since `recordSettlement` is an upsert; and
+    3. Clear the `needs_attention` flag raised for a stuck order on the other corridor, since `clearAttention` deletes by id alone.
+
+    No funds are at risk. The impact is confined to what an operator and a polling user believe, which could still matter: a user is told their open order settled, and the queue meant to surface a stuck order can be cleared by an unrelated one.
+
+    **Remediations to Consider**
+
+    Consider:
+
+    - Namespacing the D1 keys per corridor; or
+    - Deriving `order_id` inside `origin_settler` from the order's own fields, as `SourceEscrow._orderId` does, so collisions become infeasible rather than merely unrewarding.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Denial of Service</field>
+  <field name="impact">low</field>
+  <field name="impactNote">UI refund denial; on-chain refund still available. No loss of funds</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">Solana transactions are cheap</field>
+  <field name="status">fixed</field>
+  <field name="commit">952b1f56ff853b1dacdede4378f9ab9df0a691da</field>
+  <field name="content">
+    ## [L-4] Cheap program-transaction spam can hide expired orders from the automatic refund scan
+
+    The reverse refund loop automatically finds refundable orders by calling `scanOpenedIntents(null)` on every tick. Rather than enumerating `Order` accounts, this function performs a fresh scan of the program's transaction history that is intended to cover the preceding 24 hours.
+
+    However, each scan stops after the newest 1000 program signatures even when it has not reached the 24-hour cutoff:
+
+    ```js
+    // engine/svm-adapter.js:205-216
+    const page = await this.conn.getSignaturesForAddress(this.programId, { ..., limit: 1000 });
+    // ...
+    if (cursor == null &amp;&amp; sigs.length &gt;= SIG_PAGE) break;
+    ```
+
+    The cap counts failed transactions as well as successful opens, because failures are discarded only later at `engine/svm-adapter.js:223`. An attacker can therefore send 1,000 cheap, failing transactions involving `origin_settler` after a target order and push it outside every subsequent refund snapshot. Because each pass starts from the newest signature again, the expired order remains hidden as more history is added.
+
+    The input remains recoverable on-chain because `refund` is permissionless, but that action is not exposed through the user path. Both Solana-origin settle/refund endpoints are operator-authenticated, and the browser is told only to poll because the solver "auto-refunds expired orders" (`ui/server.ts:2318-2340`). Consequently, an ordinary user's funds can remain Open past expiry until they construct a custom transaction or obtain operator intervention, contrary to the advertised automatic safety path.
+
+    **Remediations to Consider**
+
+    Enumerate program-owned `Order` accounts through an RPC or indexer that supports it, or maintain a durable index populated at open time and reconciled against chain truth. If transaction history must remain the fallback, page to the full time cutoff for refund scans, and expose a refund UI as a user recovery path.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Denial of Service</field>
+  <field name="impact">low</field>
+  <field name="impactNote">Reverse corridor discovery halts; on-chain refund remains available</field>
+  <field name="chance">medium</field>
+  <field name="chanceNote">A single cheap burst is sufficient</field>
+  <field name="status">fixed</field>
+  <field name="commit">f214c87ee409eaeea98254305fd79d4d90dd830b</field>
+  <field name="content">
+    ## [L-5] The bounded reverse scan reintroduces a denial of service through truncation
+
+    The remediation for L-4 replaced the unbounded history walk with a bounded one, and its own commit comment diagnoses the failure mode of the code it replaces: "the cursor never advances, the gap only grows, and discovery is dead until someone resets it by hand".
+
+    However, the replacement reintroduces that same condition through truncation rather than a thrown error. The accompanying note describes the residual risk as requiring a sustained flood, but a single burst is enough to exceed the bound and leave a permanent gap.
+
+    The resulting denial of service stops enrollment of new reverse orders, since `scanOpenedIntents` feeds `engine.discover`. Depositors can always self-refund on-chain, so funds are never at risk; the corridor is simply down, and does not recover on its own.
+
+    **Remediations to Consider**
+
+    Make partial progress persistable, so that the scan resumes from where it stopped and eventually pages over all transactions rather than restarting from the newest signature each time.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Proof Verification</field>
+  <field name="impact">high</field>
+  <field name="impactNote">Source input claimed without a final destination delivery</field>
+  <field name="chance">low</field>
+  <field name="chanceNote">Requires a compromised signer caller and a reorganization</field>
+  <field name="status">fixed</field>
+  <field name="commit">4eae27858bdf5f9b0e7ffabf71b43b743b1b28b9</field>
+  <field name="content">
+    ## [L-6] The normal quorum path does not finalize the order-bound receipt
+
+    Following the remediation for H-3, attestation is described as resting on the settler receipt read at the finalized head. That is true only when `deliveryRef` is absent.
+
+    However, normal fresh deliveries do carry a reference, and in that case the signer calls:
+
+    ```js
+    verifySolanaReceipt(..., { requireFinal: !hasRef })
+    verifyEvmReceipt(..., { requireFinal: !hasRef })
+    ```
+
+    It then separately proves that `deliveryRef` is final. But delivery-reference verification only looks for an exact token transfer or balance increase; it does not prove that the referenced transaction created this order's settler receipt.
+
+    If that fresh receipt is reorganized out after quorum signs, the source input can be claimed without a final destination delivery attributable to this order. A final older transfer with the same token, recipient, and amount can therefore be paired with a fresh, non-final receipt for this order by a compromised signer caller. This is narrower than H-3, but it still defeats the independent-signers and finality boundary at precisely the moment that boundary is needed.
+
+    **Remediations to Consider**
+
+    Always read the exact order-bound receipt at the project's configured finality level, regardless of whether a `deliveryRef` was supplied: Base at `safe`, and Solana at `finalized`. Treat the transaction reference as optional corroborating or diagnostic evidence only. The signer must not issue a signature until the receipt itself has reached that configured level. This is the smallest fix and closes the split-proof issue under the project's current finality policy.
+
+    If the project wants a stronger Base guarantee, consider changing the Base receipt read from `safe` to the literal `finalized` RPC tag. Note that this would increase settlement latency — roughly twenty minutes instead of the current sub-two-minute mainnet policy — so the claim margin, fill deadline, and related parameters would need to be increased and re-tested.
+  </field>
+  <field name="response">
+We opted to not take the stronger variant (Base at literal `finalized` rather than `safe`): twenty minutes of added settlement latency would force the claim margin and fill deadline to be re-tuned, which pushes against H-1's refund window.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Error Recovery</field>
+  <field name="impact">medium</field>
+  <field name="impactNote">Solver loses an output it has already delivered</field>
+  <field name="chance">low</field>
+  <field name="chanceNote">Requires a mid-flight failure on the operator path</field>
+  <field name="status">fixed</field>
+  <field name="commit">33fb3f0b95d29392fa87a647a4000672a21b8d98</field>
+  <field name="content">
+    ## [L-7] Operator settlements are not guaranteed to retry
+
+    The automated solver adds each order to its pending queue before processing it, and the alarm loop keeps retrying orders in that queue until they finish.
+
+    However, the operator `/settle` endpoint skips the enqueue step and calls `processOrder(...)` directly. If the operator pays the output and then encounters a failure — signer, RPC, storage, or otherwise — the on-chain receipt may prevent a second payment, but the alarm loop may not know it needs to finish the source claim, because the order may never have entered the pending queue. If this persists and the user later refunds after the order expires, the solver loses the output it already paid.
+
+    **Remediations to Consider**
+
+    Add the order to the pending queue and ensure the alarm is armed before `/settle` calls `processOrder(...)`.
+
+    Alternatively, add a safer engine method such as `settleOne()` that always enrolls the order, arms the alarm, and then processes it. The operator endpoint and any future one-off callers would use this method instead of calling `processOrder(...)` directly.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Input Validation</field>
+  <field name="impact">low</field>
+  <field name="impactNote">Prevents self-inflicted, unfillable orders</field>
+  <field name="status">fixed</field>
+  <field name="commit">a4e33b882a13fc87ef501f7a336d657da85a6c04</field>
+  <field name="content">
+    ## [Q-1] `open` accepts a zero `filler`
+
+    `filler` is the immutable recipient of the escrowed input after a successful claim. The EVM `SourceEscrow` rejects a zero filler when recording an order.
+
+    However, `origin_settler::open` stores `Pubkey::default()` without validation. A claim could therefore transfer the input to a token account whose authority is the System Program address, from which no signer could recover it.
+
+    In normal operation, the solver rejects such an order because its filler does not match the solver's identity, while the depositor who supplied the value can still refund after expiry; the practical impact is therefore limited to accepting malformed, unfillable orders instead of failing early.
+
+    **Remediations to Consider**
+
+    Reject `Pubkey::default()` in `open` with a dedicated `ZeroFiller` error, matching the EVM escrow.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Coding Standards</field>
+  <field name="impact">low</field>
+  <field name="impactNote">Preventative hardening for future token support</field>
+  <field name="status">fixed</field>
+  <field name="commit">b371561a587842784cacb12391c2d4b3a652516a</field>
+  <field name="content">
+    ## [Q-2] SPL transfers use `transfer` instead of `transfer_checked`
+
+    The three token transfers in `origin_settler` use `anchor_spl::token::transfer` rather than `transfer_checked`. This is safe today because the typed accounts accept only the classic SPL Token program, while the account constraints and SPL Token itself enforce matching mints; Token-2022 extensions cannot reach this program.
+
+    However, this safety depends on that implicit Token-2022 exclusion. If the account types are later migrated to `token_interface`, a transfer-fee token could make the vault receive less than the `input_amount` recorded by `open`, which performs no balance-delta check. The same migration could therefore remove the current protection without making the risk obvious.
+
+    **Remediations to Consider**
+
+    Use `transfer_checked`, while accounting for the potential increase in transaction sizes. Also document where classic-SPL-only account types are required, and introduce a vault balance-delta check if Token-2022 support is later introduced.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Error Recovery</field>
+  <field name="impact">low</field>
+  <field name="impactNote">Misleading terminal error on a transient condition</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## [Q-3] A not-yet-finalized delivery is reported as a verification failure
+
+    When the signer corroborates a delivery reference, it retains a `425` response path for the case where the delivery exists but has not yet reached the required commitment.
+
+    However, the corroboration itself calls `getTransaction`, which defaults to the `finalized` commitment. A delivery that is only seconds old therefore returns no transaction at all, and the signer answers `409 "delivery did not verify"` before the `425` path is ever reached. The accurate answer in that moment is "wait roughly 25 seconds", not "this delivery is invalid".
+
+    No funds are at risk, and the condition resolves on retry. The cost is diagnostic: a transient timing condition is reported as a terminal verification failure, which is misleading to operators and to any caller that treats `409` as non-retryable.
+
+    **Remediations to Consider**
+
+    Name the commitment explicitly on the corroboration read so that a recent-but-unfinalized delivery falls through to the existing `425` path, and reserve `409` for a reference that genuinely does not verify.
+  </field>
+</item>
