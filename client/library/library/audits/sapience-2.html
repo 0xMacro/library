@@ -1,0 +1,48 @@
+<page
+  clientName="Sapience"
+  reportDate="April 2, 2026"
+  auditTitle="Sapience A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/sapiencexyz/sapience"
+  repoCommitHash="cfbaaa8045706ed96a604cb4484b55f11809553b"
+  finalCommitHash="162a139e60cbdcb52761865a45723e7fe3ae5db1"
+  customRepoInfo
+  layout="/library/audits/_layout.html"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team from March 26 to March 29, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions on Discord with the {{page.clientName}} team.</li>
+    <li>Technical documentation available in the repository.</li>
+  </ul>
+</content-for>
+
+
+<content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash <b>(initial)</b>:
+        <code>cfbaaa8045706ed96a604cb4484b55f11809553b</code>
+      </li>
+    </ul>
+  </content-for>
+
+
+  <content-for name="source-code">
+
+    <p>We audited the following contracts with <b>f2b6bd9231ae9915f9ba88f6bef02e7a914e6288</b> commit hash:</p>
+    <template type="file-hashes">
+      1bec137aef2a1f962c40ae22f12e754e4cb958cf131a3e4db024662569acbcc9  packages/protocol/src/SecondaryMarketEscrow.sol
+      25b8666dc38cba5f9c6f5077e31c07aa07f76a12ae11fa8291f421238f56ff25  packages/protocol/src/interfaces/ISecondaryMarketEscrow.sol
+    </template>
+  </content-for>
