@@ -1,0 +1,59 @@
+<page
+  clientName="Veda Labs"
+  reportDate="September 18th, 2026"
+  auditTitle="Veda A-103"
+  auditSubtitle="OpenOceanAdapter"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-private"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on September 16th, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository, including the description of <a href="{{page.repoUrl}}/pull/93" target="_blank" class="text-blue-500 hover:underline">PR 93</a>.</li>
+  </ul>
+
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li class="break-words break-all">
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank" class="text-blue-500 hover:underline">boring-vault-private</a>
+    </li>
+    <li class="break-words break-all">
+      <b>Pull Request:</b>
+      <a href="{{page.repoUrl}}/pull/778" target="_blank" class="text-blue-500 hover:underline">PR 93</a>
+      (branch <code>Tempo DirectPropAMM strategist integration and buffer helper
+    </code>)
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash:</b>
+      <code>0816dda2622b051d1a417d9a9a093fe6cbebbd49</code>
+    </li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+  <p>Specifically, we audited the following contract within this repository:</p>
+
+  <template type="file-hashes">
+    5f4eabba211fd4fb2322d66a9d3203e04e71488498212768f0877ae188b8fa27  src/base/DecodersAndSanitizers/Protocols/DirectPropAMMDecoderAndSanitizer.sol
+    2527973cc218aea4af41ed6ae1e7e4269f93b9f054ca73447db80d4ee20540d2  src/base/DecodersAndSanitizers/TempoDirectPropAMMDecoderAndSanitizer.sol
+  </template>
+
+  <p>Additionally a buffer helper contract to help interact with propAMM was provided via a zip file and reviewed alongside the sanitizer</p>
+
+  <template type="file-hashes">
+    f26b9901c96bcaaaa5978d2abc63c62fd13e3053c31a125204979b6cdebe8ba3  src/DirectPropAMMBufferHelper.sol
+  </template>
+</content-for>
+
+</page>
