@@ -1,0 +1,106 @@
+<page
+  clientName="Veda Labs"
+  reportDate="October 1st, 2026"
+  auditTitle="Veda A-106"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-private"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on October 1st, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository, including the description of each described Pull Request.</li>
+  </ul>
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        The changes in scope add two token issuers as new trusted parties for the vaults that use them.
+
+        **Ondo (USDY and rUSDY issuer).** Vaults using the Ondo leaves rely on Ondo for:
+            <ul>
+                <li>keeping the vault registered in `OndoIDRegistry` and off the USDY blocklist and sanctions list</li>
+                <li>keeping redemptions unpaused and USDC an accepted token</li>
+                <li>its oracle, fees, price floor and rate limits (10 million USD of redemptions per 24 hours per user ID, shared by every address under that ID, and 15 million USD across all Ondo users), all changeable at any time</li>
+                <li>the usual issuer powers over the tokens: both are upgradeable and rUSDY exposes an admin `burnShares()`</li>
+            </ul>
+        Any of the first three can delay or block the exit from USDY and rUSDY, but cannot redirect a payout, which always goes to the calling vault.
+
+        **Hastra (wYLDS and PRIME issuer).** Vaults using the Hastra leaves or `HastraPrimeBufferHelper` rely on Hastra for:
+            <ul>
+                <li>keeping wYLDS and PRIME unpaused and the vault unfrozen; both powers are held by EOAs and take effect immediately</li>
+                <li>keeping the PRIME NAV fresh: a report older than 3600 seconds reverts every PRIME conversion and, with the buffer helper set, every USDC deposit through the teller until the helper is unset</li>
+                <li>settling exits from wYLDS, which are asynchronous (one pending redemption per address) and settled all or nothing by Hastra's operator from its redeemVault (about 98 thousand USDC at review time), shared by every Veda vault entering PRIME this way</li>
+                <li>upgrades and redeemVault changes, which go through a 1 day timelock</li>
+            </ul>
+    </template>
+</content-for>
+
+<content-for name="repo-info">
+  branch and commit.
+
+<p class="break-words break-all">
+  <b>Repository:</b>
+  <a href="{{page.repoUrl}}" target="_blank" class="text-blue-500 hover:underline">boring-vault-private</a>
+</p>
+
+<p class="break-words break-all">
+  <a href="{{page.repoUrl}}/pull/153" target="_blank" class="text-blue-500 hover:underline"><b>PR 153</b></a>, Ondo USDY decoder<br>
+  Branch <code>willtobin/scfeat-43-ondo-usdy-instant-mintredeem-decoder</code> at commit <code>38c2c22a9176d109be2a32efdfb5b2952ab3a9cc</code>
+</p>
+
+<p class="break-words break-all">
+  <a href="{{page.repoUrl}}/pull/123" target="_blank" class="text-blue-500 hover:underline"><b>PR 123</b></a>, Hastra PRIME decoder and buffer helper<br>
+  Branch <code>will/scfeat-39-hastra-prime-decoder</code> at commit <code>40627627d0e68e8a5361f82e6fddaecedd357876</code>
+</p>
+
+<p class="break-words break-all">
+  <a href="{{page.repoUrl}}/pull/121" target="_blank" class="text-blue-500 hover:underline"><b>PR 121</b></a>, CCIP decoder V0.2 (GenericExtraArgsV2)<br>
+  Branch <code>feat/ccip-decoder-extra-args-v2</code> at commit <code>5c103db17ed0cd8820e3894b69609041aef8dcff</code>
+</p>
+
+<p class="break-words break-all">
+  <a href="{{page.repoUrl}}/pull/156" target="_blank" class="text-blue-500 hover:underline"><b>PR 156</b></a>, Uniswap V3 SwapRouter02 adapter<br>
+  Branch <code>feat/add-swaprouter02-adapter</code> at commit <code>fb393d10bf32416c4d0b33a7155050f7a358cff1</code>
+</p>
+</content-for>
+
+<content-for name="source-code">
+  <p>Specifically, we audited the changes each pull request makes to the following files, at the commit of that pull request. Files added by a pull request were reviewed in full.</p>
+
+  <p>PR 153 (commit <code>38c2c22a9176d109be2a32efdfb5b2952ab3a9cc</code>):</p>
+
+  <template type="file-hashes">
+    c99279bbd69319af980718a7a3c898c41c1fcde09ddb55705f6c04908ba6183f  src/base/DecodersAndSanitizers/Protocols/OndoDecoderAndSanitizer.sol
+  </template>
+
+  <p>PR 123 (commit <code>40627627d0e68e8a5361f82e6fddaecedd357876</code>):</p>
+
+  <template type="file-hashes">
+    eb665927a9b4510e7724698bb2e713ae1c0ad8897f697f3aed7ea5794bb8cdd7  src/base/DecodersAndSanitizers/Protocols/HastraPrimeDecoderAndSanitizer.sol
+    8bbdc3b9f846d07eb57913129f6b6ec820b43cae8f34ff3de8c3423bf83712c9  src/base/DecodersAndSanitizers/HastraPrimeFullDecoderAndSanitizer.sol
+    83a606e2d1d8312f89d79e7c4c779c44916c4c80e5c0b0ae1b28d49545a8b0bd  src/base/Roles/HastraPrimeBufferHelper.sol
+  </template>
+
+  <p>PR 121 (commit <code>5c103db17ed0cd8820e3894b69609041aef8dcff</code>):</p>
+
+  <template type="file-hashes">
+    b1a08a009752ba92aa86c513e8fd06cb7845354b5a993549b983d1d14f7e620a  src/base/DecodersAndSanitizers/Protocols/CCIPDecoderAndSanitizer.sol
+    0c946217bdea371b013aa30276f1980fe5d3dfccd4ab75013858414dd583c4a4  src/interfaces/DecoderCustomTypes.sol
+    8c9458ca0eaa2f65cbd53c2a69f48795d48081b5bbc53249f8c428cc160dfa17  script/GigaDeployDecoderAndSanitizer.s.sol
+    0a050ee79fead9a7f45dfbf997bbbfbd1e390e04cd835dfd4259565d01bcac31  script/DeployDecodersAndSanitizersWithNoConstructorArgs.s.sol
+  </template>
+
+  <p>PR 156 (commit <code>fb393d10bf32416c4d0b33a7155050f7a358cff1</code>):</p>
+
+  <template type="file-hashes">
+    4ea5ebcb2bf65a91ab840936c7f0773e9be8d4fca405de3e771418abf45decd0  src/base/Periphery/adapters/UniswapV3SwapRouter02Adapter.sol
+  </template>
+</content-for>
+
+</page>
