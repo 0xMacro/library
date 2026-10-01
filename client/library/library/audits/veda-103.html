@@ -1,0 +1,58 @@
+<page
+  clientName="Veda Labs"
+  reportDate="September 14th, 2026"
+  auditTitle="Veda A-103"
+  auditSubtitle="OpenOceanAdapter"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  customReviewInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on September 11th, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository, including the description of <a href="{{page.repoUrl}}/pull/778" target="_blank" class="text-blue-500 hover:underline">PR 778</a>.</li>
+  </ul>
+
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li class="break-words break-all">
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank" class="text-blue-500 hover:underline">boring-vault-private</a>
+    </li>
+    <li class="break-words break-all">
+      <b>Pull Request:</b>
+      <a href="{{page.repoUrl}}/pull/778" target="_blank" class="text-blue-500 hover:underline">PR 778</a>
+      (branch <code>Add OpenOceanAdapter (No Caller Check)
+    </code>)
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash:</b>
+      <code>0816dda2622b051d1a417d9a9a093fe6cbebbd49</code>
+    </li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+  <p>Specifically, we audited the following contract within this repository:</p>
+
+  <template type="file-hashes">
+    ce9627a8c81222bb6e0b1579299bed106e0b4116d71d1072008dbb8279cea033  src/base/Periphery/adapters/OpenOceanAdapterNoCaller.sol
+  </template>
+</content-for>
+
+<content-for name="review-info">
+  <p><b>Note:</b> This review covers a single contract deployed as an incident response measure, and its correctness depends on facts outside the contract. We found the implementation matches that stated intent.</p>
+
+  <p>The audit does not pertain to deployment scripts, the installation transaction that repoints the vault's <code>hook</code> slot, the authority configuration granting <code>addBlockedSpender</code> and <code>removeBlockedSpender</code>, or any other contracts or scripts in the repository beyond the one described above. The deployment transaction had not been received at the time of this report, so no deployed bytecode or constructor arguments were reviewed.</p>
+</content-for>
+
+</page>
