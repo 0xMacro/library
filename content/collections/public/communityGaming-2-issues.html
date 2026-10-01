@@ -1,0 +1,16 @@
+<item>
+    <field name="topic">Code Quality</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">3fb1d9c8b38448af410f4d4a6d897a8ad323f20a</field>
+    <field name="content">
+      ## [Q-1] Extra inheritance of ERC20
+  
+      [`Token.sol`](https://github.com/TournamentDAO/cg-smart-contracts/blob/545468c5c309ddb3e70253dd8ff444c4cddca3f8/contracts/cgx_token/Token.sol) and [`PredictionCredits.sol`] inherits both [`ERC20`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol) and [`ERC20Permit`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/extensions/ERC20Permit.sol) however `ERC20Permit` already inherits `ERC20`, so it is unnecessary.
+  
+      **Remediations to Consider**
+  
+      Remove the inheritance of ERC20 for `Token.sol`.
+    </field>
+</item>
+  
