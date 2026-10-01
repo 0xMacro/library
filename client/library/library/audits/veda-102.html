@@ -1,0 +1,76 @@
+<page
+  clientName="Veda Labs"
+  reportDate="September 14th, 2026"
+  auditTitle="Veda A-102"
+  auditSubtitle="AtomicQueue Allowance Hook"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-private"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_VEDA_102"
+  customRepoInfo
+  customReviewInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on September 14th, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository, including the description of <a href="{{page.repoUrl}}/pull/114" target="_blank" class="text-blue-500 hover:underline">PR 114</a>.</li>
+  </ul>
+
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    ### **Trusted Parties**
+
+    - **Hook owner / authority** - Governs `addBlockedSpender` and `removeBlockedSpender` through `Auth`. Removing the exploited queue from the blocked set restores that queue's ability to pull shares from every approver.
+    - **Vault admin (`setBeforeTransferHook`)** - Repoints the vault's `hook` slot. It can both install this contract and repoint away from it. See `I-1`.
+    - **Legacy Teller (`legacyHook`)** - Immutable, set at construction. It runs its allowance check first and then delegates to the Teller unchanged.
+
+    ### **Accepted Risks**
+
+    1. **Freeze until revoke** - Any holder with both a live allowance to a blocked spender and a share balance cannot transfer until they call `approve(spender, 0)`. At the time of review this affected 144 LiquidUSD holders, about 2.09M of a 26.6M share supply (7.9%). All 144 are externally owned accounts - 21 of them EIP-7702 delegated - so every affected holder can self-serve the revocation. Veda Labs accepts this as a user-communication item rather than a code change.
+    2. **Immutable `legacyHook`** - Keeping the allowance block across a future Teller migration requires deploying a fresh hook, because `legacyHook` cannot be updated in place. See I-1.
+    3. **Scope of the block** - The hook stops transfers of vault shares only. It does not, and is not intended to, recover shares already pulled by the exploited queue.
+  </template>
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li class="break-words break-all">
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank" class="text-blue-500 hover:underline">boring-vault-private</a>
+    </li>
+    <li class="break-words break-all">
+      <b>Pull Request:</b>
+      <a href="{{page.repoUrl}}/pull/114" target="_blank" class="text-blue-500 hover:underline">PR 114</a>
+      (branch <code>fix/atomic-queue-remediation</code>)
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash:</b>
+      <code>64fe79de695f1f9ed53fd9a1f55d64ee4583a059</code>
+    </li>
+    <li class="break-words break-all">
+      <b>Deployment:</b>
+      Not received at the time of this report.
+    </li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+  <p>Specifically, we audited the following contract within this repository:</p>
+
+  <template type="file-hashes">
+    5ecae565c5038b6d6d934a79eb87cc71ee2c17d64a17c0d99367f268f9e32d06  src/base/Roles/AtomicQueueAllowanceHook.sol
+  </template>
+</content-for>
+
+<content-for name="review-info">
+  <p><b>Note:</b> This review covers a single contract deployed as an incident response measure, and its correctness depends on facts outside the contract. We found the implementation matches that stated intent.</p>
+
+  <p>The audit does not pertain to deployment scripts, the installation transaction that repoints the vault's <code>hook</code> slot, the authority configuration granting <code>addBlockedSpender</code> and <code>removeBlockedSpender</code>, or any other contracts or scripts in the repository beyond the one described above. The deployment transaction had not been received at the time of this report, so no deployed bytecode or constructor arguments were reviewed.</p>
+</content-for>
+
+</page>
