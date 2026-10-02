@@ -1,0 +1,134 @@
+<page
+  clientName="Trade'm"
+  reportDate="September 29, 2026"
+  auditTitle="Trade'm-1"
+  auditSubtitle="Two-Sided Bonding Curve Markets"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Da11a5-B/trademe-contracts-audit"
+  layout="/library/audits/_layout.html"
+  passwordEncrypt="env:PAGE_PASS_TRADEM_1"
+  customRepoInfo
+  customReviewInfo
+  customDeploymentDisclaimer
+  appendixLinks="#methodology::Methodology and Verification;;#economic-properties::Economic Properties and Limitations;;#deployment-review::Supplemental Deployment Review;;#closure::Review Closure"
+>
+
+<content-for name="deployment-disclaimer">
+  Except for the explicitly described supplemental source and local-test review of DeployMainnet.s.sol, this report does not audit deployment scripts or the deployment process. The supplemental review does not verify live deployments, Safe configuration, signer custody, or production infrastructure.
+</content-for>
+
+<content-for name="schedule">
+  The security audit was performed on September 18 and 22, 2026, followed by fixes review on September 29, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions with the Trade'm team.</li>
+    <li>Repository documentation at the reviewed revisions, including README, the audit scope one-pager, known-issues register, and supplied specification/errata.</li>
+  </ul>
+  <h2 id="review-summary">Review Summary</h2>
+  <template type="audit-markdown">
+    We reviewed the project's bonding-curve mathematics, reserve accounting, settlement lifecycle, governance permissions, factory and registry. No severe issues were identified.
+  </template>
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    ### Trusted Parties
+
+    - **Governance (`multisig`):** Controls market creation and listings, roles, spreads up to 8%, surplus collection, buy pauses, and market closure. Cannot upgrade existing markets, withdraw holder backing, or redirect claims.
+    - **Governance concentration:** The client reports an intended 2-of-3 Safe with all three owner keys controlled by one individual. This is a signing threshold, not independent-party governance; the configuration and key custody were not independently verified.
+    - **Guardian:** Can repeatedly pause buys for seven days, but cannot pause sells or claims or move funds. Governance can replace it.
+    - **Treasury:** Receives surplus. Misconfiguration can strand fees or prevent archive transfers.
+    - **Payment-token issuer:** USDC upgrades, pauses, transfer blocking, and blocklisting remain outside protocol control.
+
+    ### Contracts and Enforced Boundaries
+
+    - **`Market`:** Immutable, supply-priced curves with fee sweeps. Archived claims pay holders at frozen rates without deadlines or pauses.
+    - **`MarketFactory`:** Deploys fixed market code and records provenance. Default roles affect only future markets.
+    - **`Registry`:** Append-only listings, trusts governance's factory selection. Existing markets operate independently of the registry.
+
+    ### What Users Must Trust
+
+    - **Governance judgment and availability:** Fee policy and closure timing remain discretionary. Archive requires governance action after at least 24 hours; there is no completion deadline.
+    - **Applications:** Must identify trusted markets, interpret views correctly, and supply appropriate slippage limits. Application protections are outside this contract review.
+  </template>
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li><b>Repository:</b> <a href="{{page.repoUrl}}" target="_blank">trademe-contracts-audit</a></li>
+    <li class="break-words break-all"><b>Commit Hash (initial):</b> <code>75c587b5e71fa4b0162c486435e2196a751fd25a</code> (tag <code>audit-v2</code>)</li>
+    <li class="break-words break-all"><b>Commit Hash (accepted fixes):</b> <code>9bfe9c517cd791be61a5a41192805773f0544b18</code> (tag <code>audit-v3</code>, branch <code>fixes/audit-v2</code>)</li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+  <p>The primary audit scope comprises these three contracts. SHA-256 hashes below identify the source files at the accepted fixes commit, not deployed bytecode.</p>
+  <template type="file-hashes">
+    c8555802e8e9f138161c87bc6ceea968040e43e26d0cbfe3689c971e93fc450f  src/Market.sol
+    8595e7d287053ff00cfaf6756a054f4adbf3b351ba374d124ec0fe97d6aa2a51  src/MarketFactory.sol
+    a6ae284593ce914d0fb7170bf7b2914830efd3da0836a9ac8720b4abe20cda3d  src/Registry.sol
+  </template>
+  <p>The following script received supplemental source and local-test review during fixes review.</p>
+  <template type="file-hashes">
+    dd19668c04b809a0b74c8b1d49b9ee7718b518d2d6a0b4b85d4fd8d4428e1e05  script/DeployMainnet.s.sol
+  </template>
+</content-for>
+
+<content-for name="review-info">
+  <p>Documentation, tests, gas snapshots and supplied static-analysis output were supporting evidence. Application code, quote services, indexers, the private monorepo, operational runbooks, live deployments, Safe configuration, signer custody and the external token implementation were excluded. No live fork rehearsal or broadcast was performed. Client-reported application fixes and monorepo synchronization were not independently verified.</p>
+</content-for>
+
+<content-for name="appendix">
+<section id="methodology" class="Copy min-h-page py-12 print:pb-0 print:pagebreak">
+  <h2>Methodology and Verification</h2>
+  <template type="audit-markdown">
+    The review combined manual source inspection, including:
+
+    - Algebraic derivation of the rounding and backing inequalities
+    - Boundary analysis
+    - Adversarial scenario analysis
+    - Unit, fuzz and invariant tests
+    - Economic review (see next section)
+
+    Documented known issues and existing tests were verified independently, rather than treated as untested truth.
+
+    Fixes review was completed against the `audit-v2` tag. Afterwards we also reviewed the later-introduced deployment script (specified in Source Code section), completed against the `audit-v3` tag.
+  </template>
+</section>
+<section id="economic-properties" class="Copy min-h-page py-12 print:pb-0 print:pagebreak">
+  <h2>Economic Properties and Limitations Assessed</h2>
+  <template type="audit-markdown">
+    Here `S` is integer share-wei and `L(S) = floor(S(S + 2e21)/2e33)` is liability in micro-USDC. Accounting conclusions assume exact token transfers and the contract's reachable state invariants.
+
+    | Property | Conclusion and residual limitation |
+    | --- | --- |
+    | Reserve conservation on buy, sell and sweep | Buy liability growth is at most gross input; sell proceeds are at most liability reduction; sweeping leaves exactly the current liability. These properties hold with EVM rounding throughout the permitted 0-8% spread range. |
+    | Square root and buy rounding | The square root returns the exact integer floor. Buy output is conservative: at most 999 share-wei below the floored unquantized ideal, and less than 1,000 below the real ideal. The one-share-wei fixture tolerance is not a bound for every buy compared with the unrounded ideal curve. Larger differences remain conservative and do not threaten solvency. |
+    | Settlement dust and rate floor | For positive frozen supply, after all holders claim, locked reserve dust is less than `claimants + S/1e18` micro-USDC per side; an empty side has zero settlement dust. The $1 rate floor holds permanently from `S = 44721000016078781`; smaller supplies can fall below it or produce zero claims. A fresh one-micro-USDC purchase can become entirely sweepable rounding surplus. Donations are separate, unrecoverable balances. |
+    | Remaining-claim coverage | After any subset of successful claims, reserves cover every remaining frozen claim. Claim order does not change entitlement; failed transfers roll back the affected call. Post-archive liability views stay frozen and do not represent the remaining obligation. |
+    | Fragmented trading | Arbitrarily split, self-only buy/sell cycles returning to their initial inventory cannot profit from rounding, including at zero spreads. This does not prohibit profits funded by other traders' intervening orders. |
+    | Transaction ordering and minimum outputs | Successful trades meet the caller's minimum output. Ordering can consume the permitted tolerance or cause a revert. Zero minima are accepted; the external application’s stated slippage defaults and ceiling were not verified. |
+    | Wind-down and archive timing | Whether an early seller receives more per share than later claimants depends on supply, spread, and sale size; it is not guaranteed. Exact average settlement value falls as supply is sold, while integer rates may wobble near quantization boundaries. Governance can change spreads during wind-down and controls archive timing after the 24-hour minimum, with no upper deadline or permissionless fallback. |
+    | Extreme-value exit availability | Accepted synthetic buys can exceed the arithmetic domain of a single full sale, but only at 780 million times the current total supply of USDC. Even then, smaller sales remain available. No feasible real-asset exploit was demonstrated. |
+    | USDC issuer restrictions | USDC issuer upgrades, pauses, transfer blocking and blocklisting remain outside protocol control. A blocked treasury makes positive-surplus `archive()` revert atomically: both sides and lifecycle remain unchanged, and holder backing is not swept away. If only the treasury is blocked, governance can set an eligible destination and retry. An archive with zero surplus skips the transfer. A blocked market, blocked holder or token-wide restriction has a different scope and is not generally repaired by changing treasury. |
+  </template>
+</section>
+<section id="deployment-review" class="Copy min-h-page py-12 print:pb-0 print:pagebreak">
+  <h2>Supplemental Deployment-Script Review</h2>
+  <template type="audit-markdown">
+    The mainnet script enforces chain `8453`, the configured canonical USDC address, token code/six decimals, nonzero roles, separation of deployer and roles, and reported multisig threshold/owner count checks. It rejects an EIP-7702 style delegated key as multisig and only creates a Factory and Registry (creating markets and registration is left to future governance actions). The token constant matches [Circle's published Base USDC address](https://developers.circle.com/stablecoins/usdc-contract-addresses).
+
+    No new issue was identified within this supplemental review. The two deployment transactions are not atomic: a partial deployment requires operational recovery.
+
+    The script leaves the deployer no directly assigned protocol role, but does not check whether that key is a Safe owner. The intended governance, guardian and treasury addresses require client confirmation. Governance is constructor-bound, so a wrong governance address can permanently impair administration, and a wrong treasury can irreversibly misdirect fees.
+  </template>
+</section>
+<section id="closure" class="Copy min-h-page py-12 print:pb-0 print:pagebreak">
+  <h2>Review Closure</h2>
+  <template type="audit-markdown">
+    The technical review accepts `audit-v3`, identified in Source Code, with the recorded dispositions and limitations. Q-1 and Q-2 remain intentionally unimplemented; I-1 and I-2 were addressed through documentation, so the supported-asset and view-semantics boundaries remain in force. Later code, configuration or deployment changes are not automatically covered. Acceptance does not authorize a production launch.
+  </template>
+</section>
+</content-for>
+
+</page>

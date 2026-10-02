@@ -41,6 +41,8 @@
 .Copy h2 code,
 .Copy h3 code,
 .Copy h4 code,
+.Copy th code,
+.Copy td code,
 .IssueTitle code {
   @apply bg-gray-200/75 dark:bg-gray-700;
   padding: .2em .4em;
