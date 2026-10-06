@@ -100,7 +100,9 @@
       <h2>Overall Assessment</h2>
     <if cond="issues.length > 0">
       <p>The following is an aggregation of issues found by the Macro Audit team:</p>
-
+    </if> <else>
+      <p>No issues or discrepancies were identified within the defined scope of this audit.</p>
+    </else>
       <div class="mt-8 -mx-4 overflow-x-auto sm:mx-0">
         <div class="inline-block min-w-full py-2 align-middle">
           <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
@@ -129,7 +131,7 @@
             <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
               <for let="severity of 'CHMLQIG'.split('')">
                 {{var subset = issues.filter(i => i.severity === severity)}}
-                <if cond="subset.length > 0">
+                <if cond="'CHML'.includes(severity) || subset.length > 0">
                   <tr>
                     <td class="whitespace-nowrap pl-4 sm:pl-0 py-4 pr-3  font-medium text-gray-900 dark:text-gray-300 text-right">
                       {{Issues.severityNames[severity]}}
@@ -153,10 +155,9 @@
           </table>
         </div>
       </div>
+    <if cond="issues.length > 0">
       <p>{{page.clientName}} was quick to respond to these issues.</p>
-    </if> <else>
-      <p>No issues or discrepancies were identified within the defined scope of this audit.</p>
-    </else>
+    </if>
 
   </section>
 
