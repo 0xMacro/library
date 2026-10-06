@@ -96,69 +96,69 @@
     <p><b class="text-red-500">Disclaimer:</b> While Macro’s review is comprehensive and has surfaced some changes that should be made to the source code, this audit should not solely be relied upon for security, as no single audit is guaranteed to catch all possible bugs.</p>
   </section>
   
-    <section id="overall" class="Copy min-h-page py-16 print:pt-12 print:pb-0 print:pagebreak">
-      <h2>Overall Assessment</h2>
+  <section id="overall" class="Copy min-h-page py-16 print:pt-12 print:pb-0 print:pagebreak">
+    <h2>Overall Assessment</h2>
     <if cond="issues.length > 0">
       <p>The following is an aggregation of issues found by the Macro Audit team:</p>
-    </if> <else>
+    </if>
+    <else>
       <p>No issues or discrepancies were identified within the defined scope of this audit.</p>
     </else>
-      <div class="mt-8 -mx-4 overflow-x-auto sm:mx-0">
-        <div class="inline-block min-w-full py-2 align-middle">
-          <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
-            <thead>
-              <tr>
-                <th
-                  scope="col"
-                  class="py-3.5 pl-4 sm:pl-0 pr-3 text-right font-medium text-gray-900 dark:text-gray-300 dark:text-gray-300"
-                >
-                  Severity
-                </th>
-                <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
-                  Count
-                </th>
-                <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
-                  Acknowledged
-                </th>
-                <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
-                  Won't Do
-                </th>
-                <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
-                  Addressed
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
-              <for let="severity of 'CHMLQIG'.split('')">
-                {{var subset = issues.filter(i => i.severity === severity)}}
-                <if cond="'CHML'.includes(severity) || subset.length > 0">
-                  <tr>
-                    <td class="whitespace-nowrap pl-4 sm:pl-0 py-4 pr-3  font-medium text-gray-900 dark:text-gray-300 text-right">
-                      {{Issues.severityNames[severity]}}
-                    </td>
-                    <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
-                      {{subset.length}}
-                    </td>
-                    <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
-                      {{subset.filter(i => i.status === 'ack').length || '-'}}
-                    </td>
-                    <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
-                      {{subset.filter(i => i.status === 'wontdo').length || '-'}}
-                    </td>
-                    <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
-                      {{subset.filter(i => Issues.isAddressed(i.status)).length || '-'}}
-                    </td>
-                  </tr>
-                </if>
-              </for>
-            </tbody>
-          </table>
-        </div>
+    <div class="mt-8 -mx-4 overflow-x-auto sm:mx-0">
+      <div class="inline-block min-w-full py-2 align-middle">
+        <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-600 border-t border-b sm:border-r sm:border-l dark:border-gray-600 font-ui text-sm">
+          <thead>
+            <tr>
+              <th
+                scope="col"
+                class="py-3.5 pl-4 sm:pl-0 pr-3 text-right font-medium text-gray-900 dark:text-gray-300 dark:text-gray-300"
+              >
+                Severity
+              </th>
+              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                Count
+              </th>
+              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                Acknowledged
+              </th>
+              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                Won't Do
+              </th>
+              <th scope="col" class="py-3.5 px-3 text-center  font-medium text-gray-900 dark:text-gray-300">
+                Addressed
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+            <for let="severity of 'CHMLQIG'.split('')">
+              {{var subset = issues.filter(i => i.severity === severity)}}
+              <if cond="'CHML'.includes(severity) || subset.length > 0">
+                <tr>
+                  <td class="whitespace-nowrap pl-4 sm:pl-0 py-4 pr-3  font-medium text-gray-900 dark:text-gray-300 text-right">
+                    {{Issues.severityNames[severity]}}
+                  </td>
+                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                    {{subset.length}}
+                  </td>
+                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                    {{subset.filter(i => i.status === 'ack').length || '-'}}
+                  </td>
+                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                    {{subset.filter(i => i.status === 'wontdo').length || '-'}}
+                  </td>
+                  <td class="whitespace-nowrap py-4 px-3  text-gray-500 dark:text-gray-100 font-ui text-center">
+                    {{subset.filter(i => Issues.isAddressed(i.status)).length || '-'}}
+                  </td>
+                </tr>
+              </if>
+            </for>
+          </tbody>
+        </table>
       </div>
+    </div>
     <if cond="issues.length > 0">
       <p>{{page.clientName}} was quick to respond to these issues.</p>
     </if>
-
   </section>
 
   <section id="specification" class="Copy min-h-page py-16 print:pt-12 print:pb-0">
