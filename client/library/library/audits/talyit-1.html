@@ -1,6 +1,6 @@
 <page
   clientName="talyit"
-  reportDate="September 29, 2026"
+  reportDate="October 7, 2026"
   auditTitle="talyit-1"
   auditSubtitle="Two-Sided Bonding Curve Markets"
   auditVersion="1.0.0"
@@ -10,15 +10,15 @@
   customRepoInfo
   customReviewInfo
   customDeploymentDisclaimer
-  appendixLinks="#methodology::Methodology and Verification;;#economic-properties::Economic Properties and Limitations;;#deployment-review::Supplemental Deployment Review;;#closure::Review Closure"
+  appendixLinks="#methodology::Methodology and Verification;;#economic-properties::Economic Properties and Limitations;;#deployment-review::Deployment Review;;#closure::Review Closure"
 >
 
 <content-for name="deployment-disclaimer">
-  Except for the explicitly described supplemental source and local-test review of DeployMainnet.s.sol, this report does not audit deployment scripts or the deployment process. The supplemental review does not verify live deployments, Safe configuration, signer custody, or production infrastructure.
+  The onchain Safe configuration verification in Deployment Review is an operational observation outside the source code audit, and the DeployMainnet.s.sol review covers only source. These checks do not verify the live MarketFactory and Registry deployments, their constructor parameters, or subsequently created markets. Signer custody and production infrastructure were not verified.
 </content-for>
 
 <content-for name="schedule">
-  The security audit was performed on September 18 and 22, 2026, followed by fixes review on September 29, 2026.
+  The security audit was performed on September 18 and 22, 2026, followed by fixes review on September 29 and verification of the deployed Safe's configuration on October 7, 2026.
 </content-for>
 
 <content-for name="spec">
@@ -35,7 +35,7 @@
     ### Trusted Parties
 
     - **Governance (`multisig`):** Controls market creation and listings, roles, spreads up to 8%, surplus collection, buy pauses, and market closure. Cannot upgrade existing markets, withdraw holder backing, or redirect claims.
-    - **Governance concentration:** The client reports an intended 2-of-3 Safe with all three owner keys controlled by one individual. This is a signing threshold, not independent-party governance; the configuration and key custody were not independently verified.
+    - **Governance concentration:** The Safe selected for governance has a 2-of-3 onchain configuration, verified at the block identified in Deployment Review. The client reports that one individual controls all three owner keys; this custody claim is not independently verifiable, and the signing threshold does not imply independent-party governance.
     - **Guardian:** Can repeatedly pause buys for seven days, but cannot pause sells or claims or move funds. Governance can replace it.
     - **Treasury:** Receives surplus. Misconfiguration can strand fees or prevent archive transfers.
     - **Payment-token issuer:** USDC upgrades, pauses, transfer blocking, and blocklisting remain outside protocol control.
@@ -75,7 +75,7 @@
 </content-for>
 
 <content-for name="review-info">
-  <p>Documentation, tests, gas snapshots and supplied static-analysis output were supporting evidence. Application code, quote services, indexers, the private monorepo, operational runbooks, live deployments, Safe configuration, signer custody and the external token implementation were excluded. No live fork rehearsal or broadcast was performed. Client-reported application fixes and monorepo synchronization were not independently verified.</p>
+  <p>Documentation, tests, gas snapshots and supplied static-analysis output were supporting evidence. Application code, quote services, indexers, the private monorepo, operational runbooks, live MarketFactory and Registry deployments, signer custody and the external token implementation were excluded. Deployment Review separately records the already deployed Safe's configuration at the cited Base block. Client-reported application fixes and monorepo synchronization were not independently verified.</p>
 </content-for>
 
 <content-for name="appendix">
@@ -92,7 +92,7 @@
 
     Documented known issues and existing tests were verified independently, rather than treated as untested truth.
 
-    The initial contract review assessed `audit-v2` (`75c587b5e71fa4b0162c486435e2196a751fd25a`). The fixes review and supplemental source and local-test review of `DeployMainnet.s.sol` assessed `audit-v3` (`9bfe9c517cd791be61a5a41192805773f0544b18`).
+    The initial contract review assessed `audit-v2` (`75c587b5e71fa4b0162c486435e2196a751fd25a`). The fixes review and supplemental source and local-test review of `DeployMainnet.s.sol` assessed `audit-v3` (`9bfe9c517cd791be61a5a41192805773f0544b18`). The October 7 verification queried the deployed Safe's configuration at the cited Base block and verified the owner-swap transaction and signatures; it did not inspect live MarketFactory or Registry deployments.
   </template>
 </section>
 <section id="economic-properties" class="Copy min-h-page py-12 print:pb-0 print:pagebreak">
@@ -114,13 +114,24 @@
   </template>
 </section>
 <section id="deployment-review" class="Copy min-h-page py-12 print:pb-0 print:pagebreak">
-  <h2>Supplemental Deployment-Script Review</h2>
+  <h2>Deployment Review</h2>
   <template type="audit-markdown">
-    The mainnet script enforces chain `8453`, the configured canonical USDC address, token code/six decimals, nonzero roles, separation of deployer and roles, and reported multisig threshold/owner count checks. It rejects an EIP-7702 style delegated key as multisig and only creates a Factory and Registry (creating markets and registration is left to future governance actions). The token constant matches [Circle's published Base USDC address](https://developers.circle.com/stablecoins/usdc-contract-addresses).
+    The mainnet script enforces chain `8453`, the configured canonical USDC address, token code/six decimals, nonzero roles, separation of deployer and roles, and reported multisig threshold/owner count checks. It rejects an EIP-7702 style delegated key as multisig and deploys one MarketFactory and one Registry using the existing Safe address. Governance later creates individual markets through MarketFactory and lists them in Registry. The token constant matches [Circle's published Base USDC address](https://developers.circle.com/stablecoins/usdc-contract-addresses).
 
-    No new issue was identified within this supplemental review. The two deployment transactions are not atomic: a partial deployment requires operational recovery.
+    No new issue was identified within this supplemental review. MarketFactory and Registry are deployed in separate transactions: if the first succeeds and the second fails, completing the deployment requires operational recovery.
 
-    The script leaves the deployer no directly assigned protocol role, but does not check whether that key is a Safe owner. The intended governance, guardian and treasury addresses require client confirmation. Governance is constructor-bound, so a wrong governance address can permanently impair administration, and a wrong treasury can irreversibly misdirect fees.
+    The script leaves the deployer no directly assigned protocol role, but does not check whether that key is a Safe owner. The client supplied these intended Base-mainnet deployment parameters. Their use in the MarketFactory and Registry deployment transactions and resulting contract configuration remains to be verified once those contracts are deployed:
+
+    | Parameter | Address |
+    | --- | --- |
+    | Governance Safe and treasury | `0x0D4714f31D613a0b26aBeda9361d8781079C3fBD` |
+    | Guardian | `0xd27AD4B9e5c0C6587bc1e4D0a6D4EB9af449888C` |
+    | Single-use deployer | `0x9Bfb24a7b20da923B354fF22a6b01bc9e69984ec` |
+    | Base USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+
+    At Base block **52,306,690** ([hash `0x71a3029c6495e17fca50bd0bcad869c4714b18a543aaf0123faa680f05d0a4f4`](https://basescan.org/block/52306690), October 7, 2026, 19:52:07 UTC), we independently read the Safe: **2-of-3 owners**, nonce 1, SafeL2 1.5.0 implementation and CompatibilityFallbackHandler 1.5.0 matching published Safe runtime hashes, and no modules or guards. The [owner replacement transaction](https://basescan.org/tx/0xc12165ae1e30e6157a61c563d8109e0b14b909adf5bc92c501c9d75b6b351359) succeeded in block 52,306,622: its Safe transaction used nonce 0, removed the former third owner and added the current third owner, with signatures verified against the two continuing owners. The new owner, guardian and deployer had no code or prior transactions at the snapshot block. The onchain owner list is available from the Safe.
+
+    This snapshot establishes the Safe's configuration at the cited block; signer custody and later Safe configuration changes remain outside this verification. Governance is constructor-bound, so a wrong governance address can permanently impair administration, and a wrong treasury can irreversibly misdirect fees. Recheck the Safe's configuration and the MarketFactory and Registry constructor parameters immediately before deploying those two contracts, then verify their deployed code, configuration and transaction receipts.
   </template>
 </section>
 <section id="closure" class="Copy min-h-page py-12 print:pb-0 print:pagebreak">
