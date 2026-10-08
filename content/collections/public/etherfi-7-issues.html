@@ -1,0 +1,50 @@
+<item>
+  <field name="topic">Integration</field>
+  <field name="impact">low</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">23d924ecfb25c65a7dc2660b07741d3e886c7100</field>
+  <field name="content">
+    ## [L-1] Aave V4 and Morpho decoder outputs are not packed as addresses
+
+    In `SafeBorrowerDecoderAndSanitizer.sol` contract, the Aave V4 and Morpho functions pack the reserve id or market id as a full 32 byte word instead of the 20 byte address chunks merkle leaves are built from, so the leaves for these four functions cannot be generated.
+
+    ```solidity
+    function borrowFromAaveV4(uint256 reserveId, uint256, bytes32[] calldata, address) external pure virtual returns (bytes memory) {
+        return abi.encodePacked(reserveId);
+    }
+    ...
+    function borrowFromMorpho(bytes32 marketId, uint256, bytes32[] calldata, address) external pure virtual returns (bytes memory) {
+        return abi.encodePacked(marketId);
+    }
+    ```
+
+    **Reference:** SafeBorrowerDecoderAndSanitizer#L14-28
+
+    ### Remediations to Consider
+
+    Consider packing the Aave V4 reserve id as an address with a bound check, and the Morpho market id as two address sized halves, so the current tooling can produce the leaves.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Code Quality</field>
+  <field name="impact">low</field>
+  <field name="status">fixed</field>
+  <field name="commit">23d924ecfb25c65a7dc2660b07741d3e886c7100</field>
+  <field name="content">
+    ## [Q-1] Zero price checks are unreachable on Aave
+
+    In `SafeBorrower.sol` contract, `_validateAaveV3Oracle()` and `_validateAaveV4Oracle()` functions end with a zero check on the reserve price. Neither oracle can return zero: Aave V4 reverts with `InvalidSource` or `InvalidPrice` on a missing source or a non positive answer, and Aave V3 defers to its fallback oracle, which none of the live mainnet markets configures, so the call reverts inside the oracle as well. The `InvalidOracleData` branches can only execute on a V3 market whose fallback oracle returns zero.
+
+    ```solidity
+    if (IAaveOracle(oracle).getAssetPrice(reserve) == 0) revert InvalidOracleData(oracle);
+    ...
+    if (IAaveV4Oracle(oracle).getReservePrice(reserveId) == 0) revert InvalidOracleData(oracle);
+    ```
+
+    **Reference:** SafeBorrower#L281 and #L291
+
+    Consider removing both checks, or wrapping the price calls so that an oracle revert surfaces as `InvalidOracleData` if a uniform error is wanted.
+  </field>
+</item>
