@@ -1,0 +1,80 @@
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="impact">medium</field>
+  <field name="impactNote">Multisig coordination required for routine fee collection</field>
+  <field name="status">wontdo</field>
+  <field name="content">
+    ## [Q-1] Permissioning fee sweeps creates unnecessary operational friction
+
+    `Market.sweepFees()` requires the multisig, even though it only transfers funds to the already-configured treasury.
+
+    However, the multisig must acquire signatures whenever it wants to collect accumulated fees. This creates operational overhead that adds no protection to funds or the market's economics.
+
+    Consider making `sweepFees()` permissionless so that caller can trigger collection at its own gas cost, including future offchain infrastructure.
+
+    **Fix-review disposition (Q-1): Wontdo for this version.** Governance retains control over when fees leave; no permission change was made. The rationale is recorded in `audit/KNOWN_ISSUES.md` §9 at `audit-v3`.
+  </field>
+  <field name="response">
+We acknowledge the simpler collection process. We retain governance control over sweep timing and accept the signing overhead; permissioning adds no holder-backing protection. Automation and permissionless designs remain options for later assessment.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Interoperability</field>
+  <field name="impact">low</field>
+  <field name="impactNote">Integrations must independently combine lifecycle and pause checks</field>
+  <field name="status">ack</field>
+  <field name="content">
+    ## [Q-2] Missing consolidated buy-availability view could complicate integrations
+
+    `Market.buysPaused()` reports only the timed pause. However, it can return `false` even when the market is `ANNOUNCED` or `ARCHIVED` and every buy reverts.
+
+    Consider adding `buyingEnabled()` while retaining `buysPaused()` for its narrower use case, to make it easier for outside integrations to check if a market is available to trade or not.
+
+    **Fix-review disposition (Q-2): Acknowledged.** The helper is deferred. Lifecycle/pause eligibility and transaction-specific limits are documented and tested at `audit-v3`; the client's application changes were not reviewed.
+  </field>
+  <field name="response">
+A combined getter would simplify integration. We defer it for this version; the README documents `lifecycle() == TRADING && !buysPaused()`, using reads at the same block. Application changes remain outside the audited scope.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Protocol Design</field>
+  <field name="status">addressed</field>
+  <field name="commit">5c4c67d952e9fa60369de5b1e18d3ae31648ad58</field>
+  <field name="content">
+    ## [I-1] Payment-asset configuration is primarily USDC-compatible
+
+    `Market` and `MarketFactory` accept the payment-token address at construction and keep it immutable. The pricing and reserve math convert between 18-decimal WAD values and 6-decimal token units through the fixed `USDC_SCALE = 1e12` constant.
+
+    Consequently, deployments are designed for USDC, but the bytecode can technically use any ERC-20, but the token must:
+
+    - Have six decimals
+    - Have exact transfers (no transfer fees, rebasing, etc)
+    - Behave exactly as USDC does on returning true/false on calling a transfer function
+
+    The contracts intentionally do not use a wrapper like OpenZeppelin's `SafeERC20`, which would only broaden compatibility with no-return tokens. If the platform ever selects another six-decimal token, it must also verify that the transfer function has the above properties, and does not apply hooks or other balance-changing behavior.
+
+    **Fix-review disposition (I-1): Addressed through documentation**, commit `5c4c67d`. Asset requirements, failure modes and issuer-control limits are stated in `audit/KNOWN_ISSUES.md` §6; all four new asset-assumption tests pass. Supported-asset assumptions remain unchanged.
+  </field>
+</item>
+
+<item>
+  <field name="topic">Interoperability</field>
+  <field name="status">addressed</field>
+  <field name="commit">fb4ccc96927e66f06e25fb158572cc451aab8b5e</field>
+  <field name="content">
+    ## [I-2] Market views have lifecycle, pricing, and accounting caveats
+
+    `Market`'s views return their intended values, but their meanings are narrower than an integration might infer from their names:
+
+    - **Trading availability:** `buysPaused()` reports only the timed pause. It can return `false` while `ANNOUNCED` or `ARCHIVED` lifecycle gates prohibit buying.
+    - **Frozen state:** After archive, `supplyOf()`, `liability()`, and `mid()` retain their values at time of archive, while claims reduce holder balances and reserves. They do not describe remaining unclaimed shares or payment obligations.
+    - **Pricing and units:** `mid()` is a floored marginal price, not an executable quote (the actual trade price depends on trade size and spread). `mid()` also uses 18 decimals, whereas `settlementRate()` uses six; they should not be interpreted at the same scale.
+    - **Zero settlement rates:** `settlementRate()` can be zero both before and after archive for an empty or dust-funded side. It is not a substitute for `lifecycle()`.
+
+    Misinterpreting these values could cause incorrect displays or quotes, reverting transactions, or false insolvency alerts in consuming applications. These are not contract defects, but informational integration caveats.
+
+    **Fix-review disposition (I-2): Addressed through documentation**, commit `fb4ccc9`. Market NatSpec and README integration caveats clarify these meanings; all five new view-semantics tests pass. No view implementation was changed.
+  </field>
+</item>
