@@ -1,0 +1,29 @@
+<page
+  clientName="Sentora"
+  reportDate="June 12th, 2026"
+  auditTitle="Sentora A-13"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  repoUrl="https://github.com/Into-The-Block-Corp/ITBUniV3"
+  repoCommitHash="9248771c5a37edf10421b18170accc369cbed5a1"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team June 10th, 2026.
+</content-for>
+  
+<content-for name="spec">
+<ul>
+    <li>Discussions on telegram with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository.</li>
+</ul>
+</content-for>
+  
+<content-for name="source-code">
+  
+    <p>Specifically, we audited the following contract:</p>
+  
+    <template type="file-hashes">
+        294f2a5cac9d40b1dd9b59848231a5fa5e92e7a6f75a233eb27b7b7097797948  src/contracts/PositionManager.sol
+    </template>
+</content-for>
