@@ -1,0 +1,38 @@
+<item>
+    <field name="topic">Verification</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">TODO</field>
+    <field name="content">
+      ## [L-1] Add ability to view `tradeHash` to verify parameters being signed
+  
+      Users can view their trade approval hash via [`getTradeApprovalHash()`](https://github.com/sapiencexyz/sapience/blob/cfbaaa8045706ed96a604cb4484b55f11809553b/packages/protocol/src/SecondaryMarketEscrow.sol#L185-L198) to verify the data hash being to be signed by the user. This requires inputting a `tradeHash` which contains a hash of important trade data including the token and collateral types, amount and price. Allowing users to be able to input this data and generate the trade hash used in the trade approval hash would help verify what they are actually signing, since a malicious hash could result in negative outcomes for the user.
+  
+      **Remediations to Consider**
+  
+      Add the ability to generate the trade hash with its input parameters to more easily verify what exactly is being signed.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Duplicate code</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">TODO</field>
+    <field name="content">
+      ## [Q-1] Duplicate code used to generate `TradeApprovalHash`
+  
+       --- | --- |
+      | **Impact** | low |
+  
+      The trade approval hash which is signed and verified in trades is generated in the public view function [`getTradeApprovalHash()`](https://github.com/sapiencexyz/sapience/blob/cfbaaa8045706ed96a604cb4484b55f11809553b/packages/protocol/src/SecondaryMarketEscrow.sol#L185-L198), as well as independently in both [`_isTradeApprovalValid()`](https://github.com/sapiencexyz/sapience/blob/cfbaaa8045706ed96a604cb4484b55f11809553b/packages/protocol/src/SecondaryMarketEscrow.sol#L262-L282) and [`_isTradeApprovalValidWithEIP1271Fallback()`](https://github.com/sapiencexyz/sapience/blob/cfbaaa8045706ed96a604cb4484b55f11809553b/packages/protocol/src/SecondaryMarketEscrow.sol#L284-L315). Although the result is the same valid hash, and no branch calculates it multiple times, it is best practice to reduce duplicate code where possible to prevent issues creeping up if changes are made in the future.
+  
+      **Remediations to Consider**
+  
+      Use [`getTradeApprovalHash()`](https://github.com/sapiencexyz/sapience/blob/cfbaaa8045706ed96a604cb4484b55f11809553b/packages/protocol/src/SecondaryMarketEscrow.sol#L185-L198) wherever the approval hash is required to prevent duplicate code.
+  
+      ---
+    </field>
+  </item>
+  
