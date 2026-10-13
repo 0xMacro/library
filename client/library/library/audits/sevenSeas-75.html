@@ -1,0 +1,35 @@
+<page
+  clientName="Seven Seas"
+  reportDate="March 3rd, 2026"
+  auditTitle="Seven Seas A-75"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  issueSummaryFormat="table"
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on February 25th, 2025.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li class="break-words break-all">
+        <b>One Inch V6 decoder (from <a href="https://github.com/Veda-Labs/boring-vault/pull/610">PR 610</a>)</b> </br>
+        Commit Hash: <code>260b62e882ebe8f376fe4e3c44b5602c4720b746</code>
+        <template type="file-hashes">
+          61fe6015ebb845b6f22be0dbe50e72fc41869972f2b86bc8ea34e0867467376c  src/base/DecodersAndSanitizers/Protocols/OneInchDecoderAndSanitizer.sol
+          964cdaa88caf8d47365e3fb31389fbe0d4d07f9839c8188c8f01662286e74f55  src/base/DecodersAndSanitizers/Protocols/OneInchOwnedDecoderAndSanitizer.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
