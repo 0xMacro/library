@@ -1,0 +1,30 @@
+<page
+  clientName="Veda Labs"
+  reportDate="October 21st, 2026"
+  auditTitle="Veda A-81"
+  auditVersion="1.0.0"
+  layout="/library/audits/_layout.html"
+  issueSummaryFormat="legacy"
+  repoUrl="https://github.com/Veda-Labs/boring-vault"
+  repoCommitHash="2011d8596b51eae0609b8df70856203a342741da"
+>
+
+<content-for name="schedule">
+    The security audit was performed by the Macro security team on March 23rd, 2026.
+</content-for>
+  
+<content-for name="spec">
+<ul>
+    <li>Discussions on Slack with the {{page.clientName}} team.</li>
+    <li>Available documentation in the repository.</li>
+</ul>
+</content-for>
+  
+<content-for name="source-code">
+  
+    <p>Specifically, we audited the following contracts:</p>
+  
+    <template type="file-hashes">
+        4f1de09f903646d6bf80e24f6191f8556458d03964409e8c630109a895727b77  src/base/Roles/TellerWithMultiAssetSupport.sol
+    </template>
+</content-for>
