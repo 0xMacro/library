@@ -1,0 +1,100 @@
+<page
+  clientName="EtherFi"
+  reportDate="October 22nd, 2026"
+  auditTitle="EtherFi A-8"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/nonce-cap/vault-solidity-tools"
+  layout="/library/audits/_layout.html"
+  issueSummaryFormat="legacy"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team from October 22nd, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>Discussions with the {{page.clientName}} team</li>
+    <li>Available documentation in the repository, including the SafeBorrower configuration section of the README.</li>
+  </ul>
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+  <template type="audit-markdown">
+    `SafeBorrower` is a guard between a strategist and the lending protocols. It holds no tokens and no position. A registered vault or drone calls one of its six functions through the Veda manager, and `SafeBorrower` calls the same manager back under its own merkle root to execute a borrow or a collateral withdrawal on Aave V3, Aave V4 or Morpho Blue, with the caller as position owner and recipient. Three roles act on it: the owner, expected to be a timelock, a pauser role, and the strategist whose merkle root holds the `SafeBorrower` leaves. Direct lending leaves (supply, repay, borrow, withdraw) stay available outside `SafeBorrower` and are the path for managing positions as before.
+
+The contract enforces only that the caller is registered. The merkle roots decide which key reaches `SafeBorrower` and which protocol calls `SafeBorrower` may make.
+
+## External Infrastructure
+
+### Lending protocols
+
+One instance serves every Aave V3 pool (Aave and Spark), Aave V4 spoke and Morpho market the owner configures, and the strategist passes the venue on each call. After each action the account is read back from the protocol, so liquidations and changes made outside `SafeBorrower` are seen on the next call.
+
+Aave keeps one account per address in each pool or spoke, so the loan to value and buffer checks bound the whole account on the acted venue, and changes made outside `SafeBorrower` (e-mode, collateral toggles, governance threshold cuts) can only make the guarded path fail closed. Morpho markets are immutable and isolated, the market id fixes the oracle, and Morpho liquidations have no close factor, so the distance between the configured maximum and the market’s liquidation loan to value is the only protection there.
+
+The Aave oracle check compares the oracle contract and the acted reserve’s price source against approved addresses. It reads no price and no other reserve, so it halts on a source change of the acted reserve and otherwise trusts the venue’s valuation, which is the valuation the venue liquidates on. Aave V4 supply and repay go through Aave’s Giver position manager, whose only functions are supply and repay with tokens pulled from the caller.
+
+### Veda merkle verification manager
+
+The manager, out of scope, verifies both hops. The outer leaf binds `SafeBorrower`, the venue and the market id, the inner leaves must bind the protocol call with the beneficiary fixed to the caller. For drones both hops target the drone with a trailer, and the drone forwards only calls from its vault.
+
+### BucketLimiter
+
+The `BucketLimiter` library, out of scope, is unchanged since the audited `SafeSwapper`. Buckets are per caller, venue, market and action, in nano tokens, and capacity doubles as the per action maximum.
+
+## Actors
+
+### Owner
+
+Registers callers, configures markets, risk limits and buckets per venue, unpauses and upgrades. No setter validates its input: the registered caller must be the manager’s vault or one of its drones, the limits must fit the account’s live thresholds, and values overwrite with positions open. Wrong values fail closed, except limits set at or beyond the protocol’s own (an Aave ceiling at or above the liquidation threshold with a zero buffer, a Morpho maximum at or above the liquidation loan to value), which leave the guard inert. An upgraded implementation inherits the inner root, so it can skip every check but can only execute the leaves that root holds.
+
+### Pauser
+
+Can pause the six actions globally or per venue, and nothing else. Only the owner unpauses.
+
+### Strategist
+
+Through `SafeBorrower`, per bucket window, caller, venue and market, it can draw debt up to the borrow bucket, raise the account to the configured ceiling, withdraw collateral to the caller up to the withdraw bucket, and leave the account paying interest on idle debt. Tokens never leave the vault or drone. It chooses the venue among those configured for the caller, but cannot choose the recipient, the position owner or the inner decoder, and every read and write is keyed by the calling address, so a vault and its drones have separate configuration and budgets. Since `SafeBorrower` only offers actions that raise leverage, de-risking and every exit from a halt go through the direct supply, repay and withdraw leaves outside it.
+
+## Accepted Risks
+
+- Leverage up to the configured ceiling. The checks bound the account at the moment of each action, while price, interest and the V4 risk premium keep moving it afterwards. Keeping the account healthy is done outside `SafeBorrower` through supply and repay.
+- Unchecked collateral valuation. The oracle check covers the reserve in the call only, so a source change on another reserve of the account passes and the ceiling is computed against Aave’s new valuation. The check is intended as a floor on the acted reserve, not as protection against Aave feed changes: Aave and Spark governance are trusted to keep their sources correct, and a wrong source would move the ceiling together with Aave’s own liquidation line, so the account stays as far from liquidation as configured in Aave’s terms.
+- Configuration tied to live positions. The ceiling and buffer must fit the registered account’s current ratio, and a value tightened below it leaves the account unable to act through `SafeBorrower` until a direct repay or supply.
+- Root contents at deployment. The inner root holds only the six protocol shapes with the beneficiary fixed to the caller, and the tooling must express the Aave V4 and Morpho outer leaves.
+  </template>
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li class="break-words break-all">
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank" class="text-blue-500 hover:underline">vault-solidity-tools</a>
+    </li>
+    <li class="break-words break-all">
+      <b>Pull Request:</b>
+      <a href="{{page.repoUrl}}/pull/49" target="_blank" class="text-blue-500 hover:underline">PR 49</a>
+      (branch <code>feat: let SafeBorrower serve any Aave V3 pool, Aave V4 spoke, and Morpho</code>)
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash (initial):</b>
+      <code>430680f7cc6c89836fdde64d834449bb29941636</code>
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash (final):</b>
+      <code>f2cd3a59bc71e013f8409365a49ecbf7b1eae37e</code>
+    </li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+  <p>Specifically, we audited the following contracts within this repository. The hashes below correspond to the final commit, which includes the fixes reviewed after the audit:</p>
+
+  <template type="file-hashes">
+    7682e2c013598c517dd597ee6855d18db6256d9702d9c2ea7d5e779432de4378  src/SafeBorrower.sol
+    4ee530d690777ad132e521537f687feaa39b4b0e98abb5560fdfdbde4101cae4  src/SafeBorrowerDecoderAndSanitizer.sol
+  </template>
+
+</content-for>
+
+</page>
