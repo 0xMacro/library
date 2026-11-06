@@ -1,0 +1,8 @@
+<item>
+  <field name="topic">Edge Case</field>
+  <field name="content">
+    ## [I-1] Unblock delay starts at scheduling rather than at block time
+
+    In `NoSelfCallGuard.sol` contract, `unblockSafes()` function can only be called by the Signer Admin Timelock, so every unblock waits for the timelock’s delay. That delay counts from when the unblock is scheduled, not from when the Safe is blocked, and timelock operations don’t expire, so an unblock left pending can lift a later block right away. The intended procedure only schedules an unblock after a block, and the Signer Admin Safe still has to schedule it, so this doesn’t change its powers or its trust model.
+  </field>
+</item>
