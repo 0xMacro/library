@@ -1,0 +1,95 @@
+<page
+  clientName="Veda Labs"
+  reportDate="November 6th, 2026"
+  auditTitle="Veda A-108"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-private"
+  layout="/library/audits/_layout.html"
+  issueSummaryFormat="legacy"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on November 5th, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>The description and review comments of <a href="{{page.repoUrl}}/pull/185" target="_blank" class="text-blue-500 hover:underline">PR 185</a>.</li>
+    <li>Veda’s design documents for the admin transaction architecture, including the audit brief for the guard.</li>
+    <li>Source of the canonical Safe 1.3.0, 1.4.1 and 1.5.0 singletons and fallback handlers.</li>
+  </ul>
+  <h2 id="tmaar">Trust Model, Assumptions, and Accepted Risks (TMAAR)</h2>
+    <template type="audit-markdown">
+        The scope of this audit focuses specifically on the custom Safe guard `NoSelfCallGuard` contract, intended to be used in every Safe. Before every owner transaction, a guarded Safe calls `checkTransaction()`, which rejects:
+
+        - calls to the Safe itself (`to == msg.sender`),
+        - delegate calls,
+        - AccessControl `renounceRole()` calls to any target,
+        - on the blockable instance, any transaction from a Safe that has been blocked.
+
+        Two instances exist on each chain: a never blockable one with no authorities for the Signer Admin Safe, Signer Safes and Admin Safes, and a blockable one for Role Safes. Both authorities are immutable, so the `CREATE2` address of an instance deployed through the Safe Singleton Factory proves its code and its authorities.
+
+        ## External Infrastructure
+
+        ### Safe
+
+        The guard is used with Safe’s canonical, audited deployments of 1.3.0, 1.4.1 and SafeL2 1.5.0. Every `execTransaction()` calls `checkTransaction()` before executing, configuration setters accept only the Safe itself as caller, and module transactions skip the guarded call as intended. Configuration therefore changes only through each Safe’s module. Other Safe versions and fallback handlers were not considered in this audit.
+
+        ## Actors
+
+        ### Guarded Safes
+
+        Owners can make any call except to the Safe itself. What a Safe can do is bounded by the roles it has been granted and by any assets and approvals it holds.
+
+        ### Blocker
+
+        The Signer Admin Safe can block any address on the blockable instance at once, without a check that the address uses that instance, and is itself exempt. It can’t unblock. A compromised blocker can stop every Role Safe.
+
+        ### Unblocker
+
+        The Signer Admin Timelock is the intended unblocker, so every unblock is an operation the Signer Admin Safe schedules, which then waits out the timelock’s delay before execution.
+
+        ## Accepted Risks and Assumptions
+
+        - A guarded Safe can call any contract other than itself, so role grants are the access control.
+        - A block doesn’t stop `isValidSignature()`, and approvals the Safe gave before the block still count.
+        - `renounceRole` is checked on the outer selector only. A contract that grants a role and has a self multicall or a trusted forwarder would let a Safe renounce through it. `TimelockController` has neither currently.
+        - A block stops transactions signed before it but doesn’t invalidate them, so an unblock without rotating the owner first could leave them executable.
+        - The blocker and unblocker addresses are immutable. Replacing the Signer Admin Safe or Signer Admin Timelock needs a new blockable instance on each chain, set on every Role Safe through the current Signer Admin Timelock.
+        - Deploy time invariants. Each guarded Safe has its timelock as its only module, enabled before the guard, with no module guard, the canonical fallback handler and nothing else in its setup history.
+        - Role Safes use the blockable instance, with the Signer Admin Timelock as their module, and all other Safes the never blockable instance, both deployed from the committed artifact. The Signer Admin Timelock runs at 96 hours with no admin and the Signer Admin Safe as its only proposer and canceller.
+        - Target chains are assumed EVM equivalent, supporting `PUSH0` and standard `CREATE2` derivation, with no precompile that forwards calls with the caller preserved.
+    </template>
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li class="break-words break-all">
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank" class="text-blue-500 hover:underline">boring-vault-private</a>
+    </li>
+    <li class="break-words break-all">
+      <b>Pull Request:</b>
+      <a href="{{page.repoUrl}}/pull/185" target="_blank" class="text-blue-500 hover:underline">PR 185</a>
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash (initial):</b>
+      <code>38d1c59d9cabefd51afeb782c819eb1aba1b4ea6</code>
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash (final):</b>
+      <code>f7cf1e81500e9630c2815876db4051060b5e7b5b</code>
+    </li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+  <p>Specifically, we audited the following contract:</p>
+
+  <template type="file-hashes">
+    f9bb285b4a8681f1e88f3dc9cf2fa484c9edf3ec53f63e039bde26c9b6037be0  src/base/Governance/NoSelfCallGuard.sol
+  </template>
+</content-for>
+
+</page>
