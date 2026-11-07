@@ -1,0 +1,17 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">low</field>
+    <field name="chance">medium</field>
+    <field name="status">fixed</field>
+    <field name="commit">f2cd3a59bc71e013f8409365a49ecbf7b1eae37e</field>
+    <field name="content">
+      ## [L-1] Pause cannot halt a single venue
+  
+      In `SafeBorrower.sol`, `pause()` sets the single paused flag checked by `whenNotPaused` on all major actions. These changes allow vaults to interact with multiple venues, where one deployment serves every configured Aave pool, Morpho instance and/or potential forks, so the pauser can only halt all of them at once. On an incident specific to one venue, the pauser must  halt borrowing and collateral withdrawal on every healthy venue, and wait for the owner to configure the market, which is expected to be delayed due to a timelock.
+  
+      **Remediations to Consider**
+  
+      Consider allowing venues to be paused individually as well as globally to allow for handling of venue specific incidents without effecting other healthy venues.
+    </field>
+  </item>
+  
