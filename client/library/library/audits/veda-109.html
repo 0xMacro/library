@@ -1,0 +1,48 @@
+<page
+  clientName="Veda Labs"
+  reportDate="November 11th, 2026"
+  auditTitle="Veda A-109"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/boring-vault-private"
+  layout="/library/audits/_layout.html"
+  issueSummaryFormat="legacy"
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The audit was performed by the Macro security team on November 10th and 11th, 2026.
+</content-for>
+
+<content-for name="spec">
+  <ul>
+    <li>The description of <a href="{{page.repoUrl}}/pull/189" target="_blank" class="text-blue-500 hover:underline">PR 189</a>.</li>
+    <li>LayerZero V2 documentation and source for OFT sends and message options, at the versions deployed on the lanes used by the multihop leaves.</li>
+  </ul>
+</content-for>
+
+<content-for name="repo-info">
+  <ul>
+    <li class="break-words break-all">
+      <b>Repository:</b>
+      <a href="{{page.repoUrl}}" target="_blank" class="text-blue-500 hover:underline">boring-vault-private</a>
+    </li>
+    <li class="break-words break-all">
+      <b>Pull Request:</b>
+      <a href="{{page.repoUrl}}/pull/189" target="_blank" class="text-blue-500 hover:underline">PR 189</a>
+    </li>
+    <li class="break-words break-all">
+      <b>Commit Hash:</b>
+      <code>189eccc98ec50fa803c2eecfcb6e3a38818a959e</code>
+    </li>
+  </ul>
+</content-for>
+
+<content-for name="source-code">
+  <p>Specifically, we audited the following contract:</p>
+
+  <template type="file-hashes">
+    c174c64d80ed5492ba1484a8b62abbd0205aa5362832a798235497120b4790e4  src/base/DecodersAndSanitizers/Protocols/OFTDecoderAndSanitizer.sol
+  </template>
+</content-for>
+
+</page>
