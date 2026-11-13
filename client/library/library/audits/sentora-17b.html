@@ -1,0 +1,49 @@
+<page
+  clientName="Sentora"
+  reportDate="October 21, 2026"
+  auditTitle="Sentora B-17"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Into-The-Block-Corp/ITBKamino"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  passwordEncrypt="env:PAGE_PASS_SENTORA_17B"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on October 10th to 15th 2026.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li class="break-words break-all">
+        <b>The supervised_swap_borrow branch (changes from main at a0de4ac8 to 480c3b85; only the program files within the diff were in scope)</b> </br>
+        Commit Hash: <code>70a87fcb8be88ffba040e9f5a11752f23976ff70</code>
+        <template type="file-hashes">
+            544c6cc968471b155ed233541b8d904000e240d70dbee9c1cd9fadf25bace132  programs/position-manager/src/common/auth_validation.rs
+            80738c2bbbe23d25d913ce42b7d6f23d82e1ffb6dc03ffdd0d6a61e47af5b2c7  programs/position-manager/src/common/constants.rs
+            e38df21db35d5a61d0c77fbd12158ef506f4aa1c08894830929d4eed54d08f35  programs/position-manager/src/common/errors.rs
+            f6ec645cf7d8538e83ef676a296bba3d682b89f43d8381a77b029af2eeab867f  programs/position-manager/src/common/mod.rs
+            2d49eb0e2a7439dffa404cc0933126cfbaec7d717a0aa014523ec57569dac82c  programs/position-manager/src/common/price_guard.rs
+            a0ae9de4f39d1eef61e05490b3393c425e8e871ed7efb7db29e1b4b7b82151bb  programs/position-manager/src/common/swap_cpi.rs
+            6ac06c684674c97bc82a4f59ffbd6f5662f90437fca06aececdba1d6096cb609  programs/position-manager/src/instructions/hold_position/initialize_hold_position.rs
+            7c4dc8da8d3c38b12604f0536f5f248a59cf6d28cded30c6e4039e2d861c43ea  programs/position-manager/src/instructions/hold_position/mod.rs
+            7d88a08c5413495a4f8255a6cc346d0053c06741d11e89e5552fe70e55f09062  programs/position-manager/src/instructions/mod.rs
+            3d3aa802bacfd1d6622a581131e6e8a84e02d5c2c078ead12642fabd38769c2f  programs/position-manager/src/instructions/supervised_loan/initialize_supervised_swap_borrow_position.rs
+            5c35777256fd59b8abb4905ca6f3ba08a25af6d6506a21fc3d99d70157bf4dd2  programs/position-manager/src/instructions/supervised_loan/mod.rs
+            0d34482ea4460de3667f26ce99224513bd1b21a5338ac5ea4719cc7da1539902  programs/position-manager/src/instructions/supervised_loan/swap_position_assets.rs
+            559c7bff4c0953ff8d96a41184293b8021a71bfe9773b93152a77b307b8e031e  programs/position-manager/src/instructions/supervised_loan/transfer_assets.rs
+            83a7a6bbaefd2a8a5c74a4ed0dbb0a9ee8acbde9467e8a2208f5758d3c57d1b8  programs/position-manager/src/instructions/supervised_loan/update_deviation_limit.rs
+            dac5246dcfa2b034df22554ec88c83da533d17eb65d11c624d342123824a53e0  programs/position-manager/src/lib.rs
+            7eabee3772386ad60d20e5d1ffcb42af9b30ea0e6f0bec905082b2b9518e0645  programs/position-manager/src/state/position_config.rs
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
