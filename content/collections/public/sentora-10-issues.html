@@ -1,0 +1,16 @@
+<item>
+    <field name="topic">Documentation</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [Q-1] Function documentation may help integrators
+  
+      Currently there is little function documentation describing functions and the results they return. In the case of functions returning pricing data, which could be used by other protocols or tooling, key information like the decimal scaling of these values should be present to prevent issues from occurring and making it easier to use these functions.
+  
+      **Remediations to Consider**
+  
+      Add function documentation, particularly on functions like [`getPrices()`](https://github.com/Into-The-Block-Corp/ITBMorpho/blob/3adb6725409e7267c6969a71443e4d00d6fb8e51/contracts/0.8.20/ITBMorpho/multiasset/PositionManagerMultiasset.sol#L215-L218) to add context like price decimal scaling, to make it more clear to integrators how to interact with your protocol.
+
+    </field>
+  </item>
+  
