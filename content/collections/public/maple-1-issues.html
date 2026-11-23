@@ -2,7 +2,7 @@
     <field name="topic">Protocol Design</field>
     <field name="impact">medium</field>
     <field name="chance">low</field>
-    <field name="status">ack</field>
+    <field name="status">addressed</field>
     <field name="content">
       ## [M-1] Actors in manual redeem mode may remain in processed but not redeemed state for a long time
   
@@ -10,15 +10,8 @@
   
       As a result, they may have an advantage in certain market conditions when an unrealized loss is about to increase, which they may front-run as they can perform exchange instantly while others would need to go through the withdrawal manager queue.
     </field>
-    <field name="response">
-      We will consider this for the version 2 of the withdrawal mechanism design.
-      
-      Currently, we do not believe this to be a concern, as the manual flow can only be enabled for LPs by the Pool Delegate or Protocol Admins. This will be done only for over-collateralized pools, such as our cash management product where the incentive for parking funds is lower.
-      
-      This flow is also designed for smart contract integrators, so we will ensure that we review the smart contracts ahead of time to see if this would be an issue. As an added precaution, we will ask our Pool Delegates and Protocol Admins to use private RPCs like Flashbots to send any transactions that would reduce the share token exchange rate, to further discourage this issue.
-      
-      If an LP is seen abusing this, we can also revoke their permissions to interact with the share token or not process any future redemption requests.
-    </field>
+    <field name="statusNote">
+      Maple confirmed the manual redemption flow is reserved for an internal Maple contract and will not be enabled for external LPs. With no external actor in manual redeem mode, the front running scenario described above no longer applies, and what remains is a core trust assumption on Maple as a trusted actor.    </field>
   </item>
   
   <item>
