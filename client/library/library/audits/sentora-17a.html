@@ -1,0 +1,72 @@
+<page
+  clientName="Sentora"
+  reportDate="October 21, 2026"
+  auditTitle="Sentora A-17"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Into-The-Block-Corp/ITBAaveV4"
+  layout="/library/audits/_layout.html"
+  customRepoInfo
+  passwordEncrypt="env:PAGE_PASS_SENTORA_17A"
+>
+
+<content-for name="schedule">
+  The security audit was performed by the Macro security team on October 1st to 9th 2026.
+</content-for>
+
+<content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+  </content-for>
+
+<content-for name="repo-info">
+    <ul>
+      <li class="break-words break-all">
+        <b>ITBAaveV4</b> </br>
+        Commit Hash: <code>719d3955ed5890dc41a7dfa218dfd04a13f73ec2</code>
+        <template type="file-hashes">
+            3f4bce140ea6a756afbfe58ced787e4a8a3154d14882bf615ddd07dfdd953d6f  src/contracts/BasePositionManagerV4.sol
+            7c2dbbd31085038123c26d0142439416c107cd987d138d7551a0d7909d96ae87  src/contracts/aaveV4/DataTypesV4.sol
+            b55c2674b6f96d1d91d2b503357a2f8ba5e3dc6db3739c0a76e1a42718131af6  src/contracts/aaveV4/IAaveOracle.sol
+            793ed821384bd5d28fb4d7f2d66f59a982468ab35f8e6c6cd22ab8cbbb8c59ac  src/contracts/aaveV4/IHub.sol
+            0a3d4e34cfd134080c26bf20606cf758c40d514b9392581597ffb66fcb0fde02  src/contracts/aaveV4/ISpoke.sol
+            33059aea454e3c44b983bf50f7e3b320c782c3bef7676972e112edbcc065b7f9  src/contracts/external/etherfi/IDepositAdapter.sol
+            ce9b472ad530ad73be4ffaf89283c3fb91b76eb76b6dce8df2e43cdf6e7c3374  src/contracts/external/etherfi/IWEETH.sol
+            c7562e82fda10f37656c5264c3a8ae098bf23ade93197b5374481f1dca762f83  src/contracts/external/lido/ILido.sol
+            763204b7ae7252704c61f79dafbbf242c6863ce2f3c46d98e1b843c6225071bd  src/contracts/external/lido/IWstETH.sol
+            c1496b716f20b14bf34446187e6407d968102cde506dad440ccac9560c388bc3  src/contracts/external/merkl/IMerkleDistributor.sol
+            57d56791d69db2907b59d01eb57936e81430c0bdc891ba5a83daa55c7abdb2e6  src/contracts/multiasset/IPositionManagerMultiassetV4.sol
+            3e79d08d84452b27a42ac5fbbfc72515743b2b861138a207d5c478d77dbcb805  src/contracts/multiasset/PositionManager1InchLidoMerklOwnable2StepWithShortcutV4.sol
+            2a59defeb0297cd3e886c6935f562300dc682879afe38005b11ab5af7d2e6144  src/contracts/multiasset/PositionManager1InchLidoMerklV4.sol
+            04feca4da82d84f8d0791bdcf69950149f1e3741931c9a60a435ec5a0ef60681  src/contracts/multiasset/PositionManager1InchLidoOwnable2StepWithShortcutV4.sol
+            5946f906362f71fd708830fa95bd57e8845828de5bf974147843348cb38057c5  src/contracts/multiasset/PositionManager1InchLidoV4.sol
+            1c50d444ae9a802bed1204e3eb68bc382a800bfc7cfed5fb58b2abaffb7aac60  src/contracts/multiasset/PositionManager1InchMerklOwnable2StepWithShortcutV4.sol
+            06ab7a64b3546e1561ac5dfcef8ba7ecefc7d4236330a57678d1453106bc80a4  src/contracts/multiasset/PositionManager1InchMerklV4.sol
+            8f1ee5f95c9417d3fd1000054c6c684db99496f8dd18c1d64dcdb898455a3e0b  src/contracts/multiasset/PositionManager1InchOwnable2StepWithShortcutV4.sol
+            f6890e33e5c7bbc5012c63627928707c17dff382422bc0ebbeaa2892728c4ed7  src/contracts/multiasset/PositionManager1InchV4.sol
+            de466521b7bb35c2ce0d0a165a4d508e1f60769dd67e47474276527775381f2a  src/contracts/multiasset/PositionManager1InchweETHMerklOwnable2StepWithShortcutV4.sol
+            dfab81726a59d3168a905bdf832742ca294d95a87d8e0ec2d92193f3f9498243  src/contracts/multiasset/PositionManager1InchweETHMerklV4.sol
+            efb2161a2b4b2dff798d8b6df448f2c7a8f9fb0b6217f3412dd8227e509ab672  src/contracts/multiasset/PositionManager1InchweETHOwnable2StepWithShortcutV4.sol
+            efc75715a1e2ee9abaeb72455d8fbee6483c2a653831b6dc50faf88828bcfeb5  src/contracts/multiasset/PositionManager1InchweETHV4.sol
+            9c3d170d021c77e3b4a328c694c97b0e59f1651ac44b65eb03cf0e734f2a4efc  src/contracts/multiasset/PositionManagerMultiassetV4.sol
+            683ae653a756902012700db10c18b81466d2a423025fabf24a5cd9398c26e6e1  src/contracts/multiasset/libraries/MultiassetMethodsV4.sol
+            881f320b7669be06ea37c96207a8d6bd2a3d6ad22f15db76752f4df5ffb3524f  src/contracts/rewards/UseMerkl.sol
+            3254eb60f6e528c335b7754dbdddefa3825fc7edc15c6c059c08753d71017d4b  src/contracts/single/PositionManagerMerklV4.sol
+            b20d4905c1ee7869370291a69977c0c239ace9398b1f24fb8441075e803f2cd9  src/contracts/single/PositionManagerMerklV4Ownable2StepWithShortcut.sol
+            148035723c5f0156b23486aec9521569ef8048622f1a500448ece5e0b3012acc  src/contracts/single/PositionManagerV4.sol
+            86f0f11aed10e009aa47b2916c7e5c49203115677288fefa06138feab16ac234  src/contracts/single/PositionManagerV4Ownable2StepWithShortcut.sol
+        </template>
+      </li>
+
+      <li class="break-words break-all">
+        <b>ITBSupervisedLoan (commit review: only the changes introduced by the commit below were in scope)</b> </br>
+        Commit Hash: <code>0710da5c6814a4ebfea12769ddeb7de64860d69d</code>
+        <template type="file-hashes">
+            aefbcdb5f6d0e02ad0611821183c940ac560406e84d15f24ffec871b574b80bb  src/@itb/aavev4/contracts/LoanManager.sol
+            7ca2576bb95f3857a726cee2a7a0ce6ecbd11e70cd0f1c626d8b7bd40297117c  src/@itb/aavev4/contracts/LoanManagerOwnable2StepWithShortcut.sol
+        </template>
+      </li>
+    </ul>
+  </content-for>
+</page>
