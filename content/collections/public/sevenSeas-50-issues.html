@@ -1,0 +1,420 @@
+<item>
+    <field name="topic">Protocol Design</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">76c3f12f42ba79b97e086dcb2a21e01506db7f9b</field>
+    <field name="content">
+      ## [H-1] Shares may not be locked for receiver on deposit
+  
+      When a deposit intent is fulfilled by the solver, the user that signed the intent pays the required assets, and a shareLock period is set for this user if the share locking is enforced:
+  
+      ```solidity
+      if (enforceShareLock) {
+          _afterPublicDeposit(depositData.user, depositData.asset, depositData.amountIn, shares, shareLockPeriod);
+      ```
+      Reference: [IntentsTeller.sol#L546-547](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L546-L547)
+  
+      ```solidity
+      function _afterPublicDeposit(
+          address user,
+          ERC20 depositAsset,
+          uint256 depositAmount,
+          uint256 shares,
+          uint256 currentShareLockPeriod
+      ) internal {
+          // Increment then assign as its slightly more gas efficient.
+          uint256 nonce = ++depositNonce;
+          // Only set share unlock time and history if share lock period is greater than 0.
+          if (currentShareLockPeriod > 0) {
+              beforeTransferData[user].shareUnlockTime = uint64(block.timestamp + currentShareLockPeriod);
+              publicDepositHistory[nonce] = keccak256(
+                  abi.encode(user, depositAsset, depositAmount, shares, block.timestamp, currentShareLockPeriod)
+              );
+          }
+          emit Deposit(nonce, user, address(depositAsset), depositAmount, shares, block.timestamp, currentShareLockPeriod);
+      }
+      ```
+      Reference: [IntentsTeller#L590-607](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L590-L607)
+  
+      When a users shares are locked, it prevents shares from being transferred until the period has elapsed. The intent of this is to prevent users from withdrawing immediately and potentially take advantage of arbitrage opportunities, or take short term profit in volatile events of price swings.
+  
+      However, a deposit does not always result in the users receiving the shares, as they can specify a `to` address which is the receiver when calling `boringVault.enter()`:
+  
+      ```solidity
+      vault.enter(depositData.user, depositData.asset, depositData.amountIn, depositData.to, shares);
+      ```
+  
+      Reference: [IntentsTeller.sol#544](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L544)
+  
+      This means that if the user and the receiving to address differ, the receiver is able to bypass the share lock period and thus able to freely transfer and withdraw immediately after receiving their assets.
+  
+      **Remediations to Consider**
+  
+      Do not allow a receiving address to be specified, and send shares to the user instead. Otherwise if you allow a specified receiver and lock their shares as intended it opens up griefing vectors.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">DOS</field>
+    <field name="impact">high</field>
+    <field name="chance">high</field>
+    <field name="status">fixed</field>
+    <field name="commit">f7c0051a2d84bbf16f7d55daaded80ed1e7fd25a</field>
+    <field name="content">
+      ## [H-2] Native token operations will consistently fail
+  
+      The `IntentsTeller` contract is designed to facilitate deposits and withdrawals for `token0` and `token1` as defined by its associated `fluxManager`. However, if `token0` is configured to be the native token (represented by `address(0)`), all deposit and withdrawal operations for this asset will fail.
+  
+      The root cause of this issue lies within the [`_erc20Deposit()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/tellers/IntentsTeller.sol#L525) and [`_erc20Withdraw()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/tellers/IntentsTeller.sol#L553) functions in `IntentsTeller` contract. These functions directly pass the asset's address from `ActionData` to the `enter()` and `exit()` functions of the `BoringVault` contract.
+  
+      The `BoringVault` contract's `enter()` and `exit()` methods are designed to work exclusively with ERC20 tokens. They execute `asset.safeTransferFrom()` and `asset.safeTransfer()` respectively. When `depositData.asset` or `withdrawData.asset` is `address(0)`, these calls will revert because `address(0)` is not a contract and has no functions to call.
+  
+      The highest impact scenario occurs when the contract is deployed with the native token as one of the core assets in the liquidity pool. This would render the primary functionality of depositing and withdrawing that native asset completely inoperable.
+  
+      **Remediations to Consider**
+  
+      To support native assets, the logic in `_erc20Deposit()` and `_erc20Withdraw()` should be updated. When `depositData.asset` corresponds to the native token, the contract should instead use its wrapped ERC20 counterpart (e.g., WETH) for interactions with the `BoringVault`.
+  
+      ```diff
+              vault.enter(
+                      depositData.user, 
+      -				depositData.asset, 
+      +				depositData.asset == address(0) ? nativeWrapper : depositData.asset,
+                      depositData.amountIn, 
+                      depositData.to, 
+                      shares
+              );
+                  
+              vault.exit(
+                      withdrawData.to, 
+      -				withdrawData.asset, 
+      +				withdrawData.asset == address(0) ? nativeWrapper : withdrawData.asset, 
+                      assetsOut, 
+                      withdrawData.user, 
+                      withdrawData.amountIn
+              );
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Signatures</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">e8628d0e7556ad37d55ecced5ebba9e682046550</field>
+    <field name="content">
+      ## [M-1] Signed intents can be used for either deposit or withdrawals
+  
+      [ActionData](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L33-L55) is signed by users to define their intent of depositing or withdrawing and their acceptable parameters. This is then used by a address with the Solver permission to call either [deposit()](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L463-L477) or [withdraw()](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L479-L488). Each validates that intents data user signed it, and hasn’t been used prior, before executing it. Notably the value `isWithdrawal` is signed and verified in [_verifySignedMessage()](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L609-L642), however it is not used to check if the intended function [deposit()](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L463-L477) or [withdraw()](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L479-L488) is executing either. This allows for the solver to ignore the `isWithdrawal` intent and call either function. Typically the Solver is trusted to execute these intents as intended, if a solver were to call the wrong function it would likely be detrimental to the user.
+  
+      **Remediations to Consider**
+  
+      Validate the intended function, [deposit()](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L463-L477) or [withdraw()](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L479-L488) is called based on the `isWithdrawal` value.
+
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Fee Mechanism</field>
+    <field name="impact">high</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5426f94f0fa85580da70c1e99506fe3e46bbd138</field>
+    <field name="content">
+      ## [M-2] Incorrect asset denomination in fee claiming leads to fund misappropriation
+  
+      There is a discrepancy between how performance fees are calculated and claimed. The `pendingFee` is calculated in `rebalance()` [based on the immutable `baseIn0Or1` flag](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L308-L312), which determines whether the fee is denominated in `token0` or `token1`. However, the [`claimFees()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/FluxManager.sol#L139) function takes a `token0Or1` parameter that allows the fee to be paid out in an asset independent of how it was calculated. This allows an admin to withdraw fees in the wrong asset, leading to a misinterpretation of value due to differing token decimals and prices. As the result, admin may mistakenly claim more or less value as fee than expected. Moreover, in extreme case that admin claim way more than expected, it can massively drop the price of BoringVault share.
+  
+      **Remediations to Consider**
+  
+      The `claimFees()` function should not accept a parameter for the token type. It should instead use the `baseIn0Or1` flag to ensure fees are always claimed in the same asset they were denominated in.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Type Mismatch</field>
+    <field name="impact">medium</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">5426f94f0fa85580da70c1e99506fe3e46bbd138</field>
+    <field name="content">
+      ## [L-1] Mismatched data types in function parameters may lead to unexpected behaviour
+  
+      The [`_mint()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L352) function in the `UniswapV4FluxManager` contract defines parameters with data types that are inconsistent with the official [Uniswap V4 documentation](https://docs.uniswap.org/contracts/v4/quickstart/manage-liquidity/mint-position#3-encode-parameters).
+  
+      In `_mint()` function, the `liquidity` parameter is `uint128` while the documentation specifies `uint256`. This unnecessarily restricts the amount of liquidity that can be added.
+  
+      Conversely, `amount0Max` and `amount1Max` are `uint256` instead of `uint128`. When decoding, Uniswap uses a [low-level method](https://github.com/Uniswap/v4-periphery/blob/ad04c9f24a170accf5ea1b2836bbafd514537ca6/src/libraries/CalldataDecoder.sol#L107-L132) instead of a standard `abi.decode`. This means that when the values are greater than `type(uint128).max`, instead of throwing an error, Uniswap will use the 128 least significant bits. As a result, this can lead to unexpected values for `amount0Max` and `amount1Max`.
+  
+      Other functions like [`_burn()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L379), [`_increaseLiquidity()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L391), and [`_decreaseLiquidity()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L413) are also affected by similar issues.
+  
+      **Remediations to Consider**
+      Align the data types in the `_mint()`, `_burn()`, `_increaseLiquidity()`, and `_decreaseLiquidity()` functions with the Uniswap V4 documentation.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Accounting</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2994d483b6d556e7772e4511d2b1657431d24ade</field>
+    <field name="content">
+      ## [L-2] Unclaimed native ETH not included in initial rebalance calculations
+  
+      In [`UniswapV4FluxManager.sol`](https://github.com/Veda-Labs/flux/blob/feat/add-new-teller/src/managers/https://github.com/Veda-Labs/flux/blob/feat/add-new-teller/src/managers/UniswapV4FluxManager.solUniswapV4FluxManager.sol), a user with the strategist role can call [`rebalance()`](https://github.com/Veda-Labs/flux/blob/feat/add-new-teller/src/managers/UniswapV4FluxManager.sol#L221-L315) which allow for adjusting assets in the vault via actions like swapping tokens, providing or removing liquidity. As safeguard to ensure asset value is relatively the same after the call to rebalance, the value before and after is calculated and checked that the delta does not exceed set rebalance deviations. The initial token balances are refreshed before unwrapping any wETH into native ETH before calculating the total assets:
+  
+      ```solidity
+      _refreshInternalFluxAccounting();
+      if (address(token0) == address(0)) {
+          _unwrapAllNative();
+      }
+      uint256 totalSupplyBefore = boringVault.totalSupply();
+      uint256 totalAssetsInBaseBefore = totalAssets(exchangeRate, baseIn0Or1);
+      ```
+      Reference: [UniswapV4FluxManager.sol#L226-231](https://github.com/Veda-Labs/flux/blob/feat/add-new-teller/src/managers/UniswapV4FluxManager.sol#L226-L231)
+  
+      ```solidity
+      /// @notice Refresh internal flux constants.
+      /// @dev For Uniswap V4 this is token0 and token1 contract balances
+      function _refreshInternalFluxAccounting() internal override {
+          token0Balance = address(token0) == address(0)
+              ? SafeCast.toUint128(ERC20(nativeWrapper).balanceOf(address(boringVault)))
+              : SafeCast.toUint128(token0.balanceOf(address(boringVault)));
+          token1Balance = SafeCast.toUint128(token1.balanceOf(address(boringVault)));
+      }
+      ```
+      Reference:  [UniswapV4FluxManager.sol#L179-186](https://github.com/Veda-Labs/flux/blob/feat/add-new-teller/src/managers/UniswapV4FluxManager.sol#L179-L186)
+  
+      However, in the case where the boring vault has a native ETH balance, it will not be included in the token balance initially calculated in [_refreshInternalFluxAccounting()](https://github.com/Veda-Labs/flux/blob/feat/add-new-teller/src/managers/UniswapV4FluxManager.sol#L179-L186), it will however be included after the rebalance as all ETH is wrapped back to wETH before [_refreshInternalFluxAccounting()](https://github.com/Veda-Labs/flux/blob/feat/add-new-teller/src/managers/UniswapV4FluxManager.sol#L179-L186) is called and total assets calculated. This results is potentially inaccurate differences in asset value as a result of the rebalance and could effect whether the rebalance deviation is triggered. Unaccounted for native ETH could result in a rebalance that loses excessive funds to not revert as expected, or if there is an excessive amount of unaccounted for ETH, it could prevent any rebalance occurring as it would trigger the upper rebalance deviation threshold.
+  
+      **Remediations to Consider**
+  
+      In [_refreshInternalFluxAccounting()](https://github.com/Veda-Labs/flux/blob/feat/add-new-teller/src/managers/UniswapV4FluxManager.sol#L179-L186) account for native ETH as well as wETH as required to ensure accurate accounting.
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Signatures</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [L-3] Use nonces for Intents to prevent collision
+  
+      [ActionData](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L33-L55) parameters are signed by users and validated in [_verifySignedMessage()](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L609-L642), where if valid it will mark the digest as used to prevent the signature from being re-used:
+  
+      ```solidity
+      if (usedSignatures[digest]) {
+          revert IntentsTeller__DuplicateSignature();
+      }
+  
+      usedSignatures[digest] = true;
+      ```
+      Reference: [IntentsTeller.sol#L637-641](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L637-L641)
+  
+      However, in the case where the same data is intended to be used multiple times, they will share the same digest and only one can execute. Although this case may be rare, it is good to include the possibility of multiple of the same intents.
+  
+      **Remediations to Consider**
+  
+      Include a nonce in each intent to distinguish from other intents with the same values.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Specifications</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">663c01c6ac95a7b2624c88752ec823184a4eb4dc</field>
+    <field name="content">
+      ## [L-4] Use a Hash Struct for EIP712 signatures
+  
+      Currently parameters in [ActionData](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/tellers/IntentsTeller.sol#L33-L55) are signed by users to agree to an intent to either deposit or withdraw into the boring vault. However, [EIP712](https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct) expects a hash struct to be signed, which includes a type hash which describes the struct being signed, as well as the encoded parameters. This is the expected way to interact with the EIP712 standard to help ensure signatures can only be used for specific actions in a contract.
+  
+      **Remediations to Consider**
+  
+      Include a type hash of the data being signed.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundancy</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">663c01c6ac95a7b2624c88752ec823184a4eb4dc</field>
+    <field name="content">
+      ## [Q-1] Redundant address in EIP-712 signed message
+  
+      The [`_verifySignedMessage()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/tellers/IntentsTeller.sol#L615) function in the `IntentsTeller` contract includes `address(this)` when constructing the EIP-712 message hash. The underlying `_hashTypedDataV4()` function from OpenZeppelin's `EIP712` contract already incorporates the contract's address via the domain separator. Consider excluding `address(this)` when constructing the EIP-712 message hash to avoid redundancy.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundancy</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a32b4af73bd5cf5cf5fd7a5569869c188c707cb1</field>
+    <field name="content">
+      ## [Q-2] Redundant calculations
+  
+      The `getRate()` and `totalAssets()` functions in `FluxManager` contract contain redundant arithmetic, performing division operations where the numerator and denominator share a common factor.
+  
+      1. [managers/FluxManager.sol#L217](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/FluxManager.sol#L217)
+      
+          ```diff
+          -		return uint256(10 ** decimals1).mulDivDown(exchangeRate, 10 ** decimals1);		
+          +		return exchangeRate;
+          ```
+      
+      2. [managers/FluxManager.sol#L187-L189](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/FluxManager.sol#L187-L189)
+      
+          ```diff
+          -		uint256 converted = token1Assets * (10 ** decimals0);
+          -		converted = converted.mulDivDown(10 ** decimals1, exchangeRate);
+          -		converted /= 10 ** decimals1;
+      
+          +		uint256 converted = token1Assets.mulDivDown(10 ** decimals0, exchangeRate);
+          ```
+      
+      3. [managers/FluxManager.sol#L193-L195](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/FluxManager.sol#L193-L195)
+      
+          ```diff
+          -		uint256 converted = token0Assets * (10 ** decimals1);
+          -		converted = converted.mulDivDown(exchangeRate, 10 ** decimals1);
+          -		converted /= 10 ** decimals0;
+      
+          +		uint256 converted = token0Assets.mulDivDown(exchangeRate, 10 ** decimals0);
+          ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundancy</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">1a4e7bce7af166a7b7ea1be99a5bd34222cd7681</field>
+    <field name="content">
+      ## [Q-3] Unused state variables
+  
+      The state variables [`lastPerformanceReview`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/FluxManager.sol#L43), [`performanceReviewFrequency`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/FluxManager.sol#L44), and [`totalSupplyLastReview`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/FluxManager.sol#L47) are declared in `FluxManager` contract but are never utilized. Consider removing these variables will optimize gas usage and improve code clarity.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-1] Inefficient lookup of position data using loops
+  
+      The `UniswapV4FluxManager` contract uses loops in [`_removePositionIfPresent()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L623), [`_incrementLiquidity()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L589), and [`_decrementLiquidity()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L606) functions to find position data. As the number of tracked positions increases, the gas cost for these functions will grow, leading to higher operational costs. The use of loops for searching through an array is the root cause.
+  
+      Consider replacing the loop with a mapping from `positionId` to its index in the `trackedPositions` array. This provides an O(1) lookup, significantly reducing gas costs.
+  
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Redundancy</field>
+    <field name="impact">low</field>
+    <field name="status">ack</field>
+    <field name="content">
+      ## [G-2] Redundant data validation
+  
+      In `FluxManager` contract, the [`getRate()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/FluxManager.sol#L209) function calls [`totalAssets()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/FluxManager.sol#L200) function within its execution path. Both of these functions are decorated with the [`checkDatum`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/FluxManager.sol#L74) modifier. Consequently, when `getRate()` is called and the vault's total supply is non-zero, the `checkDatum` validation, which involves an external call, is performed twice. This redundancy leads to unnecessary gas consumption for core vault operations like deposits and withdrawals.
+  
+      The recommended solution is to remove the `checkDatum` modifier from `getRate` and explicitly perform the validation only within the code paths where the total supply is zero. The following diff illustrates this change:
+  
+      ```diff
+      -   function getRate(uint256 exchangeRate, bool quoteIn0Or1) public view checkDatum(exchangeRate) returns (uint256) {
+      +   function getRate(uint256 exchangeRate, bool quoteIn0Or1) public view returns (uint256) {
+              uint256 ts = boringVault.totalSupply();
+              if (ts == 0) {
+      +		        datum.validateExchangeRateWithDatum(exchangeRate, decimals1, datumLowerBound, datumUpperBound);
+                  if (baseIn0Or1 && quoteIn0Or1) {
+                      return 10 ** decimals0;
+                  } else if (!baseIn0Or1 && quoteIn0Or1) {
+                      return uint256(10 ** decimals0).mulDivDown(10 ** decimals1, exchangeRate);
+                  } else if (baseIn0Or1 && !quoteIn0Or1) {
+                      return uint256(10 ** decimals1).mulDivDown(exchangeRate, 10 ** decimals1);
+                  } else if (!baseIn0Or1 && !quoteIn0Or1) {
+                      return 10 ** decimals1;
+                  } else {
+                      // Generic revert as we will never actually reach this branch.
+                      revert();
+                  }
+              } else {
+                  uint256 ta = totalAssets(exchangeRate, quoteIn0Or1);
+                  return ta.mulDivDown(10 ** decimalsBoring, ts);
+              }
+          }
+      ```
+    </field>
+  </item>
+  
+  <item>
+    <field name="topic">Gas Optimization</field>
+    <field name="impact">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">2994d483b6d556e7772e4511d2b1657431d24ade</field>
+    <field name="content">
+      ## [G-3] Redundant State Variables for Token Balances Cause Gas Inefficiency
+  
+      The state variables [`token0Balance` and `token1Balance`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L98-L99) in `UniswapV4FluxManager` contract cache token balances from `BoringVault`. These balances are immediately refreshed via [`_refreshInternalFluxAccounting()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L182-L185) at the start of every function that uses them, such as [`rebalance()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/managers/UniswapV4FluxManager.sol#L226) in `UniswapV4FluxManager` contract and [`deposit()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/tellers/IntentsTeller.sol#L468)/[`withdraw()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/tellers/IntentsTeller.sol#L484)/[`bulkActions()`](https://github.com/Veda-Labs/flux/blob/ed3472c3ab2dd43451f94fd3b245c75c3f1a1f86/src/tellers/IntentsTeller.sol#L490) in `IntentsTeller` contract.
+  
+      This immediate refresh treats the cached values as transient for a single transaction, making their storage in state redundant and incurring unnecessary `SSTORE` gas costs. This design also adds complexity by requiring developers to manually call the refresh function. Fetching balances directly when needed makes the contract simpler, less error-prone, and more gas-efficient.
+  
+      Consider removing the `token0Balance` and `token1Balance` state variables and the now-obsolete `_refreshInternalFluxAccounting()` function. Instead, fetch balances directly from token contracts inside the functions that use them. This eliminates `SSTORE` costs and simplifies the logic.
+  
+      ```diff
+      -		function _refreshInternalFluxAccounting() internal override {
+      -		    token0Balance = address(token0) == address(0)
+      -		        ? SafeCast.toUint128(ERC20(nativeWrapper).balanceOf(address(boringVault)))
+      -		        : SafeCast.toUint128(token0.balanceOf(address(boringVault)));
+      -		    token1Balance = SafeCast.toUint128(token1.balanceOf(address(boringVault)));
+      -		}
+  
+              function _totalAssets(uint256 exchangeRate)
+                  internal
+                  view
+                  override
+                  returns (uint256 token0Assets, uint256 token1Assets)
+              {
+      -		    token0Assets = token0Balance;
+      -		    token1Assets = token1Balance;
+      +				token0Assets = address(token0) == address(0)
+      +		        ? SafeCast.toUint128(ERC20(nativeWrapper).balanceOf(address(boringVault)))
+      +		        : SafeCast.toUint128(token0.balanceOf(address(boringVault)));
+      +		    token1Assets = SafeCast.toUint128(token1.balanceOf(address(boringVault)));
+          
+                  // Calculate the current sqrtPrice.
+                  uint256 ratioX192 = FullMath.mulDiv(exchangeRate, 2 ** 192, 10 ** decimals0);
+                  uint160 sqrtPriceX96 = SafeCast.toUint160(_sqrt(ratioX192));
+          
+                  // Iterate through tracked position data and aggregate token balances
+                  uint256 positionCount = trackedPositionData.length;
+                  for (uint256 i; i < positionCount; ++i) {
+                      PositionData memory data = trackedPositionData[i];
+                      (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
+                          sqrtPriceX96,
+                          TickMath.getSqrtRatioAtTick(data.tickLower),
+                          TickMath.getSqrtRatioAtTick(data.tickUpper),
+                          data.liquidity
+                      );
+                      token0Assets += amount0;
+                      token1Assets += amount1;
+                  }
+              }
+      ```
+    </field>
+  </item>
+  

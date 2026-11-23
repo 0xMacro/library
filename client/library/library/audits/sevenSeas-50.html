@@ -1,0 +1,54 @@
+<page
+  clientName="Seven Seas"
+  reportDate="June 30, 2025"
+  auditTitle="Seven Seas A-50"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/Veda-Labs/flux"
+  layout="/library/audits/_layout.html" 
+  customRepoInfo
+>
+
+<content-for name="schedule">
+  The security audit performed by the Macro security team over multiple days starting June 16th-20th, 2025.
+</content-for>
+
+  <content-for name="spec">
+    <ul>
+      <li>Discussions with the {{page.clientName}} team.</li>
+      <li>Available documentation in the repository.</li>
+    </ul>
+
+    <template type="audit-markdown">
+      
+        ## Trusted Entities:
+        Solver: Executes users signed intents to deposit or withdraw from the vault. They are trusted to execute these orders in a timely manner.
+
+        Strategist: Can call [rebalance()](https://github.com/Veda-Labs/flux/blob/2085f721c4a2d66b41b2d6411115aa4f2759788d/src/managers/UniswapV4FluxManager.sol#L221-L315) to adjust assets in the vault. Allows them to swap tokens via accepted aggregators or directly with the corresponding uniswapV4 pool, as well as provide or remove liquidity. A portion of the profits from these rebalances, typically via rewards earned by providing liquidity, are distributed to the set `payout` address. It is trusted that they act in the best interest of the protocol, and to not manipulate the vault to extract profit.
+
+        Admin: Can set the rebalance deviations, performance fees, payout address, the price oracle and trusted aggregators, Is trusted to set reasonable values, and set proper aggregators and price oracles. It is understood that a malicious aggregator or oracle could be used to extract value from the vault.
+
+        Multisig: Can pause and unpause the Intents teller and the flux manager, preventing deposits, withdrawals or rebalancing. They are trusted to only pause these contracts when necessary.
+
+        Owner: Can set deposit and withdrawal asset data, share lock period and intent max deadlines, as well as control permissioned operators as well as allowing and denying transfers for select users. They are trusted to set proper values that benefit the protocol, as well as only freeze transfers of those that are adversely effecting the protocol or its users.
+
+        Denier: Can allow or deny users and operators to transfer shares. Like the owner is trusted to only freeze a users assets when necessary and in the interest of the protocol.
+         </template>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+
+      <li class="break-words break-all">
+        Commit Hash: <code>2085f721c4a2d66b41b2d6411115aa4f2759788d</code>
+        <template type="file-hashes">
+            68b602725125a157c3082905e18c9d779451ca3b197f6502807cace96ad2a141  src/datums/ChainlinkDatum.sol
+            2ccc468b04d7fe0784f1aab6c3bbc1003b1ed029eb9111764e06f7f33afce119  src/managers/FluxManager.sol
+            de5b12678a827c5e44324abccff7f5aa6e8eb866716945006f77d0dec643f431  src/managers/UniswapV4FluxManager.sol
+            e78f1de1061ca64c3c0637e5a3f84a28757e22267144014cfad850da344f4fa8  src/tellers/IntentsTeller.sol
+        </template>
+      </li>
+     
+      
+    </ul>
+  </content-for>
+</page>
