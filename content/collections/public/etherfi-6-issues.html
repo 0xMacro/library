@@ -1,0 +1,117 @@
+<item>
+  <field name="topic">HyperCore integration</field>
+  <field name="impact">medium</field>
+  <field name="chance">high</field>
+  <field name="status">fixed</field>
+  <field name="commit">28747bb6aa8c87cba92498cd4925545bbbe9d8fb</field>
+  <field name="statusNote">This issue was identified by the development team during additional testing against portfolio margin account. </field>
+  <field name="content">
+      ## [M-1] Spot sell guard rejects every sell under portfolio margin
+
+      In `HyperliquidSafeTrader.sol` contract, `_checkSpotSellBalance()` function reads the sellable amount from the spot balance precompile and reverts when the order size exceeds `total - hold`. Under portfolio margin, HyperCore automatically supplies idle spot balances to the borrow lend pool, and the spot balance precompile then reports those balances as zero. The guard therefore computes a sellable amount of zero and every call to `rateLimitedSellSpot()` reverts with `SpotSellExceedsAvailableBalance`, precisely in the mode the strategy is built for.
+
+      ```solidity
+      function _checkSpotSellBalance(uint64 size) internal view {
+          SpotBalance memory balance = abi.decode(_readHyperCore(SPOT_BALANCE_PRECOMPILE, abi.encode(address(this), spotTokenIndex)), (SpotBalance));
+          uint256 availableWei = balance.total > balance.hold ? uint256(balance.total - balance.hold) : 0;
+          uint256 availableSize = spotWeiDecimals <= 8 ? availableWei * 10 ** (8 - spotWeiDecimals) : availableWei / 10 ** (spotWeiDecimals - 8);
+          if (size > availableSize) revert SpotSellExceedsAvailableBalance(size, availableSize);
+      }
+      ```
+
+      **Reference:** HyperliquidSafeTrader#L475-480
+
+      The consequence is a liveness failure of the operational path rather than a loss of funds. The operational strategist cannot reduce the spot leg through the guarded function, so any spot unwind, including an emergency one, has to go through the secure multisig via the unguarded `limitOrder()`. The revert is atomic and explicit, so no bucket or cooldown is consumed and the contract gives a clear stop signal, and the backend is expected to treat it as one.
+
+  </field>
+</item>
+
+<item>
+  <field name="topic">HyperCore integration</field>
+  <field name="impact">medium</field>
+  <field name="chance">medium</field>
+  <field name="status">fixed</field>
+  <field name="commit">a91006874a81f85229b301a725a3bdd6b07e6474</field>
+  <field name="statusNote">Fixed in PR 38 (head a910068): spot buy cap on spendable USDC, paired grow and shrink functions with the hedge margin reserved at buy time, collateral lock subtracted from the sellable balance, per order type hedge imbalance bands, and a single shared cooldown. Verified against live portfolio margin accounts.</field>
+  <field name="content">
+      ## [M-2] Grow path can open USDC borrows under portfolio margin
+
+      In `HyperliquidSafeTrader.sol` contract, `_checkSpotSellBalance()` function guards the sell side against HyperCore opening a borrow for an oversized order, but under portfolio margin the borrow cannot happen on that side. Only the quote stablecoins are borrowable. HYPE and BTC are collateral only, so a sell above the balance is rejected by HyperCore rather than borrowed. The borrow happens instead when `rateLimitedBuySpot()` is submitted with less USDC than the order costs, or `rateLimitedShortPerp()` with less than the required initial margin: HyperCore borrows the shortfall in USDC against the HYPE or BTC collateral at its loan to value ratio and fills the order. Neither function checks balance or margin, so the operational key can put the account into USDC debt through ordinary orders.
+
+      ```solidity
+      function rateLimitedBuySpot(uint64 limitPrice, uint64 size, uint128 cloid) external onlySubvault {
+          ...
+          _checkSlippage(limitPrice, referencePrice, maxSlippageBps[RateLimitType.SPOT_GROW], true);
+          _consumeRateLimit(RateLimitType.SPOT_GROW, truncatedSize, referencePrice);
+          _sendHyperCoreAction(ACTION_LIMIT_ORDER, abi.encode(spotAsset, true, limitPrice, truncatedSize, false, TIF_IOC, cloid));
+      }
+      ```
+
+      **Reference:** HyperliquidSafeTrader#L324-336 and #L357-368
+
+      The debt accrues interest continuously at the stablecoin borrow rate, and because the `HYPE` bought becomes collateral for the next purchase, repeated buys can lever the position to roughly 2.5 times the starting size within the LTV limit. Doubling a hedged position on borrowed USDC lifts the portfolio margin ratio from about 0.05 to about 0.60 before any price move, potentially cutting a price rally that could reach liquidation from roughly 340 percent to roughly 120 percent.
+
+      While the borrow is outstanding, HyperCore also holds part of the HYPE as collateral and rejects sells of it. The spot balance precompile reports zero for both `total` and `hold` in this mode, and the borrow lend precompile reports the full supplied balance, but part of it is not available because it’s locked collateral. A sell order including this balance is then rejected by HyperCore, consuming the bucket and cooldown.
+  </field>
+</item>
+
+<item>
+    <field name="topic">Configuration</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">fixed</field>
+    <field name="commit">a15a4dcb305b957f161fea198f9fa75a7cc45db0</field>
+    <field name="content">
+        ## [L-1] Potential misconfiguration edge cases
+
+        In `HyperliquidSafeTrader.sol` contract, there are multiple potential misconfigurations that can silently pass and leave the contract in an undesired state. Three setting values pass validation, look correct on-chain, and silently disable a guard or brick an action, recoverable by the owner reconfiguring:
+
+        - `refillRate == 0` in `configureRateLimit()`, the bucket never refills and becomes a one time budget. This fails silently and late, behaving correctly until capacity is first exhausted.
+        - `maxOrderNotional < MIN_ORDER_NOTIONAL` in `configureRateLimit()`, every order of that type reverts with `OrderNotionalBelowMinimum` or `MaxOrderNotionalExceeded` depending on the order notional.
+        - `minimumOrderDelayBlocks == 0` in `constructor()`, this renders a non-cooldown scenario, so the same order type can be submitted repeatedly in one block against the same stale balance read.
+
+        None of these cases are externally exploitable, all require a trusted owner or deployer to enter a wrong value.
+
+        ### Remediations to Consider
+
+        Consider adding require statements for these configuration cases to avoid mistaken or wrong values being set.
+    </field>
+  </item>
+
+  <item>
+    <field name="topic">Configuration</field>
+    <field name="impact">low</field>
+    <field name="chance">low</field>
+    <field name="status">ack</field>
+    <field name="response">We are fine accepting the loss of dust in these cases.</field>
+    <field name="content">
+
+        ## [L-2] `depositTokenToHyperCore()` burns sub unit deposit dust
+
+        In `HyperliquidSafeTrader.sol` contract, when a linked token is deposited to HyperCore via `depositTokenToHyperCore()` function, the node credits only the round portion of the transferred amount and permanently burns the remainder. Per the Hyperliquid HyperCore to HyperEVM transfers documentation: 
+
+        > If the EVM contract has extra Wei decimals, then if the relevant log emitted has a value that is not round (does not end in `extraEvmWeiDecimals` zeros), the non-round amount is burned (guaranteed to be <1 Wei). This is true for both HYPE and any other spot tokens.
+        > 
+        
+        **Source:** Hyperliquid Docs
+        
+        The function reads `TokenInfo` and already holds `evmExtraWeiDecimals` in memory, but transfers `hyperevmAmount` unchecked, so any sub Core unit remainder is silently lost.
+        
+        ```solidity
+        TokenInfo memory tokenInfo = abi.decode(_readHyperCore(TOKEN_INFO_PRECOMPILE, abi.encode(tokenIndex)), (TokenInfo));
+        hyperevmAsset = tokenInfo.evmContract;
+        if (hyperevmAsset == address(0)) revert SpotAssetNotLinked();
+        SafeTransferLib.safeTransfer(hyperevmAsset, systemAddress, hyperevmAmount);
+        ```
+        
+        **Reference:** HyperliquidSafeTrader#L269-280
+        
+        The impact is almost negligible. The loss is guaranteed below one Core wei unit per call (at most `10 ** -weiDecimals` of a token), is zero for most basis assets (`BTC`, `HYPE`, `USDC` and `USDT0` all have `evmExtraWeiDecimals <= 0`), and applies only to tokens with `evmExtraWeiDecimals > 0` (meme and HIP tokens such as `PURR` at 13, `HFUN` at 10).
+        
+        ### Remediations to Consider
+        
+        - Round `hyperevmAmount` down to a multiple of `10 ** evmExtraWeiDecimals` before transfer (keeping the remainder in the contract) for tokens with positive `evmExtraWeiDecimals`.
+        - Alternatively, given the low impact, accept the behavior and simply document it as a known dust pitfall so operators are aware, optionally having the backend pre-round deposit amounts off-chain.
+    </field>
+  </item>
+  
