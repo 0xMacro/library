@@ -1,0 +1,77 @@
+<page
+  clientName="KatanaPerps"
+  reportDate="November 23rd, 2026"
+  auditTitle="KatanaPerps A-2"
+  auditVersion="1.0.0"
+  repoUrl="https://github.com/katanaperps/katana-perps-contracts-niseko-ma"
+  repoCommitHashFinal="cc97a1aab3921db52bd6a639051d43b5c12760b1"
+  layout="/library/audits/_layout.html"
+  issueSummaryFormat="legacy"
+  passwordEncrypt="env:PAGE_PASS_KATANAPERPS_1"
+  customRepoInfo
+  customReviewInfo
+>
+  <content-for name="schedule">
+    The security audit was performed by the Macro security team from October 19th to October 28th, 2026.
+  </content-for>
+  <content-for name="spec">
+    <ul>
+      <li>Discussions on Slack with the {{page.clientName}} team.</li>
+      <li>Documentation files contained in the repo.</li>
+    </ul>
+  </content-for>
+
+  <content-for name="repo-info">
+    <ul>
+      <li>
+        <b>Repository:</b>
+        <a href="{{page.repoUrl}}" target="_blank">
+          {{page.repoUrl.split('/').slice(-1)[0]}}
+        </a>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash of Part 1 (Managed Account Updates):
+        <code>8254175b1118296e2e1a3a7232bfa83c9247d94c</code>
+      </li>
+      <li class="break-words break-all">
+        Commit Hash of Part 2 (Profit Sharing Vault):
+        <code>59ef75eacae9b0bb196bebcb759bf3decf57a3a9</code>
+      </li>
+
+    </ul>
+  </content-for>
+
+  <content-for name="source-code">
+    <p>For part 1, we audited the changes between commits <code>0cecbcd</code> and <code>8254175</code> for the following contracts:</p>
+
+    <template type="file-hashes">
+17d5ee9cc2e327c1b954a093de9fac25fe82626f37d6c5d0d2f05471cc1cf1fa  contracts/index-price-adapters/ChainlinkDataStreamsIndexPriceAdapter_v3.sol
+524ef77babc2543d7550b39c21d53bdfcc1b96cd0baa4e5d61327919c4f13f4a  contracts/index-price-adapters/KatanaPerpsIndexPriceAdapter_v3.sol
+3267ec770ddd73142c4983371fc12f682eb20f13172ee8c639be867dd52bc5ac  contracts/managed-accounts/libraries/FixedIncomeVaultConstants_v1.sol
+3508e3abf2efbcdc3ef0bdb311a4e500a85ac3a6198e32c25a08cc8945d2766f  contracts/managed-accounts/libraries/FixedIncomeVaultCreation_v1.sol
+2e767dc20eca9173d95102ade2730a31e767724fb40927c7ba7aad2d38ab03a4  contracts/managed-accounts/libraries/FixedIncomeVaultInterestCalculation_v1.sol
+aa8d186181a84b19d49f0db55b49c682a94912905120b255bb7ba9940bca96eb  contracts/managed-accounts/libraries/FixedIncomeVaultWithdrawing_v1.sol
+c1162984a4da273edda15105a8d7277f083dd7ac05cf1103ce4c76e5f1d86d0e  contracts/managed-accounts/libraries/VaultDepositQueue.sol
+2b51f7f90957df400b21fbf74d57d0484dcaeabb5a3e27bb66ed5746b4ff9cbe  contracts/managed-accounts/libraries/VaultProviderBaseWithdrawing.sol
+4a2246cad46a80017c441eaa9d2cfd647166d40a5fb938f7b3b96f1cf56e6719  contracts/managed-accounts/FixedIncomeVaultProvider_v1.sol
+dbbd79d3e14bb30e0c7f51580851425f4e65e1248ebefdbc88909df349611198  contracts/managed-accounts/VaultProviderBase.sol
+945243d6e1de3439957ef0a51a668622ade44a9079ea3df30c55a9ba2d25c14c  contracts/oracle-price-adapters/AggregatingOraclePriceAdapter_v1.sol
+    </template>
+
+    <p>For part 2, we audited the following contracts:</p>
+
+    <template type="file-hashes">
+6dcc10d9762e2121474282239c664f546ca2d4c32f3b76425683def6aa31dcfc  contracts/libraries/Math.sol
+9365f47cae4ed26c4dc15cf2451cf1e7f63fd20ea82c2062ece1fb1bd644bf35  contracts/managed-accounts/libraries/ProfitShareVaultConstants_v1.sol
+56a22b5e5c81c868c45e9df1ac42693ebf000d4b7de7c653d394fd617b10d6c4  contracts/managed-accounts/libraries/ProfitShareVaultCreation_v1.sol
+4d77b9916d6d85ff021405740bc728f467de92fc4869d3f70d25bc208b8645ff  contracts/managed-accounts/libraries/ProfitShareVaultManagementFeeCalculation_v1.sol
+209a5f60f75078e457a65618a847a9c58f123098aeb7f3ec349a50526ba38dff  contracts/managed-accounts/libraries/ProfitShareVaultWithdrawing_v1.sol
+780f139774b0f40d25babc82b8034576c359a9c643490cf4afbf0fbad9e32b23  contracts/managed-accounts/libraries/FixedIncomeVaultInterestCalculation_v1.sol
+0f2dd944791dd55a19a679c18fe49fee5bc72a5857c8d061d1f962c003b38775  contracts/managed-accounts/libraries/VaultWithdrawalQueue.sol
+19bb261cfd47b235a2755237f2f8627b0989fccc04aa0db41a9ed07998bd2716  contracts/managed-accounts/FixedIncomeVaultProvider_v1.sol
+b252d9b77ad9c7d6be347f415aac3195b91a3a78d30c76e9c3ba12a9781b8eab  contracts/managed-accounts/ProfitShareVaultProviderStateAggregator_v1.sol
+d23d37c4b30cabdfac4bc5f56477c0b99c4d94e75a31c0147d8dbaa5d64a7bfe  contracts/managed-accounts/ProfitShareVaultProvider_v1.sol
+    </template>
+
+  </content-for>
+</page>
